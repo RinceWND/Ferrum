@@ -111,11 +111,11 @@
          call read_tsclim_monthly_pnetcdf_obs
      $        ( rm_b, tc_b, sc_b, "ts_clim_old.nc", mon_b )
      
-         call read_wind_monthly_pnetcdf
-     $        ( uw_a, vw_a,       "sfrc_old.nc",    mon_a )
-
-         call read_wind_monthly_pnetcdf
-     $        ( uw_b, vw_b,       "sfrc_old.nc",    mon_b )
+!         call read_wind_monthly_pnetcdf
+!     $        ( uw_a, vw_a,       "sfrc_old.nc",    mon_a )
+!
+!         call read_wind_monthly_pnetcdf
+!     $        ( uw_b, vw_b,       "sfrc_old.nc",    mon_b )
 
 !         write( infile_a, '( "ssts",i2.2,".nc" )' ) mon_a
 !         call read_ssts_monthly_pnetcdf
@@ -227,8 +227,8 @@
 !     $        ( tm_b, sm_b, tc_b, sc_b, "ts_clim.nc", mon_b )
          call read_tsclim_monthly_pnetcdf_obs
      $        ( rm_b, tc_b, sc_b, "ts_clim_old.nc", mon_b )
-         call read_wind_monthly_pnetcdf
-     $        ( uw_b, vw_b,       "sfrc_old.nc",    mon_b )
+!         call read_wind_monthly_pnetcdf
+!     $        ( uw_b, vw_b,       "sfrc_old.nc",    mon_b )
 
 !         write( infile_b, '( "ssts",i2.2,".nc" )' ) mon_b
 !         call read_ssts_monthly_pnetcdf
@@ -249,8 +249,8 @@
 !      smean = ( 1.0 - aa ) * sm_a + aa * sm_b
       rmean = ( 1.0 - aa ) * rm_a + aa * rm_b
       
-      wusurf = ( 1.0 - aa ) * uw_a + aa * uw_b
-      wvsurf = ( 1.0 - aa ) * vw_a + aa * vw_b      
+!      wusurf = ( 1.0 - aa ) * uw_a + aa * uw_b
+!      wvsurf = ( 1.0 - aa ) * vw_a + aa * vw_b
 
       tsurf = ( 1.0 - aa ) * tsurf_a + aa * tsurf_b
       ssurf = ( 1.0 - aa ) * ssurf_a + aa * ssurf_b

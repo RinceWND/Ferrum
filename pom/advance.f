@@ -477,8 +477,8 @@
 !eda: this was the place where Lin et al. assimilate drifters
 !eda: /home/xil/OIpsLag/gomc27_test87d_hcast2me_pseudo1.f
 !     IF(MOD(IINT,16).EQ.0) THEN   ! 16 = 3.*3600./dti, every 3 hours
-c--      IF(iint.eq.1 .or. MOD(IINT,16).EQ.0) THEN
-c--      IF(MOD(IINT,IASSIM).EQ.0) THEN
+!--      IF(iint.eq.1 .or. MOD(IINT,16).EQ.0) THEN
+!--      IF(MOD(IINT,IASSIM).EQ.0) THEN
 !        call assimdrf_OIpsLag(time, itime1, mins, sec, 
 !    1     IM, JM, KB, u, v, Nx, Ny, beta, alon, alat, zz, D,
 !    2     igs, ige, jgs, jge, ndrfmax,
