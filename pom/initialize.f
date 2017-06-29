@@ -480,7 +480,7 @@
 ! read grid 
 !lyomoving:call idealized setup subr instead of reading grid:
 !
-      call read_grid_pnetcdf_obs
+      call read_grid_pnetcdf !_obs
 !     The followings are read in read_grid_pnetcdf:
 !     z,zz,dx,dy
 !     east_u,east_v,east_e,east_c
@@ -583,11 +583,11 @@
 
 ! read initial temperature and salinity from ic file
 !      call read_initial_ts_pnetcdf(kb,tb,sb)
-!      call read_clim_ts_pnetcdf(tb,sb,n)
-      call read_clim_ts_pnetcdf_obs(tb,sb,rho,n)
+      call read_clim_ts_pnetcdf(tb,sb,n)
+!      call read_clim_ts_pnetcdf_obs(tb,sb,rho,n)
 
 ! read annual-mean, xy-ave t,sclim if avail !lyo:20110202:
-      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean_old.nc"
+      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean.nc"
       inquire(file=trim(netcdf_ic_file),exist=fexist)
       if(fexist) then  !annual-mean xy-ave t,sclim
       call read_mean_ts_pnetcdf(tclim,sclim,n)
