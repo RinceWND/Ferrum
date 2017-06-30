@@ -416,7 +416,7 @@
       integer(mpi_offset_kind) start(3),edge(3)
 
 ! create netcdf restart file
-      nprint=int((iint+time0*86400/dti)/irestart)
+      nprint=int((iint+time0*86400./dti)/irestart)
 !      write(netcdf_out_file,'(''out/'',a,''.'',i4.4,''.nc'')') 
 !     $     trim(write_rst_file),nprint
       if(my_task.eq.0) write(*,'(/''writing file '',a)')

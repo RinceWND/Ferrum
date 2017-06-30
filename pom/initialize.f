@@ -185,35 +185,35 @@
 
 ! Reference density (recommended values: 1025 for seawater,
 ! 1000 for freswater; S.I. units):
-      rhoref=1025.e0
+      rhoref=1025.
 
 ! Temperature bias (deg. C)
-      tbias=0.e0
+      tbias=0.
 
 ! Salinity bias
-      sbias=0.e0
+      sbias=0.
 
 ! gravity constant (S.I. units)
-      grav=9.806e0
+      grav=9.806
 
 ! von Karman's constant
-      kappa=0.4e0
+      kappa=0.4
 
 ! Bottom roughness (metres)
-      z0b=.01e0
+      z0b=.01
 
 ! Minimum bottom friction coeff.
-      cbcmin=.0025e0
+      cbcmin=.0025
 
 ! Maximum bottom friction coeff.
       cbcmax=5. !1.e0   !lyo:20110315:botwavedrag:
 
 ! Smagorinsky diffusivity coeff.
-      horcon=0.2e0  !lyo:pac10:exp004: !=0.1e0
+      horcon=0.2  !lyo:pac10:exp004: !=0.1e0
 
 ! Inverse horizontal turbulent Prandtl number (ah/am; dimensionless):
 ! NOTE that tprni=0.e0 yields zero horizontal diffusivity!
-      tprni=.2e0
+      tprni=.2
        
 
 ! Background viscosity used in subroutines profq, proft, profu and
@@ -222,13 +222,13 @@
 
 ! Maximum magnitude of vaf (used in check that essentially tests
 ! for CFL violation):
-      vmaxl=5.e0 !lyo:debug:100.e0
+      vmaxl=5. !lyo:debug:100.e0
 
 ! Maximum allowable value of:
 !   <difference of depths>/<sum of depths>
 ! for two adjacent cells (dimensionless). This is used in subroutine
 ! slpmax. If >= 1, then slpmax is not applied:
-      slmax=2.e0
+      slmax=2.
 
 ! Water type, used in subroutine proft.
 !    ntp    Jerlov water type
@@ -262,15 +262,15 @@
 
 ! Constant in temporal filter used to prevent solution splitting
 ! (dimensionless):
-      smoth=0.10e0
+      smoth=0.10
 
 ! Weight used for surface slope term in external (2-D) dynamic
 ! equation (a value of alpha = 0.e0 is perfectly acceptable, but the
 ! value, alpha=.225e0 permits a longer time step):
-      alpha=0.225e0
+      alpha=0.225
 
 ! Initial value of aam:
-      aam_init=500.e0
+      aam_init=500.
 
 
 ! read input namelist
@@ -287,19 +287,19 @@
 
 ! calculate some constants
       small=1.e-10           ! Small value
-      pi=atan(1.e0)*4.e0    ! PI
+      pi=atan(1.)*4.    ! PI
 
       dti=dte*float(isplit)
       dte2=dte*2
       dti2=dti*2
 
-      iend=max0(nint(days*24.e0*3600.e0/dti),2)
-      iprint=nint(prtd1*24.e0*3600.e0/dti)
-      irestart=nint(write_rst*24.e0*3600.e0/dti)
-      iprints=nint(prtd2*24.e0*3600.e0/dti) !fhx:20110131:add 3hrly output
+      iend=max0(nint(days*24.*3600./dti),2)
+      iprint=nint(prtd1*24.*3600./dti)
+      irestart=nint(write_rst*24.*3600./dti)
+      iprints=nint(prtd2*24.*3600./dti) !fhx:20110131:add 3hrly output
 
-      ispi=1.e0/float(isplit)
-      isp2i=1.e0/(2.e0*float(isplit))
+      ispi=1./float(isplit)
+      isp2i=1./(2.*float(isplit))
 
 ! initialise time
 ! Calulate the Julian days from 1992-01-01 !fhx:20110113
@@ -685,7 +685,7 @@
       endif
 
 !     Radiation factors for use in subroutine bcond !alu:20101216 
-      rfe=1.e0; rfw=1.e0; rfn=1.e0; rfs=1.e0 !=1 Flather; =0 clamped
+      rfe=1.; rfw=1.; rfn=1.; rfs=1. !=1 Flather; =0 clamped
 
 ! Periodic in "x" and/or "y"?  !lyo:20110224:alu:stcc:
 !     iperx.ne.0 if x-periodic; ipery.ne.0 if y-periodic               !

@@ -91,7 +91,7 @@
      
 !          wvsurf(i,j)=0.e0
 
-          e_atmos(i,j)=0.e0
+          e_atmos(i,j)=0.
 !          vfluxf(i,j)=0.e0
 
 ! set w(i,j,1)=vflux(i,j).ne.0 if one wishes non-zero flow across
@@ -120,7 +120,7 @@
 
 ! set the salinity of water vapor/precipitation which enters/leaves
 ! the atmosphere (or e.g., an ice cover)
-          satm=0.e0
+          satm=0.
 !          wssurf(i,j)=            vfluxf(i,j)*(satm-s(i,j,1)-sbias)
 
         end do
@@ -171,10 +171,10 @@
               aam(i,j,k)=horcon*dx(i,j)*dy(i,j)*aamfac(i,j)       !fhx:incmix
      $                    *sqrt( ((u(i+1,j,k)-u(i,j,k))/dx(i,j))**2
      $                          +((v(i,j+1,k)-v(i,j,k))/dy(i,j))**2
-     $                    +.5e0*(.25e0*(u(i,j+1,k)+u(i+1,j+1,k)
+     $                    +.5*(.25*(u(i,j+1,k)+u(i+1,j+1,k)
      $                                 -u(i,j-1,k)-u(i+1,j-1,k))
      $                    /dy(i,j)
-     $                    +.25e0*(v(i+1,j,k)+v(i+1,j+1,k)
+     $                    +.25*(v(i+1,j,k)+v(i+1,j+1,k)
      $                           -v(i-1,j,k)-v(i-1,j+1,k))
      $                    /dx(i,j)) **2)
             end do
@@ -210,11 +210,11 @@
 
         do j=1,jm
           do i=1,im
-            adx2d(i,j)=0.e0
-            ady2d(i,j)=0.e0
-            drx2d(i,j)=0.e0
-            dry2d(i,j)=0.e0
-            aam2d(i,j)=0.e0
+            adx2d(i,j)=0.
+            ady2d(i,j)=0.
+            drx2d(i,j)=0.
+            dry2d(i,j)=0.
+            aam2d(i,j)=0.
           end do
         end do
 
@@ -424,12 +424,12 @@
       integer i,j,k
       real(kind=rk) dxr,dxl,dyt,dyb
 
-      if((iint.ne.1.or.time0.ne.0.e0).and.mode.ne.2) then
+      if((iint.ne.1.or.time0.ne.0.).and.mode.ne.2) then
 
 ! adjust u(z) and v(z) such that depth average of (u,v) = (ua,va)
         do j=1,jm
           do i=1,im
-            tps(i,j)=0.e0
+            tps(i,j)=0.
           end do
         end do
 
@@ -452,7 +452,7 @@
 
         do j=1,jm
           do i=1,im
-            tps(i,j)=0.e0
+            tps(i,j)=0.
           end do
         end do
 
@@ -496,8 +496,8 @@
         do k=1,kb
           do j=1,jm
             do i=1,im
-              uf(i,j,k)=0.e0
-              vf(i,j,k)=0.e0
+              uf(i,j,k)=0.
+              vf(i,j,k)=0.
             end do
           end do
         end do
@@ -517,11 +517,11 @@
           do j=1,jm
             do i=1,im
               q2(i,j,k)=q2(i,j,k)
-     $                   +.5e0*smoth*(uf(i,j,k)+q2b(i,j,k)
-     $                                -2.e0*q2(i,j,k))
+     $                   +.5*smoth*(uf(i,j,k)+q2b(i,j,k)
+     $                                -2.*q2(i,j,k))
               q2l(i,j,k)=q2l(i,j,k)
-     $                   +.5e0*smoth*(vf(i,j,k)+q2lb(i,j,k)
-     $                                -2.e0*q2l(i,j,k))
+     $                   +.5*smoth*(vf(i,j,k)+q2lb(i,j,k)
+     $                                -2.*q2l(i,j,k))
               q2b(i,j,k)=q2(i,j,k)
               q2(i,j,k)=uf(i,j,k)
               q2lb(i,j,k)=q2l(i,j,k)
@@ -563,11 +563,11 @@
             do j=1,jm
               do i=1,im
                 t(i,j,k)=t(i,j,k)
-     $                    +.5e0*smoth*(uf(i,j,k)+tb(i,j,k)
-     $                                 -2.e0*t(i,j,k))
+     $                    +.5*smoth*(uf(i,j,k)+tb(i,j,k)
+     $                                 -2.*t(i,j,k))
                 s(i,j,k)=s(i,j,k)
-     $                    +.5e0*smoth*(vf(i,j,k)+sb(i,j,k)
-     $                                 -2.e0*s(i,j,k))
+     $                    +.5*smoth*(vf(i,j,k)+sb(i,j,k)
+     $                                 -2.*s(i,j,k))
                 tb(i,j,k)=t(i,j,k)
                 t(i,j,k)=uf(i,j,k)
                 sb(i,j,k)=s(i,j,k)
@@ -593,7 +593,7 @@
 
         do j=1,jm
           do i=1,im
-            tps(i,j)=0.e0
+            tps(i,j)=0.
           end do
         end do
 
@@ -601,7 +601,7 @@
           do j=1,jm
             do i=1,im
               tps(i,j)=tps(i,j)
-     $                  +(uf(i,j,k)+ub(i,j,k)-2.e0*u(i,j,k))*dz(k)
+     $                  +(uf(i,j,k)+ub(i,j,k)-2.*u(i,j,k))*dz(k)
             end do
           end do
         end do
@@ -610,15 +610,15 @@
           do j=1,jm
             do i=1,im
               u(i,j,k)=u(i,j,k)
-     $                  +.5e0*smoth*(uf(i,j,k)+ub(i,j,k)
-     $                               -2.e0*u(i,j,k)-tps(i,j))
+     $                  +.5*smoth*(uf(i,j,k)+ub(i,j,k)
+     $                               -2.*u(i,j,k)-tps(i,j))
             end do
           end do
         end do
 
         do j=1,jm
           do i=1,im
-            tps(i,j)=0.e0
+            tps(i,j)=0.
           end do
         end do
 
@@ -626,7 +626,7 @@
           do j=1,jm
             do i=1,im
               tps(i,j)=tps(i,j)
-     $                  +(vf(i,j,k)+vb(i,j,k)-2.e0*v(i,j,k))*dz(k)
+     $                  +(vf(i,j,k)+vb(i,j,k)-2.*v(i,j,k))*dz(k)
             end do
           end do
         end do
@@ -635,8 +635,8 @@
           do j=1,jm
             do i=1,im
               v(i,j,k)=v(i,j,k)
-     $                  +.5e0*smoth*(vf(i,j,k)+vb(i,j,k)
-     $                               -2.e0*v(i,j,k)-tps(i,j))
+     $                  +.5*smoth*(vf(i,j,k)+vb(i,j,k)
+     $                               -2.*v(i,j,k)-tps(i,j))
             end do
           end do
         end do
@@ -751,11 +751,11 @@
         end if
 
 ! local averages
-        vol_tot  = 0.e0
-        area_tot = 0.e0
-        temp_ave = 0.e0
-        salt_ave = 0.e0
-        elev_ave = 0.e0
+        vol_tot  = 0.
+        area_tot = 0.
+        temp_ave = 0.
+        salt_ave = 0.
+        elev_ave = 0.
 
         do k=1,kbm1
            do j=1,jm

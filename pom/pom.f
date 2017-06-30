@@ -316,7 +316,7 @@
       integer irestart1d, ncount           !           each run for next-day 
       data ncount/0/                       !           fcast
 
-      irestart1d=nint(write_rst1d*86400.e0/dti)                    !lyo:exp302:
+      irestart1d=nint(write_rst1d*86400./dti)                    !lyo:exp302:
       if(     (mod(iint,irestart)   == 0                  )        !lyo:exp302:
      $   .or. (mod(iint,irestart1d) == 0 .and. ncount.eq.0) ) then !lyo:exp302:
          ncount=1                                                  !lyo:exp302:
