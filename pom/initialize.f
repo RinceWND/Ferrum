@@ -579,7 +579,6 @@
       logical :: fexist                !lyo:20110202:
 
       read(read_rst_file, '(13x,i2)') n
-      write(*,*) read_rst_file, n
 
 ! read initial temperature and salinity from ic file
 !      call read_initial_ts_pnetcdf(kb,tb,sb)
@@ -595,11 +594,6 @@
       call read_clim_ts_pnetcdf_obs(tclim,sclim,rmean,n)
       endif
       
-      write(*,*) my_task,"temp",minval(tb),maxval(tb)
-      write(*,*) my_task,"salt",minval(sb),maxval(sb)
-      
-      write(*,*) my_task,"fsm",minval(fsm, fsm>0.),maxval(fsm, fsm<1.)
-
 ! calc. initial density
       call dens(sb,tb,rho)
 
