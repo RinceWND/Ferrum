@@ -99,17 +99,17 @@
 
 
 !     data open.
-!         call read_tsclim_monthly_pnetcdf
-!     $        ( tm_a, sm_a, tc_a, sc_a, "ts_clim_old.nc", mon_a )
+         call read_tsclim_monthly_pnetcdf
+     $        ( tm_a, sm_a, tc_a, sc_a, "ts_clim.nc", mon_a )
+
+         call read_tsclim_monthly_pnetcdf
+     $        ( tm_b, sm_b, tc_b, sc_b, "ts_clim.nc", mon_b )
+     
+!         call read_tsclim_monthly_pnetcdf_obs
+!     $        ( rm_a, tc_a, sc_a, "ts_clim_old.nc", mon_a )
 !
-!         call read_tsclim_monthly_pnetcdf
-!     $        ( tm_b, sm_b, tc_b, sc_b, "ts_clim_old.nc", mon_b )
-     
-         call read_tsclim_monthly_pnetcdf_obs
-     $        ( rm_a, tc_a, sc_a, "ts_clim_old.nc", mon_a )
-     
-         call read_tsclim_monthly_pnetcdf_obs
-     $        ( rm_b, tc_b, sc_b, "ts_clim_old.nc", mon_b )
+!         call read_tsclim_monthly_pnetcdf_obs
+!     $        ( rm_b, tc_b, sc_b, "ts_clim_old.nc", mon_b )
      
 !         call read_wind_monthly_pnetcdf
 !     $        ( uw_a, vw_a,       "sfrc_old.nc",    mon_a )
@@ -223,10 +223,10 @@
          ssurf_a = ssurf_b
 
 !         write( infile_b, '( "tsclimib",i2.2,".nc" )' ) mon_b
-!         call read_tsclim_monthly_pnetcdf
-!     $        ( tm_b, sm_b, tc_b, sc_b, "ts_clim.nc", mon_b )
-         call read_tsclim_monthly_pnetcdf_obs
-     $        ( rm_b, tc_b, sc_b, "ts_clim_old.nc", mon_b )
+         call read_tsclim_monthly_pnetcdf
+     $        ( tm_b, sm_b, tc_b, sc_b, "ts_clim.nc", mon_b )
+!         call read_tsclim_monthly_pnetcdf_obs
+!     $        ( rm_b, tc_b, sc_b, "ts_clim_old.nc", mon_b )
 !         call read_wind_monthly_pnetcdf
 !     $        ( uw_b, vw_b,       "sfrc_old.nc",    mon_b )
 
@@ -328,7 +328,7 @@
 
       implicit none
       
-      integer :: ii, jj, n
+      integer n
       
       ! intent(in)
       type(date), intent(in) :: d_in

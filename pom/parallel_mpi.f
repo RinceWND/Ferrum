@@ -260,7 +260,6 @@
       integer to
       integer work,tmp
       integer ierr
-      integer mpi_rk
 
 ! sum data
       call mpi_reduce(work,tmp,1,mpi_integer,mpi_sum,to,pom_comm,ierr)
@@ -321,7 +320,6 @@
       integer from
       integer work
       integer ierr
-      integer mpi_rk
 
 ! broadcast data
       call mpi_bcast(work,1,mpi_integer,from,pom_comm,ierr)

@@ -26,7 +26,7 @@
       real(kind=rk), dimension( im_local, jm_local ) :: 
      $     mcsst_a, mcsst_b, mcsst_surf   
 
-      integer ::  i, j, ndays
+      integer :: ndays
 
       logical :: lexist
 

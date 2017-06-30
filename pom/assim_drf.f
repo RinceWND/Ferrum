@@ -57,7 +57,7 @@ c-------------------------------------------------------------------------
 
       real(kind=rk), dimension( im, jm, kb ):: uold, vold
 
-      integer :: nu, nu_delta, i, j, k, n, ndrf
+      integer :: i, j, k, n, ndrf
       integer :: IOStatus, iassimdrf
       integer, dimension (2) :: locind
       integer :: i0, j0, i1, j1
@@ -444,14 +444,20 @@ c      write(*,*)xbox, ybox, angle, ingridbox
       subroutine bcast(data,elts,src)
       implicit none
       integer elts,src
-      real*4 data(elts)
       include 'mpif.h'
 
       integer ierr
       include 'pom.h'
+      real(kind=rk) data(elts)
+      integer mpi_rk
 
-      call MPI_BCAST(data,elts,MPI_REAL,src,
-     &               MPI_COMM_WORLD,ierr)
+      if (rk==8) then
+        mpi_rk = mpi_double_precision
+      else
+        mpi_rk = mpi_real
+      end if
+
+      call mpi_bcast(data,elts,mpi_rk,src,mpi_comm_world,ierr)
 
       end subroutine bcast
 !==================================================================

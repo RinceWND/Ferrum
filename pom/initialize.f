@@ -8,7 +8,7 @@
 ! initialize POM
       implicit none
       include 'pom.h'
-      integer i,j,k
+      integer i,j
       real(kind=rk) rdisp !lyo:20110224:alu:stcc:dispensible real variable!lyo:pac10:
 !     integer io_global,jo_global,io,jo !fhx:incmix!lyo:pac10:delete
 !     real(kind=rk) xs,ys,fak!,lono,lato!lyo:pac10:moved to pom.h: !fhx:incmix
@@ -589,16 +589,17 @@
       write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean.nc"
       inquire(file=trim(netcdf_ic_file),exist=fexist)
       if(fexist) then  !annual-mean xy-ave t,sclim
-      call read_mean_ts_pnetcdf(tclim,sclim,n)
+        call read_mean_ts_pnetcdf(tclim,sclim,n)
       else             !annual-mean *clim* - dangerous for rmean
-      call read_clim_ts_pnetcdf_obs(tclim,sclim,rmean,n)
+!      call read_clim_ts_pnetcdf_obs(tclim,sclim,rmean,n)
+        call read_clim_ts_pnetcdf(tclim,sclim,n)
       endif
       
 ! calc. initial density
       call dens(sb,tb,rho)
 
 ! calc. rmean; should use xy-ave t,sclim; ok if tsforce is called later
-!      call dens(sclim,tclim,rmean)
+      call dens(sclim,tclim,rmean)
 
       do k=1,kbm1
         do j=1,jm

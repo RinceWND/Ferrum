@@ -931,10 +931,8 @@
      &       ,get_var_real_2d
       
       character*120 netcdf_grid_file
-      integer z_varid,zz_varid,dx_varid,dy_varid,east_c_varid,
-     $        east_e_varid,east_u_varid,east_v_varid,north_c_varid,
-     $        north_e_varid,north_u_varid,north_v_varid,rot_varid,
-     $        h_varid,fsm_varid!,dum_varid,dvm_varid
+      integer z_varid,zz_varid,dx_varid,dy_varid,east_e_varid,
+     $        north_e_varid,rot_varid,h_varid,fsm_varid
       integer ncid,status
       integer i,j
       integer(mpi_offset_kind) start(4),edge(4)
@@ -1154,7 +1152,7 @@
       integer get_var_real_2d, get_var_real_3d
       character*120 netcdf_in_file
       integer ncid,status
-      integer time_varid,wubot_varid,wvbot_varid,aam2d_varid,ua_varid,
+      integer wubot_varid,wvbot_varid,aam2d_varid,ua_varid,
      $        uab_varid,va_varid,vab_varid,el_varid,elb_varid,et_varid,
      $        etb_varid,egb_varid,utb_varid,vtb_varid,u_varid,ub_varid,
      $        w_varid,v_varid,vb_varid,t_varid,tb_varid,s_varid,
@@ -1503,7 +1501,7 @@
 ! open netcdf ic file
       write(netcdf_ic_file,'(a)') "./in/tsclim/ts_clim.nc"
 
-      if(my_task.eq.0) write(*,'(/''reading file '',a)')
+      if(my_task.eq.master_task) write(*,'(/''reading file '',a)')
      $  trim(netcdf_ic_file)
       status=nfmpi_open(pom_comm,netcdf_ic_file,nf_nowrite,
      $                  mpi_info_null,ncid)
