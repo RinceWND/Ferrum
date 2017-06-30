@@ -3671,7 +3671,7 @@ C  !The most south sudomains
      &               *real(
      &                (r(ntp)*exp(real(z(k)*dh(i,j)/ad1(ntp),16))
      &                 +(1.-r(ntp))*exp(real(z(k)*dh(i,j)/ad2(ntp),16)))
-     &                )
+     &                ,rk)
             end do
           end do
         end do

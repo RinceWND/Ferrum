@@ -138,8 +138,8 @@
       end if    
 
 ! check for errors
-      call sum0d_mpi(error_status,master_task)
-      call bcast0d_mpi(error_status,master_task)
+      call   sum0i_mpi(error_status,master_task)
+      call bcast0i_mpi(error_status,master_task)
       if(error_status.ne.0) then
         if(my_task.eq.master_task) write(*,'(/a)')
      $                                       'POM terminated with error'

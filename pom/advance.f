@@ -741,8 +741,8 @@
      $    '', iprint ='',i8)') time,iint,iext,iprint
 
 ! check for errors
-        call sum0d_mpi(error_status,master_task)
-        call bcast0d_mpi(error_status,master_task)
+        call   sum0i_mpi(error_status,master_task)
+        call bcast0i_mpi(error_status,master_task)
         if(error_status.ne.0) then
           if(my_task.eq.master_task) write(*,'(/a)')
      $                                       'POM terminated with error'
@@ -810,7 +810,7 @@
       integer i,j
       integer imax,jmax
 
-      vamax=0.e0
+      vamax = 0.
 
       do j=1,jm
         do i=1,im
@@ -823,11 +823,12 @@
       end do
 
       if(vamax.gt.vmaxl) then
-        if(my_task.eq.master_task.and.error_status.eq.0) write(6,'(/
-     $    ''Error: velocity condition violated''/''time ='',f9.4,
+        if (error_status.eq.0) write(*,'(/
+     $    ''Error: velocity condition violated @ processor '',i3,/
+     $    ''time ='',f9.4,
      $    '', iint ='',i8,'', iext ='',i8,'', iprint ='',i8,/
      $    ''vamax ='',e12.3,''   imax,jmax ='',2i5)')
-     $    time,iint,iext,iprint,vamax,imax,jmax
+     $    my_task,time,iint,iext,iprint,vamax,imax,jmax
         error_status=1
       end if
 

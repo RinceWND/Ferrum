@@ -2019,7 +2019,7 @@
       real(kind=rk) uw(im,jm),vw(im,jm)
       character*120 netcdf_ic_file
       character(len=*) in_file
-      integer ncid,status,n,k
+      integer ncid,status,n
       integer uw_varid,vw_varid
       integer(mpi_offset_kind) start(4),edge(4)
 
