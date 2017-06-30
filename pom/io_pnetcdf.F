@@ -790,6 +790,7 @@
       integer ncid,status
       integer i,j
       integer(mpi_offset_kind) start(4),edge(4)
+      real(kind=rk) minh
       
       start = 1
       edge  = 1
@@ -895,7 +896,8 @@
       status = get_var_real_2d(ncid,fsm_varid,start,edge,fsm)
       call handle_error_pnetcdf('get_var_real: fsm',status,nf_noerr)
 
-      write(*,*) my_task,"::::",minval(h),maxval(h)
+      minh =  minval(h)
+      where (h==minh) h = 1.
       dvm = fsm
       dum = fsm
       do j=1,jm-1

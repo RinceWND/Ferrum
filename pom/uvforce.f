@@ -85,19 +85,19 @@
 
 
 !     data open.
-!         write( infile_a, '( "bc",i2.2,".nc" )' ) mon_a
-!         call read_bc_pnetcdf
-!     $        ( ube_a, ubw_a, vbs_a, vbn_a, "bc.nc", mon_a )
-!
-!!         write( infile_b, '( "bc",i2.2,".nc" )' ) mon_b
-!         call read_bc_pnetcdf
-!     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bc.nc", mon_b )
-     
-         call read_bc_pnetcdf_obs
-     $        ( ube_a, ubw_a, vbs_a, vbn_a, "bry_old.nc", mon_a )
+         write( infile_a, '( "bc",i2.2,".nc" )' ) mon_a
+         call read_bc_pnetcdf
+     $        ( ube_a, ubw_a, vbs_a, vbn_a, "bc.nc", mon_a )
 
-         call read_bc_pnetcdf_obs
-     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bry_old.nc", mon_b )
+!         write( infile_b, '( "bc",i2.2,".nc" )' ) mon_b
+         call read_bc_pnetcdf
+     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bc.nc", mon_b )
+     
+!         call read_bc_pnetcdf_obs
+!     $        ( ube_a, ubw_a, vbs_a, vbn_a, "bry_old.nc", mon_a )
+!
+!         call read_bc_pnetcdf_obs
+!     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bry_old.nc", mon_b )
 
       if ( my_task == master_task ) 
      $        write(*,'(/a/)') "---------- uvforce_init."
@@ -184,12 +184,12 @@
          vbn_a = vbn_b
 
 
-!         write( infile_b, '( "bc",i2.2,".nc" )' ) mon_b
-!         call read_bc_pnetcdf
-!     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bc.nc", mon_b )
+         write( infile_b, '( "bc",i2.2,".nc" )' ) mon_b
+         call read_bc_pnetcdf
+     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bc.nc", mon_b )
      
-         call read_bc_pnetcdf_obs
-     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bry_old.nc", mon_b )
+!         call read_bc_pnetcdf_obs
+!     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bry_old.nc", mon_b )
 
 
       endif

@@ -687,7 +687,7 @@
 !eda:uvforce
       if (.not. calc_uvforce) then
         write(in_file,'(a)') "bc.nc"
-        call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file) 
+        call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file, 1) 
       endif
 
 !     Radiation factors for use in subroutine bcond !alu:20101216 

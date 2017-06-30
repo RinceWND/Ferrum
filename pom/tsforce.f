@@ -362,7 +362,7 @@
       enddo
 
       if (n/=nb) then
-        write(*,*) "::::",n
+        write(*,'(a,i5)') "Reading heat record ",n
         nb = n
         write( infile_b, '( a3,".",i4.4,".nc" )' )
      $        "hfl", d_in%year
