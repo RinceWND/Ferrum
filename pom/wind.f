@@ -50,7 +50,7 @@
       type(date), intent(in) :: d_in
 
       ! local     
-      type(date) :: d_tmp
+      type(date) :: d_tmp, d_tmp2
 
       logical :: lexist
 
@@ -86,10 +86,10 @@
          if(lexist) then
          d_tmp = str2date("1979-01-01 00:00:00")
          d_tmp%year = d_in%year
-         n = int(dif_date(d_in, d_tmp)/(86400.)*4.)+1
+         n = int(dif_date(d_in, d_tmp)/86400.)*4+1
 
          call read_wind_pnetcdfc
-     $        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n)
+     $             ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
 
          else
              if ( my_task == master_task ) then
@@ -164,7 +164,14 @@
             uwnd_a = uwnd_buf( :, :, 4 )
             vwnd_a = vwnd_buf( :, :, 4 )
             
-            d_tmp = d_in + 24 * 3600
+            d_tmp2 = d_in + 24 * 3600
+            n = int(dif_date(d_tmp2, d_tmp)/86400.)*4+1
+
+            if (inc_leap(d_in%year).eq.1) then
+              n = modulo(int(dif_date(d_tmp2, d_tmp)/86400.)*4, 1463)
+            else
+              n = modulo(int(dif_date(d_tmp2, d_tmp)/86400.)*4, 1459)
+            end if
 
 !!*      write( infile, '( //trim(windf)//"_",i4.4,2i2.2,".nc" )' )
 !!*  $        d_in%year, d_in%month, d_in%day     
@@ -172,7 +179,7 @@
 !debug     $        windf, d_in%year, d_in%month, d_in%day     
 !     $        windf, d_tmp%year, d_tmp%month, d_tmp%day
          write( infile, '( a3,".",i4.4,".nc" )' )
-     $        "mfl", d_in%year
+     $        "mfl", d_tmp2%year
 !!       write( infile, '( "gfsw_",i4.4,2i2.2,".nc" )' )   ! fhx:read gfsw wind
 !!   $        d_in%year, d_in%month, d_in%day     
 !            write( infile, '( "gfs_",i4.4,2i2.2,".nc" )' ) ! fhx:read gfs wind
@@ -186,7 +193,7 @@
          if(lexist) then
 
             call read_wind_pnetcdfc
-     $           ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n+4 )
+     $         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
 
          else
               if ( my_task == master_task ) then
@@ -276,7 +283,7 @@
 
       d_tmp = str2date("1979-01-01 00:00:00")
       d_tmp%year = d_in%year
-      n = int(dif_date(d_in, d_tmp)/(86400.)*4.)+1
+      n = int(dif_date(d_in, d_tmp)/86400.)
 
       do i=1,3
          
@@ -310,7 +317,7 @@
 !debug     $        windf, d_in%year, d_in%month, d_in%day    
 !     $        windf, d_tmp%year, d_tmp%month, d_tmp%day
          write( infile, '( a3,".",i4.4,".nc" )' )
-     $        "mfl", d_in%year
+     $        "mfl", d_tmp%year
 !!       write( infile, '( "gfsw_",i4.4,2i2.2,".nc" )' )   ! fhx:read gfsw wind
 !!   $        d_in%year, d_in%month, d_in%day     
 !         write( infile, '( "gfs_",i4.4,2i2.2,".nc" )' )  ! fhx:read gfs wind
@@ -324,7 +331,7 @@
          if(lexist) then
 
          call read_wind_pnetcdfc
-     $        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+     $        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n*4+1 )
          
          else
             if ( my_task == master_task ) then
