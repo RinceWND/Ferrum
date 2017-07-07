@@ -165,13 +165,7 @@
             vwnd_a = vwnd_buf( :, :, 4 )
             
             d_tmp2 = d_in + 24 * 3600
-            n = int(dif_date(d_tmp2, d_tmp)/86400.)*4+1
-
-            if (inc_leap(d_in%year).eq.1) then
-              n = modulo(int(dif_date(d_tmp2, d_tmp)/86400.)*4, 1463)
-            else
-              n = modulo(int(dif_date(d_tmp2, d_tmp)/86400.)*4, 1459)
-            end if
+            n = mod(n+4, 1460 + 4*inc_leap(d_in%year))
 
 !!*      write( infile, '( //trim(windf)//"_",i4.4,2i2.2,".nc" )' )
 !!*  $        d_in%year, d_in%month, d_in%day     
