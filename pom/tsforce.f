@@ -362,7 +362,8 @@
       enddo
 
       if (n/=nb) then
-        write(*,'(a,i5)') "Reading heat record ",n
+        if (my_task==master_task)
+     $          write(*,'(a,i5)') "Reading heat record ",n,"@",d_in%year
         nb = n
         write( infile_b, '( a3,".",i4.4,".nc" )' )
      $        "hfl", d_in%year

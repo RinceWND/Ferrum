@@ -2370,20 +2370,22 @@
 !_______________________________________________________________________
 
 !_______________________________________________________________________
-      subroutine read_wind_pnetcdf( uwnd_out, vwnd_out, filename ) !lyo:pac10:use stcc version !lyo:pac10:not used!
+      subroutine read_wind_pnetcdf( uwnd_out, vwnd_out, filename, n ) !lyo:pac10:use stcc version !lyo:pac10:not used!
 ! read wind stress
       implicit none
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
       integer get_var_real_2d
-      integer, parameter :: wind_npd = 4
+      integer, parameter :: wind_npd = 1
       real(kind=rk) uwnd_out(im,jm,wind_npd),vwnd_out(im,jm,wind_npd)
       character :: filename*16, netcdf_wind_file*24
-      integer ncid,status
+      integer ncid,status,n
       integer uwnd_varid,vwnd_varid
       integer(mpi_offset_kind) start(4),edge(4)
 
+      start = 1
+      edge  = 1
 
 ! open netcdf wind file
       netcdf_wind_file="in/"//windf//"/"//trim(filename)
@@ -2410,7 +2412,7 @@
 ! get data
       start(1)=i_global(1)
       start(2)=j_global(1)
-      start(3)=1
+      start(3)=n
       edge(1)=im
       edge(2)=jm
       edge(3)=wind_npd

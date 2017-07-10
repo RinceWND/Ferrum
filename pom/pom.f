@@ -17,7 +17,7 @@
       include 'pom.h'
 
       type(date) :: dtime
-      
+
 
 ! initialize model
       call initialize
@@ -27,7 +27,7 @@
 !     dtime = str2date( time_start(1:19) )
       dtime = str2date(read_rst_file(9:21)//":"//
      &read_rst_file(23:24)//":"//read_rst_file(26:27) )
-    
+
       if ( calc_uvforce ) call uvforce_init(dtime) !eda:uvforce 
       call tsforce_init( dtime )
       if ( calc_tsurf_mc ) call mcsst_init(dtime) !fhx:mcsst

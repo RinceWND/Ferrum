@@ -8,21 +8,23 @@
 
       include 'pom.h'
 
-      real(kind=rk), dimension( im_local, jm_local ) :: 
+      integer, parameter :: wn = 4
+
+      real(kind=rk), dimension( im_local, jm_local ) ::
      $  uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd_fine, vwnd_fine
 
 !lyo:pac10:more efficient:Comment out the followings
 !     real(kind=rk), dimension( im_local, jm_local ) :: !fhx:20110131:
 !    $ uwind_surf, vwind_surf
 
-      real(kind=rk), dimension( im_local_coarse, jm_local_coarse ) :: 
+      real(kind=rk), dimension( im_local_coarse, jm_local_coarse ) ::
      $  uwnd_a_coarse, vwnd_a_coarse, uwnd_b_coarse, vwnd_b_coarse,
      $  uwnd_coarse, vwnd_coarse
 
-      real(kind=rk), dimension( im_local_coarse, jm_local_coarse, 4 ) :: 
+      real(kind=rk), dimension( im_local_coarse, jm_local_coarse, wn )::
      $  uwnd_buf_coarse, vwnd_buf_coarse
 
-      real(kind=rk), dimension( im_local, jm_local, 4 ) :: 
+      real(kind=rk), dimension( im_local, jm_local, wn ) ::
      $  uwnd_buf, vwnd_buf 
 
       integer :: nsec(4)=(/ 0, 6*3600, 12*3600, 18*3600 /)
@@ -50,7 +52,7 @@
       type(date), intent(in) :: d_in
 
       ! local     
-      type(date) :: d_tmp, d_tmp2
+      type(date) :: d_off, d_fwd
 
       logical :: lexist
 
@@ -70,13 +72,13 @@
          sec_in_day = d_in%hour*3600 + d_in%min*60 + d_in%sec
 
 !!*      write( infile, '( //trim(windf)//"_",i4.4,2i2.2,".nc" )' )
-!!*  $        d_in%year, d_in%month, d_in%day     
+!!*  $        d_in%year, d_in%month, d_in%day
 !         write( infile, '( a4,"_",i4.4,2i2.2,".nc" )' )
 !     $        windf, d_in%year, d_in%month, d_in%day
          write( infile, '( a3,".",i4.4,".nc" )' )
      $        "mfl", d_in%year
 !!       write( infile, '( "gfsw_",i4.4,2i2.2,".nc" )' )   ! fhx:read gfsw wind
-!!    $        d_in%year, d_in%month, d_in%day     
+!!    $        d_in%year, d_in%month, d_in%day
 
 ! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010  
          inquire(file='in/'//trim(windf)//'/'//trim(infile),
@@ -84,9 +86,9 @@
 !!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)   
 
          if(lexist) then
-         d_tmp = str2date("1979-01-01 00:00:00")
-         d_tmp%year = d_in%year
-         n = int(dif_date(d_in, d_tmp)/86400.)*4+1
+         d_off = str2date("1979-01-01 00:00:00")
+         d_off%year = d_in%year
+         n = int(dif_date(d_in, d_off)/86400.)*4+1
 
          call read_wind_pnetcdfc
      $             ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
@@ -107,7 +109,7 @@
 ! interpolation
       if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.  
 
-       do k=1,4  
+       do k=1,wn
         uwnd_coarse = uwnd_buf_coarse( :, :, k )
         vwnd_coarse = vwnd_buf_coarse( :, :, k )
 
@@ -134,7 +136,7 @@
          uwnd_buf(:,:,k)=uwnd_fine
          vwnd_buf(:,:,k)=vwnd_fine
  
-       enddo ! k=1,4 
+       enddo ! k=1,wn
               
        else
 
@@ -143,10 +145,10 @@
   
        endif !  if(calc_interp) then fhx:interp_flag
                 
-         do i=1,3
+         do i=1,wn-1
 
             if (  sec_in_day >= nsec(i) .and.
-     $            sec_in_day <  nsec(i+1)  ) then               
+     $            sec_in_day <  nsec(i+1)  ) then
 
             uwnd_a = uwnd_buf( :, :, i )
             vwnd_a = vwnd_buf( :, :, i )
@@ -159,25 +161,26 @@
 
          enddo
          
-         if (  sec_in_day >= nsec(4) ) then            
+         if (  sec_in_day >= nsec(wn) ) then
 
-            uwnd_a = uwnd_buf( :, :, 4 )
-            vwnd_a = vwnd_buf( :, :, 4 )
+            uwnd_a = uwnd_buf( :, :, wn )
+            vwnd_a = vwnd_buf( :, :, wn )
             
-            d_tmp2 = d_in + 24 * 3600
-            n = mod(n+4, 1460 + 4*inc_leap(d_in%year))
+            d_fwd = d_in + 24 * 3600
+            n = int(dif_date(d_fwd, d_off)/86400.)*4+1
+            n = mod(n, 1460 + 4*inc_leap(d_in%year))
 
 !!*      write( infile, '( //trim(windf)//"_",i4.4,2i2.2,".nc" )' )
-!!*  $        d_in%year, d_in%month, d_in%day     
+!!*  $        d_in%year, d_in%month, d_in%day
 !         write( infile, '( a4,"_",i4.4,2i2.2,".nc" )' )
-!debug     $        windf, d_in%year, d_in%month, d_in%day     
-!     $        windf, d_tmp%year, d_tmp%month, d_tmp%day
+!debug     $        windf, d_in%year, d_in%month, d_in%day
+!     $        windf, d_off%year, d_off%month, d_off%day
          write( infile, '( a3,".",i4.4,".nc" )' )
-     $        "mfl", d_tmp2%year
+     $        "mfl", d_fwd%year
 !!       write( infile, '( "gfsw_",i4.4,2i2.2,".nc" )' )   ! fhx:read gfsw wind
-!!   $        d_in%year, d_in%month, d_in%day     
+!!   $        d_in%year, d_in%month, d_in%day
 !            write( infile, '( "gfs_",i4.4,2i2.2,".nc" )' ) ! fhx:read gfs wind
-!     $           d_tmp%year, d_tmp%month, d_tmp%day 
+!     $           d_off%year, d_off%month, d_off%day
 
 ! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010             
          inquire(file='in/'//trim(windf)//'/'//trim(infile),
@@ -203,7 +206,7 @@
 ! interpolation
       if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.  
 
-       do k=1,4  
+       do k=1,wn
         uwnd_coarse = uwnd_buf_coarse( :, :, k )
         vwnd_coarse = vwnd_buf_coarse( :, :, k )
         call interp_mask_2d(uwnd_coarse,1,east_e,north_e,fsm,uwnd_fine)
@@ -211,21 +214,21 @@
 !fhx: after interpolation, i=1,2 and j=1,2 seem to have problems
       if (n_west.eq.-1) then
        do i=1,2
-         uwnd_fine(i,:)=uwnd_fine(3,:)      
+         uwnd_fine(i,:)=uwnd_fine(3,:)
          vwnd_fine(i,:)=vwnd_fine(3,:)
        enddo
       endif
 
       if(n_south.eq.-1) then
        do j=1,2
-         uwnd_fine(:,j)=uwnd_fine(:,3)       
-         vwnd_fine(:,j)=vwnd_fine(:,3)        
+         uwnd_fine(:,j)=uwnd_fine(:,3)
+         vwnd_fine(:,j)=vwnd_fine(:,3)
        enddo 
       endif
          uwnd_buf(:,:,k)=uwnd_fine
          vwnd_buf(:,:,k)=vwnd_fine
  
-       enddo ! k=1,4 
+       enddo ! k=1,wn
 
        else
 
@@ -268,18 +271,18 @@
 !      logical, intent(in) :: initial
 
       ! local     
-      type(date) :: d_tmp
+      type(date) :: d_off, d_fwd
       integer n
 
       logical :: lexist     
 
       sec_in_day = d_in%hour*3600 + d_in%min*60 + d_in%sec
 
-      d_tmp = str2date("1979-01-01 00:00:00")
-      d_tmp%year = d_in%year
-      n = int(dif_date(d_in, d_tmp)/86400.)
+      d_off = str2date("1979-01-01 00:00:00")
+      d_off%year = d_in%year
+      n = int(dif_date(d_in, d_off)/86400.)
 
-      do i=1,3
+      do i=1,wn-1
          
          if (  sec_in_day >= nsec(i) .and.
      $         sec_in_day - nsec(i) < int( dti )  ) then
@@ -297,25 +300,27 @@
 
 
          
-      if (  sec_in_day >= nsec(4) .and.
-     $      sec_in_day - nsec(4) < int ( dti )  ) then 
+      if (  sec_in_day >= nsec(wn) .and.
+     $      sec_in_day - nsec(wn) < int ( dti )  ) then
 
-            uwnd_a = uwnd_buf( :, :, 4 )
-            vwnd_a = vwnd_buf( :, :, 4 )
+            uwnd_a = uwnd_buf( :, :, wn )
+            vwnd_a = vwnd_buf( :, :, wn )
          
-         d_tmp = d_in + 24 * 3600
+         d_fwd = d_in + 24 * 3600
+         n = int(dif_date(d_fwd, d_off)/86400.)*4+1
+         n = mod(n, 1460 + 4*inc_leap(d_in%year))
 
 !!*      write( infile, '( //trim(windf)//"_",i4.4,2i2.2,".nc" )' )
-!!*  $        d_in%year, d_in%month, d_in%day     
+!!*  $        d_in%year, d_in%month, d_in%day
 !         write( infile, '( a4,"_",i4.4,2i2.2,".nc" )' )
-!debug     $        windf, d_in%year, d_in%month, d_in%day    
-!     $        windf, d_tmp%year, d_tmp%month, d_tmp%day
+!debug     $        windf, d_in%year, d_in%month, d_in%day
+!     $        windf, d_off%year, d_off%month, d_off%day
          write( infile, '( a3,".",i4.4,".nc" )' )
-     $        "mfl", d_tmp%year
+     $        "mfl", d_fwd%year
 !!       write( infile, '( "gfsw_",i4.4,2i2.2,".nc" )' )   ! fhx:read gfsw wind
-!!   $        d_in%year, d_in%month, d_in%day     
+!!   $        d_in%year, d_in%month, d_in%day
 !         write( infile, '( "gfs_",i4.4,2i2.2,".nc" )' )  ! fhx:read gfs wind
-!     $        d_tmp%year, d_tmp%month, d_tmp%day
+!     $        d_off%year, d_off%month, d_off%day
 
 ! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010         
          inquire(file='in/'//trim(windf)//'/'//trim(infile),
@@ -325,7 +330,7 @@
          if(lexist) then
 
          call read_wind_pnetcdfc
-     $        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n*4+1 )
+     $        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
          
          else
             if ( my_task == master_task ) then
