@@ -1500,7 +1500,15 @@
       real(kind=rk) ga,u1,wm
       integer ii,jj
       real(kind=rk), parameter :: hmax = 8000.0 !lyo:20110224:alu:stcc:
-      
+
+      real(kind=rk) m2t,s2t,k1t,o1t ! period in days
+      integer t_est,t_nth,t_i,t_j
+
+      m2t = 1.035
+      s2t = 1.
+      k1t = 0.99725
+      o1t = 1.075791667
+
       if(idx.eq.1) then
 
 ! external (2-D) elevation boundary conditions
@@ -1537,6 +1545,202 @@
         if (ipery.ne.0) then 
          call yperi2d_mpi(elf,im,jm) !lyo:scs1d:add yperi*:ipery:
          endif
+
+         ! tides south
+         t_est = 112
+         t_nth =  36
+         if (i_global(im)>t_est .and. i_global(1)<t_est) then
+           if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
+             t_i = minloc(i_global, 1, i_global>=t_est)
+             t_j = minloc(j_global, 1, j_global>=t_nth)
+             ! M2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.04*(
+     $                cos((time-dti/86400.)*2.*3.142/m2t            )-
+     $                cos( time            *2.*3.142/m2t            ))
+             ! S2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
+     $                cos((time-dti/86400.)*2.*3.142/s2t+   3.142/3.)-
+     $                cos( time            *2.*3.142/s2t+   3.142/3.))
+             ! K1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
+     $                cos((time-dti/86400.)*2.*3.142/k1t+4.*3.142/5.)-
+     $                cos( time            *2.*3.142/k1t+4.*3.142/5.))
+             ! O1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.03*(
+     $                cos((time-dti/86400.)*2.*3.142/o1t+11.*3.142/10.)-
+     $                cos( time            *2.*3.142/o1t+11.*3.142/10.))
+           end if
+         end if
+         t_est = 113
+         t_nth =  40
+         if (i_global(im)>t_est .and. i_global(1)<t_est) then
+           if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
+             t_i = minloc(i_global, 1, i_global>=t_est)
+             t_j = minloc(j_global, 1, j_global>=t_nth)
+             ! M2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.035*(
+     $                cos((time-dti/86400.)*2.*3.142/m2t+   3.142/2.)-
+     $                cos( time            *2.*3.142/m2t+   3.142/2.))
+             ! S2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.02*(
+     $                cos((time-dti/86400.)*2.*3.142/s2t+   3.142/2.)-
+     $                cos( time            *2.*3.142/s2t+   3.142/2.))
+             ! K1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
+     $                cos((time-dti/86400.)*2.*3.142/k1t+4.*3.142/5.)-
+     $                cos( time            *2.*3.142/k1t+4.*3.142/5.))
+             ! O1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.045*(
+     $                cos((time-dti/86400.)*2.*3.142/o1t+11.*3.142/10.)-
+     $                cos( time            *2.*3.142/o1t+11.*3.142/10.))
+           end if
+         end if
+         t_est = 102
+         t_nth =  44
+         if (i_global(im)>t_est .and. i_global(1)<t_est) then
+           if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
+             t_i = minloc(i_global, 1, i_global>=t_est)
+             t_j = minloc(j_global, 1, j_global>=t_nth)
+             ! M2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
+     $                cos((time-dti/86400.)*2.*3.142/m2t+   3.142  )-
+     $                cos( time            *2.*3.142/m2t+   3.142  ))
+             ! S2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
+     $                cos((time-dti/86400.)*2.*3.142/s2t+9.*3.142/10.)-
+     $                cos( time            *2.*3.142/s2t+9.*3.142/10.))
+             ! K1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.03*(
+     $                cos((time-dti/86400.)*2.*3.142/k1t+4.*3.142/5.)-
+     $                cos( time            *2.*3.142/k1t+4.*3.142/5.))
+             ! O1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.04*(
+     $                cos((time-dti/86400.)*2.*3.142/o1t+11.*3.142/10.)-
+     $                cos( time            *2.*3.142/o1t+11.*3.142/10.))
+           end if
+         end if
+         t_est = 104
+         t_nth =  32
+         if (i_global(im)>t_est .and. i_global(1)<t_est) then
+           if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
+             t_i = minloc(i_global, 1, i_global>=t_est)
+             t_j = minloc(j_global, 1, j_global>=t_nth)
+             ! M2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.03*(
+     $                cos((time-dti/86400.)*2.*3.142/m2t+3.*3.142/2.)-
+     $                cos( time            *2.*3.142/m2t+3.*3.142/2.))
+             ! S2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.005*(
+     $                cos((time-dti/86400.)*2.*3.142/s2t             )-
+     $                cos( time            *2.*3.142/s2t             ))
+             ! K1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
+     $                cos((time-dti/86400.)*2.*3.142/k1t+5.*3.142/4.)-
+     $                cos( time            *2.*3.142/k1t+5.*3.142/4.))
+             ! O1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.02*(
+     $                cos((time-dti/86400.)*2.*3.142/o1t+11.*3.142/10.)-
+     $                cos( time            *2.*3.142/o1t+11.*3.142/10.))
+           end if
+         end if
+
+         ! tides north
+         t_est = 126
+         t_nth = 249
+         if (i_global(im)>t_est .and. i_global(1)<t_est) then
+           if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
+             t_i = minloc(i_global, 1, i_global>=t_est)
+             t_j = minloc(j_global, 1, j_global>=t_nth)
+             ! M2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.04*(
+     $                cos((time-dti/86400.)*2.*3.142/m2t            )-
+     $                cos( time            *2.*3.142/m2t            ))
+             ! S2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
+     $                cos((time-dti/86400.)*2.*3.142/s2t+7.*3.142/4.)-
+     $                cos( time            *2.*3.142/s2t+7.*3.142/4.))
+             ! K1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
+     $                cos((time-dti/86400.)*2.*3.142/k1t+11.*3.142/10.)-
+     $                cos( time            *2.*3.142/k1t+11.*3.142/10.))
+             ! O1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
+     $                cos((time-dti/86400.)*2.*3.142/o1t+    3.142  )-
+     $                cos( time            *2.*3.142/o1t+    3.142  ))
+           end if
+         end if
+         t_est = 105
+         t_nth = 241
+         if (i_global(im)>t_est .and. i_global(1)<t_est) then
+           if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
+             t_i = minloc(i_global, 1, i_global>=t_est)
+             t_j = minloc(j_global, 1, j_global>=t_nth)
+             ! M2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
+     $                cos((time-dti/86400.)*2.*3.142/m2t+   3.142/2.)-
+     $                cos( time            *2.*3.142/m2t+   3.142/2.))
+            ! S2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.005*(
+     $                cos((time-dti/86400.)*2.*3.142/s2t+5.*3.142/4.)-
+     $                cos( time            *2.*3.142/s2t+5.*3.142/4.))
+             ! K1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
+     $                cos((time-dti/86400.)*2.*3.142/k1t+11.*3.142/10.)-
+     $                cos( time            *2.*3.142/k1t+11.*3.142/10.))
+             ! O1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
+     $                cos((time-dti/86400.)*2.*3.142/o1t+    3.142  )-
+     $                cos( time            *2.*3.142/o1t+    3.142  ))
+           end if
+         end if
+         t_est =  94
+         t_nth = 240
+         if (i_global(im)>t_est .and. i_global(1)<t_est) then
+           if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
+             t_i = minloc(i_global, 1, i_global>=t_est)
+             t_j = minloc(j_global, 1, j_global>=t_nth)
+             ! M2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
+     $                cos((time-dti/86400.)*2.*3.142/m2t+   3.142  )-
+     $                cos( time            *2.*3.142/m2t+   3.142  ))
+             ! S2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
+     $                cos((time-dti/86400.)*2.*3.142/s2t+5.*3.142/4.)-
+     $                cos( time            *2.*3.142/s2t+5.*3.142/4.))
+             ! K1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
+     $                cos((time-dti/86400.)*2.*3.142/k1t+23.*3.142/20.)-
+     $                cos( time            *2.*3.142/k1t+23.*3.142/20.))
+             ! O1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
+     $                cos((time-dti/86400.)*2.*3.142/o1t+    3.142  )-
+     $                cos( time            *2.*3.142/o1t+    3.142  ))
+           end if
+         end if
+         t_est = 102
+         t_nth = 247
+         if (i_global(im)>t_est .and. i_global(1)<t_est) then
+           if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
+             t_i = minloc(i_global, 1, i_global>=t_est)
+             t_j = minloc(j_global, 1, j_global>=t_nth)
+             ! M2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
+     $                cos((time-dti/86400.)*2.*3.142/m2t+3.*3.142/2.)-
+     $                cos( time            *2.*3.142/m2t+3.*3.142/2.))
+             ! S2
+             elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
+     $                cos((time-dti/86400.)*2.*3.142/s2t+29.*3.142/20.)-
+     $                cos( time            *2.*3.142/s2t+29.*3.142/20.))
+             ! K1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
+     $                cos((time-dti/86400.)*2.*3.142/k1t+23.*3.142/20.)-
+     $                cos( time            *2.*3.142/k1t+23.*3.142/20.))
+             ! O1
+             elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
+     $                cos((time-dti/86400.)*2.*3.142/o1t+    3.142  )-
+     $                cos( time            *2.*3.142/o1t+    3.142  ))
+           end if
+         end if
 !
           do j=1,jm
              do i=1,im

@@ -3104,6 +3104,8 @@
       call def_var_pnetcdf(ncid,'wssurf',3,vdims,wssurf_varid,nf_float,
      $                     'salinity flux','psu m/s',
      $                     'east_e north_e',.true.)
+
+      if (mode/=2) then
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=z_dimid
@@ -3132,6 +3134,7 @@
       call def_var_pnetcdf(ncid,'km',4,vdims,km_varid,nf_float,
      $                     'vertical viscosity','metre2/sec',
      $                     'east_e north_e zz',.true.)
+      end if
 
 ! end definitions
       status=nfmpi_enddef(ncid)
@@ -3262,6 +3265,7 @@
       status=nfmpi_inq_varid(ncid,'wssurf',wssurf_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: wssurf'
      $                          ,status,nf_noerr)
+      if (mode/=2) then
       status=nfmpi_inq_varid(ncid,'u',u_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: u'
      $                          ,status,nf_noerr)
@@ -3286,6 +3290,7 @@
       status=nfmpi_inq_varid(ncid,'km',km_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: km'
      $                          ,status,nf_noerr)
+      end if
 
 
       endif !if ( iout == 1  ) then...
@@ -3337,6 +3342,7 @@
       call handle_error_pnetcdf('nf_put_vara_real: wssurf'
      &                                                 ,status,nf_noerr)
 
+      if (mode/=2) then
       start(1)=i_global(1)
       start(2)=j_global(1)
       start(3)=1
@@ -3364,6 +3370,7 @@
       status=nfmpi_put_vara_real_all(ncid,km_varid,start,edge
      &                                                      ,real(km,4))
       call handle_error_pnetcdf('nf_put_vara_real: km',status,nf_noerr)
+      end if
 
       else !lyo:20110224:stcc:save *_mean
 
@@ -3409,6 +3416,7 @@
       call handle_error_pnetcdf('nf_put_vara_real: wssurf'
      &                                                 ,status,nf_noerr)
 
+      if (mode/=2) then
       start(1)=i_global(1)
       start(2)=j_global(1)
       start(3)=1
@@ -3442,6 +3450,7 @@
      &                                                 ,real(km_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: km',status
      &                                                        ,nf_noerr)
+      end if
 
       endif !if ( iout == 1  ) then... !lyo:20110224:stcc:
 
