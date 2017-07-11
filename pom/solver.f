@@ -1555,20 +1555,28 @@
              t_j = minloc(j_global, 1, j_global>=t_nth)
              ! M2
              elf(t_i,t_j) = elf(t_i,t_j)-0.04*(
-     $                cos((time-dti/86400.)*2.*3.142/m2t            )-
+     $                cos((time-dte/86400.)*2.*3.142/m2t            )-
      $                cos( time            *2.*3.142/m2t            ))
              ! S2
              elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $                cos((time-dti/86400.)*2.*3.142/s2t+   3.142/3.)-
+     $                cos((time-dte/86400.)*2.*3.142/s2t+   3.142/3.)-
      $                cos( time            *2.*3.142/s2t+   3.142/3.))
              ! K1
              elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $                cos((time-dti/86400.)*2.*3.142/k1t+4.*3.142/5.)-
+     $                cos((time-dte/86400.)*2.*3.142/k1t+4.*3.142/5.)-
      $                cos( time            *2.*3.142/k1t+4.*3.142/5.))
              ! O1
              elf(t_i,t_j) = elf(t_i,t_j)-0.03*(
-     $                cos((time-dti/86400.)*2.*3.142/o1t+11.*3.142/10.)-
+     $                cos((time-dte/86400.)*2.*3.142/o1t+11.*3.142/10.)-
      $                cos( time            *2.*3.142/o1t+11.*3.142/10.))
+             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+           fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+           fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
            end if
          end if
          t_est = 113
@@ -1579,20 +1587,28 @@
              t_j = minloc(j_global, 1, j_global>=t_nth)
              ! M2
              elf(t_i,t_j) = elf(t_i,t_j)-0.035*(
-     $                cos((time-dti/86400.)*2.*3.142/m2t+   3.142/2.)-
+     $                cos((time-dte/86400.)*2.*3.142/m2t+   3.142/2.)-
      $                cos( time            *2.*3.142/m2t+   3.142/2.))
              ! S2
              elf(t_i,t_j) = elf(t_i,t_j)-0.02*(
-     $                cos((time-dti/86400.)*2.*3.142/s2t+   3.142/2.)-
+     $                cos((time-dte/86400.)*2.*3.142/s2t+   3.142/2.)-
      $                cos( time            *2.*3.142/s2t+   3.142/2.))
              ! K1
              elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
-     $                cos((time-dti/86400.)*2.*3.142/k1t+4.*3.142/5.)-
+     $                cos((time-dte/86400.)*2.*3.142/k1t+4.*3.142/5.)-
      $                cos( time            *2.*3.142/k1t+4.*3.142/5.))
              ! O1
              elf(t_i,t_j) = elf(t_i,t_j)-0.045*(
-     $                cos((time-dti/86400.)*2.*3.142/o1t+11.*3.142/10.)-
+     $                cos((time-dte/86400.)*2.*3.142/o1t+11.*3.142/10.)-
      $                cos( time            *2.*3.142/o1t+11.*3.142/10.))
+             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+           fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+           fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
            end if
          end if
          t_est = 102
@@ -1603,20 +1619,28 @@
              t_j = minloc(j_global, 1, j_global>=t_nth)
              ! M2
              elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
-     $                cos((time-dti/86400.)*2.*3.142/m2t+   3.142  )-
+     $                cos((time-dte/86400.)*2.*3.142/m2t+   3.142  )-
      $                cos( time            *2.*3.142/m2t+   3.142  ))
              ! S2
              elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $                cos((time-dti/86400.)*2.*3.142/s2t+9.*3.142/10.)-
+     $                cos((time-dte/86400.)*2.*3.142/s2t+9.*3.142/10.)-
      $                cos( time            *2.*3.142/s2t+9.*3.142/10.))
              ! K1
              elf(t_i,t_j) = elf(t_i,t_j)-0.03*(
-     $                cos((time-dti/86400.)*2.*3.142/k1t+4.*3.142/5.)-
+     $                cos((time-dte/86400.)*2.*3.142/k1t+4.*3.142/5.)-
      $                cos( time            *2.*3.142/k1t+4.*3.142/5.))
              ! O1
              elf(t_i,t_j) = elf(t_i,t_j)-0.04*(
-     $                cos((time-dti/86400.)*2.*3.142/o1t+11.*3.142/10.)-
+     $                cos((time-dte/86400.)*2.*3.142/o1t+11.*3.142/10.)-
      $                cos( time            *2.*3.142/o1t+11.*3.142/10.))
+             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+           fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+           fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
            end if
          end if
          t_est = 104
@@ -1627,20 +1651,28 @@
              t_j = minloc(j_global, 1, j_global>=t_nth)
              ! M2
              elf(t_i,t_j) = elf(t_i,t_j)-0.03*(
-     $                cos((time-dti/86400.)*2.*3.142/m2t+3.*3.142/2.)-
+     $                cos((time-dte/86400.)*2.*3.142/m2t+3.*3.142/2.)-
      $                cos( time            *2.*3.142/m2t+3.*3.142/2.))
              ! S2
              elf(t_i,t_j) = elf(t_i,t_j)-0.005*(
-     $                cos((time-dti/86400.)*2.*3.142/s2t             )-
+     $                cos((time-dte/86400.)*2.*3.142/s2t             )-
      $                cos( time            *2.*3.142/s2t             ))
              ! K1
              elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
-     $                cos((time-dti/86400.)*2.*3.142/k1t+5.*3.142/4.)-
+     $                cos((time-dte/86400.)*2.*3.142/k1t+5.*3.142/4.)-
      $                cos( time            *2.*3.142/k1t+5.*3.142/4.))
              ! O1
              elf(t_i,t_j) = elf(t_i,t_j)-0.02*(
-     $                cos((time-dti/86400.)*2.*3.142/o1t+11.*3.142/10.)-
+     $                cos((time-dte/86400.)*2.*3.142/o1t+11.*3.142/10.)-
      $                cos( time            *2.*3.142/o1t+11.*3.142/10.))
+             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+           fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+           fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
            end if
          end if
 
@@ -1653,20 +1685,28 @@
              t_j = minloc(j_global, 1, j_global>=t_nth)
              ! M2
              elf(t_i,t_j) = elf(t_i,t_j)-0.04*(
-     $                cos((time-dti/86400.)*2.*3.142/m2t            )-
+     $                cos((time-dte/86400.)*2.*3.142/m2t            )-
      $                cos( time            *2.*3.142/m2t            ))
              ! S2
              elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $                cos((time-dti/86400.)*2.*3.142/s2t+7.*3.142/4.)-
+     $                cos((time-dte/86400.)*2.*3.142/s2t+7.*3.142/4.)-
      $                cos( time            *2.*3.142/s2t+7.*3.142/4.))
              ! K1
              elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $                cos((time-dti/86400.)*2.*3.142/k1t+11.*3.142/10.)-
+     $                cos((time-dte/86400.)*2.*3.142/k1t+11.*3.142/10.)-
      $                cos( time            *2.*3.142/k1t+11.*3.142/10.))
              ! O1
              elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $                cos((time-dti/86400.)*2.*3.142/o1t+    3.142  )-
+     $                cos((time-dte/86400.)*2.*3.142/o1t+    3.142  )-
      $                cos( time            *2.*3.142/o1t+    3.142  ))
+             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+           fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+           fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
            end if
          end if
          t_est = 105
@@ -1677,20 +1717,28 @@
              t_j = minloc(j_global, 1, j_global>=t_nth)
              ! M2
              elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $                cos((time-dti/86400.)*2.*3.142/m2t+   3.142/2.)-
+     $                cos((time-dte/86400.)*2.*3.142/m2t+   3.142/2.)-
      $                cos( time            *2.*3.142/m2t+   3.142/2.))
             ! S2
              elf(t_i,t_j) = elf(t_i,t_j)-0.005*(
-     $                cos((time-dti/86400.)*2.*3.142/s2t+5.*3.142/4.)-
+     $                cos((time-dte/86400.)*2.*3.142/s2t+5.*3.142/4.)-
      $                cos( time            *2.*3.142/s2t+5.*3.142/4.))
              ! K1
              elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $                cos((time-dti/86400.)*2.*3.142/k1t+11.*3.142/10.)-
+     $                cos((time-dte/86400.)*2.*3.142/k1t+11.*3.142/10.)-
      $                cos( time            *2.*3.142/k1t+11.*3.142/10.))
              ! O1
              elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $                cos((time-dti/86400.)*2.*3.142/o1t+    3.142  )-
+     $                cos((time-dte/86400.)*2.*3.142/o1t+    3.142  )-
      $                cos( time            *2.*3.142/o1t+    3.142  ))
+             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+           fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+           fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
            end if
          end if
          t_est =  94
@@ -1701,20 +1749,28 @@
              t_j = minloc(j_global, 1, j_global>=t_nth)
              ! M2
              elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $                cos((time-dti/86400.)*2.*3.142/m2t+   3.142  )-
+     $                cos((time-dte/86400.)*2.*3.142/m2t+   3.142  )-
      $                cos( time            *2.*3.142/m2t+   3.142  ))
              ! S2
              elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
-     $                cos((time-dti/86400.)*2.*3.142/s2t+5.*3.142/4.)-
+     $                cos((time-dte/86400.)*2.*3.142/s2t+5.*3.142/4.)-
      $                cos( time            *2.*3.142/s2t+5.*3.142/4.))
              ! K1
              elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $                cos((time-dti/86400.)*2.*3.142/k1t+23.*3.142/20.)-
+     $                cos((time-dte/86400.)*2.*3.142/k1t+23.*3.142/20.)-
      $                cos( time            *2.*3.142/k1t+23.*3.142/20.))
              ! O1
              elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $                cos((time-dti/86400.)*2.*3.142/o1t+    3.142  )-
+     $                cos((time-dte/86400.)*2.*3.142/o1t+    3.142  )-
      $                cos( time            *2.*3.142/o1t+    3.142  ))
+             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+           fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+           fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
            end if
          end if
          t_est = 102
@@ -1725,20 +1781,28 @@
              t_j = minloc(j_global, 1, j_global>=t_nth)
              ! M2
              elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $                cos((time-dti/86400.)*2.*3.142/m2t+3.*3.142/2.)-
+     $                cos((time-dte/86400.)*2.*3.142/m2t+3.*3.142/2.)-
      $                cos( time            *2.*3.142/m2t+3.*3.142/2.))
              ! S2
              elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $                cos((time-dti/86400.)*2.*3.142/s2t+29.*3.142/20.)-
+     $                cos((time-dte/86400.)*2.*3.142/s2t+29.*3.142/20.)-
      $                cos( time            *2.*3.142/s2t+29.*3.142/20.))
              ! K1
              elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $                cos((time-dti/86400.)*2.*3.142/k1t+23.*3.142/20.)-
+     $                cos((time-dte/86400.)*2.*3.142/k1t+23.*3.142/20.)-
      $                cos( time            *2.*3.142/k1t+23.*3.142/20.))
              ! O1
              elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $                cos((time-dti/86400.)*2.*3.142/o1t+    3.142  )-
+     $                cos((time-dte/86400.)*2.*3.142/o1t+    3.142  )-
      $                cos( time            *2.*3.142/o1t+    3.142  ))
+             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+           fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+           fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
            end if
          end if
 !
