@@ -2126,6 +2126,8 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
+      character(len=64) v_uabe,v_uabw,v_vabs,v_vabn
+      namelist/ncinf_nml/ v_uabe,v_uabw,v_vabs,v_vabn
       integer get_var_real_3d
       character*120 netcdf_bc_file
       integer ncid,status
@@ -2136,7 +2138,11 @@
       logical :: fexist !lyo:20110224:alu:stcc:
       character(len=*), intent(in) :: in_file
       integer, intent(in) :: n
-      
+
+      open(73,file='ncinf.nml',status='old')
+      read(73,nml=ncinf_nml)
+      close(73)
+
       start = 1
       edge  = 1
 !
@@ -2157,13 +2163,13 @@
       call handle_error_pnetcdf('nfmpi_open: '//netcdf_bc_file,
      $                          status,nf_noerr)
 ! get variables
-      status=nfmpi_inq_varid(ncid,'east_u',uabe_varid)
+      status=nfmpi_inq_varid(ncid,trim(v_uabe),uabe_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: uabe',status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'west_u',uabw_varid)
+      status=nfmpi_inq_varid(ncid,trim(v_uabw),uabw_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: uabw',status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'south_v',vabs_varid)
+      status=nfmpi_inq_varid(ncid,trim(v_vabs),vabs_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: vabs',status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'north_v',vabn_varid)
+      status=nfmpi_inq_varid(ncid,trim(v_vabn),vabn_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: vabn',status,nf_noerr)
 ! get data
       start(1)=j_global(1)
