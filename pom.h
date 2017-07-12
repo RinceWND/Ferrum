@@ -44,17 +44,17 @@
 !     $  n_proc= 110) !45             ) !num_of_nodes = 16  4x4
         
        parameter(
-     $  im_global=180        ,
-     $  jm_global=313         ,
-     $  kb=33                 ,
-     $  im_local=91,
-     $  jm_local=313,
-     $  im_global_coarse=180 ,
-     $  jm_global_coarse=313  ,
-     $  im_local_coarse=91,
-     $  jm_local_coarse=313,
-     $  x_division=2          ,
-     $  y_division=1          ,
+     $  im_global=182        ,
+     $  jm_global=322        ,
+     $  kb=33                ,
+     $  im_local=92          ,
+     $  jm_local=322         ,
+     $  im_global_coarse=182 ,
+     $  jm_global_coarse=322 ,
+     $  im_local_coarse=92   ,
+     $  jm_local_coarse=322  ,
+     $  x_division=2         ,
+     $  y_division=1         ,
      $  n_proc= 2)
 
 

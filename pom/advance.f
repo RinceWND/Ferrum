@@ -1055,7 +1055,7 @@
       call detect_nan_2d( uaf, "uaf" )
       call detect_nan_2d( vaf, "vaf" )
       call detect_nan_2d( elf, "elf" )
-      
+
 
       return
       end
