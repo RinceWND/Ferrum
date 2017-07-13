@@ -43,19 +43,7 @@
 !     $  y_division=2          ,    
 !     $  n_proc= 110) !45             ) !num_of_nodes = 16  4x4
         
-       parameter(
-     $  im_global=182        ,
-     $  jm_global=322        ,
-     $  kb=33                ,
-     $  im_local=92          ,
-     $  jm_local=162         ,
-     $  im_global_coarse=182 ,
-     $  jm_global_coarse=322 ,
-     $  im_local_coarse=92   ,
-     $  jm_local_coarse=162  ,
-     $  x_division=2         ,
-     $  y_division=2         ,
-     $  n_proc= 4)
+      include 'domain_dist'
 
 
 ! tide parameters !fhx:tide
