@@ -48,14 +48,14 @@
      $  jm_global=322        ,
      $  kb=33                ,
      $  im_local=92          ,
-     $  jm_local=322         ,
+     $  jm_local=162         ,
      $  im_global_coarse=182 ,
      $  jm_global_coarse=322 ,
      $  im_local_coarse=92   ,
-     $  jm_local_coarse=322  ,
+     $  jm_local_coarse=162  ,
      $  x_division=2         ,
-     $  y_division=1         ,
-     $  n_proc= 2)
+     $  y_division=2         ,
+     $  n_proc= 4)
 
 
 ! tide parameters !fhx:tide

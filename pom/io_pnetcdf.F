@@ -414,6 +414,12 @@
       integer vdims(3)
       integer(mpi_offset_kind) length
       integer(mpi_offset_kind) start(3),edge(3)
+      logical spinup
+      namelist/misc_nml/ spinup
+
+      open(73, file='switch.nml',status='old')
+      read(73, nml=misc_nml)
+      close(73)
 
 ! create netcdf restart file
       nprint=int((iint+time0*86400./dti)/irestart)
@@ -631,8 +637,12 @@
 ! write data
       start(1)=1
       edge(1)=1
-      status=nfmpi_put_vara_double_all(ncid,time_varid,start,edge
+      if (spinup) then
+        status=nfmpi_put_vara_double_all(ncid,time_varid,start,edge,0.)
+      else
+        status=nfmpi_put_vara_double_all(ncid,time_varid,start,edge
      &                                                    ,real(time,8))
+      end if
       call handle_error_pnetcdf('nf_put_vara_double',status,nf_noerr)
 
       start(1)=i_global(1)
@@ -4282,13 +4292,13 @@
         integer(mpi_offset_kind),dimension(4),intent(in)  :: start, edge
         real(kind=rk),
      &     dimension(edge(1),edge(2),edge(3)),intent(out) :: var
-        
+
         integer       status, vtype
         integer(mpi_offset_kind) k,l,m,n
         real(kind=4)  f4, o4, m4
         real(kind=8)  f8, o8, m8
         real(kind=rk) fk, ok, mv
-        
+
         integer(kind=1), dimension(:,:,:), allocatable :: i1  ! byte
         integer(kind=2), dimension(:,:,:), allocatable :: i2  ! short
         integer(kind=4), dimension(:,:,:), allocatable :: i4  ! int
@@ -4364,20 +4374,23 @@
           end if
         end if
 
-        status = nfmpi_inq_atttype(ncid, varid, "_FillValue", vtype)
-        if (vtype==NF_FLOAT) then
-          status = nfmpi_get_att_real(ncid,varid,"_FillValue",m4)
-          mv = real(m4)
-        else if (vtype==NF_DOUBLE) then
-          status = nfmpi_get_att_double(ncid,varid,"_FillValue",m8)
-          mv = real(m8)
-        else
-          call handle_error_pnetcdf('Failed reading `_FillValue`',
-     $                                status,nf_noerr)
-        end if
-
-        where (var==mv) var = 0.
-
         get_var_real_3d = status
+
+        ! the below code is optional
+        status = nfmpi_inq_atttype(ncid, varid, "_FillValue", vtype)
+        if (status==nf_noerr) then
+          if (vtype==NF_FLOAT) then
+            status = nfmpi_get_att_real(ncid,varid,"_FillValue",m4)
+            mv = real(m4)
+          else if (vtype==NF_DOUBLE) then
+            status = nfmpi_get_att_double(ncid,varid,"_FillValue",m8)
+            mv = real(m8)
+          else
+            call handle_error_pnetcdf('Failed reading `_FillValue`',
+     $                                status,nf_noerr)
+          end if
+
+          where (var==mv) var = 0.
+        end if
 
       end function

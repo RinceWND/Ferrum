@@ -16,8 +16,14 @@
       implicit none
       include 'pom.h'
 
+      logical spinup
+      namelist/misc_nml/ spinup
+
       type(date) :: dtime
 
+      open(73, file='switch.nml',status='old')
+      read(73, nml=misc_nml)
+      close(73)
 
 ! initialize model
       call initialize
@@ -52,12 +58,14 @@
 
         
 !     external forcings
-        if ( calc_uvforce ) call uvforce_main(dtime)  !eda:uvforce
-        call tsforce_main( dtime )            
-        if ( calc_tsurf_mc )call mcsst_main(dtime)  !fhx:mcsst  
-        if ( calc_tsforce ) call tsforce_tsflx( dtime )
-        if ( calc_wind )    call wind_main( dtime )
-        if ( calc_river )   call river_main( dtime, .false. )
+        if (iint==1 .or. .not.spinup) then
+          if ( calc_uvforce ) call uvforce_main(dtime)  !eda:uvforce
+          call tsforce_main( dtime )
+          if ( calc_tsurf_mc )call mcsst_main(dtime)  !fhx:mcsst
+          if ( calc_tsforce ) call tsforce_tsflx( dtime )
+          if ( calc_wind )    call wind_main( dtime )
+          if ( calc_river )   call river_main( dtime, .false. )
+        end if
 
        
 !     advance model
