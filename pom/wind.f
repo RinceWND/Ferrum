@@ -8,6 +8,9 @@
 
       include 'pom.h'
 
+      real(kind=rk) sf_bf, sf_hf, sf_wi
+      namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
+
       integer, parameter :: wn = 4
 
       real(kind=rk), dimension( im_local, jm_local ) ::
@@ -58,6 +61,11 @@
 
       integer n
 
+
+      open(73, file='switch.nml',status='old')
+      read(73, nml=sensitivity_nml)
+      close(73)
+
       ! initialize
       n = 1
 
@@ -86,12 +94,15 @@
 !!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)   
 
          if(lexist) then
-         d_off = str2date("1979-01-01 00:00:00")
-         d_off%year = d_in%year
-         n = int(dif_date(d_in, d_off)/86400.)*4+1
+           d_off = str2date("1979-01-01 00:00:00")
+           d_off%year = d_in%year
+           n = int(dif_date(d_in, d_off)/86400.)*4+1
 
-         call read_wind_pnetcdfc
+           call read_wind_pnetcdfc
      $             ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+
+           uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
+           vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
 
          else
              if ( my_task == master_task ) then
@@ -103,8 +114,6 @@
              vwnd_buf_coarse = 0.         
             
          endif
-
-         write(*,*) minval(uwnd_buf_coarse),maxval(uwnd_buf_coarse)
 
 ! interpolation
       if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.  
@@ -191,6 +200,9 @@
 
             call read_wind_pnetcdfc
      $         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+
+           uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
+           vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
 
          else
               if ( my_task == master_task ) then
@@ -331,7 +343,10 @@
 
          call read_wind_pnetcdfc
      $        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
-         
+
+           uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
+           vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
+
          else
             if ( my_task == master_task ) then
                  write(*,'(/2a)') 

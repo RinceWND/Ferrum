@@ -7,6 +7,9 @@
       public :: uvforce_init, uvforce_main 
 
       include 'pom.h'
+
+      real(kind=rk) sf_bf, sf_hf, sf_wi
+      namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
       
 !     days in month
       integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,               
@@ -45,7 +48,11 @@
 
 !     intent(in)
       type(date), intent(in) :: d_in 
-  
+
+
+      open(73, file='switch.nml',status='old')
+      read(73, nml=sensitivity_nml)
+      close(73)
 
 !     check leap year
       if( ( mod( d_in%year, 4 ) .eq. 0 
@@ -98,6 +105,12 @@
 !
 !         call read_bc_pnetcdf_obs
 !     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bry_old.nc", mon_b )
+!     TODO: Treat water transport increase properly in case of baroclinic velocities input
+!           The below won't work for vertically non-homogeneous velocity field
+         ube_a = sf_bf*ube_a
+         ubw_a = sf_bf*ubw_a
+         vbs_a = sf_bf*vbs_a
+         vbn_a = sf_bf*vbn_a
 
       if ( my_task == master_task ) 
      $        write(*,'(/a/)') "---------- uvforce_init."
@@ -188,6 +201,11 @@
          call read_bc_pnetcdf
      $        ( ube_b, ubw_b, vbs_b, vbn_b, "bc.nc", mon_b )
      
+         ube_b = sf_bf*ube_b
+         ubw_b = sf_bf*ubw_b
+         vbs_b = sf_bf*vbs_b
+         vbn_b = sf_bf*vbn_b
+
 !         call read_bc_pnetcdf_obs
 !     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bry_old.nc", mon_b )
 

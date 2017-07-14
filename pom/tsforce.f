@@ -7,7 +7,10 @@
       public :: tsforce_init, tsforce_main, tsforce_tsflx
 
       include 'pom.h'
-      
+
+      real(kind=rk) sf_bf, sf_hf, sf_wi
+      namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
+
 !     days in month
       integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,               
      $                          31, 31, 30, 31, 30, 31/)
@@ -52,6 +55,10 @@
 !     intent(in)
       type(date), intent(in) :: d_in 
   
+
+      open(73, file='switch.nml',status='old')
+      read(73, nml=sensitivity_nml)
+      close(73)
 
 !     initialize
 
@@ -327,7 +334,7 @@
       use module_time
 
       implicit none
-      
+
       integer n
       
       ! intent(in)
@@ -337,7 +344,6 @@
 
       logical :: lexist    
 
- 
 
       sec_in_day = d_in%hour*3600 + d_in%min*60 + d_in%sec
 
@@ -363,7 +369,7 @@
 
       if (n/=nb) then
         if (my_task==master_task)
-     $          write(*,'(a,i5)') "Reading heat record ",n,"@",d_in%year
+     $       write(*,'(2(a,i5))') "Reading heat record ",n,"@",d_in%year
         nb = n
         write( infile_b, '( a3,".",i4.4,".nc" )' )
      $        "hfl", d_in%year
@@ -376,7 +382,8 @@
           call read_heat_pnetcdf(
      $                  uht,swr,tair,emp,infile_b,n)
 !     $                 wtsurf(1:im,1:jm),swrad(1:im,1:jm),infile_b,n)
-          wtsurf(1:im,1:jm) = wtsurf+uht+emp*(tair-t(1:im,1:jm,1))*3986.
+          wtsurf(1:im,1:jm) = wtsurf
+     $                      +sf_hf*(uht+emp*(tair-t(1:im,1:jm,1))*3986.)
           swrad(1:im,1:jm)  = swr
           wtsurf = wtsurf/(rhoref*3986.)
           swrad  = -swrad/(rhoref*3986.)
