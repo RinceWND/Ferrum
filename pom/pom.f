@@ -395,7 +395,7 @@
 
          call write_restart_pnetcdf( 
      $        "out/"//date2str(d_in)//"."//
-     $        trim(title)//".rst" )
+     $        trim(netcdf_file)//".rst" )
          
       endif
 
