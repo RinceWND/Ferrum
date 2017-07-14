@@ -304,8 +304,8 @@
 ! initialise time
 ! Calulate the Julian days from 1992-01-01 !fhx:20110113
       dtime0 = str2date( time_start(1:19) )
-      dtime = str2date(read_rst_file(9:21)//":"//
-     &  read_rst_file(23:24)//":"//read_rst_file(26:27) )
+      dtime = str2date(read_rst_file(1:13)//":"//
+     &  read_rst_file(15:16)//":"//read_rst_file(18:19) )
 
        time0=( dtime - dtime0 ) / 86400
        
@@ -578,7 +578,7 @@
       character*120 netcdf_ic_file     !lyo:20110202:
       logical :: fexist                !lyo:20110202:
 
-      read(read_rst_file, '(13x,i2)') n
+      read(read_rst_file, '(5x,i2)') n
 
 ! read initial temperature and salinity from ic file
 !      call read_initial_ts_pnetcdf(kb,tb,sb)

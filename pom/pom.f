@@ -31,8 +31,8 @@
 ! starting date and time
 ! read date from restart file name !fhx:
 !     dtime = str2date( time_start(1:19) )
-      dtime = str2date(read_rst_file(9:21)//":"//
-     &read_rst_file(23:24)//":"//read_rst_file(26:27) )
+      dtime = str2date(read_rst_file(1:13)//":"//
+     &read_rst_file(15:16)//":"//read_rst_file(18:19) )
 
       if ( calc_uvforce ) call uvforce_init(dtime) !eda:uvforce 
       call tsforce_init( dtime )
@@ -394,8 +394,8 @@
 
 
          call write_restart_pnetcdf( 
-     $        "out/"//trim(write_rst_file)//"."//
-     $        date2str(d_in)//".nc" )
+     $        "out/"//date2str(d_in)//"."//
+     $        trim(title)//".rst" )
          
       endif
 
