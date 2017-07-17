@@ -1267,7 +1267,7 @@
       end
 
 !_______________________________________________________________________
-      subroutine baropg_lin()
+      subroutine baropg_lin
 
       implicit none
       include 'pom.h'
@@ -1338,7 +1338,7 @@
       end subroutine
 
 !_______________________________________________________________________
-      subroutine baropg_song_std()
+      subroutine baropg_song_std
 
       implicit none
       include 'pom.h'
@@ -1421,7 +1421,7 @@
      &              (fac2+fac1*(rho(i,j,1)+rho(i,j-1,1)))*
      &              (z(1)*(dt(i,j)-dt(i,j-1))+et(i,j)-et(i,j-1))
             drhoy(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i,j-1))*
-     &                        phie(i)*(dy(i,j)+dy(i-1,j))
+     &                        phie(i)*(dy(i,j)+dy(i,j-1))
             end if
           end do
 !

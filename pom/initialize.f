@@ -328,7 +328,7 @@
         write(6,'('' nadv       = '',i10)') nadv
         write(6,'('' nitera     = '',i10)') nitera
         write(6,'('' sw         = '',f10.4)') sw
-        write(6,'('' npg         = '',i10)') npg    !fhx:Toni:npg
+        write(6,'('' npg        = '',i10)') npg    !fhx:Toni:npg
         write(6,'('' nread_rst  = '',i10)') nread_rst
         write(6,'('' write_rst  = '',f10.4)') write_rst
         write(6,'('' irestart   = '',i10)') irestart
@@ -375,6 +375,10 @@
         write(6,'('' calc_interp    = '',l)') calc_interp   !fhx:interp_flag
         write(6,'('' output_flag    = '',i2)') output_flag  !fhx:20110131:
         write(6,'('' SURF_flag      = '',i2)') SURF_flag    !fhx:20110131:
+        write(6,'(/'' Sensitivity:'')')
+        write(6,'(''   heat flux     = '',f10.4)') sf_hf
+        write(6,'(''   wind speed    = '',f10.4)') sf_wi
+        write(6,'(''   lat.velocities= '',f10.4)') sf_bf
       end if
 
       return

@@ -4102,13 +4102,6 @@
         integer time_dimid,x_dimid,y_dimid,z_dimid
         integer time_varid
      $       ,z_varid,zz_varid,dx_varid,dy_varid
-     $       , east_c_varid, east_e_varid, east_u_varid, east_v_varid
-     $       ,north_c_varid,north_e_varid,north_u_varid,north_v_varid
-     $       ,h_varid,fsm_varid,dum_varid,dvm_varid,rot_varid
-     $       ,wusurf_varid,wvsurf_varid,wtsurf_varid,wssurf_varid
-     $       ,t_varid,s_varid,rho_varid,km_varid,kh_varid
-     $       ,frz_varid
-     $       ,aamfrz_varid
         integer uabe_varid,uabw_varid,vabs_varid,vabn_varid
         integer tbe_varid,tbw_varid,tbs_varid,tbn_varid
         integer sbe_varid,sbw_varid,sbs_varid,sbn_varid
