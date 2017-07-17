@@ -8,18 +8,15 @@
 
       include 'pom.h'
 
-      real(kind=rk) sf_bf, sf_hf, sf_wi
-      namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
-
 !     days in month
       integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,               
      $                          31, 31, 30, 31, 30, 31/)
                              
 !     coefficients for relaxation 
 !     c1 = 1/30 [m/day]
-!     real(kind=rk), parameter :: c1 = 3.858024691e-7 
+      real(kind=rk), parameter :: c1 = 3.858024691e-7 
 !     c1 = 1 [m/day] !lyo:20110202:
-      real(kind=rk), parameter :: c1 = 1.157407407e-5 !lyo:pac10:exp001->007;exp302:
+!      real(kind=rk), parameter :: c1 = 1.157407407e-5 !lyo:pac10:exp001->007;exp302:
       real(kind=rk) :: sstrelx, sssrelx
 
 
@@ -55,10 +52,6 @@
 !     intent(in)
       type(date), intent(in) :: d_in 
   
-
-      open(73, file='switch.nml',status='old')
-      read(73, nml=sensitivity_nml)
-      close(73)
 
 !     initialize
 

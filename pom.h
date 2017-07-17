@@ -602,7 +602,7 @@
 
       parameter(
      $  nfe=  1        ,
-     $  nfw=  20        ,
+     $  nfw=  1        ,
      $  nfn=  1        ,
      $  nfs=  1         )
 
@@ -731,3 +731,13 @@
      $  uwsrf(im_local,jm_local)        ,   ! wind data for SURF mean output
      $  vwsrf(im_local,jm_local)
 !fhx:20110131:end:
+
+      real(kind=rk)
+     $  sf_bf                           ,   ! boundary flux (barotropic velocities) factor
+     $  sf_hf                           ,   ! heat flux factor
+     $  sf_wi                               ! wind velocity factor
+
+      common/blksensitivity/
+     $  sf_bf                           ,
+     $  sf_hf                           ,
+     $  sf_wi

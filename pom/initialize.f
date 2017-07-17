@@ -177,6 +177,8 @@
      $     output_flag, SURF_flag !fhx:20110131:
       type(date) ::  dtime, dtime0
 
+      namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
+
 ! Input of filenames and constants
 
 ! Logical for inertial ramp (.true. if inertial ramp to be applied
@@ -277,10 +279,11 @@
       open(73,file='pom.nml',status='old')
       read(73,nml=pom_nml)
       close(73)
-  
+
 ! read main switches
       open(73,file='switch.nml',status='old')
       read(73,nml=switch_nml)
+      read(73,nml=sensitivity_nml)
       close(73)
 
 ! End of input of constants

@@ -8,9 +8,6 @@
 
       include 'pom.h'
 
-      real(kind=rk) sf_bf, sf_hf, sf_wi
-      namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
-
       integer, parameter :: wn = 4
 
       real(kind=rk), dimension( im_local, jm_local ) ::
@@ -61,10 +58,6 @@
 
       integer n
 
-
-      open(73, file='switch.nml',status='old')
-      read(73, nml=sensitivity_nml)
-      close(73)
 
       ! initialize
       n = 1
