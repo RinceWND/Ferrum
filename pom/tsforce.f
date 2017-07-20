@@ -216,8 +216,8 @@
          sm_a = sm_b
          tc_a = tc_b
          sc_a = sc_b
-         uw_a = uw_b
-         vw_a = vw_b
+!         uw_a = uw_b
+!         vw_a = vw_b
 
          tsurf_a = tsurf_b
          ssurf_a = ssurf_b
@@ -245,9 +245,9 @@
 
       tclim = ( 1.0 - aa ) * tc_a + aa * tc_b
       sclim = ( 1.0 - aa ) * sc_a + aa * sc_b
-!      tmean = ( 1.0 - aa ) * tm_a + aa * tm_b
-!      smean = ( 1.0 - aa ) * sm_a + aa * sm_b
-      rmean = ( 1.0 - aa ) * rm_a + aa * rm_b
+      tmean = ( 1.0 - aa ) * tm_a + aa * tm_b
+      smean = ( 1.0 - aa ) * sm_a + aa * sm_b
+!      rmean = ( 1.0 - aa ) * rm_a + aa * rm_b
       
 !      wusurf = ( 1.0 - aa ) * uw_a + aa * uw_b
 !      wvsurf = ( 1.0 - aa ) * vw_a + aa * vw_b
@@ -258,7 +258,7 @@
 
 !     calculation of rmean.
       
-!      call dens( smean, tmean, rmean )
+      call dens( smean, tmean, rmean )
 
 !     set boundary condition.
 
@@ -344,22 +344,6 @@
       d_tmp%year = d_in%year
       n = int(dif_date(d_in, d_tmp)/(86400.)*4.)+1
       
-      do j=1,jm
-         do i=1,im
-            
-            sstrelx = 1.0d0
-!lyo:20110202:
-!           sssrelx = ( 1.0d0 + tanh( 0.002d0 * (h(i,j)-1000.d0)))*0.5d0 
-!           sssrelx = ( 1.0d0 + tanh(0.0005d0 * (h(i,j)-2500.d0)))*0.5d0 
-
-            wtsurf( i, j ) 
-     $           = c1 * sstrelx * ( tb( i, j, 1 ) - tsurf( i, j ) )
-            wssurf( i, j ) 
-     $           = c1 * sssrelx * ( sb( i, j, 1 ) - ssurf( i, j ) )
-            
-         enddo
-      enddo
-
       if (n/=nb) then
         if (my_task==master_task)
      $       write(*,'(2(a,i5))') "Reading heat record ",n,"@",d_in%year
@@ -375,10 +359,7 @@
           call read_heat_pnetcdf(
      $                  uht,swr,tair,emp,infile_b,n)
 !     $                 wtsurf(1:im,1:jm),swrad(1:im,1:jm),infile_b,n)
-          wtsurf(1:im,1:jm) = wtsurf
-     $                      +sf_hf*(uht+emp*(tair-t(1:im,1:jm,1))*3986.)
           swrad(1:im,1:jm)  = swr
-          wtsurf = wtsurf/(rhoref*3986.)
           swrad  = -swrad/(rhoref*3986.)
         else
           if ( my_task == master_task ) then
@@ -389,6 +370,24 @@
         endif
 
       end if
+
+      do j=1,jm
+         do i=1,im
+
+            sstrelx = 1.0d0
+!lyo:20110202:
+!           sssrelx = ( 1.0d0 + tanh( 0.002d0 * (h(i,j)-1000.d0)))*0.5d0
+!           sssrelx = ( 1.0d0 + tanh(0.0005d0 * (h(i,j)-2500.d0)))*0.5d0
+
+            wtsurf( i, j ) = sf_hf *
+     $           ( uht(i,j)/3986.+emp(i,j)*(tair(i,j)-t(i,j,1)) )/rhoref
+            wtsurf( i, j ) = wtsurf(i,j)
+     $           + c1 * sstrelx * ( tb( i, j, 1 ) - tsurf( i, j ) )
+            wssurf( i, j )
+     $           = c1 * sssrelx * ( sb( i, j, 1 ) - ssurf( i, j ) )
+
+         enddo
+      enddo
 
 ! TODO: interpolation
 
