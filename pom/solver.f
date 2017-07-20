@@ -1346,7 +1346,7 @@
       real(kind=rk) phix(2:im),phie(im)
       real(kind=rk) fac1,fac2,fac3,cff1,cff2,cff3,cff4,gamma
 
-      rho = rho-rmean
+!      rho = rho-rmean
 
       fac1 =     .5 *grav/rhoref
       fac2 = 1000.  *grav/rhoref
@@ -1354,15 +1354,13 @@
 
       do j = 1,jm
         do i = 2,im
-          if (dum(i,j)/=0.) then
           cff1 = (z(1)-zz(1))*(dt(i,j)+dt(i-1,j))
           phix(i) = fac1*(rho(i,j,1)-rho(i-1,j,1))*cff1
           phix(i) = phix(i)+                                              &
      &            (fac2+fac1*(rho(i,j,1)+rho(i-1,j,1)))*
-     &            (z(1)*(dt(i,j)-dt(i-1,j))+et(i,j)-et(i-1,j))
+     &            (z(1)*(dt(i,j)-dt(i-1,j)))
           drhox(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i-1,j))*
      &                      phix(i)*(dy(i,j)+dy(i-1,j))
-          end if
          end do
 !
 !  Compute interior baroclinic pressure gradient.  Differentiate and
@@ -1370,11 +1368,9 @@
 !
         do k = 2,kbm1
           do i = 2,im
-            if (dum(i,j)/=0.) then
             cff1 = 1./(dt(i  ,j)*(zz(k-1)-zz(k))*
      &                 dt(i-1,j)*(zz(k-1)-zz(k)))
             cff2 = (dt(i,j)-dt(i-1,j))*(zz(k)+zz(k-1))
-     &            +2.*(et(i,j)-et(i-1,j))
             cff3 = (zz(k-1)-zz(k))*(dt(i,j)-dt(i-1,j))
             gamma = .125*cff1*cff2*cff3
 
@@ -1384,9 +1380,9 @@
      &             rho(i,j,k  )-rho(i-1,j,k  )
             cff3 = (dt(i,j)+dt(i-1,j))*(zz(k-1)-zz(k))
             cff4 = (1.+gamma)*
-     &               (zz(k-1)*(dt(i,j)-dt(i-1,j))+et(i,j)-et(i-1,j))+          &
+     &               (zz(k-1)*(dt(i,j)-dt(i-1,j)))+
      &             (1.-gamma)*
-     &               (zz(k  )*(dt(i,j)-dt(i-1,j))+et(i,j)-et(i-1,j))
+     &               (zz(k  )*(dt(i,j)-dt(i-1,j)))
             phix(i) = phix(i)+                                            &
      &                fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1402,7 +1398,6 @@
 !     &              fac3*(cff1*cff3-cff2*cff4)
             drhox(i,j,k) = -.25*dz(k)*(dt(i,j)+dt(i-1,j))*
      &                        phix(i)*(dy(i,j)+dy(i-1,j))
-            end if
           end do
         end do
 !
@@ -1414,15 +1409,13 @@
 !
         if (j>=2) then
           do i = 1,im
-            if (dvm(i,j)/=0.) then
             cff1 = (z(1)-zz(1))*(dt(i,j)+dt(i,j-1))
             phie(i) = fac1*(rho(i,j,1)-rho(i,j-1,1))*cff1
             phie(i) = phie(i)+                                            &
      &              (fac2+fac1*(rho(i,j,1)+rho(i,j-1,1)))*
-     &              (z(1)*(dt(i,j)-dt(i,j-1))+et(i,j)-et(i,j-1))
+     &              (z(1)*(dt(i,j)-dt(i,j-1)))
             drhoy(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i,j-1))*
      &                        phie(i)*(dy(i,j)+dy(i,j-1))
-            end if
           end do
 !
 !  Compute interior baroclinic pressure gradient.  Differentiate and
@@ -1430,11 +1423,9 @@
 !
           do k = 2,kbm1
             do i = 1,im
-              if (dvm(i,j)/=0.) then
               cff1 = 1./(dt(i,j  )*(z(k-1)-z(k))*
      &                   dt(i,j-1)*(z(k-1)-z(k)))
-              cff2 = (dt(i,j)-dt(i,j-1))*(zz(k)+zz(k-1))+                       &
-     &               2.*(et(i,j)-et(i,j-1))
+              cff2 = (dt(i,j)-dt(i,j-1))*(zz(k)+zz(k-1))
               cff3 = (zz(k-1)-zz(k))*(dt(i,j)-dt(i,j-1))
               gamma = .125*cff1*cff2*cff3
 
@@ -1444,9 +1435,9 @@
      &               rho(i,j,k  )-rho(i,j-1,k  )
               cff3 = (dt(i,j)+dt(i,j-1))*(zz(k-1)-zz(k))
               cff4 = (1.+gamma)*
-     &                 (zz(k-1)*(dt(i,j)-dt(i,j-1))+et(i,j)-et(i,j-1))+
+     &                 (zz(k-1)*(dt(i,j)-dt(i,j-1)))+
      &               (1.-gamma)*
-     &                 (zz(k  )*(dt(i,j)-dt(i,j-1))+et(i,j)-et(i,j-1))
+     &                 (zz(k  )*(dt(i,j)-dt(i,j-1)))
               phie(i) = phie(i)+                                          &
      &                  fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1463,13 +1454,12 @@
               drhoy(i,j,k) = -.25*dz(k)*(dt(i,j)+dt(i,j-1))*
      &                          phie(i)*(dx(i,j)+dx(i,j-1))
 !              if (isnan(drhoy(i,j,k))) write(*,*) my_task,"::",i,j,k
-              end if
             end do
           end do
         end if
       end do
 
-      rho = rho+rmean
+!      rho = rho+rmean
 
       end subroutine
 
