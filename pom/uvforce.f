@@ -13,11 +13,11 @@
      $                          31, 31, 30, 31, 30, 31/)
                              
 
-      real(kind=rk), dimension( im_local ) ::
-     $     vabs_a, vabn_a, vabs_b, vabn_b
-
-      real(kind=rk), dimension( jm_local ) ::
-     $     uabe_a, uabw_a, uabe_b, uabw_b
+!      real(kind=rk), dimension( im_local ) ::
+!     $     vabs_a, vabn_a, vabs_b, vabn_b
+!
+!      real(kind=rk), dimension( jm_local ) ::
+!     $     uabe_a, uabw_a, uabe_b, uabw_b
 
       real(kind=rk), dimension( im_local, kb ) ::
      $     vbs_a, vbn_a, vbs_b, vbn_b

@@ -589,7 +589,7 @@
 
 !_______________________________________________________________________
 !      subroutine advt2(fb,f,fclim,ff,xflux,yflux)
-      subroutine advt2(fb,f,fclim,ff,xflux,yflux,var)
+      subroutine advt2(fb,fclim,ff,xflux,yflux,var)
 ! integrate conservative scalar equations
 ! this is a first-order upstream scheme, which reduces implicit
 ! diffusion using the Smolarkiewicz iterative upstream scheme with an
@@ -599,7 +599,7 @@
 ! National Agency for New Technology and Environment, Rome, Italy)
       implicit none
       include 'pom.h'
-      real(kind=rk), dimension(im,jm,kb) :: fb,f,fclim,ff,xflux,yflux
+      real(kind=rk), dimension(im,jm,kb) :: fb,fclim,ff,xflux,yflux
      &                                 ,fbmem,xmassflux,ymassflux,zwflux
       real(kind=rk), dimension(im,jm)    :: eta
 !      real(kind=rk) eps, epsval  ! rwnd: iteration check

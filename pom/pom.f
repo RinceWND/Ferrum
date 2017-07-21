@@ -89,7 +89,7 @@
       call write_output( dtime )
 
 ! write SURF output
-      call write_output_surf( dtime ) !fhx:20110131:
+      call write_output_surf !fhx:20110131:
 
 ! write restart
       call write_restart( dtime )
@@ -267,13 +267,11 @@
 
 !
 !_______________________________________________________________________
-      subroutine write_output_surf( d_in )!fhx:20110131: new subr.
+      subroutine write_output_surf !fhx:20110131: new subr.
       use module_time
 
       implicit none
       include 'pom.h'
-
-      type(date), intent(in) :: d_in
 
       if(netcdf_file.ne.'nonetcdf' .and. mod(iint,iprints).eq.0) then
 
@@ -298,7 +296,7 @@
        
          usrf_mean    = 0.0
          vsrf_mean    = 0.0
-         elsrf_mean    = 0.0
+         elsrf_mean   = 0.0
          uwsrf_mean = 0.0
          vwsrf_mean = 0.0
          

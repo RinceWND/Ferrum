@@ -18,7 +18,6 @@
 !    $ uwind_surf, vwind_surf
 
       real(kind=rk), dimension( im_local_coarse, jm_local_coarse ) ::
-     $  uwnd_a_coarse, vwnd_a_coarse, uwnd_b_coarse, vwnd_b_coarse,
      $  uwnd_coarse, vwnd_coarse
 
       real(kind=rk), dimension( im_local_coarse, jm_local_coarse, wn )::
@@ -115,8 +114,8 @@
         uwnd_coarse = uwnd_buf_coarse( :, :, k )
         vwnd_coarse = vwnd_buf_coarse( :, :, k )
 
-        call interp_mask_2d(uwnd_coarse,1,east_e,north_e,fsm,uwnd_fine)
-        call interp_mask_2d(vwnd_coarse,2,east_e,north_e,fsm,vwnd_fine)
+        call interp_mask_2d(uwnd_coarse,1,east_e,north_e,uwnd_fine)
+        call interp_mask_2d(vwnd_coarse,2,east_e,north_e,vwnd_fine)
 !fhx: after interpolation, i=1,3 and j=1,3 seem to have problems
       if (n_west.eq.-1) then
 !         print*, uwnd_fine(1,1),uwnd_fine(1,2),uwnd_fine(2,1)
@@ -214,8 +213,8 @@
        do k=1,wn
         uwnd_coarse = uwnd_buf_coarse( :, :, k )
         vwnd_coarse = vwnd_buf_coarse( :, :, k )
-        call interp_mask_2d(uwnd_coarse,1,east_e,north_e,fsm,uwnd_fine)
-        call interp_mask_2d(vwnd_coarse,2,east_e,north_e,fsm,vwnd_fine)
+        call interp_mask_2d(uwnd_coarse,1,east_e,north_e,uwnd_fine)
+        call interp_mask_2d(vwnd_coarse,2,east_e,north_e,vwnd_fine)
 !fhx: after interpolation, i=1,2 and j=1,2 seem to have problems
       if (n_west.eq.-1) then
        do i=1,2
@@ -357,8 +356,8 @@
        do k=1,4  
         uwnd_coarse = uwnd_buf_coarse( :, :, k )
         vwnd_coarse = vwnd_buf_coarse( :, :, k )
-        call interp_mask_2d(uwnd_coarse,1,east_e,north_e,fsm,uwnd_fine)
-        call interp_mask_2d(vwnd_coarse,2,east_e,north_e,fsm,vwnd_fine)
+        call interp_mask_2d(uwnd_coarse,1,east_e,north_e,uwnd_fine)
+        call interp_mask_2d(vwnd_coarse,2,east_e,north_e,vwnd_fine)
 !fhx: after interpolation, i=1,2 and j=1,2 seem to have problems
       if (n_west.eq.-1) then
        do i=1,2

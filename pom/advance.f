@@ -539,10 +539,10 @@
             call advt1(tb,t,tclim,uf,a,c,'T')
             call advt1(sb,s,sclim,vf,a,c,'S')
           else if(nadv.eq.2) then
-!            call advt2(tb,t,tclim,uf,a,c)
-!            call advt2(sb,s,sclim,vf,a,c)
-            call advt2(tb,t,tclim,uf,a,c,'T')
-            call advt2(sb,s,sclim,vf,a,c,'S')
+!            call advt2(tb,tclim,uf,a,c)
+!            call advt2(sb,sclim,vf,a,c)
+            call advt2(tb,tclim,uf,a,c,'T')
+            call advt2(sb,sclim,vf,a,c,'S')
           else
             error_status=1
             write(6,'(/''Error: invalid value for nadv'')')

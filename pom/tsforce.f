@@ -27,14 +27,14 @@
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
      $     tm_a, sm_a, tm_b, sm_b,
-     $     tmean, smean, rm_a, rm_b
+     $     tmean, smean!, rm_a, rm_b
      
-      real(kind=rk), dimension( im_local, jm_local ) ::
-     $     uw_a, vw_a, uw_b, vw_b
+!      real(kind=rk), dimension( im_local, jm_local ) ::
+!     $     uw_a, vw_a, uw_b, vw_b
     
       integer :: mon_a, mon_b, sec_in_month, mid_in_month
       integer :: i, j, k, nb
-      character*13 :: infile_a, infile_b
+      character*13 :: infile_b
       real(kind=rk) :: aa
 
 

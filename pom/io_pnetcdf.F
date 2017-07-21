@@ -4100,8 +4100,7 @@
         character(len=*), intent(in) :: netcdf_out_file
         character*120 str_tmp !,netcdf_out_file !lyo:20110224:alu:stcc:
         integer time_dimid,x_dimid,y_dimid,z_dimid
-        integer time_varid
-     $       ,z_varid,zz_varid,dx_varid,dy_varid
+        integer time_varid,z_varid,zz_varid
         integer uabe_varid,uabw_varid,vabs_varid,vabn_varid
         integer tbe_varid,tbw_varid,tbs_varid,tbn_varid
         integer sbe_varid,sbw_varid,sbs_varid,sbn_varid

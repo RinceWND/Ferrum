@@ -31,8 +31,7 @@
 !--------------------------------------------------------------------------------
 
       subroutine interp_mask_2d(
-     $    var_coarse, flag_uv, alon_fine, alat_fine,
-     $    mask_fine, var_fine)
+     $    var_coarse, flag_uv, alon_fine, alat_fine, var_fine)
 
 !--------------------------------------------------------------------------------
 
@@ -44,7 +43,7 @@
 
       real(kind=rk), dimension(im_coarse, jm_coarse) ::  var_coarse
 
-      real(kind=rk), dimension(im,jm) :: alon_fine, alat_fine, mask_fine
+      real(kind=rk), dimension(im,jm) :: alon_fine, alat_fine
 
       integer, intent(in) :: flag_uv
       real(kind=rk), intent(out)   :: var_fine(im, jm)
@@ -270,8 +269,7 @@
 
 !--------------------------------------------------------------------------------
       subroutine interp_mask_3d(
-     $    var_coarse, flag_uv, alon_fine, alat_fine,
-     $    mask_fine, var_fine)
+     $    var_coarse, flag_uv, alon_fine, alat_fine, var_fine)
 
 !--------------------------------------------------------------------------------
 
@@ -282,7 +280,7 @@
 
       real(kind=rk), dimension(im_coarse, jm_coarse, kb) ::  var_coarse
 
-      real(kind=rk), dimension(im,jm) :: alon_fine, alat_fine, mask_fine
+      real(kind=rk), dimension(im,jm) :: alon_fine, alat_fine
 
       integer, intent(in) :: flag_uv
       real(kind=rk), intent(out)   :: var_fine(im, jm, kb)
@@ -293,7 +291,7 @@
 
        do k = 1, kb
         call interp_mask_2d(var_coarse(:, :, k), flag_uv, 
-     $   alon_fine,  alat_fine,  mask_fine,  var_fine(:, :, k))
+     $   alon_fine,  alat_fine,  var_fine(:, :, k))
        enddo
 
 !--------------------------------------------------------------------------------
