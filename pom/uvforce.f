@@ -28,7 +28,7 @@
     
       integer :: mon_a, mon_b, sec_in_month, mid_in_month
       integer :: k
-      character*7 :: infile_a, infile_b
+      character(len=7) :: infile_a, infile_b
       real(kind=rk) :: aa
 
 

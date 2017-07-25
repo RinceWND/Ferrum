@@ -106,7 +106,7 @@
       end
 
 !_______________________________________________________________________
-      real*8 function realtime()
+      real(kind=8) function realtime()
       call system_clock(i,j,k)
       realtime=i/dble(j)
       return

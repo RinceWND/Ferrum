@@ -67,7 +67,7 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       character(len=*), intent(in) :: netcdf_out_file
-      character*120 str_tmp!, netcdf_out_file
+      character(len=120) str_tmp!, netcdf_out_file
       integer time_dimid,x_dimid,y_dimid,z_dimid
       integer z_varid,zz_varid,dx_varid,dy_varid,east_c_varid,
      $        east_e_varid,east_u_varid,east_v_varid,north_c_varid,
@@ -399,7 +399,7 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       character(len=*), intent(in) :: netcdf_out_file
-      character*120 str_tmp
+      character(len=120) str_tmp
       integer nprint
       integer ncid,status
       integer time_dimid,x_dimid,y_dimid,z_dimid
@@ -792,7 +792,7 @@
       integer get_var_real_1d
      &       ,get_var_real_2d
       
-      character*120 netcdf_grid_file
+      character(len=120) netcdf_grid_file
       integer z_varid,zz_varid,dx_varid,dy_varid,east_c_varid,
      $        east_e_varid,east_u_varid,east_v_varid,north_c_varid,
      $        north_e_varid,north_u_varid,north_v_varid,rot_varid,
@@ -940,7 +940,7 @@
       integer get_var_real_1d
      &       ,get_var_real_2d
       
-      character*120 netcdf_grid_file
+      character(len=120) netcdf_grid_file
       integer z_varid,zz_varid,dx_varid,dy_varid,east_e_varid,
      $        north_e_varid,rot_varid,h_varid,fsm_varid
       integer ncid,status
@@ -1092,7 +1092,7 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      character*120 netcdf_grid_file
+      character(len=120) netcdf_grid_file
       integer alon_coarse_varid,alat_coarse_varid,mask_coarse_varid
       integer ncid,status
       integer(mpi_offset_kind) start(2),edge(2)
@@ -1160,7 +1160,7 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       integer get_var_real_2d, get_var_real_3d
-      character*120 netcdf_in_file
+      character(len=120) netcdf_in_file
       integer ncid,status
       integer wubot_varid,wvbot_varid,aam2d_varid,ua_varid,
      $        uab_varid,va_varid,vab_varid,el_varid,elb_varid,et_varid,
@@ -1434,7 +1434,7 @@
       integer k
 !      real(kind=rk) temp(im,jm,k),salt(im,jm,k)
       real(kind=rk) temp(im,jm,kb),salt(im,jm,kb)
-      character*120 netcdf_ic_file
+      character(len=120) netcdf_ic_file
       integer ncid,status
       integer tb_varid,sb_varid
       integer(mpi_offset_kind) start(4),edge(4)
@@ -1503,7 +1503,7 @@
       integer k,n
 !      real(kind=rk) temp(im,jm,k),salt(im,jm,k)
       real(kind=rk) temp(im,jm,kb),salt(im,jm,kb)
-      character*120 netcdf_ic_file
+      character(len=120) netcdf_ic_file
       integer ncid,status
       integer tclim_varid,sclim_varid
       integer(mpi_offset_kind) start(4),edge(4)
@@ -1543,7 +1543,7 @@
       do k=1,kbm1
         where (fsm==0.)
           temp(:,:,k) = 0.
-          salt(:,:,k) = 34.
+          salt(:,:,k) = 0.
         end where
       end do
       temp(:,:,kb) = temp(:,:,kbm1)
@@ -1566,7 +1566,7 @@
       integer k,n
 !      real(kind=rk) temp(im,jm,k),salt(im,jm,k)
       real(kind=rk) temp(im,jm,kb),salt(im,jm,kb),rm(im,jm,kb)
-      character*120 netcdf_ic_file
+      character(len=120) netcdf_ic_file
       integer ncid,status
       integer tclim_varid,sclim_varid,rm_varid
       integer(mpi_offset_kind) start(4),edge(4)
@@ -1636,7 +1636,7 @@
       integer get_var_real_3d
 !      real(kind=rk) temp(im,jm,k),salt(im,jm,k)
       real(kind=rk) temp(im,jm,kb),salt(im,jm,kb)
-      character*120 netcdf_ic_file
+      character(len=120) netcdf_ic_file
       integer ncid,status
       integer tmean_varid,smean_varid
       integer(mpi_offset_kind) start(4),edge(4)
@@ -1688,7 +1688,7 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      character*120 netcdf_bc_file
+      character(len=120) netcdf_bc_file
       integer ncid,status
       integer tw_varid,sw_varid,uw_varid,ew_varid
       integer te_varid,se_varid,ue_varid,ee_varid
@@ -1821,7 +1821,7 @@
       include 'pom.h'
       integer n
       real(kind=rk) wu(im,jm),wv(im,jm)
-      character*120 netcdf_wind_file
+      character(len=120) netcdf_wind_file
       integer ncid,status
       integer wu_varid,wv_varid
       integer(mpi_offset_kind) start(2),edge(2)
@@ -1878,7 +1878,7 @@
       include 'pom.h'
       integer get_var_real_3d
       real(kind=rk) tm(im,jm,kb),sm(im,jm,kb),tc(im,jm,kb),sc(im,jm,kb)
-      character*120 netcdf_ic_file
+      character(len=120) netcdf_ic_file
       character(len=*) in_file
       integer ncid,status,n,k
       integer tm_varid,sm_varid,tc_varid,sc_varid
@@ -1956,7 +1956,7 @@
       include 'pom.h'
       integer get_var_real_3d
       real(kind=rk) rm(im,jm,kb),tc(im,jm,kb),sc(im,jm,kb)
-      character*120 netcdf_ic_file
+      character(len=120) netcdf_ic_file
       character(len=*) in_file
       integer ncid,status,n,k
       integer rm_varid,tc_varid,sc_varid
@@ -2027,7 +2027,7 @@
       include 'pom.h'
       integer get_var_real_2d
       real(kind=rk) uw(im,jm),vw(im,jm)
-      character*120 netcdf_ic_file
+      character(len=120) netcdf_ic_file
       character(len=*) in_file
       integer ncid,status,n
       integer uw_varid,vw_varid
@@ -2083,8 +2083,8 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       real(kind=rk) sst(im,jm),sss(im,jm)
-      character*9 in_file
-      character*120 netcdf_ssts_file
+      character(len=9) in_file
+      character(len=120) netcdf_ssts_file
       integer ncid,status
       integer sst_varid,sss_varid
       integer(mpi_offset_kind) start(2),edge(2)
@@ -2137,7 +2137,7 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       integer get_var_real_3d
-      character*120 netcdf_bc_file
+      character(len=120) netcdf_bc_file
       integer ncid,status
       integer uabe_varid, uabw_varid, vabs_varid, vabn_varid
       integer(mpi_offset_kind) start(4),edge(4)
@@ -2226,7 +2226,7 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       integer get_var_real_2d
-      character*120 netcdf_bc_file
+      character(len=120) netcdf_bc_file
       integer ncid,status
       integer ube_varid, ubw_varid, vbs_varid, vbn_varid
       integer(mpi_offset_kind) start(4),edge(4)
@@ -2314,7 +2314,7 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      character*120 netcdf_bc_file
+      character(len=120) netcdf_bc_file
       integer ncid,status
       integer ampe_varid,phae_varid,amue_varid,phue_varid
       integer(mpi_offset_kind) start(2),edge(2)
@@ -2451,7 +2451,8 @@
       real(kind=rk) uwnd_out(im_coarse,jm_coarse,wind_npd)
       real(kind=rk) vwnd_out(im_coarse,jm_coarse,wind_npd)
 !      character :: filename*15, netcdf_wind_file*23
-      character :: filename*11, netcdf_wind_file*24
+      character(len=11) filename
+      character(len=24) netcdf_wind_file
       integer ncid,status,n
       integer uwnd_varid,vwnd_varid
       integer(mpi_offset_kind) start(4),edge(4)
@@ -2549,7 +2550,8 @@
       integer n
       real(kind=rk), dimension(im,jm) :: hfl, swr, air, emp
 !      character :: filename*15, netcdf_wind_file*23
-      character :: filename*11, netcdf_wind_file*24
+      character(len=11) filename
+      character(len=24) netcdf_heat_file
       integer ncid,status
       integer hfl_varid, swr_varid, air_varid, emp_varid
       integer(mpi_offset_kind) start(4),edge(4)
@@ -2559,17 +2561,17 @@
 
 
 ! open netcdf wind file
-      netcdf_wind_file="in/heat/"//trim(filename)
+      netcdf_heat_file="in/heat/"//trim(filename)
 !*    write(netcdf_wind_file,'("in/"//windf//"/",a )')
 !     write(netcdf_wind_file,'("in/"//trim(windf)//"/",a )')
 !!    write(netcdf_wind_file,'("in/"trim(windf)"/",a )')
 !*   $                         trim(filename)
 !!    write(netcdf_wind_file,'(''in/gfsw/'',a )') trim(filename)
-!      if(my_task.eq.0) write(*,'(/''reading file '',a)')
-!     $                                    trim(netcdf_wind_file)
-      status=nfmpi_open(pom_comm_coarse,netcdf_wind_file,nf_nowrite,
+      if(my_task.eq.0) write(*,'(/''reading heat '',a,'' @ '',i4)')
+     $                                    trim(netcdf_heat_file),n
+      status=nfmpi_open(pom_comm_coarse,netcdf_heat_file,nf_nowrite,
      $                  mpi_info_null,ncid)
-      call handle_error_pnetcdf('nfmpi_open: '//netcdf_wind_file,
+      call handle_error_pnetcdf('nfmpi_open: '//netcdf_heat_file,
      $                          status,nf_noerr)
 
 ! get variables
@@ -2957,7 +2959,7 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       character(len=*), intent(in) :: netcdf_out_file
-      character*120 str_tmp!, netcdf_out_file
+      character(len=120) str_tmp!, netcdf_out_file
       integer time_dimid,x_dimid,y_dimid,z_dimid
       integer z_varid,zz_varid,dx_varid,dy_varid,east_c_varid,
      $        east_e_varid,east_u_varid,east_v_varid,north_c_varid,
@@ -3471,7 +3473,7 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       character(len=*), intent(in) :: netcdf_out_file
-      character*120 str_tmp!, netcdf_out_file
+      character(len=120) str_tmp!, netcdf_out_file
       integer time_dimid,x_dimid,y_dimid,z_dimid
       integer z_varid,zz_varid,
      $        east_e_varid,
@@ -3726,7 +3728,7 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       character(len=*), intent(in) :: netcdf_out_file
-      character*120 str_tmp !,netcdf_out_file !lyo:20110224:alu:stcc:
+      character(len=120) str_tmp !,netcdf_out_file !lyo:20110224:alu:stcc:
       integer time_dimid,x_dimid,y_dimid,z_dimid
       integer time_varid
      $       ,z_varid,zz_varid,dx_varid,dy_varid
@@ -4098,7 +4100,7 @@
 # include "pnetcdf.inc"
         include 'pom.h'
         character(len=*), intent(in) :: netcdf_out_file
-        character*120 str_tmp !,netcdf_out_file !lyo:20110224:alu:stcc:
+        character(len=120) str_tmp !,netcdf_out_file !lyo:20110224:alu:stcc:
         integer time_dimid,x_dimid,y_dimid,z_dimid
         integer time_varid,z_varid,zz_varid
         integer uabe_varid,uabw_varid,vabs_varid,vabn_varid

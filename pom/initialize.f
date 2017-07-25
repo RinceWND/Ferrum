@@ -364,15 +364,15 @@
         write(6,'('' smoth      = '',f10.4)') smoth
         write(6,'('' alpha      = '',f10.4)') alpha
 !        write(6,'('' lramp      = '',l10)') lramp
-        write(6,'('' calc_wind      = '',l)') calc_wind
-        write(6,'('' calc_tsforce   = '',l)') calc_tsforce
-        write(6,'('' calc_river     = '',l)') calc_river
-        write(6,'('' calc_assim     = '',l)') calc_assim
-        write(6,'('' calc_assimdrf  = '',l)') calc_assimdrf !eda
-        write(6,'('' calc_uvforce  = '',l)') calc_uvforce !eda:uvforce
-        write(6,'('' calc_tsurf_mc  = '',l)') calc_tsurf_mc !fhx:mcsst
-        write(6,'('' calc_tide      = '',l)') calc_tide     !fhx:tide
-        write(6,'('' calc_interp    = '',l)') calc_interp   !fhx:interp_flag
+        write(6,'('' calc_wind      = '',l2)') calc_wind
+        write(6,'('' calc_tsforce   = '',l2)') calc_tsforce
+        write(6,'('' calc_river     = '',l2)') calc_river
+        write(6,'('' calc_assim     = '',l2)') calc_assim
+        write(6,'('' calc_assimdrf  = '',l2)') calc_assimdrf !eda
+        write(6,'('' calc_uvforce   = '',l2)') calc_uvforce !eda:uvforce
+        write(6,'('' calc_tsurf_mc  = '',l2)') calc_tsurf_mc !fhx:mcsst
+        write(6,'('' calc_tide      = '',l2)') calc_tide     !fhx:tide
+        write(6,'('' calc_interp    = '',l2)') calc_interp   !fhx:interp_flag
         write(6,'('' output_flag    = '',i2)') output_flag  !fhx:20110131:
         write(6,'('' SURF_flag      = '',i2)') SURF_flag    !fhx:20110131:
         write(6,'(/'' Sensitivity:'')')
@@ -582,7 +582,7 @@
       include 'pom.h'
       integer i,j,k, n
       integer :: ii, jj                !lyo:pac10:
-      character*120 netcdf_ic_file     !lyo:20110202:
+      character(len=120) netcdf_ic_file     !lyo:20110202:
       logical :: fexist                !lyo:20110202:
 
       read(read_rst_file, '(5x,i2)') n
@@ -683,7 +683,7 @@
       logical :: here, judge_inout !lyo:scs1d:
       integer :: i,j,ic,jc         !lyo:scs1d:
       real(kind=rk)    :: corcon            !lyo:scs1d:
-      character*120 in_file        !eda:uvforce
+      character(len=120) in_file        !eda:uvforce
 
 !     call read_uabe_pnetcdf(uabe)
 !eda:uvforce
@@ -969,8 +969,8 @@
           do k=1,ks
             tin(k)=tb(i,j,k)
             if (zs(k).le.h(i,j) .and. tin(k).lt.0.01) then
-              tmax=amax1(tb(i-1,j,k),tb(i+1,j,k),
-     $                   tb(i,j-1,k),tb(i,j+1,k))
+              tmax = max(tb(i-1,j,k),tb(i+1,j,k),
+     $                   tb(i,j-1,k),tb(i,j+1,k)) !rwnd: is amax1 necessary?
               tin(k)=tmax
             endif
             if (tin(k).lt.0.01 .and. k.ne.1) tin(k)=tin(k-1)

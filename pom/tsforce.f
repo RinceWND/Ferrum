@@ -34,7 +34,7 @@
     
       integer :: mon_a, mon_b, sec_in_month, mid_in_month
       integer :: i, j, k, nb
-      character*13 :: infile_b
+      character(len=13) :: infile_b
       real(kind=rk) :: aa
 
 
@@ -345,8 +345,6 @@
       n = int(dif_date(d_in, d_tmp)/(86400.)*4.)+1
       
       if (n/=nb) then
-        if (my_task==master_task)
-     $       write(*,'(2(a,i5))') "Reading heat record ",n,"@",d_in%year
         nb = n
         write( infile_b, '( a3,".",i4.4,".nc" )' )
      $        "hfl", d_in%year

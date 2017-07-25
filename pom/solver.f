@@ -1272,10 +1272,10 @@
       implicit none
       include 'pom.h'
       integer i,j,k
-      real(kind=rk) p(im,jm,kb),fx(im,jm,kb),fc(im,kb)
+      real(kind=rk) p(im,jm,kb),fx(im,jm,kb),fc(im,jm,kb)
       real(kind=rk) dh,cff,cff1
 
-      rho = rho-rmean
+!      rho = rho-rmean
         
       p(:,:,1) = 0.
       do k = 1,kbm1
@@ -1289,22 +1289,21 @@
 !
 !  Calculate pressure gradient in the XI-direction (m4/s2).
 !
-      fc(:,1) = 0.
+      fc(:,:,1) = 0.
       do k = 1,kbm1
         do j = 1,jm
           do i = 2,im
 !            if (dum(i,j)/=0.) then
-              dh = z(k+1)*(dt(i,j)-dt(i-1,j))+et(i,j)-et(i-1,j)
-              fc(i,k+1) = .5*dh*(p(i,j,k+1)+p(i-1,j,k+1))
+              dh = z(k+1)*(dt(i,j)-dt(i-1,j))!+et(i,j)-et(i-1,j)
+              fc(i,j,k+1) = .5*dh*(p(i,j,k+1)+p(i-1,j,k+1))
               drhox(i,j,k) = .5*(cff*(dz(k)*dt(i-1,j)+
      &                                dz(k)*dt(i  ,j))
-     &                             *( z(1)*(dt(i-1,j)-dt(i,j))+
-     &                                et(i-1,j)-et(i,j) )
+     &                             *( z(1)*(dt(i-1,j)-dt(i,j)))
 !     &                              *( et(i,j)-et(i-1,j) ) ! invert et?
      &                         +cff1*(fx(i-1,j,k)-
      &                                fx(i  ,j,k)+
-     &                                fc(i,k  )-
-     &                                fc(i,k+1)))*(dy(i,j)+dy(i-1,j))
+     &                                fc(i,j,k  )-
+     &                                fc(i,j,k+1)))*(dy(i,j)+dy(i-1,j))
 !            end if
           end do
         end do
@@ -1312,28 +1311,27 @@
 !
 !  Calculate pressure gradient in the ETA-direction (m4/s2).
 !
-      fc(:,1) = 0.
+      fc(:,:,1) = 0.
       do k = 1,kbm1
         do j = 2,jm
           do i = 1,im
 !            if (dvm(i,j)/=0.) then
-              dh = z(k+1)*(dt(i,j)-dt(i,j-1))+et(i,j)-et(i,j-1)
-              fc(i,k+1) = .5*dh*(p(i,j,k+1)+p(i,j-1,k+1))
+              dh = z(k+1)*(dt(i,j)-dt(i,j-1))!+et(i,j)-et(i,j-1)
+              fc(i,j,k+1) = .5*dh*(p(i,j,k+1)+p(i,j-1,k+1))
               drhoy(i,j,k) = .5*(cff*(dz(k)*dt(i,j-1)+
      &                                dz(k)*dt(i,j  ))
-     &                             *( z(1)*(dt(i,j-1)-dt(i,j))+
-     &                                et(i,j-1)-et(i,j))
+     &                             *( z(1)*(dt(i,j-1)-dt(i,j)))
 !     &                              *( et(i,j)-et(i,j-1) )
      &                         +cff1*(fx(i,j-1,k)-
      &                                fx(i,j  ,k)+
-     &                                fc(i,k  )-
-     &                                fc(i,k+1)))*(dx(i,j)+dx(i,j-1))
+     &                                fc(i,j,k  )-
+     &                                fc(i,j,k+1)))*(dx(i,j)+dx(i,j-1))
 !            end if
           end do
         end do
       end do
 
-      rho = rho+rmean
+!      rho = rho+rmean
 
       end subroutine
 
@@ -3400,7 +3398,7 @@ C  !The most south sudomains
 ! ayumi 2010/4/12
             gh(i,j,k)=(l(i,j,k)**2)*boygr(i,j,k)
      $           /(q2b(i,j,k)+small)
-            gh(i,j,k)=min(gh(i,j,k),.028)
+            gh(i,j,k)=min(gh(i,j,k),.028_rk)
           end do
         end do
       end do

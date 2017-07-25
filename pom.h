@@ -673,17 +673,17 @@
 
 !_______________________________________________________________________
 ! Character variables
-      character*4
+      character(len=4)
      $  windf           !lyo: windf = ccmp, ecmw, or gfsw etc
 
-      character*26
+      character(len=26)
      $  time_start      ! date and time of start of initial run of model
 
-      character*40
+      character(len=40)
      $  source         ,
      $  title
 
-      character*120
+      character(len=120)
      $  netcdf_file    ,
      $  read_rst_file  ,
      $  write_rst_file

@@ -32,7 +32,7 @@
       real(kind=rk), parameter :: rhoa = 1.22, rhow = 1025.0
       real(kind=rk) :: aa, uwnd, vwnd, cda, uvabs!, rdisp !lyo:pac10:add rdisp
 
-      character*16 :: infile
+      character(len=16) :: infile
 
 
       contains

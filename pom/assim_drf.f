@@ -72,7 +72,7 @@ c-------------------------------------------------------------------------
       real(kind=rk),dimension (ndrfmax) :: ulag_o, vlag_o, ueu_b, veu_b, 
      1     lat_drf, lon_drf, u_drf, v_drf
 
-      character*20 id_in
+      character(len=20) id_in
 
       namelist/assimdrf_nml/ nassimdrf,nx, ny, beta, mindist,zd
       real(kind=rk) :: nassimdrf, nx, ny, beta, mindist,zd
