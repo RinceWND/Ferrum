@@ -4196,3 +4196,57 @@ C  !The most south sudomains
        return
        end
 !_______________________________________________________________________
+
+       subroutine icedrag()
+         implicit none
+         include 'pom.h'
+         
+         real(kind=rk), dimension(im,jm) :: ui, vi, ci, hi
+         real(kind=rk), dimension(im,jm) :: delx,dely
+         real(kind=rk), dimension(im,jm) :: rhoi, uvi, uv
+         real(kind=rk), dimension(im,jm) :: tauiau,tauiav,tauiwu,tauiwv
+         
+         integer i
+         
+         ui = 0.
+         vi = 0.
+         ci = 0.
+         hi =  .5
+         delx = 0.
+         dely = 0.
+         rhoi = 900.
+         
+         ci(50,50) = 1.
+         ci(51,50) =  .9
+         
+         do i=1,10
+
+         delx(2:im,:) = el(2:im,:)-el(1:imm1,:)
+         dely(:,2:jm) = el(:,2:jm)-el(:,1:jmm1)
+
+         rhoi = 900.*hi*ci ! 900. kg/m3 - 0.9 g/cm3?
+         
+         tauiau = wusurf
+         tauiav = wvsurf
+         
+         uv  = sqrt(u(1:im,1:jm,1)**2+v(1:im,1:jm,1)**2)
+         uvi = sqrt(ui**2+vi**2)
+         
+         tauiwu= 5.5e-3*rho(1:im,1:jm,1)*(ui-u(1:im,1:jm,1))*abs(uvi-uv)
+         tauiwv= 5.5e-3*rho(1:im,1:jm,1)*(vi-v(1:im,1:jm,1))*abs(uvi-uv)
+
+         ui = ui - 2.*cor(1:im,1:jm)*ui - grav*d(1:im,1:jm)*delx
+     &           + (tauiau-tauiwu)/rhoi
+         vi = vi - 2.*cor(1:im,1:jm)*vi - grav*d(1:im,1:jm)*dely
+     &           + (tauiav-tauiwv)/rhoi
+     
+         if (my_task==0) then
+           write(*,*) "--------------------------------------------"
+           write(*,*) "|", ui(49,51),":",ci(50,51),":",ci(51,51),"|"
+           write(*,*) "|", ui(49,50),":",ci(50,50),":",ci(51,50),"|"
+           write(*,*) "|", ui(49,49),":",ci(50,49),":",ci(51,49),"|"
+           write(*,*) "--------------------------------------------"
+         end if
+         
+         end do
+       end subroutine
