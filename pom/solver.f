@@ -4201,9 +4201,9 @@ C  !The most south sudomains
          implicit none
          include 'pom.h'
          
-         real(kind=rk), dimension(im,jm) :: ui, vi, ci, hi
-         real(kind=rk), dimension(im,jm) :: delx,dely
-         real(kind=rk), dimension(im,jm) :: rhoi, uvi, uv
+         real(kind=rk), dimension(im,jm) :: ui, vi, ci, hi, uidy,vidx
+         real(kind=rk), dimension(im,jm) :: delx,dely,cidx,cidy
+         real(kind=rk), dimension(im,jm) :: rhoi, uvi, uv, uidx, vidy
          real(kind=rk), dimension(im,jm) :: tauiau,tauiav,tauiwu,tauiwv
          
          integer i
@@ -4215,16 +4215,24 @@ C  !The most south sudomains
          delx = 0.
          dely = 0.
          rhoi = 900.
+         uvi = 0.
+         uv  = 0.
+         
+         wusurf = -2.8747850318252379E-006
+         wvsurf = -2.8747850318252379E-006
          
          ci(50,50) = 1.
          ci(51,50) =  .9
          
-         do i=1,10
+         do i=1,100
 
-         delx(2:im,:) = el(2:im,:)-el(1:imm1,:)
-         dely(:,2:jm) = el(:,2:jm)-el(:,1:jmm1)
+         delx(2:im,:) = 2.*(el(2:im,:)-el(1:imm1,:))
+     &                    /(dx(2:im,:)+dx(1:imm1,:))
+         dely(:,2:jm) = 2.*(el(:,2:jm)-el(:,1:jmm1))
+     &                    /(dy(:,2:jm)+dy(:,1:jmm1))
 
          rhoi = 900.*hi*ci ! 900. kg/m3 - 0.9 g/cm3?
+         rhoi = rhoi + (rho(1:im,1:jm,1)*1000.+rhoref)*(1-ci)
          
          tauiau = wusurf
          tauiav = wvsurf
@@ -4232,20 +4240,49 @@ C  !The most south sudomains
          uv  = sqrt(u(1:im,1:jm,1)**2+v(1:im,1:jm,1)**2)
          uvi = sqrt(ui**2+vi**2)
          
-         tauiwu= 5.5e-3*rho(1:im,1:jm,1)*(ui-u(1:im,1:jm,1))*abs(uvi-uv)
-         tauiwv= 5.5e-3*rho(1:im,1:jm,1)*(vi-v(1:im,1:jm,1))*abs(uvi-uv)
+         tauiwu= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
+     &     *(ui-u(1:im,1:jm,1))*abs(uvi-uv)
+         tauiwv= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
+     &     *(vi-v(1:im,1:jm,1))*abs(uvi-uv)
+         
+!         if (my_task==0) then
+!           write(*,*) maxval(abs(tauiau)), "|", maxval(abs(tauiwu))
+!           write(*,*) maxval(abs(tauiav)), "|", maxval(abs(tauiwv))
+!         end if
+         
+         cidx = 2.*(ci(2:im,:)-ci(1:imm1,:))/(dx(2:im,:)+dx(1:imm1,:))
+         cidy = 2.*(ci(:,2:jm)-ci(:,1:jmm1))/(dy(:,2:jm)+dy(:,1:jmm1))
+         
+         uidx = (ui(2:im,:)-ui(1:imm1,:))/dx(2:im,:)
+!         uidy = (ui(:,2:jm)-ui(:,1:jmm1))/dy(:,2:jm)
+!         vidx = (vi(2:im,:)-vi(1:imm1,:))/dx(2:im,:)
+         vidy = (vi(:,2:jm)-vi(:,1:jmm1))/dy(:,2:jm)
+         
+         ci(2:imm1,2:jmm1) = ci(2:imm1,2:jmm1)
+     &       - dti*(ui(3:im,2:jmm1)*cidx+vi(2:imm1,3:jm)*cidy
+     &             +ci*(uidx+vidy))
 
-         ui = ui - 2.*cor(1:im,1:jm)*ui - grav*d(1:im,1:jm)*delx
-     &           + (tauiau-tauiwu)/rhoi
-         vi = vi - 2.*cor(1:im,1:jm)*vi - grav*d(1:im,1:jm)*dely
-     &           + (tauiav-tauiwv)/rhoi
+         where (ci>0.)
+         ui = ui + ( -2.*cor(1:im,1:jm)*ui - grav*delx
+     &              + (tauiau-tauiwu)/rhoi )*dti
+         vi = vi + ( -2.*cor(1:im,1:jm)*vi - grav*dely
+     &              + (tauiav-tauiwv)/rhoi )*dti
+         end where
      
          if (my_task==0) then
            write(*,*) "--------------------------------------------"
-           write(*,*) "|", ui(49,51),":",ci(50,51),":",ci(51,51),"|"
-           write(*,*) "|", ui(49,50),":",ci(50,50),":",ci(51,50),"|"
-           write(*,*) "|", ui(49,49),":",ci(50,49),":",ci(51,49),"|"
+           write(*,*) "|", ci(49,51),":",ci(50,51),":",ci(51,51),"|"
+           write(*,*) "|", ci(49,50),":",ci(50,50),":",ci(51,50),"|"
+           write(*,*) "|", ci(49,49),":",ci(50,49),":",ci(51,49),"|"
            write(*,*) "--------------------------------------------"
+!           write(*,*) "|", ui(49,51),":",ui(50,51),":",ui(51,51),"|"
+!           write(*,*) "|", ui(49,50),":",ui(50,50),":",ui(51,50),"|"
+!           write(*,*) "|", ui(49,49),":",ui(50,49),":",ui(51,49),"|"
+!           write(*,*) "--------------------------------------------"
+!           write(*,*) "|", vi(49,51),":",vi(50,51),":",vi(51,51),"|"
+!           write(*,*) "|", vi(49,50),":",vi(50,50),":",vi(51,50),"|"
+!           write(*,*) "|", vi(49,49),":",vi(50,49),":",vi(51,49),"|"
+!           write(*,*) "--------------------------------------------"
          end if
          
          end do
