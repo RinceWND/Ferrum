@@ -4258,8 +4258,8 @@ C  !The most south sudomains
 !         vidx = (vi(2:im,:)-vi(1:imm1,:))/dx(2:im,:)
          vidy = (vi(:,2:jm)-vi(:,1:jmm1))/dy(:,2:jm)
          
-         ci(2:imm1,2:jmm1) = ci(2:imm1,2:jmm1)
-     &       - dti*(ui(3:im,2:jmm1)*cidx+vi(2:imm1,3:jm)*cidy
+         ci(1:imm1,1:jmm1) = ci(1:imm1,1:jmm1)
+     &       - dti*(ui(2:im,1:jmm1)*cidx+vi(1:imm1,2:jm)*cidy
      &             +ci*(uidx+vidy))
 
          where (ci>0.)
