@@ -268,6 +268,7 @@
      $  aru            ,! cell area centered on U grid points
      $  arv            ,! cell area centered on V grid points
      $  cbc            ,! bottom friction coefficient
+     $  cb             ,!:sea ice concentration at time n-1
      $  cor            ,! coriolis parameter
      $  d              ,! h+el
      $  drx2d          ,! vertical integral of drhox
@@ -294,6 +295,7 @@
      $  fluxva         ,
      $  fsm            ,! mask for scalar variables
      $  h              ,! bottom depth
+     $  hi             ,! sea ice thickness
      $  north_c        ,! horizontal coordinate of cell corner points in y
      $  north_e        ,! horizontal coordinate of elevation points in y
      $  north_u        ,! horizontal coordinate of U points in y
@@ -309,11 +311,13 @@
      $  vfluxf         ,! volume flux through water column surface at time n+1
      $  uab            ,! vertical mean of u at time n-1
      $  uaf            ,! vertical mean of u at time n+1
+     $  ui             ,! sea ice u-velocity
      $  utb            ,! ua time averaged over the interval dti at time n-1
      $  utf            ,! ua time averaged over the interval dti at time n+1
      $  va             ,! vertical mean of v at time n
      $  vab            ,! vertical mean of v at time n-1
      $  vaf            ,! vertical mean of v at time n+1
+     $  vi             ,! sea ice v-velocity
      $  vtb            ,! va time averaged over the interval dti at time n-1
      $  vtf            ,! va time averaged over the interval dti at time n+1
      $  wssurf         ,! <ws(0)> salinity flux at the surface
@@ -337,6 +341,7 @@
      $  aru(im_local,jm_local)     ,
      $  arv(im_local,jm_local)     ,
      $  cbc(im_local,jm_local)     ,
+     $  cb(im_local,jm_local)      ,    !:rwnd
      $  cor(im_local,jm_local)     ,
      $  d(im_local,jm_local)       ,
      $  drx2d(im_local,jm_local)   ,
@@ -363,6 +368,7 @@
      $  fluxva(im_local,jm_local)  ,
      $  fsm(im_local,jm_local)     ,
      $  h(im_local,jm_local)       ,
+     $  hi(im_local,jm_local)      ,    !:rwnd
      $  north_c(im_local,jm_local) ,
      $  north_e(im_local,jm_local) ,
      $  north_u(im_local,jm_local) ,
@@ -378,11 +384,13 @@
      $  vfluxf(im_local,jm_local)  ,
      $  uab(im_local,jm_local)     ,
      $  uaf(im_local,jm_local)     ,
+     $  ui(im_local,jm_local)      ,    !:rwnd
      $  utb(im_local,jm_local)     ,
      $  utf(im_local,jm_local)     ,
      $  va(im_local,jm_local)      ,
      $  vab(im_local,jm_local)     ,
      $  vaf(im_local,jm_local)     ,
+     $  vi(im_local,jm_local)      ,    !:rwnd
      $  vtb(im_local,jm_local)     ,
      $  vtf(im_local,jm_local)     ,
      $  wssurf(im_local,jm_local)  ,

@@ -793,6 +793,137 @@
       return
       end
 
+      subroutine advtC(cbm,cf)
+! integrate conservative scalar equations
+! this is a first-order upstream scheme, which reduces implicit
+! diffusion using the Smolarkiewicz iterative upstream scheme with an
+! antidiffusive velocity
+! it is based on the subroutines of Gianmaria Sannino (Inter-university
+! Computing Consortium, Rome, Italy) and Vincenzo Artale (Italian
+! National Agency for New Technology and Environment, Rome, Italy)
+      implicit none
+      include 'pom.h'
+      real(kind=rk), dimension(im,jm) :: cbm,cf,xflux,yflux
+     &                                 ,cbmem,xmassflux,ymassflux
+      real(kind=rk), dimension(im,jm)    :: eta
+!      real(kind=rk) eps, epsval  ! rwnd: iteration check
+      integer i,j,k,itera
+
+! calculate horizontal mass fluxes
+      xmassflux = 0.
+      ymassflux = 0.
+
+      do j=2,jmm1
+        do i=2,im
+          xmassflux(i,j)=.25*(dy(i-1,j)+dy(i,j))
+     $                      *(dt(i-1,j)+dt(i,j))*ui(i,j)
+        end do
+      end do
+
+      do j=2,jm
+        do i=2,imm1
+          ymassflux(i,j)=.25*(dx(i,j-1)+dx(i,j))
+     $                      *(dt(i,j-1)+dt(i,j))*vi(i,j)
+        end do
+      end do
+
+      do j=1,jm
+        do i=1,im
+          eta(i,j)=etb(i,j)
+        end do
+      end do
+
+      do j=1,jm
+        do i=1,im
+          cbmem(i,j)=cbm(i,j)
+        end do
+      end do
+
+! start Smolarkiewicz scheme
+      do itera=1,nitera
+
+! upwind advection scheme
+        do j=2,jm
+          do i=2,im
+            xflux(i,j) = .5
+     $                      *((xmassflux(i,j)+abs(xmassflux(i,j)))
+     $                       *cbmem(i-1,j)+
+     $                        (xmassflux(i,j)-abs(xmassflux(i,j)))
+     $                       *cbmem(i,j))
+
+            yflux(i,j) = .5
+     $                      *((ymassflux(i,j)+abs(ymassflux(i,j)))
+     $                       *cbmem(i,j-1)+
+     $                        (ymassflux(i,j)-abs(ymassflux(i,j)))
+     $                       *cbmem(i,j))
+          end do
+        end do
+
+! add net advective fluxes and step forward in time
+        do j=2,jmm1
+          do i=2,imm1
+            cf(i,j) = xflux(i+1,j)-xflux(i,j)
+     $               +yflux(i,j+1)-yflux(i,j)
+            cf(i,j) = (cbmem(i,j)*(h(i,j)+eta(i,j))*art(i,j)
+     $                   -dti2*cf(i,j))/((h(i,j)+etf(i,j))*art(i,j))
+          end do
+        end do
+        ! next line added on 22-Jul-2009 by Raffaele Bernardello
+        call exchange2d_mpi(cf,im,jm)
+
+! calculate antidiffusion velocity
+        call smol_adifC(xmassflux,ymassflux,cf)
+        
+!        epsval = maxval(abs(ff(:,:,1:kbm1)-fbmem(:,:,1:kbm1))) ! rwnd: iteration check
+!        
+!        call max0d_mpi(epsval,master_task) ! rwnd: iteration check
+!        call bcast0d_mpi(epsval,my_task) ! rwnd: iteration check
+
+        do j=1,jm
+          do i=1,im
+            eta(i,j)=etf(i,j)
+            cbmem(i,j)=cf(i,j)
+          end do
+        end do
+
+!        if (epsval < eps) exit ! rwnd: iteration check
+
+! end of Smolarkiewicz scheme
+      end do
+      
+!      write(*,*) my_task, ": ", var, ": nitera = ", itera  ! rwnd: iteration check
+
+! add horizontal diffusive fluxes
+      do j=2,jm
+        do i=2,im
+          xmassflux(i,j) = .5*(aam(i,j,1)+aam(i-1,j,1))
+          ymassflux(i,j) = .5*(aam(i,j,1)+aam(i,j-1,1))
+        end do
+      end do
+
+      do j=2,jm
+        do i=2,im
+         xflux(i,j) = -xmassflux(i,j)*(h(i,j)+h(i-1,j))*tprni
+     $                   *(cb(i,j)-cb(i-1,j))*dum(i,j)
+     $                   *(dy(i,j)+dy(i-1,j))*0.5/(dx(i,j)+dx(i-1,j))
+         yflux(i,j) = -ymassflux(i,j)*(h(i,j)+h(i,j-1))*tprni
+     $                   *(cb(i,j)-cb(i,j-1))*dvm(i,j)
+     $                   *(dx(i,j)+dx(i,j-1))*0.5/(dy(i,j)+dy(i,j-1))
+        end do
+      end do
+
+! add net horizontal fluxes and step forward in time
+      do j=2,jmm1
+        do i=2,imm1
+          cf(i,j) = cf(i,j)-dti2*(xflux(i+1,j)-xflux(i,j)
+     $                           +yflux(i,j+1)-yflux(i,j))
+     $                          /((h(i,j)+etf(i,j))*art(i,j))
+        end do
+      end do
+
+      return
+      end
+
 !_______________________________________________________________________
       subroutine advu
 ! do horizontal and vertical advection of u-momentum, and includes
@@ -4020,6 +4151,66 @@ C  !The most south sudomains
       end
 
 !_______________________________________________________________________
+      subroutine smol_adifC(xmassflux,ymassflux,cf)
+! calculate the antidiffusive velocity used to reduce the numerical
+! diffusion associated with the upstream differencing scheme
+! this is based on a subroutine of Gianmaria Sannino (Inter-university
+! Computing Consortium, Rome, Italy) and Vincenzo Artale (Italian
+! National Agency for New Technology and Environment, Rome, Italy)
+      implicit none
+      include 'pom.h'
+      real(kind=rk),dimension(im,jm) :: cf,xmassflux,ymassflux
+      real(kind=rk) mol,abs_1,abs_2
+      real(kind=rk) value_min,epsilon
+      real(kind=rk) udx,u2dt,vdy,v2dt
+      integer i,j,k
+      parameter (value_min=1.e-9,epsilon=1.0e-14)
+
+! apply temperature and salinity mask
+      cf = cf*fsm
+
+! recalculate mass fluxes with antidiffusion velocity
+      do j=2,jmm1
+        do i=2,im
+          if(cf(i,j).lt.value_min.or.
+     $       cf(i-1,j).lt.value_min) then
+            xmassflux(i,j) = 0.
+          else
+            udx=abs(xmassflux(i,j))
+            u2dt=dti2*xmassflux(i,j)*xmassflux(i,j)*2.
+     $          /(aru(i,j)*(dt(i-1,j)+dt(i,j)))
+            mol=(cf(i,j)-cf(i-1,j))
+     $          /(cf(i-1,j)+cf(i,j)+epsilon)
+            xmassflux(i,j)=(udx-u2dt)*mol*sw
+            abs_1=abs(udx)
+            abs_2=abs(u2dt)
+            if(abs_1.lt.abs_2) xmassflux(i,j)=0.
+          end if
+        end do
+      end do
+
+      do j=2,jm
+        do i=2,imm1
+          if(cf(i,j).lt.value_min.or.
+     $       cf(i,j-1).lt.value_min) then
+            ymassflux(i,j)=0.
+          else
+            vdy=abs(ymassflux(i,j))
+            v2dt=dti2*ymassflux(i,j)*ymassflux(i,j)*2.
+     $          /(arv(i,j)*(dt(i,j-1)+dt(i,j)))
+            mol=(cf(i,j)-cf(i,j-1))
+     $          /(cf(i,j-1)+cf(i,j)+epsilon)
+            ymassflux(i,j)=(vdy-v2dt)*mol*sw
+            abs_1=abs(vdy)
+            abs_2=abs(v2dt)
+            if(abs_1.lt.abs_2) ymassflux(i,j)=0.
+          end if
+        end do
+      end do
+
+      return
+      end
+!_______________________________________________________________________
       subroutine vertvl(xflux,yflux)
 ! calculates vertical velocity
       implicit none
@@ -4201,12 +4392,13 @@ C  !The most south sudomains
          implicit none
          include 'pom.h'
          
-         real(kind=rk), dimension(im,jm) :: ui, vi, ci, hi, uidy,vidx
-         real(kind=rk), dimension(im,jm) :: delx,dely,cidx,cidy
-         real(kind=rk), dimension(im,jm) :: rhoi, uvi, uv, uidx, vidy
-         real(kind=rk), dimension(im,jm) :: tauiau,tauiav,tauiwu,tauiwv
+         real(kind=rk), dimension(im_local,jm_local):: ci, cf, uif
+     &                 ,delx,dely,cidx,cidy, rhoi, uvi, uv, uidx, vidy
+     &                 ,tauiau,tauiav,tauiwu,tauiwv, uib, vif, vib
+         logical, dimension(im_local,jm_local) :: icm
+         character*128 flnm
          
-         integer i
+         integer i,j,ti
          
          ui = 0.
          vi = 0.
@@ -4217,14 +4409,18 @@ C  !The most south sudomains
          rhoi = 900.
          uvi = 0.
          uv  = 0.
+         uidx = 0.
+         vidy = 0.
+         icm = .false.
          
-         wusurf = -2.8747850318252379E-006
-         wvsurf = -2.8747850318252379E-006
+         ci(55:60,55:60) = 1.
+         ci(50:54,50:54) =  .8
          
-         ci(50,50) = 1.
-         ci(51,50) =  .9
+         cb = ci
+         uib = ui
+         vib = vi
          
-         do i=1,100
+         do ti=1,1000
 
          delx(2:im,:) = 2.*(el(2:im,:)-el(1:imm1,:))
      &                    /(dx(2:im,:)+dx(1:imm1,:))
@@ -4232,7 +4428,8 @@ C  !The most south sudomains
      &                    /(dy(:,2:jm)+dy(:,1:jmm1))
 
          rhoi = 900.*hi*ci ! 900. kg/m3 - 0.9 g/cm3?
-         rhoi = rhoi + (rho(1:im,1:jm,1)*1000.+rhoref)*(1-ci)
+         where (ci<.05) rhoi = rhoref
+!         rhoi = rhoi + (rho(1:im,1:jm,1)*1000.+rhoref)*(1-ci) ! since concentration is not limited by 1, the line is incorrect. TODO: limit concentration
          
          tauiau = wusurf
          tauiav = wvsurf
@@ -4241,40 +4438,77 @@ C  !The most south sudomains
          uvi = sqrt(ui**2+vi**2)
          
          tauiwu= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
-     &     *(ui-u(1:im,1:jm,1))*abs(uvi-uv)
+     &     *(ui-u(1:im,1:jm,1))*abs(ui-u(1:im,1:jm,1))
          tauiwv= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
-     &     *(vi-v(1:im,1:jm,1))*abs(uvi-uv)
+     &     *(vi-v(1:im,1:jm,1))*abs(vi-v(1:im,1:jm,1))
          
 !         if (my_task==0) then
 !           write(*,*) maxval(abs(tauiau)), "|", maxval(abs(tauiwu))
 !           write(*,*) maxval(abs(tauiav)), "|", maxval(abs(tauiwv))
 !         end if
          
-         cidx = 2.*(ci(2:im,:)-ci(1:imm1,:))/(dx(2:im,:)+dx(1:imm1,:))
-         cidy = 2.*(ci(:,2:jm)-ci(:,1:jmm1))/(dy(:,2:jm)+dy(:,1:jmm1))
+         cidx(2:im,:) = 2.*(ci(2:im,:)-ci(1:imm1,:))
+     &                    /(dx(2:im,:)+dx(1:imm1,:))
+         cidy(:,2:jm) = 2.*(ci(:,2:jm)-ci(:,1:jmm1))
+     &                    /(dy(:,2:jm)+dy(:,1:jmm1))
          
-         uidx = (ui(2:im,:)-ui(1:imm1,:))/dx(2:im,:)
+         uidx(2:im,:) = (ui(2:im,:)-ui(1:imm1,:))/dx(2:im,:)
 !         uidy = (ui(:,2:jm)-ui(:,1:jmm1))/dy(:,2:jm)
 !         vidx = (vi(2:im,:)-vi(1:imm1,:))/dx(2:im,:)
-         vidy = (vi(:,2:jm)-vi(:,1:jmm1))/dy(:,2:jm)
+         vidy(:,2:jm) = (vi(:,2:jm)-vi(:,1:jmm1))/dy(:,2:jm)
          
-         ci(1:imm1,1:jmm1) = ci(1:imm1,1:jmm1)
-     &       - dti*(ui(2:im,1:jmm1)*cidx+vi(1:imm1,2:jm)*cidy
-     &             +ci*(uidx+vidy))
-
-         where (ci>0.)
-         ui = ui + ( -2.*cor(1:im,1:jm)*ui - grav*delx
-     &              + (tauiau-tauiwu)/rhoi )*dti
-         vi = vi + ( -2.*cor(1:im,1:jm)*vi - grav*dely
-     &              + (tauiav-tauiwv)/rhoi )*dti
+         call advtC(cb,cf,ui,vi)
+         
+         where (cf<small) cf = 0.
+         where (cf>1.)
+           hi = hi + hi*(cf-1.)/cf
+           cf = 1.
          end where
+
+         do j=2,jmm1
+           do i=2,imm1
+             if (cf(i-1,j)+cf(i,j)+cf(i+1,j)+cf(i,j-1)+cf(i,j+1)>0.)
+     &          icm = .true.
+           end do
+         end do
+
+         where (cf>small)
+         uif = ui + ( -2.*cor(1:im,1:jm)*vi - grav*delx
+     &              + (tauiau-tauiwu)/rhoi )*dte
+         vif = vi + (  2.*cor(1:im,1:jm)*ui - grav*dely
+     &              + (tauiav-tauiwv)/rhoi )*dte
+         end where
+         
+         ui = ui+.5*smoth*(uif+uib-2.*ui)
+         vi = vi+.5*smoth*(vif+vib-2.*vi)
+         ci = ci+.5*smoth*(cf+cb-2.*ci)
+         uib = ui
+         ui  = uif
+         vib = vi
+         vi = vif
+         cb = ci
+         ci = cf
+         
+         if (ti>450) then
+          time = ti
+          write(flnm, '(a,i0.5,a)') '/home/rincewnd/icec.', ti, '.nc'
+          call write_debug_pnetcdf(flnm)
+          if (my_task==1) then
+           write(*,*) "--------------------------------------------"
+           write(*,*) "cb:", minval(cb), maxval(cb), my_task
+           write(*,*) "ui:", minval(ui), maxval(ui), my_task
+           write(*,*) "vi:", minval(vi), maxval(vi), my_task
+           write(*,*) "ri:", minval(rhoi,cf>small),maxval(rhoi), my_task
+           write(*,*) "--------------------------------------------"
+          end if
+         end if
      
-         if (my_task==0) then
-           write(*,*) "--------------------------------------------"
-           write(*,*) "|", ci(49,51),":",ci(50,51),":",ci(51,51),"|"
-           write(*,*) "|", ci(49,50),":",ci(50,50),":",ci(51,50),"|"
-           write(*,*) "|", ci(49,49),":",ci(50,49),":",ci(51,49),"|"
-           write(*,*) "--------------------------------------------"
+!         if (my_task==0) then
+!           write(*,*) "--------------------------------------------"
+!           write(*,*) "|", ci(49,51),":",ci(50,51),":",ci(51,51),"|"
+!           write(*,*) "|", ci(49,50),":",ci(50,50),":",ci(51,50),"|"
+!           write(*,*) "|", ci(49,49),":",ci(50,49),":",ci(51,49),"|"
+!           write(*,*) "--------------------------------------------"
 !           write(*,*) "|", ui(49,51),":",ui(50,51),":",ui(51,51),"|"
 !           write(*,*) "|", ui(49,50),":",ui(50,50),":",ui(51,50),"|"
 !           write(*,*) "|", ui(49,49),":",ui(50,49),":",ui(51,49),"|"
@@ -4283,7 +4517,7 @@ C  !The most south sudomains
 !           write(*,*) "|", vi(49,50),":",vi(50,50),":",vi(51,50),"|"
 !           write(*,*) "|", vi(49,49),":",vi(50,49),":",vi(51,49),"|"
 !           write(*,*) "--------------------------------------------"
-         end if
+!         end if
          
          end do
        end subroutine

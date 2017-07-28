@@ -4102,8 +4102,8 @@
         character(len=*), intent(in) :: netcdf_out_file
         character(len=120) str_tmp !,netcdf_out_file !lyo:20110224:alu:stcc:
         integer time_dimid,x_dimid,y_dimid,z_dimid
-        integer time_varid,z_varid,zz_varid
-        integer uabe_varid,uabw_varid,vabs_varid,vabn_varid
+        integer time_varid,z_varid,zz_varid,icec_varid,ui_varid,vi_varid
+        integer uabe_varid,uabw_varid,vabs_varid,vabn_varid,hi_varid
         integer tbe_varid,tbw_varid,tbs_varid,tbn_varid
         integer sbe_varid,sbw_varid,sbs_varid,sbn_varid
         integer ncid,status,flags
@@ -4253,21 +4253,21 @@
 !     $                     'aamfrz coeffi','dimensionless',
 !     $                     'east_v north_v',.true.)
 !     
-!      vdims(1)=x_dimid
-!      vdims(2)=y_dimid
-!      vdims(3)=time_dimid
-!      call def_var_pnetcdf(ncid,'wusurf',3,vdims,wusurf_varid,nf_float,
-!     $                     'x-momentum flux','metre^2/sec^2',
-!     $                     'east_u north_u',.true.)
-!      call def_var_pnetcdf(ncid,'wvsurf',3,vdims,wvsurf_varid,nf_float,
-!     $                     'y-momentum flux','metre^2/sec^2',
-!     $                     'east_v north_v',.true.)
-!      call def_var_pnetcdf(ncid,'wtsurf',3,vdims,wtsurf_varid,nf_float,
-!     $                     'temperature flux','deg m/s',
-!     $                     'east_e north_e',.true.)
-!      call def_var_pnetcdf(ncid,'wssurf',3,vdims,wssurf_varid,nf_float,
-!     $                     'salinity flux','psu m/s',
-!     $                     'east_e north_e',.true.)
+      vdims(1)=x_dimid
+      vdims(2)=y_dimid
+      vdims(3)=time_dimid
+      call def_var_pnetcdf(ncid,'ice_c',3,vdims,icec_varid,nf_float,
+     $                     'Sea ice concentration','',
+     $                     'east_e north_e',.true.)
+      call def_var_pnetcdf(ncid,'ice_u',3,vdims,ui_varid,nf_float,
+     $                     'Sea ice u-velocity','metre/sec',
+     $                     'east_u north_u',.true.)
+      call def_var_pnetcdf(ncid,'ice_v',3,vdims,vi_varid,nf_float,
+     $                     'Sea ice v-velocity','metre/sec',
+     $                     'east_v north_v',.true.)
+      call def_var_pnetcdf(ncid,'hi',3,vdims,hi_varid,nf_float,
+     $                     'sea ice thickness','metre',
+     $                     'east_e north_e',.true.)
 !
 !      vdims(1)=x_dimid
 !      vdims(2)=y_dimid
@@ -4399,28 +4399,28 @@
 !      call handle_error_pnetcdf('nf_put_var_real: aamfrz',status
 !     &                                                        ,nf_noerr)
 !
-!      start(1)=i_global(1)
-!      start(2)=j_global(1)
-!      start(3)=1
-!      edge(1)=im
-!      edge(2)=jm
-!      edge(3)=1
-!      status=nfmpi_put_vara_real_all(
-!     $     ncid,wusurf_varid,start,edge,real(wusurf,4))
-!      call handle_error_pnetcdf(
-!     $     'nf_put_vara_real: wusurf',status,nf_noerr)
-!      status=nfmpi_put_vara_real_all(
-!     $     ncid,wvsurf_varid,start,edge,real(wvsurf,4))
-!      call handle_error_pnetcdf(
-!     $     'nf_put_vara_real: wvsurf',status,nf_noerr)
-!      status=nfmpi_put_vara_real_all(
-!     $     ncid,wtsurf_varid,start,edge,real(wtsurf,4))
-!      call handle_error_pnetcdf(
-!     $     'nf_put_vara_real: wtsurf',status,nf_noerr)
-!      status=nfmpi_put_vara_real_all(
-!     $     ncid,wssurf_varid,start,edge,real(wssurf,4))
-!      call handle_error_pnetcdf('
-!     $     nf_put_vara_real: wssurf',status,nf_noerr)
+      start(1)=i_global(1)
+      start(2)=j_global(1)
+      start(3)=1
+      edge(1)=im
+      edge(2)=jm
+      edge(3)=1
+      status=nfmpi_put_vara_real_all(
+     $     ncid,icec_varid,start,edge,real(cb,4))
+      call handle_error_pnetcdf(
+     $     'nf_put_vara_real: icec',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(
+     $     ncid,ui_varid,start,edge,real(ui,4))
+      call handle_error_pnetcdf(
+     $     'nf_put_vara_real: iceu',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(
+     $     ncid,vi_varid,start,edge,real(vi,4))
+      call handle_error_pnetcdf(
+     $     'nf_put_vara_real: icev',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(
+     $     ncid,hi_varid,start,edge,real(hi,4))
+      call handle_error_pnetcdf(
+     $     'nf_put_vara_real: hi',status,nf_noerr)
 !
 !
 !      start(1)=i_global(1)
