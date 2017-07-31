@@ -69,6 +69,7 @@
           if ( calc_tsforce ) call tsforce_tsflx( dtime )
           if ( calc_wind )    call wind_main( dtime )
           if ( calc_river )   call river_main( dtime, .false. )
+          call icedrag
         end if
 
        

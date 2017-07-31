@@ -4383,141 +4383,177 @@ C  !The most south sudomains
       if(x.lt.7.0) then
         ixd=int(2.0*x)+1
         fsinhinv=fdat(ixd)+(fdat(ixd+1)-fdat(ixd))*(x-xd(ixd))*2.0
-       endif
-       return
-       end
+      endif
+      return
+      end
 !_______________________________________________________________________
 
-       subroutine icedrag()
-         implicit none
-         include 'pom.h'
+      subroutine icedrag
+        implicit none
+        include 'pom.h'
          
-         real(kind=rk), dimension(im_local,jm_local):: ci, cf, uif
-     &                 ,delx,dely,cidx,cidy, rhoi, uvi, uv, uidx, vidy
-     &                 ,tauiau,tauiav,tauiwu,tauiwv, uib, vif, vib
-         logical, dimension(im_local,jm_local) :: icm
-         character*128 flnm
-         
-         integer i,j,ti
-         
-         ui = 0.
-         vi = 0.
-         ci = 0.
-         hi =  .5
-         delx = 0.
-         dely = 0.
-         rhoi = 900.
-         uvi = 0.
-         uv  = 0.
-         uidx = 0.
-         vidy = 0.
-         icm = .false.
-         
-         ci(55:60,55:60) = 1.
-         ci(50:54,50:54) =  .8
-         
-         cb = ci
-         uib = ui
-         vib = vi
-         
-         do ti=1,1000
+        real(kind=rk), dimension(im_local,jm_local):: ci, cf
+     &                ,uif, vif, uib, vib, fx, fy, divu, pice
+     &                ,delx,dely,cidx,cidy, rhoi, uvi, uv, uidx, vidy
+     &                ,tauiau,tauiav,tauiwu,tauiwv
+        logical, dimension(im_local,jm_local) :: icm
+        character*128 flnm
 
-         delx(2:im,:) = 2.*(el(2:im,:)-el(1:imm1,:))
-     &                    /(dx(2:im,:)+dx(1:imm1,:))
-         dely(:,2:jm) = 2.*(el(:,2:jm)-el(:,1:jmm1))
-     &                    /(dy(:,2:jm)+dy(:,1:jmm1))
+        integer i,j,ti
+        real(kind=rk) eeta
 
-         rhoi = 900.*hi*ci ! 900. kg/m3 - 0.9 g/cm3?
-         where (ci<.05) rhoi = rhoref
-!         rhoi = rhoi + (rho(1:im,1:jm,1)*1000.+rhoref)*(1-ci) ! since concentration is not limited by 1, the line is incorrect. TODO: limit concentration
-         
-         tauiau = wusurf
-         tauiav = wvsurf
-         
-         uv  = sqrt(u(1:im,1:jm,1)**2+v(1:im,1:jm,1)**2)
-         uvi = sqrt(ui**2+vi**2)
-         
-         tauiwu= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
-     &     *(ui-u(1:im,1:jm,1))*abs(ui-u(1:im,1:jm,1))
-         tauiwv= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
-     &     *(vi-v(1:im,1:jm,1))*abs(vi-v(1:im,1:jm,1))
-         
-!         if (my_task==0) then
-!           write(*,*) maxval(abs(tauiau)), "|", maxval(abs(tauiwu))
-!           write(*,*) maxval(abs(tauiav)), "|", maxval(abs(tauiwv))
-!         end if
-         
-         cidx(2:im,:) = 2.*(ci(2:im,:)-ci(1:imm1,:))
-     &                    /(dx(2:im,:)+dx(1:imm1,:))
-         cidy(:,2:jm) = 2.*(ci(:,2:jm)-ci(:,1:jmm1))
-     &                    /(dy(:,2:jm)+dy(:,1:jmm1))
-         
-         uidx(2:im,:) = (ui(2:im,:)-ui(1:imm1,:))/dx(2:im,:)
-!         uidy = (ui(:,2:jm)-ui(:,1:jmm1))/dy(:,2:jm)
-!         vidx = (vi(2:im,:)-vi(1:imm1,:))/dx(2:im,:)
-         vidy(:,2:jm) = (vi(:,2:jm)-vi(:,1:jmm1))/dy(:,2:jm)
-         
-         call advtC(cb,cf,ui,vi)
-         
-         where (cf<small) cf = 0.
-         where (cf>1.)
-           hi = hi + hi*(cf-1.)/cf
-           cf = 1.
-         end where
+        eeta = 1.e2 !1.01e-7 ! 1010 cm2/s? ! The source claims the coefficient equals to 10^10 cm2/s! This gives unreallistic Infinities.
 
-         do j=2,jmm1
-           do i=2,imm1
-             if (cf(i-1,j)+cf(i,j)+cf(i+1,j)+cf(i,j-1)+cf(i,j+1)>0.)
-     &          icm = .true.
-           end do
-         end do
+        ui = 0.
+        vi = 0.
+        ci = 0.
+        hi =  .5
+        delx = 0.
+        dely = 0.
+        rhoi = 900.
+        uvi = 0.
+        uv  = 0.
+        uidx = 0.
+        vidy = 0.
+        icm = .false.
 
-         where (cf>small)
-         uif = ui + ( -2.*cor(1:im,1:jm)*vi - grav*delx
-     &              + (tauiau-tauiwu)/rhoi )*dte
-         vif = vi + (  2.*cor(1:im,1:jm)*ui - grav*dely
-     &              + (tauiav-tauiwv)/rhoi )*dte
-         end where
-         
-         ui = ui+.5*smoth*(uif+uib-2.*ui)
-         vi = vi+.5*smoth*(vif+vib-2.*vi)
-         ci = ci+.5*smoth*(cf+cb-2.*ci)
-         uib = ui
-         ui  = uif
-         vib = vi
-         vi = vif
-         cb = ci
-         ci = cf
-         
-         if (ti>450) then
-          time = ti
-          write(flnm, '(a,i0.5,a)') '/home/rincewnd/icec.', ti, '.nc'
-          call write_debug_pnetcdf(flnm)
-          if (my_task==1) then
-           write(*,*) "--------------------------------------------"
-           write(*,*) "cb:", minval(cb), maxval(cb), my_task
-           write(*,*) "ui:", minval(ui), maxval(ui), my_task
-           write(*,*) "vi:", minval(vi), maxval(vi), my_task
-           write(*,*) "ri:", minval(rhoi,cf>small),maxval(rhoi), my_task
-           write(*,*) "--------------------------------------------"
+        ci(40:60,40:60) =  .8
+        ci(45:55,45:55) =  .9
+        ci(49:51,49:51) = 1.
+
+        cb = ci
+        uib = ui
+        vib = vi
+
+        do ti=1,10000
+
+          delx(2:im,:) = 2.*(el(2:im,:)-el(1:imm1,:))
+     &                     /(dx(2:im,:)+dx(1:imm1,:))
+          dely(:,2:jm) = 2.*(el(:,2:jm)-el(:,1:jmm1))
+     &                     /(dy(:,2:jm)+dy(:,1:jmm1))
+
+          rhoi = 900.*hi !*ci ! 900. kg/m3 - 0.9 g/cm3?
+!          where (ci<.05) rhoi = 10.
+!          rhoi = rhoi + (rho(1:im,1:jm,1)*1000.+rhoref)*(1-ci) ! since concentration is not limited by 1, the line is incorrect. TODO: limit concentration
+
+          tauiau = wusurf
+          tauiav = wvsurf
+
+          uv  = sqrt(u(1:im,1:jm,1)**2+v(1:im,1:jm,1)**2)
+          uvi = sqrt(ui**2+vi**2)
+
+          tauiwu= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
+     &      *(ui-u(1:im,1:jm,1))*abs(ui-u(1:im,1:jm,1))
+          tauiwv= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
+     &      *(vi-v(1:im,1:jm,1))*abs(vi-v(1:im,1:jm,1))
+
+!          if (my_task==0) then
+!            write(*,*) maxval(abs(tauiau)), "|", maxval(abs(tauiwu))
+!            write(*,*) maxval(abs(tauiav)), "|", maxval(abs(tauiwv))
+!          end if
+
+          cidx(2:im,:) = 2.*(ci(2:im,:)-ci(1:imm1,:))
+     &                     /(dx(2:im,:)+dx(1:imm1,:))
+          cidy(:,2:jm) = 2.*(ci(:,2:jm)-ci(:,1:jmm1))
+     &                     /(dy(:,2:jm)+dy(:,1:jmm1))
+
+          uidx(2:im,:) = (ui(2:im,:)-ui(1:imm1,:))/dx(2:im,:)
+          vidy(:,2:jm) = (vi(:,2:jm)-vi(:,1:jmm1))/dy(:,2:jm)
+          uidx(1,:) = uidx(2,:)
+          vidy(:,1) = vidy(:,2)
+!          uidy = (ui(:,2:jm)-ui(:,1:jmm1))/dy(:,2:jm)
+!          vidx = (vi(2:im,:)-vi(1:imm1,:))/dx(2:im,:)
+
+          divu(2:im,2:jm) = 2.*
+     &              ((uidx(2:im,2:jm)-uidx(1:imm1,2:jm))
+     &                /(dx(2:im,2:jm)  +dx(1:imm1,2:jm))
+     &              +(vidy(2:jm,2:jm)-vidy(2:im,1:jmm1))
+     &                /(dy(2:im,2:jm)  +dy(2:im,1:jmm1)))
+          divu(1,:) = 0.
+          divu(:,1) = 0.
+
+          pice = 0.
+
+          where (divu<0.) pice = -10.*divu
+
+          call advtC(cb,cf)
+
+          where (cf<small) cf = 0.
+
+          do j=2,jmm1
+            do i=2,imm1
+              if (cf(i-1,j)+cf(i,j)+cf(i+1,j)+cf(i,j-1)+cf(i,j+1)>0.)
+     &           icm = .true.
+            end do
+          end do
+
+          fx = 0.
+          fx(2:im,2:jm) = 2.*eeta
+     &                   *((uidx(2:im,2:jm)-uidx(1:imm1,2:jm))
+     &                     /(dx(2:im,2:jm)+dx(1:imm1,:))
+     &                    +(vidy(2:im,2:jm)-vidy(1:imm1,2:jm))
+     &                     /(dy(2:im,2:jm)+dy(1:imm1,:)))
+          fy = fx
+          fx(2:im,2:jm) = fx(2:im,2:jm) +
+     &                    eeta*(divu(2:im,2:jm)/dx(2:im,2:jm))
+          fx(2:im,2:jm) = fx(2:im,2:jm) -
+     &                    (pice(2:im,2:jm)-pice(1:imm1,2:jm))
+     &                    /dx(2:im,2:jm)
+
+          fy(2:im,2:jm) = fy(2:im,2:jm) +
+     &                    eeta*(divu(2:im,2:jm)/dy(2:im,2:jm))
+          fy(2:im,2:jm) = fy(2:im,2:jm) -
+     &                    (pice(2:im,2:jm)-pice(2:im,1:jmm1))
+     &                    /dy(2:im,2:jm)
+
+          where (cf>0.)
+           uif = ui + ( -2.*cor*vi - grav*delx
+     &                + (tauiau-tauiwu)/rhoi + fx )*dte
+           vif = vi + (  2.*cor*ui - grav*dely
+     &                + (tauiav-tauiwv)/rhoi + fy )*dte
+          end where
+          do j=1,jmm1
+            do i=1,imm1
+              if (cf(i,j)>=1.) then
+                if (uif(i  ,j)>0.) uif(i  ,j) = 0.
+                if (uif(i+1,j)<0.) uif(i+1,j) = 0.
+                if (vif(i,j  )>0.) vif(i,j  ) = 0.
+                if (vif(i,j+1)<0.) vif(i,j+1) = 0.
+                cf(i,j) = 1.
+              end if
+            end do
+          end do
+          where (cf>1.)
+            hi = hi - hi*(1.-cf)/cf
+            cf = 1.
+          end where
+
+          uif = uif*dum
+          vif = vif*dvm
+
+          ui = ui+.5*smoth*(uif+uib-2.*ui)
+          vi = vi+.5*smoth*(vif+vib-2.*vi)
+          ci = ci+.5*smoth*(cf+cb-2.*ci)
+          uib = ui
+          ui  = uif
+          vib = vi
+          vi = vif
+          cb = ci
+          ci = cf
+
+          if (mod(ti,50)==0) then
+            time = ti
+            write(flnm, '(a,i0.5,a)') '/home/rincewnd/icec.', ti, '.nc'
+            call write_debug_pnetcdf(flnm)
+            if (my_task==1) then
+              write(*,*) "--------------------------------------------"
+              write(*,*) "cb:", minval(cb), maxval(cb), my_task
+              write(*,*) "ui:", minval(ui), maxval(ui), my_task
+              write(*,*) "vi:", minval(vi), maxval(vi), my_task
+              write(*,*)"hi:",minval(rhoi,cf>small),maxval(rhoi),my_task
+              write(*,*) "--------------------------------------------"
+            end if
           end if
-         end if
-     
-!         if (my_task==0) then
-!           write(*,*) "--------------------------------------------"
-!           write(*,*) "|", ci(49,51),":",ci(50,51),":",ci(51,51),"|"
-!           write(*,*) "|", ci(49,50),":",ci(50,50),":",ci(51,50),"|"
-!           write(*,*) "|", ci(49,49),":",ci(50,49),":",ci(51,49),"|"
-!           write(*,*) "--------------------------------------------"
-!           write(*,*) "|", ui(49,51),":",ui(50,51),":",ui(51,51),"|"
-!           write(*,*) "|", ui(49,50),":",ui(50,50),":",ui(51,50),"|"
-!           write(*,*) "|", ui(49,49),":",ui(50,49),":",ui(51,49),"|"
-!           write(*,*) "--------------------------------------------"
-!           write(*,*) "|", vi(49,51),":",vi(50,51),":",vi(51,51),"|"
-!           write(*,*) "|", vi(49,50),":",vi(50,50),":",vi(51,50),"|"
-!           write(*,*) "|", vi(49,49),":",vi(50,49),":",vi(51,49),"|"
-!           write(*,*) "--------------------------------------------"
-!         end if
-         
-         end do
-       end subroutine
+
+        end do
+      end subroutine
