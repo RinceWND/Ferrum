@@ -14,7 +14,11 @@
                              
 !     coefficients for relaxation 
 !     c1 = 1/30 [m/day]
-      real(kind=rk), parameter :: c1 = 3.858024691e-7 
+!      real(kind=rk), parameter :: c1 = 3.858024691e-7
+!     c1 = 1/10 [m/day]
+      real(kind=rk), parameter :: c1 = 1.15740740740741e-6
+!     c1 = 1/7 [m/day]
+!      real(kind=rk), parameter :: c1 = 1.65343915343915e-6
 !     c1 = 1 [m/day] !lyo:20110202:
 !      real(kind=rk), parameter :: c1 = 1.157407407e-5 !lyo:pac10:exp001->007;exp302:
       real(kind=rk) :: sstrelx, sssrelx
