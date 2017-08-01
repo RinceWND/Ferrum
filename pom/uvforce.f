@@ -224,6 +224,7 @@
         vabs = vabs + vbs(:,k)*dz(k)
         vabn = vabn + vbn(:,k)*dz(k)
       end do
+      ! TODO: Check barotropic velocities!!!
 
       return
 
