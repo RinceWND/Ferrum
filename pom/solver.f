@@ -4394,13 +4394,14 @@ C  !The most south sudomains
          
         real(kind=rk), dimension(im_local,jm_local):: ci, cf
      &                ,uif, vif, uib, vib, fx, fy, divu, pice
-     &                ,delx,dely,cidx,cidy, rhoi, uvi, uv, uidx, vidy
+     &                ,delx,dely,cidx,cidy, rhoi, duvi, uidx, vidy
      &                ,tauiau,tauiav,tauiwu,tauiwv
+     &                ,fluxcx,fluxcy
         logical, dimension(im_local,jm_local) :: icm
         character*128 flnm
 
         integer i,j,ti
-        real(kind=rk) eeta
+        real(kind=rk) eeta, tmp, dteM
 
         eeta = 1.e2 !1.01e-7 ! 1010 cm2/s? ! The source claims the coefficient equals to 10^10 cm2/s! This gives unreallistic Infinities.
 
@@ -4411,15 +4412,17 @@ C  !The most south sudomains
         delx = 0.
         dely = 0.
         rhoi = 900.
-        uvi = 0.
-        uv  = 0.
+        duvi = 0.
         uidx = 0.
         vidy = 0.
+        fluxcx = 0.
+        fluxcy = 0.
         icm = .false.
 
         ci(40:60,40:60) =  .8
         ci(45:55,45:55) =  .9
-        ci(49:51,49:51) = 1.
+        ci(49:51,49:51) =  .95
+        ci = ci*fsm
 
         cb = ci
         uib = ui
@@ -4439,18 +4442,36 @@ C  !The most south sudomains
           tauiau = wusurf
           tauiav = wvsurf
 
-          uv  = sqrt(u(1:im,1:jm,1)**2+v(1:im,1:jm,1)**2)
-          uvi = sqrt(ui**2+vi**2)
+          duvi=abs(sqrt((ui-u(1:im,1:jm,1))**2+(vi-v(1:im,1:jm,1))**2))
 
           tauiwu= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
-     &      *(ui-u(1:im,1:jm,1))*abs(ui-u(1:im,1:jm,1))
+     &      *(ui-u(1:im,1:jm,1))*duvi
           tauiwv= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
-     &      *(vi-v(1:im,1:jm,1))*abs(vi-v(1:im,1:jm,1))
+     &      *(vi-v(1:im,1:jm,1))*duvi
 
 !          if (my_task==0) then
 !            write(*,*) maxval(abs(tauiau)), "|", maxval(abs(tauiwu))
 !            write(*,*) maxval(abs(tauiav)), "|", maxval(abs(tauiwv))
 !          end if
+     
+          do j=2,jm
+            do i=2,im
+              if (ui(i,j)<0.) then
+                fluxcx(i,j) = 2.*ci(i,j)*ui(i,j)*dy(i,j)
+     &                          /(dx(i,j)+dx(i-1,j))
+              else
+                fluxcx(i,j) = 2.*ci(i-1,j)*ui(i,j)*dy(i,j)
+     &                          /(dx(i,j)+dx(i-1,j))
+              end if
+              if (vi(i,j)<0.) then
+                fluxcy(i,j) = 2.*ci(i,j)*vi(i,j)*dx(i,j)
+     &                          /(dy(i,j)+dy(i-1,j))
+              else
+                fluxcy(i,j) = 2.*ci(i,j)*vi(i,j-1)*dx(i,j)
+     &                          /(dy(i,j)+dy(i-1,j))
+              end if
+            end do
+          end do
 
           cidx(2:im,:) = 2.*(ci(2:im,:)-ci(1:imm1,:))
      &                     /(dx(2:im,:)+dx(1:imm1,:))
@@ -4467,41 +4488,51 @@ C  !The most south sudomains
           divu(2:im,2:jm) = 2.*
      &              ((uidx(2:im,2:jm)-uidx(1:imm1,2:jm))
      &                /(dx(2:im,2:jm)  +dx(1:imm1,2:jm))
-     &              +(vidy(2:jm,2:jm)-vidy(2:im,1:jmm1))
+     &              +(vidy(2:im,2:jm)-vidy(2:im,1:jmm1))
      &                /(dy(2:im,2:jm)  +dy(2:im,1:jmm1)))
-          divu(1,:) = 0.
-          divu(:,1) = 0.
+          divu(1,:) = divu(2,:)
+          divu(:,1) = divu(:,2)
 
           pice = 0.
 
           where (divu<0.) pice = -10.*divu
 
-          call advtC(cb,cf)
-
-          where (cf<small) cf = 0.
-
-          do j=2,jmm1
-            do i=2,imm1
-              if (cf(i-1,j)+cf(i,j)+cf(i+1,j)+cf(i,j-1)+cf(i,j+1)>0.)
-     &           icm = .true.
+          if (.false.) then
+            call advtC(cb,cf)
+          else
+            do j=2,jm
+              do i=2,im
+                tmp = (fluxcx(i-1,j)-fluxcx(i,j))/dx(i,j)
+     &               +(fluxcy(i,j-1)-fluxcy(i,j))/dy(i,j)
+                dteM = dte
+                if ((cf(i,j)+dte*tmp)<0.) then
+                  dteM = -ci(i,j)/tmp
+                else if ((cf(i,j)+dte*tmp)>1.) then
+                  dteM = (1.-ci(i,j))/tmp
+                end if
+                cf(i,j) = ci(i,j)+dteM*tmp
+              end do
             end do
-          end do
+            cf = cf*fsm
+          end if
+
+!          where (cf<0.) cf = 0.
 
           fx = 0.
           fx(2:im,2:jm) = 2.*eeta
      &                   *((uidx(2:im,2:jm)-uidx(1:imm1,2:jm))
-     &                     /(dx(2:im,2:jm)+dx(1:imm1,:))
-     &                    +(vidy(2:im,2:jm)-vidy(1:imm1,2:jm))
-     &                     /(dy(2:im,2:jm)+dy(1:imm1,:)))
+     &                     /(dx(2:im,2:jm)+dx(1:imm1,2:jm))
+     &                    +(vidy(2:im,2:jm)-vidy(2:im,1:jmm1))
+     &                     /(dy(2:im,2:jm)+dy(2:im,1:jmm1)))
           fy = fx
           fx(2:im,2:jm) = fx(2:im,2:jm) +
-     &                    eeta*(divu(2:im,2:jm)/dx(2:im,2:jm))
+     &          eeta*((divu(2:im,2:jm)-divu(1:imm1,2:jm))/dx(2:im,2:jm))
           fx(2:im,2:jm) = fx(2:im,2:jm) -
      &                    (pice(2:im,2:jm)-pice(1:imm1,2:jm))
      &                    /dx(2:im,2:jm)
 
           fy(2:im,2:jm) = fy(2:im,2:jm) +
-     &                    eeta*(divu(2:im,2:jm)/dy(2:im,2:jm))
+     &          eeta*((divu(2:im,2:jm)-divu(2:im,1:jmm1))/dy(2:im,2:jm))
           fy(2:im,2:jm) = fy(2:im,2:jm) -
      &                    (pice(2:im,2:jm)-pice(2:im,1:jmm1))
      &                    /dy(2:im,2:jm)
@@ -4515,10 +4546,36 @@ C  !The most south sudomains
           do j=1,jmm1
             do i=1,imm1
               if (cf(i,j)>=1.) then
-                if (uif(i  ,j)>0.) uif(i  ,j) = 0.
-                if (uif(i+1,j)<0.) uif(i+1,j) = 0.
-                if (vif(i,j  )>0.) vif(i,j  ) = 0.
-                if (vif(i,j+1)<0.) vif(i,j+1) = 0.
+!                if (uif(i  ,j)>0.) uif(i  ,j) = 0.
+!                if (uif(i+1,j)<0.) uif(i+1,j) = 0.
+!                if (vif(i,j  )>0.) vif(i,j  ) = 0.
+!                if (vif(i,j+1)<0.) vif(i,j+1) = 0.
+                if (uif(i,j)>0. .and. uif(i+1,j)<0.) then
+                  uif(i,j) = uif(i,j)+uif(i+1,j)
+                  uif(i+1,j) = uif(i,j)
+                end if
+                if (uif(i,j)>0. .and. uif(i+1,j)<uif(i,j)) then
+                  uif(i,j) = .5*(uif(i,j)+uif(i+1,j))
+                  uif(i+1,j) = uif(i,j)
+                end if
+                if (uif(i+1,j)<0. .and. uif(i,j)<uif(i+1,j)) then
+                  uif(i,j) = .5*(uif(i,j)+uif(i+1,j))
+                  uif(i+1,j) = uif(i,j)
+                end if
+
+                if (vif(i,j)>0. .and. vif(i+1,j)<0.) then
+                  vif(i,j) = vif(i,j)+vif(i+1,j)
+                  vif(i+1,j) = vif(i,j)
+                end if
+                if (vif(i,j)>0. .and. vif(i+1,j)<vif(i,j)) then
+                  vif(i,j) = .5*(vif(i,j)+vif(i+1,j))
+                  vif(i+1,j) = vif(i,j)
+                end if
+                if (vif(i+1,j)<0. .and. vif(i,j)<vif(i+1,j)) then
+                  vif(i,j) = .5*(vif(i,j)+vif(i+1,j))
+                  vif(i+1,j) = vif(i,j)
+                end if
+
                 cf(i,j) = 1.
               end if
             end do
@@ -4533,7 +4590,7 @@ C  !The most south sudomains
 
           ui = ui+.5*smoth*(uif+uib-2.*ui)
           vi = vi+.5*smoth*(vif+vib-2.*vi)
-          ci = ci+.5*smoth*(cf+cb-2.*ci)
+!          ci = ci+.5*smoth*(cf+cb-2.*ci)
           uib = ui
           ui  = uif
           vib = vi
@@ -4541,7 +4598,7 @@ C  !The most south sudomains
           cb = ci
           ci = cf
 
-          if (mod(ti,50)==0) then
+          if (mod(ti,50)==0.or.ti==1) then
             time = ti
             write(flnm, '(a,i0.5,a)') '/home/rincewnd/icec.', ti, '.nc'
             call write_debug_pnetcdf(flnm)
@@ -4550,7 +4607,8 @@ C  !The most south sudomains
               write(*,*) "cb:", minval(cb), maxval(cb), my_task
               write(*,*) "ui:", minval(ui), maxval(ui), my_task
               write(*,*) "vi:", minval(vi), maxval(vi), my_task
-              write(*,*)"hi:",minval(rhoi,cf>small),maxval(rhoi),my_task
+!              write(*,*)"hi:",minval(rhoi,cf>small),maxval(rhoi),my_task
+              write(*,*) "Si:", sum(cf*art), my_task
               write(*,*) "--------------------------------------------"
             end if
           end if
