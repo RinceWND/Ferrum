@@ -815,15 +815,13 @@
 
       do j=2,jmm1
         do i=2,im
-          xmassflux(i,j)=.25*(dy(i-1,j)+dy(i,j))
-     $                      *(dt(i-1,j)+dt(i,j))*ui(i,j)
+          xmassflux(i,j)=.5*(dy(i-1,j)+dy(i,j))*ui(i,j)
         end do
       end do
 
       do j=2,jm
         do i=2,imm1
-          ymassflux(i,j)=.25*(dx(i,j-1)+dx(i,j))
-     $                      *(dt(i,j-1)+dt(i,j))*vi(i,j)
+          ymassflux(i,j)=.5*(dx(i,j-1)+dx(i,j))*vi(i,j)
         end do
       end do
 
@@ -864,8 +862,8 @@
           do i=2,imm1
             cf(i,j) = xflux(i+1,j)-xflux(i,j)
      $               +yflux(i,j+1)-yflux(i,j)
-            cf(i,j) = (cbmem(i,j)*(h(i,j)+eta(i,j))*art(i,j)
-     $                   -dti2*cf(i,j))/((h(i,j)+etf(i,j))*art(i,j))
+            cf(i,j) = (cbmem(i,j)*art(i,j)
+     $                   -dti2*cf(i,j))/art(i,j)
           end do
         end do
         ! next line added on 22-Jul-2009 by Raffaele Bernardello
@@ -894,32 +892,32 @@
 !      write(*,*) my_task, ": ", var, ": nitera = ", itera  ! rwnd: iteration check
 
 ! add horizontal diffusive fluxes
-      do j=2,jm
-        do i=2,im
-          xmassflux(i,j) = .5*(aam(i,j,1)+aam(i-1,j,1))
-          ymassflux(i,j) = .5*(aam(i,j,1)+aam(i,j-1,1))
-        end do
-      end do
+!      do j=2,jm
+!        do i=2,im
+!          xmassflux(i,j) = .5*(aam(i,j,1)+aam(i-1,j,1))
+!          ymassflux(i,j) = .5*(aam(i,j,1)+aam(i,j-1,1))
+!        end do
+!      end do
 
-      do j=2,jm
-        do i=2,im
-         xflux(i,j) = -xmassflux(i,j)*(h(i,j)+h(i-1,j))*tprni
-     $                   *(cb(i,j)-cb(i-1,j))*dum(i,j)
-     $                   *(dy(i,j)+dy(i-1,j))*0.5/(dx(i,j)+dx(i-1,j))
-         yflux(i,j) = -ymassflux(i,j)*(h(i,j)+h(i,j-1))*tprni
-     $                   *(cb(i,j)-cb(i,j-1))*dvm(i,j)
-     $                   *(dx(i,j)+dx(i,j-1))*0.5/(dy(i,j)+dy(i,j-1))
-        end do
-      end do
-
-! add net horizontal fluxes and step forward in time
-      do j=2,jmm1
-        do i=2,imm1
-          cf(i,j) = cf(i,j)-dti2*(xflux(i+1,j)-xflux(i,j)
-     $                           +yflux(i,j+1)-yflux(i,j))
-     $                          /((h(i,j)+etf(i,j))*art(i,j))
-        end do
-      end do
+!      do j=2,jm
+!        do i=2,im
+!         xflux(i,j) = -10.e2*tprni !-xmassflux(i,j)*tprni
+!     $                   *(cb(i,j)-cb(i-1,j))*dum(i,j)
+!     $                   *(dy(i,j)+dy(i-1,j))*0.5/(dx(i,j)+dx(i-1,j))
+!         yflux(i,j) = -10.e2*tprni !-ymassflux(i,j)*tprni
+!     $                   *(cb(i,j)-cb(i,j-1))*dvm(i,j)
+!     $                   *(dx(i,j)+dx(i,j-1))*0.5/(dy(i,j)+dy(i,j-1))
+!        end do
+!      end do
+!
+!! add net horizontal fluxes and step forward in time
+!      do j=2,jmm1
+!        do i=2,imm1
+!          cf(i,j) = cf(i,j)-dti2*(xflux(i+1,j)-xflux(i,j)
+!     $                           +yflux(i,j+1)-yflux(i,j))
+!     $                          /art(i,j)
+!        end do
+!      end do
 
       return
       end
@@ -4178,7 +4176,7 @@ C  !The most south sudomains
           else
             udx=abs(xmassflux(i,j))
             u2dt=dti2*xmassflux(i,j)*xmassflux(i,j)*2.
-     $          /(aru(i,j)*(dt(i-1,j)+dt(i,j)))
+     $          /aru(i,j)
             mol=(cf(i,j)-cf(i-1,j))
      $          /(cf(i-1,j)+cf(i,j)+epsilon)
             xmassflux(i,j)=(udx-u2dt)*mol*sw
@@ -4197,7 +4195,7 @@ C  !The most south sudomains
           else
             vdy=abs(ymassflux(i,j))
             v2dt=dti2*ymassflux(i,j)*ymassflux(i,j)*2.
-     $          /(arv(i,j)*(dt(i,j-1)+dt(i,j)))
+     $          /arv(i,j)
             mol=(cf(i,j)-cf(i,j-1))
      $          /(cf(i,j-1)+cf(i,j)+epsilon)
             ymassflux(i,j)=(vdy-v2dt)*mol*sw
@@ -4428,7 +4426,7 @@ C  !The most south sudomains
         uib = ui
         vib = vi
 
-        do ti=1,10000
+        do ti=1,100000
 
           delx(2:im,:) = 2.*(el(2:im,:)-el(1:imm1,:))
      &                     /(dx(2:im,:)+dx(1:imm1,:))
@@ -4453,7 +4451,7 @@ C  !The most south sudomains
 !            write(*,*) maxval(abs(tauiau)), "|", maxval(abs(tauiwu))
 !            write(*,*) maxval(abs(tauiav)), "|", maxval(abs(tauiwv))
 !          end if
-     
+
           do j=2,jm
             do i=2,im
               if (ui(i,j)<0.) then
@@ -4465,13 +4463,24 @@ C  !The most south sudomains
               end if
               if (vi(i,j)<0.) then
                 fluxcy(i,j) = 2.*ci(i,j)*vi(i,j)*dx(i,j)
-     &                          /(dy(i,j)+dy(i-1,j))
+     &                          /(dy(i,j)+dy(i,j-1))
               else
-                fluxcy(i,j) = 2.*ci(i,j)*vi(i,j-1)*dx(i,j)
-     &                          /(dy(i,j)+dy(i-1,j))
+                fluxcy(i,j) = 2.*ci(i,j-1)*vi(i,j)*dx(i,j)
+     &                          /(dy(i,j)+dy(i,j-1))
               end if
             end do
           end do
+          fluxcx(1,:) = 0.
+          fluxcy(1,:) = 0.
+          fluxcx(:,1) = 0.
+          fluxcy(:,1) = 0.
+          
+!          do j=2,jm
+!            do i=2,im
+!              tmp = (fluxcx(i-1,j)-fluxcx(i,j))/dx(i-1,j)
+!     &             +(fluxcy(i,j-1)-fluxcy(i,j))/dy(i-1,j)
+!            end do
+!          end do
 
           cidx(2:im,:) = 2.*(ci(2:im,:)-ci(1:imm1,:))
      &                     /(dx(2:im,:)+dx(1:imm1,:))
@@ -4497,18 +4506,28 @@ C  !The most south sudomains
 
           where (divu<0.) pice = -10.*divu
 
-          if (.false.) then
+          if (.true.) then
+            call exchange2d_mpi(ui,im,jm)
+            call exchange2d_mpi(vi,im,jm)
             call advtC(cb,cf)
           else
             do j=2,jm
               do i=2,im
-                tmp = (fluxcx(i-1,j)-fluxcx(i,j))/dx(i,j)
-     &               +(fluxcy(i,j-1)-fluxcy(i,j))/dy(i,j)
+                tmp = 2.*(fluxcx(i-1,j)-fluxcx(i,j))/(dy(i-1,j)+dy(i,j))
+     &               +2.*(fluxcy(i,j-1)-fluxcy(i,j))/(dx(i,j-1)+dx(i,j))
                 dteM = dte
-                if ((cf(i,j)+dte*tmp)<0.) then
-                  dteM = -ci(i,j)/tmp
-                else if ((cf(i,j)+dte*tmp)>1.) then
-                  dteM = (1.-ci(i,j))/tmp
+                if (abs(tmp)>small) then
+                  if ((cf(i,j)+dte*tmp)<0.) then
+                    dteM = -ci(i,j)/tmp
+!                    ui(i,j) = ui(i,j)+dteM/dte*ui(i,j)
+!                    vi(i,j) = vi(i,j)+dteM/dte*vi(i,j)
+                  else if ((cf(i,j)+dte*tmp)>1.) then
+                    dteM = (1.-ci(i,j))/tmp
+!                    ui(i,j) = ui(i,j)-dteM/dte*ui(i,j)
+!                    vi(i,j) = vi(i,j)-dteM/dte*vi(i,j)
+                  end if
+                else
+                  dteM = 0.
                 end if
                 cf(i,j) = ci(i,j)+dteM*tmp
               end do
@@ -4537,7 +4556,7 @@ C  !The most south sudomains
      &                    (pice(2:im,2:jm)-pice(2:im,1:jmm1))
      &                    /dy(2:im,2:jm)
 
-          where (cf>0.)
+          where (cf>0.)!small)
            uif = ui + ( -2.*cor*vi - grav*delx
      &                + (tauiau-tauiwu)/rhoi + fx )*dte
            vif = vi + (  2.*cor*ui - grav*dely
@@ -4580,17 +4599,17 @@ C  !The most south sudomains
               end if
             end do
           end do
-          where (cf>1.)
-            hi = hi - hi*(1.-cf)/cf
-            cf = 1.
-          end where
+!          where (cf>1.)
+!            hi = hi - hi*(1.-cf)/cf
+!            cf = 1.
+!          end where
 
           uif = uif*dum
           vif = vif*dvm
 
           ui = ui+.5*smoth*(uif+uib-2.*ui)
           vi = vi+.5*smoth*(vif+vib-2.*vi)
-!          ci = ci+.5*smoth*(cf+cb-2.*ci)
+          ci = ci+.5*smoth*(cf+cb-2.*ci)
           uib = ui
           ui  = uif
           vib = vi
@@ -4598,9 +4617,9 @@ C  !The most south sudomains
           cb = ci
           ci = cf
 
-          if (mod(ti,50)==0.or.ti==1) then
+          if (mod(ti,1000)==0.or.ti==1) then
             time = ti
-            write(flnm, '(a,i0.5,a)') '/home/rincewnd/icec.', ti, '.nc'
+            write(flnm, '(a,i0.6,a)') '/home/rincewnd/icec.', ti, '.nc'
             call write_debug_pnetcdf(flnm)
             if (my_task==1) then
               write(*,*) "--------------------------------------------"
