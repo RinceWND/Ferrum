@@ -61,10 +61,6 @@
       ! initialize
       n = 1
 
-      wusurf = 0.0
-      wvsurf = 0.0
-      
-
       ! wind stresses in initial state
 
       if ( calc_wind ) then

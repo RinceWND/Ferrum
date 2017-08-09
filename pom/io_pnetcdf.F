@@ -2657,9 +2657,9 @@
 
       status = get_var_real_2d(ncid,ice_varid,start,edge,ice)
       call handle_error_pnetcdf('get_var_real: sice',status,nf_noerr)
+      where(ice<=minval(ice,ice>0.)) ice = 0.
       ice = fsm*ice/100.
-      where(ice<0.) ice = 0.
-      write(*,*) my_task,"::",minval(ice),maxval(ice)
+      write(*,*) my_task,"::",minval(ice, ice>0.),maxval(ice)
 
 ! close file
       status=nfmpi_close(ncid)

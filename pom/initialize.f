@@ -122,7 +122,7 @@
      $    call incmix(aamfac,im,jm,1,lono,lato,east_e,north_e,xs,ys,fak)
 
 ! read restart data from a previous run
-      if(nread_rst.ne.0) call read_restart_pnetcdf 
+      if(nread_rst.ne.0) call read_restart_pnetcdf
 
 ! write grid and initial conditions
       if (output_flag == 1) then

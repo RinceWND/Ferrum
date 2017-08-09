@@ -4424,10 +4424,10 @@ C  !The most south sudomains
 !        ci(49:51,49:51) =  .95
 !        ci = .5
         
-        cibn = 1.
-        cibe = 0.
-        cibs = 0.
-        cibw = 0.
+        cibn = cb(:,jm)
+        cibe = cb(im,:)
+        cibs = cb(:,1)
+        cibw = cb(1,:)
 !        if (n_east==-1) then
 !          fsm(im,:) = 0.
 !          dum(im,:) = 0.
@@ -4454,25 +4454,27 @@ C  !The most south sudomains
         uib = ui
         vib = vi
 
-        delx(2:im,:) = 2.*(el(2:im,:)-el(1:imm1,:))
+        delx(2:im,:) = dum(2:im,:)*2.*(el(2:im,:)-el(1:imm1,:))
      &                     /(dx(2:im,:)+dx(1:imm1,:))
-        dely(:,2:jm) = 2.*(el(:,2:jm)-el(:,1:jmm1))
+        dely(:,2:jm) = dvm(:,2:jm)*2.*(el(:,2:jm)-el(:,1:jmm1))
      &                     /(dy(:,2:jm)+dy(:,1:jmm1))
-
-        tauiau = -0.03 !wusurf
-        tauiav =  0.05 !wvsurf
+        call exchange2d_mpi(delx,im,jm)
+        call exchange2d_mpi(dely,im,jm)
+        
+        tauiau = -wusurf*rhoref
+        tauiav = -wvsurf*rhoref
 
         do ti=1,100000
 
-          rhoi = 900.*hi*max(ci,.05) ! 900. kg/m3 - 0.9 g/cm3?
+          rhoi = 900.*hi*max(ci,.1) ! 900. kg/m3 - 0.9 g/cm3?
 !          where (ci<.05) rhoi = 10.
 !          rhoi = rhoi + (rho(1:im,1:jm,1)*1000.+rhoref)*(1-ci) ! since concentration is not limited by 1, the line is incorrect. TODO: limit concentration
 
           duvi=abs(sqrt((ui-u(1:im,1:jm,1))**2+(vi-v(1:im,1:jm,1))**2))
 
-          tauiwu= 5.5e-3*(rho(1:im,1:jm,1)*rhoref+1000.)
+          tauiwu= fsm*5.5e-3*(rho(1:im,1:jm,1)*rhoref+1000.)
      &      *(ui-u(1:im,1:jm,1))*duvi
-          tauiwv= 5.5e-3*(rho(1:im,1:jm,1)*rhoref+1000.)
+          tauiwv= fsm*5.5e-3*(rho(1:im,1:jm,1)*rhoref+1000.)
      &      *(vi-v(1:im,1:jm,1))*duvi
 
 !          if (my_task==0) then
@@ -4577,7 +4579,7 @@ C  !The most south sudomains
      &               +(fluxcy(i,j)-fluxcy(i,j+1))/dy(i,j)
                 dteM = dte
                 if (abs(tmp)>small) then
-                  if ((cf(i,j)+dte*tmp)<0.) then
+                  if ((cf(i,j)+dte*tmp)<small) then
                     dteM = -ci(i,j)/tmp
 !                    ui(i,j) = ui(i,j)+dteM/dte*ui(i,j)
 !                    vi(i,j) = vi(i,j)+dteM/dte*vi(i,j)
@@ -4746,7 +4748,7 @@ C  !The most south sudomains
             call write_debug_pnetcdf(flnm,fluxcx,fluxcy)
             if (my_task==1) then
               write(*,*) "--------------------------------------------"
-              write(*,*) "cb:", minval(cb), maxval(cb), my_task
+              write(*,*) "cb:", minval(cb, cb>0.), maxval(cb), my_task
               write(*,*) "ui:", minval(ui), maxval(ui), my_task
               write(*,*) "vi:", minval(vi), maxval(vi), my_task
 !              write(*,*)"hi:",minval(rhoi,cf>small),maxval(rhoi),my_task
