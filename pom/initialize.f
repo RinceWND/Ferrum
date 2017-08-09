@@ -667,6 +667,8 @@
           enddo
       enddo
 !lyo:pac10:end:
+      
+      call read_ice_pnetcdf( "ice.19790102.nc", cb )
 
       return
       end
@@ -693,7 +695,7 @@
       endif
 
 !     Radiation factors for use in subroutine bcond !alu:20101216 
-      rfe=1.; rfw=1.; rfn=1.; rfs=1. !=1 Flather; =0 clamped
+      rfe=0.; rfw=0.; rfn=0.; rfs=0. !=1 Flather; =0 clamped
 
 ! Periodic in "x" and/or "y"?  !lyo:20110224:alu:stcc:
 !     iperx.ne.0 if x-periodic; ipery.ne.0 if y-periodic               !

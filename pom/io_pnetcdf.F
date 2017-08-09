@@ -2615,6 +2615,58 @@
       return
       end
 !_______________________________________________________________________
+      subroutine read_ice_pnetcdf( filename, ice )
+! read wind stress
+      implicit none
+# include "mpif.h"
+# include "pnetcdf.inc"
+      include 'pom.h'
+      integer get_var_real_2d
+      integer n
+      real(kind=rk), dimension(im,jm) :: ice
+      character(len=15) filename
+      character(len=24) netcdf_sice_file
+      integer ncid,status
+      integer ice_varid
+      integer(mpi_offset_kind) start(4),edge(4)
+
+      start = 1
+      edge  = 1
+
+
+! open netcdf wind file
+      netcdf_sice_file="in/sice/"//trim(filename)
+      if(my_task.eq.0) write(*,'(/''reading ice '',a,'' @ '',i4)')
+     $                                    trim(netcdf_sice_file),n
+      status=nfmpi_open(pom_comm_coarse,netcdf_sice_file,nf_nowrite,
+     $                  mpi_info_null,ncid)
+      call handle_error_pnetcdf('nfmpi_open: '//netcdf_sice_file,
+     $                          status,nf_noerr)
+
+! get variables
+      status=nfmpi_inq_varid(ncid,'ci',ice_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: sice'
+     $                          ,status,nf_noerr)
+! get data
+      start(1)=i_global(1)
+      start(2)=j_global(1)
+      start(3)=1
+      edge(1)=im
+      edge(2)=jm
+      edge(3)=1
+
+      status = get_var_real_2d(ncid,ice_varid,start,edge,ice)
+      call handle_error_pnetcdf('get_var_real: sice',status,nf_noerr)
+      ice = fsm*ice/100.
+      where(ice<0.) ice = 0.
+      write(*,*) my_task,"::",minval(ice),maxval(ice)
+
+! close file
+      status=nfmpi_close(ncid)
+      call handle_error_pnetcdf('nf_close',status,nf_noerr)
+
+      return
+      end
 
 !_______________________________________________________________________
       subroutine read_msla_pnetcdf( ssha_out, filename )
@@ -4094,7 +4146,7 @@
       return
       end
 !_______________________________________________________________________
-      subroutine write_debug_pnetcdf( netcdf_out_file ) !lyo:20110224:alu:stcc:!lyo:pac10:add this subroutine
+      subroutine write_debug_pnetcdf( netcdf_out_file, flu, flv ) !lyo:20110224:alu:stcc:!lyo:pac10:add this subroutine
         implicit none
 # include "mpif.h"
 # include "pnetcdf.inc"
@@ -4104,12 +4156,13 @@
         integer time_dimid,x_dimid,y_dimid,z_dimid
         integer time_varid,z_varid,zz_varid,icec_varid,ui_varid,vi_varid
         integer uabe_varid,uabw_varid,vabs_varid,vabn_varid,hi_varid
-        integer tbe_varid,tbw_varid,tbs_varid,tbn_varid
-        integer sbe_varid,sbw_varid,sbs_varid,sbn_varid
+        integer tbe_varid,tbw_varid,tbs_varid,tbn_varid,uf_varid
+        integer sbe_varid,sbw_varid,sbs_varid,sbn_varid,vf_varid
         integer ncid,status,flags
         integer vdims(4)
         integer(mpi_offset_kind) length
         integer(mpi_offset_kind) start(4),edge(4)
+        real(kind=rk), dimension(im,jm), intent(in) :: flu, flv
 
         if(my_task.eq.0) write(*,'(/''writing file '',a)')
      $     trim(netcdf_out_file)
@@ -4268,6 +4321,12 @@
       call def_var_pnetcdf(ncid,'hi',3,vdims,hi_varid,nf_float,
      $                     'sea ice thickness','metre',
      $                     'east_e north_e',.true.)
+      call def_var_pnetcdf(ncid,'flx_u',3,vdims,uf_varid,nf_float,
+     $                     'Sea ice u-flux','conc/sec',
+     $                     'east_u north_u',.true.)
+      call def_var_pnetcdf(ncid,'flx_v',3,vdims,vf_varid,nf_float,
+     $                     'Sea ice v-flux','conc/sec',
+     $                     'east_v north_v',.true.)
 !
 !      vdims(1)=x_dimid
 !      vdims(2)=y_dimid
@@ -4421,6 +4480,14 @@
      $     ncid,hi_varid,start,edge,real(hi,4))
       call handle_error_pnetcdf(
      $     'nf_put_vara_real: hi',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(
+     $     ncid,uf_varid,start,edge,real(flu,4))
+      call handle_error_pnetcdf(
+     $     'nf_put_vara_real: flxu',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(
+     $     ncid,vf_varid,start,edge,real(flv,4))
+      call handle_error_pnetcdf(
+     $     'nf_put_vara_real: flxv',status,nf_noerr)
 !
 !
 !      start(1)=i_global(1)

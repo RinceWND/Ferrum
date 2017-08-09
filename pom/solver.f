@@ -4395,6 +4395,8 @@ C  !The most south sudomains
      &                ,delx,dely,cidx,cidy, rhoi, duvi, uidx, vidy
      &                ,tauiau,tauiav,tauiwu,tauiwv
      &                ,fluxcx,fluxcy
+        real(kind=rk), dimension(im_local) :: cibn, cibs
+        real(kind=rk), dimension(jm_local) :: cibw, cibe
         logical, dimension(im_local,jm_local) :: icm
         character*128 flnm
 
@@ -4405,7 +4407,7 @@ C  !The most south sudomains
 
         ui = 0.
         vi = 0.
-        ci = 0.
+!        ci = 0.
         hi =  .5
         delx = 0.
         dely = 0.
@@ -4417,37 +4419,60 @@ C  !The most south sudomains
         fluxcy = 0.
         icm = .false.
 
-        ci(40:60,40:60) =  .8
-        ci(45:55,45:55) =  .9
-        ci(49:51,49:51) =  .95
-        ci = ci*fsm
+!        ci(40:60,40:60) =  .8
+!        ci(45:55,45:55) =  .9
+!        ci(49:51,49:51) =  .95
+!        ci = .5
         
-        u(:,:,1) = 0.
-        v(:,:,1) = 0.
+        cibn = 1.
+        cibe = 0.
+        cibs = 0.
+        cibw = 0.
+!        if (n_east==-1) then
+!          fsm(im,:) = 0.
+!          dum(im,:) = 0.
+!          dvm(im,:) = 0.
+!        end if
+!        if(n_south==-1) then
+!          fsm(:,1) = 0.
+!          dum(:,1) = 0.
+!          dvm(:,1) = 0.
+!        end if
+!        if(n_north==-1) then
+!          fsm(:,jm) = 0.
+!          dum(:,jm) = 0.
+!          dvm(:,jm) = 0.
+!        end if
+        cb = cb*fsm
+        
+        
+!        u(:,:,1) = 0.
+!        v(:,:,1) =  .2
+!        el = 0.
 
-        cb = ci
+        ci = cb
         uib = ui
         vib = vi
 
-        do ti=1,100000
-
-          delx(2:im,:) = 2.*(el(2:im,:)-el(1:imm1,:))
+        delx(2:im,:) = 2.*(el(2:im,:)-el(1:imm1,:))
      &                     /(dx(2:im,:)+dx(1:imm1,:))
-          dely(:,2:jm) = 2.*(el(:,2:jm)-el(:,1:jmm1))
+        dely(:,2:jm) = 2.*(el(:,2:jm)-el(:,1:jmm1))
      &                     /(dy(:,2:jm)+dy(:,1:jmm1))
 
-          rhoi = 900.*hi !*ci ! 900. kg/m3 - 0.9 g/cm3?
+        tauiau = -0.03 !wusurf
+        tauiav =  0.05 !wvsurf
+
+        do ti=1,100000
+
+          rhoi = 900.*hi*max(ci,.05) ! 900. kg/m3 - 0.9 g/cm3?
 !          where (ci<.05) rhoi = 10.
 !          rhoi = rhoi + (rho(1:im,1:jm,1)*1000.+rhoref)*(1-ci) ! since concentration is not limited by 1, the line is incorrect. TODO: limit concentration
 
-          tauiau = wusurf
-          tauiav = wvsurf
-
           duvi=abs(sqrt((ui-u(1:im,1:jm,1))**2+(vi-v(1:im,1:jm,1))**2))
 
-          tauiwu= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
+          tauiwu= 5.5e-3*(rho(1:im,1:jm,1)*rhoref+1000.)
      &      *(ui-u(1:im,1:jm,1))*duvi
-          tauiwv= 5.5e-3*(rho(1:im,1:jm,1)*1000.+rhoref)
+          tauiwv= 5.5e-3*(rho(1:im,1:jm,1)*rhoref+1000.)
      &      *(vi-v(1:im,1:jm,1))*duvi
 
 !          if (my_task==0) then
@@ -4455,8 +4480,8 @@ C  !The most south sudomains
 !            write(*,*) maxval(abs(tauiav)), "|", maxval(abs(tauiwv))
 !          end if
 
-          do j=2,jm
-            do i=2,im
+          do j=1,jm
+            do i=2,imm1
               if (ui(i,j)<0.) then
                 fluxcx(i,j) = 2.*ci(i,j)*ui(i,j)*dy(i,j)
      &                          /(dx(i,j)+dx(i-1,j))
@@ -4464,6 +4489,10 @@ C  !The most south sudomains
                 fluxcx(i,j) = 2.*ci(i-1,j)*ui(i,j)*dy(i,j)
      &                          /(dx(i,j)+dx(i-1,j))
               end if
+            end do
+          end do
+          do j=2,jmm1
+            do i=1,im
               if (vi(i,j)<0.) then
                 fluxcy(i,j) = 2.*ci(i,j)*vi(i,j)*dx(i,j)
      &                          /(dy(i,j)+dy(i,j-1))
@@ -4475,13 +4504,41 @@ C  !The most south sudomains
           end do
           call exchange2d_mpi(fluxcx,im,jm)
           call exchange2d_mpi(fluxcy,im,jm)
+          if (n_north==-1) then
+            do i=1,im
+              if (vi(i,jm)>0.) then
+                fluxcy(i,jm) = ci(i,jm)*vi(i,jm)*dx(i,jm)/dy(i,jm)
+              else
+                fluxcy(i,jm) = cibn(i)*vi(i,jm)*dx(i,jm)/dy(i,jm)
+              end if
+            end do
+          end if
           if (n_east==-1) then
-            fluxcx(1,:) = 0.
-            fluxcy(1,:) = 0.
+            do j=1,jm
+              if (ui(im,j)>0.) then
+                fluxcx(im,j) = ci(im,j)*ui(im,j)*dy(im,j)/dx(im,j)
+              else
+                fluxcx(im,j) = cibw(j)*ui(im,j)*dy(im,j)/dx(im,j)
+              end if
+            end do
           end if
           if (n_south==-1) then
-            fluxcx(:,1) = 0.
-            fluxcy(:,1) = 0.
+            do i=1,im
+              if (vi(i,1)<0.) then
+                fluxcy(i,1) = ci(i,1)*vi(i,1)*dx(i,1)/dy(i,1)
+              else
+                fluxcy(i,1) = cibs(i)*vi(i,1)*dx(i,1)/dy(i,1)
+              end if
+            end do
+          end if
+          if (n_west==-1) then
+            do j=1,jm
+              if (ui(1,j)<0.) then
+                fluxcx(1,j) = ci(1,j)*ui(1,j)*dy(1,j)/dx(1,j)
+              else
+                fluxcx(1,j) = cibw(j)*ui(1,j)*dy(1,j)/dx(1,j)
+              end if
+            end do
           end if
           
 !          do j=2,jm
@@ -4500,7 +4557,7 @@ C  !The most south sudomains
           vidy(:,2:jm) = (vi(:,2:jm)-vi(:,1:jmm1))/dy(:,2:jm)
           call exchange2d_mpi(uidx,im,jm)
           call exchange2d_mpi(vidy,im,jm)
-          if (n_east==-1) uidx(1,:) = 0. !uidx(2,:)
+          if (n_west==-1) uidx(1,:) = 0. !uidx(2,:)
           if (n_south==-1) vidy(:,1) = 0. !vidy(:,2)
 !          uidy = (ui(:,2:jm)-ui(:,1:jmm1))/dy(:,2:jm)
 !          vidx = (vi(2:im,:)-vi(1:imm1,:))/dx(2:im,:)
@@ -4563,51 +4620,38 @@ C  !The most south sudomains
      &                     /(dy(2:im,2:jm)+dy(2:im,1:jmm1)))
           fy = fx
           fx(2:im,2:jm) = fx(2:im,2:jm) +
-     &          eeta*((divu(2:im,2:jm)-divu(1:imm1,2:jm))/dx(2:im,2:jm))
+     &          eeta*((divu(2:im,2:jm)-divu(1:imm1,2:jm))/dy(2:im,2:jm))
           fx(2:im,2:jm) = fx(2:im,2:jm) -
      &                    (pice(2:im,2:jm)-pice(1:imm1,2:jm))
-     &                    /dx(2:im,2:jm)
+     &                    /dy(2:im,2:jm)
 
           fy(2:im,2:jm) = fy(2:im,2:jm) +
-     &          eeta*((divu(2:im,2:jm)-divu(2:im,1:jmm1))/dy(2:im,2:jm))
+     &          eeta*((divu(2:im,2:jm)-divu(2:im,1:jmm1))/dx(2:im,2:jm))
           fy(2:im,2:jm) = fy(2:im,2:jm) -
      &                    (pice(2:im,2:jm)-pice(2:im,1:jmm1))
-     &                    /dy(2:im,2:jm)
+     &                    /dx(2:im,2:jm)
           call exchange2d_mpi(fx,im,jm)
           call exchange2d_mpi(fy,im,jm)
 
           do j=1,jmm1
             do i=1,imm1
-              if (cf(i,j)>small) then
-                uif(i,j) = ui(i,j) + dte*
-     &                    ( -2.*cor(i,j)*vi(i,j) - grav*delx(i,j)
-     &                     + (tauiau(i,j)-tauiwu(i,j))/rhoi(i,j)
-     &                     + fx(i,j) )
-                if (cf(i+1,j)==0.) then
-                  uif(i+1,j) = ui(i+1,j) + dte*
-     &                    ( -2.*cor(i+1,j)*vi(i+1,j) - grav*delx(i+1,j)
-     &                     + (tauiau(i+1,j)-tauiwu(i+1,j))/rhoi(i+1,j)
-     &                     + fx(i+1,j) )
-                end if
-                vif(i,j) = vi(i,j) + dte*
-     &                    (  2.*cor(i,j)*ui(i,j) - grav*dely(i,j)
-     &                     + (tauiav(i,j)-tauiwv(i,j))/rhoi(i,j)
-     &                     + fy(i,j) )
-                if (cf(i,j+1)==0.) then
-                  vif(i,j+1) = vi(i,j+1) + dte*
-     &                    (  2.*cor(i,j+1)*ui(i,j+1) - grav*dely(i,j+1)
-     &                     + (tauiav(i,j+1)-tauiwv(i,j+1))/rhoi(i,j+1)
-     &                     + fy(i,j+1) )
-                end if
-              end if
               if (cf(i,j)>=1.) then
+!                if (cf(i,j)-1.>0) then
+!                  write(*,*) "!!!", 1.-cf(i,j),"::",i,j,"::",my_task
+!                end if
 !                if (uif(i  ,j)>0.) uif(i  ,j) = 0.
 !                if (uif(i+1,j)<0.) uif(i+1,j) = 0.
 !                if (vif(i,j  )>0.) vif(i,j  ) = 0.
 !                if (vif(i,j+1)<0.) vif(i,j+1) = 0.
+                if (dum(i,j)==0. .and. uif(i+1,j)<0.) then
+                  uif(i+1,j) = 0.
+                end if
                 if (uif(i,j)>0. .and. uif(i+1,j)<0.) then
                   uif(i,j) = uif(i,j)+uif(i+1,j)
                   uif(i+1,j) = uif(i,j)
+                end if
+                if (dum(i+1,j)==0. .and. uif(i,j)>0.) then
+                  uif(i,j) = 0.
                 end if
                 if (uif(i,j)>0. .and. uif(i+1,j)<uif(i,j)) then
                   uif(i,j) = .5*(uif(i,j)+uif(i+1,j))
@@ -4618,9 +4662,15 @@ C  !The most south sudomains
                   uif(i+1,j) = uif(i,j)
                 end if
 
+                if (dvm(i,j)==0. .and. vif(i,j+1)<0.) then
+                  vif(i+1,j) = 0.
+                end if
                 if (vif(i,j)>0. .and. vif(i,j+1)<0.) then
                   vif(i,j) = vif(i,j)+vif(i,j+1)
                   vif(i,j+1) = vif(i,j)
+                end if
+                if (dvm(i,j+1)==0. .and. vif(i,j)>0.) then
+                  vif(i,j) = 0.
                 end if
                 if (vif(i,j)>0. .and. vif(i,j+1)<vif(i,j)) then
                   vif(i,j) = .5*(vif(i,j)+vif(i,j+1))
@@ -4630,14 +4680,48 @@ C  !The most south sudomains
                   vif(i,j) = .5*(vif(i,j)+vif(i,j+1))
                   vif(i,j+1) = vif(i,j)
                 end if
-
                 cf(i,j) = 1.
+              else
+                if (cf(i,j)>small) then
+                  uif(i,j) = ui(i,j) + dte*
+     &                    ( cor(i,j)*(vi(i,j)+vi(i,j+1))
+     &                     - grav*delx(i,j)
+     &                     + (tauiau(i,j)-tauiwu(i,j))/rhoi(i,j)
+     &                     + fx(i,j) )
+                  if (cf(i+1,j)==0.) then
+                    uif(i+1,j) = ui(i+1,j) + dte*
+     &                    ( cor(i+1,j)*(vi(i+1,j)+vi(i+1,j+1))
+     &                     - grav*delx(i+1,j)
+     &                     + (tauiau(i+1,j)-tauiwu(i+1,j))/rhoi(i+1,j)
+     &                     + fx(i+1,j) )
+                  end if
+                  vif(i,j) = vi(i,j) + dte*
+     &                    (-cor(i,j)*(ui(i,j)+ui(i+1,j))
+     &                     - grav*dely(i,j)
+     &                     + (tauiav(i,j)-tauiwv(i,j))/rhoi(i,j)
+     &                     + fy(i,j) )
+                  if (cf(i,j+1)==0.) then
+                    vif(i,j+1) = vi(i,j+1) + dte*
+     &                    (-cor(i,j+1)*(ui(i,j+1)+ui(i+1,j+1))
+     &                     - grav*dely(i,j+1)
+     &                     + (tauiav(i,j+1)-tauiwv(i,j+1))/rhoi(i,j+1)
+     &                     + fy(i,j+1) )
+                  end if
+                end if
               end if
             end do
           end do
           call exchange2d_mpi(cf,im,jm)
           call exchange2d_mpi(uif,im,jm)
           call exchange2d_mpi(vif,im,jm)
+          if (n_east==-1) then
+            uif(im,:) = uif(imm1,:)
+            vif(im,:) = vif(imm1,:)
+          end if
+          if (n_north==-1) then
+            uif(:,jm) = uif(:,jmm1)
+            vif(:,jm) = vif(:,jmm1)
+          end if
 !          where (cf>1.)
 !            hi = hi - hi*(1.-cf)/cf
 !            cf = 1.
@@ -4646,8 +4730,8 @@ C  !The most south sudomains
           uif = uif*dum
           vif = vif*dvm
 
-          ui = ui+.5*smoth*(uif+uib-2.*ui)
-          vi = vi+.5*smoth*(vif+vib-2.*vi)
+!          ui = ui+.5*smoth*(uif+uib-2.*ui)
+!          vi = vi+.5*smoth*(vif+vib-2.*vi)
 !          ci = ci+.5*smoth*(cf+cb-2.*ci)
           uib = ui
           ui  = uif
@@ -4656,10 +4740,10 @@ C  !The most south sudomains
           cb = ci
           ci = cf
 
-          if (mod(ti,1000)==0.or.ti==1) then
+          if (mod(ti,5000)==0.or.ti==1) then
             time = ti
             write(flnm, '(a,i0.6,a)') '/home/rincewnd/icec.', ti, '.nc'
-            call write_debug_pnetcdf(flnm)
+            call write_debug_pnetcdf(flnm,fluxcx,fluxcy)
             if (my_task==1) then
               write(*,*) "--------------------------------------------"
               write(*,*) "cb:", minval(cb), maxval(cb), my_task
