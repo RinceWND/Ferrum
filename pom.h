@@ -268,7 +268,9 @@
      $  aru            ,! cell area centered on U grid points
      $  arv            ,! cell area centered on V grid points
      $  cbc            ,! bottom friction coefficient
-     $  cb             ,!:sea ice concentration at time n-1
+     $  icb            ,!:sea ice concentration at time n-1
+     $  ice            ,!:sea ice concentration
+     $  icf            ,!:sea ice concentration at time n+1
      $  cor            ,! coriolis parameter
      $  d              ,! h+el
      $  drx2d          ,! vertical integral of drhox
@@ -341,7 +343,9 @@
      $  aru(im_local,jm_local)     ,
      $  arv(im_local,jm_local)     ,
      $  cbc(im_local,jm_local)     ,
-     $  cb(im_local,jm_local)      ,    !:rwnd
+     $  icb(im_local,jm_local)     ,    !:rwnd
+     $  ice(im_local,jm_local)     ,    !:rwnd
+     $  icf(im_local,jm_local)     ,    !:rwnd
      $  cor(im_local,jm_local)     ,
      $  d(im_local,jm_local)       ,
      $  drx2d(im_local,jm_local)   ,

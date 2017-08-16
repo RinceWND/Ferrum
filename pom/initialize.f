@@ -668,7 +668,7 @@
       enddo
 !lyo:pac10:end:
       
-      call read_ice_pnetcdf( "ice.19790102.nc", cb )
+!      call read_ice_pnetcdf( "ice.19790102.nc", icb )
 
       return
       end

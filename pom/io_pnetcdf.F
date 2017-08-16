@@ -2615,7 +2615,7 @@
       return
       end
 !_______________________________________________________________________
-      subroutine read_ice_pnetcdf( filename, ice )
+      subroutine read_ice_pnetcdf( ci, filename )
 ! read wind stress
       implicit none
 # include "mpif.h"
@@ -2623,11 +2623,11 @@
       include 'pom.h'
       integer get_var_real_2d
       integer n
-      real(kind=rk), dimension(im,jm) :: ice
+      real(kind=rk), dimension(im,jm) :: ci
       character(len=15) filename
       character(len=24) netcdf_sice_file
       integer ncid,status
-      integer ice_varid
+      integer ci_varid
       integer(mpi_offset_kind) start(4),edge(4)
 
       start = 1
@@ -2644,7 +2644,7 @@
      $                          status,nf_noerr)
 
 ! get variables
-      status=nfmpi_inq_varid(ncid,'ci',ice_varid)
+      status=nfmpi_inq_varid(ncid,'ci',ci_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: sice'
      $                          ,status,nf_noerr)
 ! get data
@@ -2655,11 +2655,11 @@
       edge(2)=jm
       edge(3)=1
 
-      status = get_var_real_2d(ncid,ice_varid,start,edge,ice)
+      status = get_var_real_2d(ncid,ci_varid,start,edge,ci)
       call handle_error_pnetcdf('get_var_real: sice',status,nf_noerr)
-      where(ice<=minval(ice,ice>0.)) ice = 0.
-      ice = fsm*ice/100.
-      write(*,*) my_task,"::",minval(ice, ice>0.),maxval(ice)
+      where(ci<=minval(ci,ci>0.)) ci = 0.
+      ci = fsm*ci/100.
+      write(*,*) my_task,"::",minval(ci, ci>0.),maxval(ci)
 
 ! close file
       status=nfmpi_close(ncid)
@@ -4465,7 +4465,7 @@
       edge(2)=jm
       edge(3)=1
       status=nfmpi_put_vara_real_all(
-     $     ncid,icec_varid,start,edge,real(cb,4))
+     $     ncid,icec_varid,start,edge,real(icb,4))
       call handle_error_pnetcdf(
      $     'nf_put_vara_real: icec',status,nf_noerr)
       status=nfmpi_put_vara_real_all(

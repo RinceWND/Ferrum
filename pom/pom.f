@@ -12,6 +12,7 @@
       use interp
       use mcsst        !fhx:mcsst
       use uvforce      !eda:uvforce
+      use seaice
 
       implicit none
       include 'pom.h'
@@ -41,6 +42,7 @@
       call wind_init( dtime )
       call river_init( dtime )
       call assim_init( dtime )
+      call ice_init( dtime )
 
       call icedrag
       call finalize_mpi
