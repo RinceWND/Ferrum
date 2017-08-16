@@ -432,23 +432,13 @@
 
             wusurf(i,j) = - rhoa / rhow * cda * uvabs * uwnd !- uwnd / rhow
             wvsurf(i,j) = - rhoa / rhow * cda * uvabs * vwnd !- vwnd / rhow
+            wusurf(i,j) = (1.-ice(i,j))*wusurf(i,j)
+     &                       -ice(i,j) *tauiwu(i,j)/rhow
+            wvsurf(i,j) = (1.-ice(i,j))*wvsurf(i,j)
+     &                       -ice(i,j) *tauiwv(i,j)/rhow
 
          enddo
       enddo
-!      print *, "W1:",
-!     &   minval(ice),maxval(ice),";",minval(wvsurf),maxval(wvsurf)
-!      print *, "I1:",
-!     &   minval(tauiwu),maxval(tauiwu),";",minval(tauiwv),maxval(tauiwv)
-      do j=1,jm
-        do i=1,im
-          wusurf(i,j) = (1.-ice(i,j))*wusurf(i,j)
-     &                     -ice(i,j) *tauiwu(i,j)/rhow
-          wvsurf(i,j) = (1.-ice(i,j))*wvsurf(i,j)
-     &                     -ice(i,j) *tauiwv(i,j)/rhow
-        end do
-      end do
-!      print *, "W2:",
-!     &   minval(wusurf),maxval(wusurf),";",minval(wvsurf),maxval(wvsurf)
 
 !     wind wave-induced enhanced bottom drag !lyo:20110315:botwavedrag:4lines
 !       if ( calc_botwavedrag ) call botwavedrag(...) !future use calc_..
