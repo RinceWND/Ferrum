@@ -2622,7 +2622,6 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       integer get_var_real_2d
-      integer n
       real(kind=rk), dimension(im,jm) :: ci
       character(len=15) filename
       character(len=24) netcdf_sice_file
@@ -2636,8 +2635,8 @@
 
 ! open netcdf wind file
       netcdf_sice_file="in/sice/"//trim(filename)
-      if(my_task.eq.0) write(*,'(/''reading ice '',a,'' @ '',i4)')
-     $                                    trim(netcdf_sice_file),n
+      if(my_task.eq.0) write(*,'(/''reading ice '',a)')
+     $                                            trim(netcdf_sice_file)
       status=nfmpi_open(pom_comm_coarse,netcdf_sice_file,nf_nowrite,
      $                  mpi_info_null,ncid)
       call handle_error_pnetcdf('nfmpi_open: '//netcdf_sice_file,
@@ -2657,9 +2656,9 @@
 
       status = get_var_real_2d(ncid,ci_varid,start,edge,ci)
       call handle_error_pnetcdf('get_var_real: sice',status,nf_noerr)
-      where(ci<=minval(ci,ci>0.)) ci = 0.
+!      where(ci<=minval(ci,ci>0.)) ci = 0.
       ci = fsm*ci/100.
-      write(*,*) my_task,"::",minval(ci, ci>0.),maxval(ci)
+!      write(*,*) my_task,"::",minval(ci, ci>0.),maxval(ci)
 
 ! close file
       status=nfmpi_close(ncid)
@@ -3017,7 +3016,8 @@
      $        east_e_varid,east_u_varid,east_v_varid,north_c_varid,
      $        north_e_varid,north_u_varid,north_v_varid,rot_varid,
      $        h_varid,fsm_varid,dum_varid,dvm_varid,uhtfl_varid,
-     $        wusurf_varid,wvsurf_varid,wtsurf_varid,wssurf_varid
+     $        wusurf_varid,wvsurf_varid,wtsurf_varid,wssurf_varid,
+     &        icec_varid
       integer time_varid,uab_varid,vab_varid,elb_varid,u_varid,v_varid,
      $        w_varid,t_varid,s_varid,rho_varid,km_varid,kh_varid
       integer ncid,status
@@ -3167,6 +3167,9 @@
      $                     'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'wssurf',3,vdims,wssurf_varid,nf_float,
      $                     'salinity flux','psu m/s',
+     $                     'east_e north_e',.true.)
+      call def_var_pnetcdf(ncid,'icec',3,vdims,icec_varid,nf_float,
+     $                     'sea ice concentration','fraction',
      $                     'east_e north_e',.true.)
       vdims(1)=x_dimid
       vdims(2)=y_dimid
@@ -3326,6 +3329,9 @@
       status=nfmpi_inq_varid(ncid,'wssurf',wssurf_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: wssurf'
      $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'icec',icec_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: icec'
+     $                          ,status,nf_noerr)
       status=nfmpi_inq_varid(ncid,'u',u_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: u'
      $                          ,status,nf_noerr)
@@ -3400,6 +3406,10 @@
      &                                                  ,real(wssurf,4))
       call handle_error_pnetcdf('nf_put_vara_real: wssurf'
      &                                                 ,status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,icec_varid,start,edge
+     &                                                     ,real(ice,4))
+      call handle_error_pnetcdf('nf_put_vara_real: icec'
+     &                                                 ,status,nf_noerr)
 
       start(1)=i_global(1)
       start(2)=j_global(1)
@@ -3469,7 +3479,15 @@
       call handle_error_pnetcdf('nf_put_vara_real: uhtfl'
      &                                                 ,status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,wssurf_varid,start,edge
-     &                                               ,real(wssurf_mean))
+     &                                             ,real(wssurf_mean,4))
+      call handle_error_pnetcdf('nf_put_vara_real: wssurf'
+     &                                                 ,status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,wssurf_varid,start,edge
+     &                                             ,real(wssurf_mean,4))
+      call handle_error_pnetcdf('nf_put_vara_real: wssurf'
+     &                                                 ,status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,icec_varid,start,edge
+     &                                                     ,real(ice,4))
       call handle_error_pnetcdf('nf_put_vara_real: wssurf'
      &                                                 ,status,nf_noerr)
 

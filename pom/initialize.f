@@ -446,6 +446,8 @@
           vfluxf(i,j) =0.
           wusurf(i,j) =0.
           wvsurf(i,j) =0.
+          tauiwu(i,j) =0.
+          tauiwv(i,j) =0.
           wtsurf(i,j) =0.
           wssurf(i,j) =0.
           swrad(i,j)  =0.
@@ -456,6 +458,7 @@
           wubot(i,j)  =0.     !lyo:20110315:botwavedrag:
           wvbot(i,j)  =0.     !lyo:20110315:botwavedrag:
           aamfac(i,j) =1.     !fhx:incmix
+          hi(i,j)=.35
         end do
       end do
 

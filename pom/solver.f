@@ -4262,7 +4262,8 @@ C  !The most south sudomains
 !lyo:20110315:botwavedrag:add subr.botwavedrag & function fsinhinv
 !_______________________________________________________________________
        subroutine botwavedrag (im,jm,fsm,wusrf,wvsrf,kp,
-     &                      wubot,wvbot,d,zzkbm1,z0b,cbcmin,cbcmax,cbc)
+     &                      wubot,wvbot,d,zzkbm1,z0b,cbcmin,cbcmax,cbc,
+     & my_task)
 !----------------------------------------------------------------------!
 !     This s.r.botwavedrag was modified from G.Mellor's s.r. botdrag   !
 !     in /home/glm/MMS/pom08.f so that it now does not require calc.   !
@@ -4321,11 +4322,12 @@ C  !The most south sudomains
 !----------------------------------------------------------------------!
       implicit none
       include 'realkind'
-      integer i,j,im,jm
+      integer i,j,im,jm,my_task
+      real(kind=rk), intent(in) :: kp
       real(kind=rk) kappa,grav,fsm(im,jm),d(im,jm)
       real(kind=rk) z0b,z0a,zzkbm1,cbcmin,cbcmax,cbc(im,jm)
       real(kind=rk) uboscil,utau2,fsinhinv,utau2min
-      real(kind=rk) pi,btoba,utauwind,const,kp
+      real(kind=rk) pi,btoba,utauwind,const
       real(kind=rk) wusrf(im,jm),wvsrf(im,jm),
      &     wubot(im,jm),wvbot(im,jm)
       data kappa/0.4/,grav/9.807/
@@ -4338,6 +4340,9 @@ C  !The most south sudomains
           if (fsm(i,j).eq.1.) then
 !           uboscil=cp(i,j)*kp(i,j)*sqrt(2.*ent(i,j)/grav) !glm's orig
 !    &               *fsinhinv(kp(i,j)*d(i,j))             !Nielson-fml
+            rewind(40+my_task)
+            write(40+my_task,*) (wusrf(i,j)**2+wvsrf(i,j)**2),",",
+     &                       grav,kp,tanh(kp*d(i,j))
             utauwind=( (wusrf(i,j)**2+wvsrf(i,j)**2)
      &                 /(grav*kp*tanh(kp*d(i,j)))   )**0.25
             uboscil=const*utauwind*fsinhinv(kp*d(i,j))
@@ -4390,13 +4395,10 @@ C  !The most south sudomains
         implicit none
         include 'pom.h'
          
-        real(kind=rk), dimension(im_local,jm_local):: ci, cf
-     &                ,uif, vif, uib, vib, fx, fy, divu, pice
+        real(kind=rk), dimension(im_local,jm_local):: fx, fy, divu, pice
      &                ,delx,dely,cidx,cidy, rhoi, duvi, uidx, vidy
-     &                ,tauiau,tauiav,tauiwu,tauiwv
+     &                ,tauiau,tauiav
      &                ,fluxcx,fluxcy
-        real(kind=rk), dimension(im_local) :: cibn, cibs
-        real(kind=rk), dimension(jm_local) :: cibw, cibe
         logical, dimension(im_local,jm_local) :: icm
         character*128 flnm
 
@@ -4608,9 +4610,9 @@ C  !The most south sudomains
 !                end if
               end do
             end do
-            cf = cf*fsm
+            icf = icf*fsm
           end if
-          call exchange2d_mpi(cf,im,jm)
+          call exchange2d_mpi(icf,im,jm)
 
 !          where (cf<0.) cf = 0.
 

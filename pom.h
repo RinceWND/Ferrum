@@ -307,19 +307,25 @@
      $  ssurf          ,
      $  swrad          ,! short wave radiation incident on the ocean surface
      $  vfluxb         ,! volume flux through water column surface at time n-1
+     $  tauiwu         ,! momentum flux through the ice-water interface
+     $  tauiwv         ,! momentum flux through the ice-water interface
      $  tps            ,
      $  tsurf          ,
      $  ua             ,! vertical mean of u at time n
      $  vfluxf         ,! volume flux through water column surface at time n+1
      $  uab            ,! vertical mean of u at time n-1
      $  uaf            ,! vertical mean of u at time n+1
+     $  uib            ,! sea ice u-velocity at time n-1
      $  ui             ,! sea ice u-velocity
+     $  uif            ,! sea ice u-velocity at time n+1
      $  utb            ,! ua time averaged over the interval dti at time n-1
      $  utf            ,! ua time averaged over the interval dti at time n+1
      $  va             ,! vertical mean of v at time n
      $  vab            ,! vertical mean of v at time n-1
      $  vaf            ,! vertical mean of v at time n+1
+     $  vib            ,! sea ice v-velocity at time n-1
      $  vi             ,! sea ice v-velocity
+     $  vif            ,! sea ice v-velocity at time n+1
      $  vtb            ,! va time averaged over the interval dti at time n-1
      $  vtf            ,! va time averaged over the interval dti at time n+1
      $  wssurf         ,! <ws(0)> salinity flux at the surface
@@ -382,19 +388,25 @@
      $  ssurf(im_local,jm_local)   ,
      $  swrad(im_local,jm_local)   ,
      $  vfluxb(im_local,jm_local)  ,
+     $  tauiwu(im_local,jm_local)  ,    !:rwnd
+     $  tauiwv(im_local,jm_local)  ,    !:rwnd
      $  tps(im_local,jm_local)     ,
      $  tsurf(im_local,jm_local)   ,
      $  ua(im_local,jm_local)      ,
      $  vfluxf(im_local,jm_local)  ,
      $  uab(im_local,jm_local)     ,
      $  uaf(im_local,jm_local)     ,
+     $  uib(im_local,jm_local)     ,    !:rwnd
      $  ui(im_local,jm_local)      ,    !:rwnd
+     $  uif(im_local,jm_local)     ,    !:rwnd
      $  utb(im_local,jm_local)     ,
      $  utf(im_local,jm_local)     ,
      $  va(im_local,jm_local)      ,
      $  vab(im_local,jm_local)     ,
      $  vaf(im_local,jm_local)     ,
+     $  vib(im_local,jm_local)     ,    !:rwnd
      $  vi(im_local,jm_local)      ,    !:rwnd
+     $  vif(im_local,jm_local)     ,    !:rwnd
      $  vtb(im_local,jm_local)     ,
      $  vtf(im_local,jm_local)     ,
      $  wssurf(im_local,jm_local)  ,
@@ -553,6 +565,10 @@
 !_______________________________________________________________________
 ! 1 and 2-D boundary value arrays
       real(kind=rk)
+     $  cibe           ,! sea ice concentration at the eastern open boundary
+     $  cibn           ,! sea ice concentration at the northern open boundary
+     $  cibs           ,! sea ice concentration at the southern open boundary
+     $  cibw           ,! sea ice concentration at the western open boundary
      $  ele            ,! elevation at the eastern open boundary
      $  eln            ,! elevation at the northern open boundary
      $  els            ,! elevation at the southern open boundary
@@ -579,6 +595,10 @@
      $  phue            ! M2/k1 UA phase at the eastern open boundary      !fhx:tide
 
       common/bdry1/     !lyo:20110224:alu:stcc:changed to bdry1!lyo:pac10:
+     $  cibe(jm_local)       ,
+     $  cibn(im_local)       ,
+     $  cibs(im_local)       ,
+     $  cibw(jm_local)       ,
      $  ele(jm_local)        ,
      $  eln(im_local)        ,
      $  els(im_local)        ,
