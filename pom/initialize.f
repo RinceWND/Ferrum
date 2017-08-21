@@ -297,7 +297,7 @@
       dti2=dti*2
 
       iend=max0(nint(days*24.*3600./dti),2)
-      iprint=nint(prtd1*24.*3600./dti)
+      iprint=max(nint(prtd1*24.*3600./dti),1)
       irestart=nint(write_rst*24.*3600./dti)
       iprints=nint(prtd2*24.*3600./dti) !fhx:20110131:add 3hrly output
 
