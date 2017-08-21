@@ -407,7 +407,7 @@
 !lyo:pac10:more efficient:
             uwsrf(i,j)=uwnd; vwsrf(i,j)=vwnd;
 
-            uvabs = sqrt( uwnd**2 + vwnd**2 )
+            uvabs = sqrt( (uwnd-u(i,j,1))**2 + (vwnd-v(i,j,1))**2 )
 
 
 !     test ayumi 2010/7/20
@@ -430,21 +430,18 @@
                cda = 0.00138821   !modify cda = 0.000138821 ---> 0.00138821
             endif
 
-            wusurf(i,j) = - rhoa / rhow * cda * uvabs * uwnd !- uwnd / rhow
-            wvsurf(i,j) = - rhoa / rhow * cda * uvabs * vwnd !- vwnd / rhow
-            wusurf(i,j) = (1.-ice(i,j))*wusurf(i,j)
-     &                       -ice(i,j) *tauiwu(i,j)/rhow
-            wvsurf(i,j) = (1.-ice(i,j))*wvsurf(i,j)
-     &                       -ice(i,j) *tauiwv(i,j)/rhow
+            wusurf(i,j) = - rhoa / rhow * cda * uvabs * (uwnd-u(i,j,1)) !- uwnd / rhow
+            wvsurf(i,j) = - rhoa / rhow * cda * uvabs * (vwnd-v(i,j,1)) !- vwnd / rhow
 
          enddo
       enddo
 
 !     wind wave-induced enhanced bottom drag !lyo:20110315:botwavedrag:4lines
 !       if ( calc_botwavedrag ) call botwavedrag(...) !future use calc_..
-        call botwavedrag (im,jm,fsm,wusurf,wvsurf,
+        call botwavedrag (im,jm,fsm
+     &                   ,(1.-ice)*wusurf,(1.-ice)*wvsurf,
      $  0.0314159_rk,          !kp=2.*pi/200.=0.0314159
-     $  wubot,wvbot,h,zz(kbm1),z0b,cbcmin,cbcmax,cbc,my_task)
+     $  wubot,wvbot,h,zz(kbm1),z0b,cbcmin,cbcmax,cbc)
       
 
       
