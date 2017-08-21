@@ -4262,8 +4262,7 @@ C  !The most south sudomains
 !lyo:20110315:botwavedrag:add subr.botwavedrag & function fsinhinv
 !_______________________________________________________________________
        subroutine botwavedrag (im,jm,fsm,wusrf,wvsrf,kp,
-     &                      wubot,wvbot,d,zzkbm1,z0b,cbcmin,cbcmax,cbc,
-     & my_task)
+     &                      wubot,wvbot,d,zzkbm1,z0b,cbcmin,cbcmax,cbc)
 !----------------------------------------------------------------------!
 !     This s.r.botwavedrag was modified from G.Mellor's s.r. botdrag   !
 !     in /home/glm/MMS/pom08.f so that it now does not require calc.   !
@@ -4322,7 +4321,7 @@ C  !The most south sudomains
 !----------------------------------------------------------------------!
       implicit none
       include 'realkind'
-      integer i,j,im,jm,my_task
+      integer i,j,im,jm
       real(kind=rk), intent(in) :: kp
       real(kind=rk) kappa,grav,fsm(im,jm),d(im,jm)
       real(kind=rk) z0b,z0a,zzkbm1,cbcmin,cbcmax,cbc(im,jm)
@@ -4340,9 +4339,6 @@ C  !The most south sudomains
           if (fsm(i,j).eq.1.) then
 !           uboscil=cp(i,j)*kp(i,j)*sqrt(2.*ent(i,j)/grav) !glm's orig
 !    &               *fsinhinv(kp(i,j)*d(i,j))             !Nielson-fml
-            rewind(40+my_task)
-            write(40+my_task,*) (wusrf(i,j)**2+wvsrf(i,j)**2),",",
-     &                       grav,kp,tanh(kp*d(i,j))
             utauwind=( (wusrf(i,j)**2+wvsrf(i,j)**2)
      &                 /(grav*kp*tanh(kp*d(i,j)))   )**0.25
             uboscil=const*utauwind*fsinhinv(kp*d(i,j))
