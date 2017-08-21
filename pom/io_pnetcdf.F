@@ -3017,7 +3017,7 @@
      $        north_e_varid,north_u_varid,north_v_varid,rot_varid,
      $        h_varid,fsm_varid,dum_varid,dvm_varid,uhtfl_varid,
      $        wusurf_varid,wvsurf_varid,wtsurf_varid,wssurf_varid,
-     &        icec_varid
+     &        icec_varid, ui_varid, vi_varid
       integer time_varid,uab_varid,vab_varid,elb_varid,u_varid,v_varid,
      $        w_varid,t_varid,s_varid,rho_varid,km_varid,kh_varid
       integer ncid,status
@@ -3171,6 +3171,12 @@
       call def_var_pnetcdf(ncid,'icec',3,vdims,icec_varid,nf_float,
      $                     'sea ice concentration','fraction',
      $                     'east_e north_e',.true.)
+      call def_var_pnetcdf(ncid,'ui',3,vdims,ui_varid,nf_float,
+     $                     'sea ice x-velocity','m/s',
+     $                     'east_u north_u',.true.)
+      call def_var_pnetcdf(ncid,'vi',3,vdims,vi_varid,nf_float,
+     $                     'sea ice y-velocity','m/s',
+     $                     'east_v north_v',.true.)
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=z_dimid
@@ -3332,6 +3338,12 @@
       status=nfmpi_inq_varid(ncid,'icec',icec_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: icec'
      $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'ui',ui_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: ui'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'vi',vi_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: vi'
+     $                          ,status,nf_noerr)
       status=nfmpi_inq_varid(ncid,'u',u_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: u'
      $                          ,status,nf_noerr)
@@ -3410,6 +3422,12 @@
      &                                                     ,real(ice,4))
       call handle_error_pnetcdf('nf_put_vara_real: icec'
      &                                                 ,status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,ui_varid,start,edge
+     &                                                      ,real(ui,4))
+      call handle_error_pnetcdf('nf_put_vara_real: ui',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,vi_varid,start,edge
+     &                                                      ,real(vi,4))
+      call handle_error_pnetcdf('nf_put_vara_real: vi',status,nf_noerr)
 
       start(1)=i_global(1)
       start(2)=j_global(1)
@@ -3488,8 +3506,14 @@
      &                                                 ,status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,icec_varid,start,edge
      &                                                     ,real(ice,4))
-      call handle_error_pnetcdf('nf_put_vara_real: wssurf'
+      call handle_error_pnetcdf('nf_put_vara_real: icec'
      &                                                 ,status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,ui_varid,start,edge
+     &                                                      ,real(ui,4))
+      call handle_error_pnetcdf('nf_put_vara_real: ui',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,vi_varid,start,edge
+     &                                                      ,real(vi,4))
+      call handle_error_pnetcdf('nf_put_vara_real: vi',status,nf_noerr)
 
       start(1)=i_global(1)
       start(2)=j_global(1)
