@@ -92,7 +92,7 @@
         d_2%year = d_in%year
         secs = d_in-d_2
 
-        day_b = 2*(int(secs/172800.)+1)+2
+        day_b = 2*(int(secs/172800.)+1)
 
         d_2 = d_2 + day_b*86400
 
@@ -102,7 +102,7 @@
 
         if ( day_b-day_a > 4 ) then
 
-          day_a = day_b
+          day_a = day_b-2
 
           ice_a = ice_b
           aa = 0.
@@ -152,21 +152,6 @@
         fluxcx = 0.
         fluxcy = 0.
 
-!        if (n_east==-1) then
-!          fsm(im,:) = 0.
-!          dum(im,:) = 0.
-!          dvm(im,:) = 0.
-!        end if
-!        if(n_south==-1) then
-!          fsm(:,1) = 0.
-!          dum(:,1) = 0.
-!          dvm(:,1) = 0.
-!        end if
-!        if(n_north==-1) then
-!          fsm(:,jm) = 0.
-!          dum(:,jm) = 0.
-!          dvm(:,jm) = 0.
-!        end if
         icb = icb*fsm
         
         
@@ -174,151 +159,196 @@
 !        v(:,:,1) =  .2
 !        el = 0.
 
+! Calculate sea surface elevation gradient
         delx(2:im,:) = dum(2:im,:)*2.*(el(2:im,:)-el(1:imm1,:))
      &                     /(dx(2:im,:)+dx(1:imm1,:))
         dely(:,2:jm) = dvm(:,2:jm)*2.*(el(:,2:jm)-el(:,1:jmm1))
      &                     /(dy(:,2:jm)+dy(:,1:jmm1))
         call exchange2d_mpi(delx,im,jm)
         call exchange2d_mpi(dely,im,jm)
-        
-        tauiau = -wusurf*rhoref
-        tauiav = -wvsurf*rhoref
 
-        rhoi = 900.*hi*max(ice,.1) ! 900. kg/m3 - 0.9 g/cm3?
-!          where (ci<.05) rhoi = 10.
-!          rhoi = rhoi + (rho(1:im,1:jm,1)*1000.+rhoref)*(1-ci) ! since concentration is not limited by 1, the line is incorrect. TODO: limit concentration
+! Get wind stress over ice-free water (convert it from m^2/s^2 to N/m^2)
+        tauiau = wusurf*rhoref
+        tauiav = wvsurf*rhoref
 
+! Estimate sea ice density to a unit area
+        rhoi = 900.*hi*max(ice,.1)
+
+! Calculate water-ice stress
         duvi=abs(sqrt((ui-u(1:im,1:jm,1))**2+(vi-v(1:im,1:jm,1))**2))
 
-        tauiwu= fsm*5.5e-3*(rho(1:im,1:jm,1)*rhoref+1000.)
-     &      *(ui-u(1:im,1:jm,1))*duvi
-        tauiwv= fsm*5.5e-3*(rho(1:im,1:jm,1)*rhoref+1000.)
-     &      *(vi-v(1:im,1:jm,1))*duvi
+        tauiwu= dum*5.5e-3*rhoref*(ui-u(1:im,1:jm,1))*duvi
+        tauiwv= dvm*5.5e-3*rhoref*(vi-v(1:im,1:jm,1))*duvi
 
+! Compute ice concentration fluxes
         do j=1,jm
           do i=2,imm1
             if (ui(i,j)<0.) then
-              fluxcx(i,j) = 2.*ice(i,j)*ui(i,j)*dy(i,j)
-     &                          /(dx(i,j)+dx(i-1,j))
+              fluxcx(i,j) = ice(i  ,j)*ui(i,j)*dy(i,j)
             else
-              fluxcx(i,j) = 2.*ice(i-1,j)*ui(i,j)*dy(i,j)
-     &                          /(dx(i,j)+dx(i-1,j))
+              fluxcx(i,j) = ice(i-1,j)*ui(i,j)*dy(i,j)
             end if
           end do
         end do
         do j=2,jmm1
           do i=1,im
             if (vi(i,j)<0.) then
-              fluxcy(i,j) = 2.*ice(i,j)*vi(i,j)*dx(i,j)
-     &                          /(dy(i,j)+dy(i,j-1))
+              fluxcy(i,j) = ice(i,j  )*vi(i,j)*dx(i,j)
             else
-              fluxcy(i,j) = 2.*ice(i,j-1)*vi(i,j)*dx(i,j)
-     &                          /(dy(i,j)+dy(i,j-1))
+              fluxcy(i,j) = ice(i,j-1)*vi(i,j)*dx(i,j)
             end if
           end do
         end do
         call exchange2d_mpi(fluxcx,im,jm)
         call exchange2d_mpi(fluxcy,im,jm)
+
+! Apply ice concentration boundary conditions
         if (n_north==-1) then
           do i=1,im
             if (vi(i,jm)>0.) then
-              fluxcy(i,jm) = ice(i,jm)*vi(i,jm)*dx(i,jm)/dy(i,jm)
+              fluxcy(i,jm) = ice(i,jm)*vi(i,jm)*dx(i,jm)
             else
-              fluxcy(i,jm) = cibn(i)*vi(i,jm)*dx(i,jm)/dy(i,jm)
+              fluxcy(i,jm) = cibn(i)  *vi(i,jm)*dx(i,jm)
             end if
           end do
         end if
         if (n_east==-1) then
           do j=1,jm
             if (ui(im,j)>0.) then
-              fluxcx(im,j) = ice(im,j)*ui(im,j)*dy(im,j)/dx(im,j)
+              fluxcx(im,j) = ice(im,j)*ui(im,j)*dy(im,j)
             else
-              fluxcx(im,j) = cibw(j)*ui(im,j)*dy(im,j)/dx(im,j)
+              fluxcx(im,j) = cibw(j)  *ui(im,j)*dy(im,j)
             end if
           end do
         end if
         if (n_south==-1) then
           do i=1,im
             if (vi(i,1)<0.) then
-              fluxcy(i,1) = ice(i,1)*vi(i,1)*dx(i,1)/dy(i,1)
+              fluxcy(i,1) = ice(i,1)*vi(i,1)*dx(i,1)
             else
-              fluxcy(i,1) = cibs(i)*vi(i,1)*dx(i,1)/dy(i,1)
+              fluxcy(i,1) = cibs(i) *vi(i,1)*dx(i,1)
             end if
           end do
         end if
         if (n_west==-1) then
           do j=1,jm
             if (ui(1,j)<0.) then
-              fluxcx(1,j) = ice(1,j)*ui(1,j)*dy(1,j)/dx(1,j)
+              fluxcx(1,j) = ice(1,j)*ui(1,j)*dy(1,j)
             else
-              fluxcx(1,j) = cibw(j)*ui(1,j)*dy(1,j)/dx(1,j)
+              fluxcx(1,j) = cibw(j) *ui(1,j)*dy(1,j)
             end if
           end do
         end if
-          
-        cidx(2:im,:) = 2.*(ice(2:im,:)-ice(1:imm1,:))
-     &                      /(dx(2:im,:)+ dx(1:imm1,:))
-        cidy(:,2:jm) = 2.*(ice(:,2:jm)-ice(:,1:jmm1))
-     &                      /(dy(:,2:jm)+ dy(:,1:jmm1))
 
+! Calculate velocity gradients
         uidx(2:im,:) = (ui(2:im,:)-ui(1:imm1,:))/dx(2:im,:)
         vidy(:,2:jm) = (vi(:,2:jm)-vi(:,1:jmm1))/dy(:,2:jm)
         call exchange2d_mpi(uidx,im,jm)
         call exchange2d_mpi(vidy,im,jm)
+! Apply boundaries
         if (n_west==-1) uidx(1,:) = 0. !uidx(2,:)
         if (n_south==-1) vidy(:,1) = 0. !vidy(:,2)
-!          uidy = (ui(:,2:jm)-ui(:,1:jmm1))/dy(:,2:jm)
-!          vidx = (vi(2:im,:)-vi(1:imm1,:))/dx(2:im,:)
 
+! Derive divergency
         divu = uidx+vidy
 
+! Get internal stress
         pice = 0.
-
         where (divu<0.) pice = -10.*divu
 
+! Start ice concentration advection
         if (.false.) then
-          call advtC(icb,icf)
+          call advtC(ice,icf)
         else
           do j=1,jmm1
             do i=1,imm1
-              tmp = (fluxcx(i,j)-fluxcx(i+1,j))/dx(i,j)
-     &             +(fluxcy(i,j)-fluxcy(i,j+1))/dy(i,j)
-              dteM = dte
-              if (abs(tmp)>small) then
-                if ((ice(i,j)+dte*tmp)<small) then
-                  dteM = -ice(i,j)/tmp
-!                    ui(i,j) = ui(i,j)+dteM/dte*ui(i,j)
-!                    vi(i,j) = vi(i,j)+dteM/dte*vi(i,j)
-                else if ((ice(i,j)+dte*tmp)>1.) then
-                  dteM = (1.-ice(i,j))/tmp
-!                    ui(i,j) = ui(i,j)-dteM/dte*ui(i,j)
-!                    vi(i,j) = vi(i,j)-dteM/dte*vi(i,j)
+              tmp = (fluxcx(i,j)-fluxcx(i+1,j)
+     &              +fluxcy(i,j)-fluxcy(i,j+1))
+              icf(i,j) = ice(i,j)+dte*tmp/art(i,j)
+              ! if there will be no ice in the cell, correct output fluxes (velocities) only
+              if (icf(i,j) < 0.) then
+                icf(i,j) = 0.
+                num = 0
+                tmp = 0.
+                if (fluxcx(i  ,j)<0.) then
+                  ui(i  ,j) = 0.
+                  num = num+1
+                  tmp = tmp+fluxcx(i,j)
                 end if
-!                else
-!                  dteM = dte
+                if (fluxcx(i+1,j)>0.) then
+                  ui(i+1,j) = 0.
+                  num = num+1
+                  tmp = tmp+fluxcx(i+1,j)
+                end if
+                if (fluxcy(i,j  )<0.) then
+                  vi(i,j  ) = 0.
+                  num = num+1
+                  tmp = tmp+fluxcy(i,j)
+                end if
+                if (fluxcy(i,j+1)>0.) then
+                  vi(i,j+1) = 0.
+                  num = num+1
+                  tmp = tmp+fluxcy(i,j+1)
+                end if
+
+                if (fluxcx(i  ,j)<0.) then
+                  fluxcx(i  ,j)=fluxcx(i  ,j)-tmp/float(num)
+                end if
+                if (fluxcx(i+1,j)>0.) then
+                  fluxcx(i+1,j)=fluxcx(i+1,j)+tmp/float(num)
+                end if
+                if (fluxcy(i,j  )<0.) then
+                  fluxcy(i,j  )=fluxcy(i,j  )-tmp/float(num)
+                end if
+                if (fluxcy(i,j+1)>0.) then
+                  fluxcy(i,j+1)=fluxcy(i,j+1)+tmp/float(num)
+                end if
+              else
+              ! if the cell will be water-free, correct input fluxes (velocities) only
+                if (icf(i,j) > 1.) then
+                  icf(i,j) = 1.
+                  num = 0
+                  tmp = 0.
+                  if (fluxcx(i  ,j)>0.) then
+                    ui(i  ,j) = 0.
+                    num = num+1
+                    tmp = tmp+fluxcx(i,j)
+                  end if
+                  if (fluxcx(i+1,j)<0.) then
+                    ui(i+1,j) = 0.
+                    num = num+1
+                    tmp = tmp+fluxcx(i+1,j)
+                  end if
+                  if (fluxcy(i,j  )>0.) then
+                    vi(i,j  ) = 0.
+                    num = num+1
+                    tmp = tmp+fluxcy(i,j)
+                  end if
+                  if (fluxcy(i,j+1)<0.) then
+                    vi(i,j+1) = 0.
+                    num = num+1
+                    tmp = tmp+fluxcy(i,j+1)
+                  end if
+
+                  if (fluxcx(i  ,j)>0.) then
+                    fluxcx(i  ,j)=fluxcx(i  ,j)-tmp/float(num)
+                  end if
+                  if (fluxcx(i+1,j)<0.) then
+                    fluxcx(i+1,j)=fluxcx(i+1,j)+tmp/float(num)
+                  end if
+                  if (fluxcy(i,j  )>0.) then
+                    fluxcy(i,j  )=fluxcy(i,j  )-tmp/float(num)
+                  end if
+                  if (fluxcy(i,j+1)<0.) then
+                    fluxcy(i,j+1)=fluxcy(i,j+1)+tmp/float(num)
+                  end if
+                end if
               end if
-              icf(i,j) = ice(i,j)+dteM*tmp
-!                if (cf(i,j)>0..and.cf(i,j)<small) then
-!! The code below does NOT conserve ice concentration, though it will compensate ice concentration loss a little (?)
-!                  if (ui(i,j)+ui(i+1,j)>0.) then
-!                    cf(i+1,j) = cf(i+1,j)+cf(i,j)
-!                  else
-!                    if (i>1) cf(i-1,j) = cf(i-1,j)+cf(i,j)
-!                  end if
-!                  if (vi(i,j)+vi(i,j+1)>0.) then
-!                    cf(i,j+1) = cf(i,j+1)+cf(i,j)
-!                  else
-!                    if (j>1) cf(i,j-1) = cf(i,j-1)+cf(i,j)
-!                  end if
-!                  cf(i,j) = 0.
-!                end if
             end do
           end do
           icf = icf*fsm
         end if
         call exchange2d_mpi(icf,im,jm)
-
-!          where (cf<0.) cf = 0.
 
         fx = 0.
         fx(2:im,2:jm) = 2.*eeta
@@ -343,78 +373,32 @@
 
         do j=1,jmm1
           do i=1,imm1
-            if (icf(i,j)>=1.) then
-!                if (cf(i,j)-1.>0) then
-!                  write(*,*) "!!!", 1.-cf(i,j),"::",i,j,"::",my_task
-!                end if
-!                if (uif(i  ,j)>0.) uif(i  ,j) = 0.
-!                if (uif(i+1,j)<0.) uif(i+1,j) = 0.
-!                if (vif(i,j  )>0.) vif(i,j  ) = 0.
-!                if (vif(i,j+1)<0.) vif(i,j+1) = 0.
-              if (dum(i,j)==0. .and. uif(i+1,j)<0.) then
-                uif(i+1,j) = 0.
-              end if
-              if (uif(i,j)>0. .and. uif(i+1,j)<0.) then
-                uif(i,j) = uif(i,j)+uif(i+1,j)
-                uif(i+1,j) = uif(i,j)
-              end if
-              if (dum(i+1,j)==0. .and. uif(i,j)>0.) then
-                uif(i,j) = 0.
-              end if
-              if (uif(i,j)>0. .and. uif(i+1,j)<uif(i,j)) then
-                uif(i,j) = .5*(uif(i,j)+uif(i+1,j))
-                uif(i+1,j) = uif(i,j)
-              end if
-              if (uif(i+1,j)<0. .and. uif(i,j)>uif(i+1,j)) then
-                uif(i,j) = .5*(uif(i,j)+uif(i+1,j))
-                uif(i+1,j) = uif(i,j)
-              end if
-
-              if (dvm(i,j)==0. .and. vif(i,j+1)<0.) then
-                vif(i+1,j) = 0.
-              end if
-              if (vif(i,j)>0. .and. vif(i,j+1)<0.) then
-                vif(i,j) = vif(i,j)+vif(i,j+1)
-                vif(i,j+1) = vif(i,j)
-              end if
-              if (dvm(i,j+1)==0. .and. vif(i,j)>0.) then
-                vif(i,j) = 0.
-              end if
-              if (vif(i,j)>0. .and. vif(i,j+1)<vif(i,j)) then
-                vif(i,j) = .5*(vif(i,j)+vif(i,j+1))
-                vif(i,j+1) = vif(i,j)
-              end if
-              if (vif(i,j+1)<0. .and. vif(i,j)>vif(i,j+1)) then
-                vif(i,j) = .5*(vif(i,j)+vif(i,j+1))
-                vif(i,j+1) = vif(i,j)
-              end if
-              icf(i,j) = 1.
-            else
-              if (icf(i,j)>small) then
-                uif(i,j) = ui(i,j) + dte*
+            uif(i,j) = 0.
+            vif(i,j) = 0.
+            if (icf(i,j)>0.) then
+              uif(i,j) = ui(i,j) + dte*
      &                    ( cor(i,j)*(vi(i,j)+vi(i,j+1))
      &                     - grav*delx(i,j)
      &                     + (tauiau(i,j)-tauiwu(i,j))/rhoi(i,j)
      &                     + fx(i,j) )
-                if (icf(i+1,j)==0.) then
-                  uif(i+1,j) = ui(i+1,j) + dte*
+              if (icf(i+1,j)==0.) then
+                uif(i+1,j) = ui(i+1,j) + dte*
      &                    ( cor(i+1,j)*(vi(i+1,j)+vi(i+1,j+1))
      &                     - grav*delx(i+1,j)
      &                     + (tauiau(i+1,j)-tauiwu(i+1,j))/rhoi(i+1,j)
      &                     + fx(i+1,j) )
-                end if
-                vif(i,j) = vi(i,j) + dte*
+              end if
+              vif(i,j) = vi(i,j) + dte*
      &                    (-cor(i,j)*(ui(i,j)+ui(i+1,j))
      &                     - grav*dely(i,j)
      &                     + (tauiav(i,j)-tauiwv(i,j))/rhoi(i,j)
      &                     + fy(i,j) )
-                if (icf(i,j+1)==0.) then
-                  vif(i,j+1) = vi(i,j+1) + dte*
+              if (icf(i,j+1)==0.) then
+                vif(i,j+1) = vi(i,j+1) + dte*
      &                    (-cor(i,j+1)*(ui(i,j+1)+ui(i+1,j+1))
      &                     - grav*dely(i,j+1)
      &                     + (tauiav(i,j+1)-tauiwv(i,j+1))/rhoi(i,j+1)
      &                     + fy(i,j+1) )
-                end if
               end if
             end if
           end do
@@ -430,17 +414,10 @@
           uif(:,jm) = uif(:,jmm1)
           vif(:,jm) = vif(:,jmm1)
         end if
-!          where (cf>1.)
-!            hi = hi - hi*(1.-cf)/cf
-!            cf = 1.
-!          end where
 
         uif = uif*dum
         vif = vif*dvm
 
-!          ui = ui+.5*smoth*(uif+uib-2.*ui)
-!          vi = vi+.5*smoth*(vif+vib-2.*vi)
-!          ci = ci+.5*smoth*(cf+cb-2.*ci)
         uib = ui
         ui  = uif
         vib = vi

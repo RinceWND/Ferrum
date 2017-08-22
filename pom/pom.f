@@ -65,16 +65,16 @@
           call tsforce_main( dtime )
           if ( calc_tsurf_mc )call mcsst_main(dtime)  !fhx:mcsst
           if ( calc_tsforce ) call tsforce_tsflx( dtime )
-          call ice_main( dtime )
           if ( calc_wind )    call wind_main( dtime )
           if ( calc_river )   call river_main( dtime, .false. )
+          call ice_main( dtime )
         end if
 
        
 !     advance model
 !       call advance( dtime )    !lyo:???
         call advance    
-        call ice_advance
+!        call ice_advance
 
 !     drifter data assimilation  !eda:
 

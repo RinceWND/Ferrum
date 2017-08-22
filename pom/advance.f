@@ -4,6 +4,7 @@
 
 !_______________________________________________________________________
       subroutine advance
+        use seaice
 ! advance POM 1 step in time
       implicit none
       include 'pom.h'
@@ -24,6 +25,7 @@
       do iext=1,isplit
         call mode_external
         call check_nan_2d  !fhx:tide:debug
+        call ice_advance
       end do
 
 ! internal (3-D) mode calculation
