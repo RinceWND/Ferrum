@@ -25,7 +25,7 @@
       do iext=1,isplit
         call mode_external
         call check_nan_2d  !fhx:tide:debug
-        call ice_advance
+        if (calc_ice) call ice_advance
       end do
 
 ! internal (3-D) mode calculation

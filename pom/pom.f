@@ -42,7 +42,7 @@
       call wind_init( dtime )
       call river_init( dtime )
       call assim_init( dtime )
-      call ice_init( dtime )
+      if ( calc_ice ) call ice_init( dtime )
     
       if(my_task == master_task) then
         write(*,'(a)') 'End of initialization'
@@ -67,7 +67,7 @@
           if ( calc_tsforce ) call tsforce_tsflx( dtime )
           if ( calc_wind )    call wind_main( dtime )
           if ( calc_river )   call river_main( dtime, .false. )
-          call ice_main( dtime )
+          if ( calc_ice )     call ice_main( dtime )
         end if
 
        
