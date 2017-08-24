@@ -134,7 +134,7 @@
      &                ,rhoi, duvi, uidx, vidy, fluxcx, fluxcy
      &                ,tauiau, tauiav
         real(kind=rk) eeta, tmp
-        integer i,j
+        integer i,j, cnum
 
         eeta = 1.e2 !1.01e-7 ! 1010 cm2/s? ! The source claims the coefficient equals to 10^10 cm2/s! This gives unreallistic Infinities.
 
@@ -259,79 +259,79 @@
               ! if there will be no ice in the cell, correct output fluxes (velocities) only
               if (icf(i,j) < 0.) then
                 icf(i,j) = 0.
-                num = 0
+                cnum = 0
                 tmp = 0.
                 if (fluxcx(i  ,j)<0.) then
                   ui(i  ,j) = 0.
-                  num = num+1
+                  cnum = cnum+1
                   tmp = tmp+fluxcx(i,j)
                 end if
                 if (fluxcx(i+1,j)>0.) then
                   ui(i+1,j) = 0.
-                  num = num+1
+                  cnum = cnum+1
                   tmp = tmp+fluxcx(i+1,j)
                 end if
                 if (fluxcy(i,j  )<0.) then
                   vi(i,j  ) = 0.
-                  num = num+1
+                  cnum = cnum+1
                   tmp = tmp+fluxcy(i,j)
                 end if
                 if (fluxcy(i,j+1)>0.) then
                   vi(i,j+1) = 0.
-                  num = num+1
+                  cnum = cnum+1
                   tmp = tmp+fluxcy(i,j+1)
                 end if
 
                 if (fluxcx(i  ,j)<0.) then
-                  fluxcx(i  ,j)=fluxcx(i  ,j)-tmp/float(num)
+                  fluxcx(i  ,j)=fluxcx(i  ,j)-tmp/float(cnum)
                 end if
                 if (fluxcx(i+1,j)>0.) then
-                  fluxcx(i+1,j)=fluxcx(i+1,j)+tmp/float(num)
+                  fluxcx(i+1,j)=fluxcx(i+1,j)+tmp/float(cnum)
                 end if
                 if (fluxcy(i,j  )<0.) then
-                  fluxcy(i,j  )=fluxcy(i,j  )-tmp/float(num)
+                  fluxcy(i,j  )=fluxcy(i,j  )-tmp/float(cnum)
                 end if
                 if (fluxcy(i,j+1)>0.) then
-                  fluxcy(i,j+1)=fluxcy(i,j+1)+tmp/float(num)
+                  fluxcy(i,j+1)=fluxcy(i,j+1)+tmp/float(cnum)
                 end if
               else
               ! if the cell will be water-free, correct input fluxes (velocities) only
                 if (icf(i,j) > 1.) then
                   icf(i,j) = 1.
-                  num = 0
+                  cnum = 0
                   tmp = 0.
                   if (fluxcx(i  ,j)>0.) then
                     ui(i  ,j) = 0.
-                    num = num+1
+                    cnum = cnum+1
                     tmp = tmp+fluxcx(i,j)
                   end if
                   if (fluxcx(i+1,j)<0.) then
                     ui(i+1,j) = 0.
-                    num = num+1
+                    cnum = cnum+1
                     tmp = tmp+fluxcx(i+1,j)
                   end if
                   if (fluxcy(i,j  )>0.) then
                     vi(i,j  ) = 0.
-                    num = num+1
+                    cnum = cnum+1
                     tmp = tmp+fluxcy(i,j)
                   end if
                   if (fluxcy(i,j+1)<0.) then
                     vi(i,j+1) = 0.
-                    num = num+1
+                    cnum = cnum+1
                     tmp = tmp+fluxcy(i,j+1)
                   end if
 
                   if (fluxcx(i  ,j)>0.) then
-                    fluxcx(i  ,j)=fluxcx(i  ,j)-tmp/float(num)
+                    fluxcx(i  ,j)=fluxcx(i  ,j)-tmp/float(cnum)
                   end if
                   if (fluxcx(i+1,j)<0.) then
-                    fluxcx(i+1,j)=fluxcx(i+1,j)+tmp/float(num)
+                    fluxcx(i+1,j)=fluxcx(i+1,j)+tmp/float(cnum)
                   end if
                   if (fluxcy(i,j  )>0.) then
-                    fluxcy(i,j  )=fluxcy(i,j  )-tmp/float(num)
+                    fluxcy(i,j  )=fluxcy(i,j  )-tmp/float(cnum)
                   end if
                   if (fluxcy(i,j+1)<0.) then
-                    fluxcy(i,j+1)=fluxcy(i,j+1)+tmp/float(num)
+                    fluxcy(i,j+1)=fluxcy(i,j+1)+tmp/float(cnum)
                   end if
                 end if
               end if
