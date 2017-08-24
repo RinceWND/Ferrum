@@ -159,11 +159,11 @@
         call exchange2d_mpi(dely,im,jm)
 
 ! Get wind stress over ice-free water (convert it from m^2/s^2 to N/m^2)
-        tauiau = wusurf*rhoref
-        tauiav = wvsurf*rhoref
+        tauiau = -wusurf*rhoref
+        tauiav = -wvsurf*rhoref
 
 ! Estimate sea ice density to a unit area
-        rhoi = 900.*hi*max(ice,.1)
+        rhoi = 900.*hi !*max(ice,.1)
 
 ! Calculate water-ice stress
         duvi=abs(sqrt((ui-u(1:im,1:jm,1))**2+(vi-v(1:im,1:jm,1))**2))
