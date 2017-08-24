@@ -807,7 +807,7 @@
      &                                 ,cbmem,xmassflux,ymassflux
       real(kind=rk), dimension(im,jm)    :: eta
 !      real(kind=rk) eps, epsval  ! rwnd: iteration check
-      integer i,j,k,itera
+      integer i,j,itera
 
 ! calculate horizontal mass fluxes
       xmassflux = 0.
@@ -4161,7 +4161,7 @@ C  !The most south sudomains
       real(kind=rk) mol,abs_1,abs_2
       real(kind=rk) value_min,epsilon
       real(kind=rk) udx,u2dt,vdy,v2dt
-      integer i,j,k
+      integer i,j
       parameter (value_min=1.e-9,epsilon=1.0e-14)
 
 ! apply temperature and salinity mask
@@ -4327,8 +4327,8 @@ C  !The most south sudomains
       real(kind=rk) z0b,z0a,zzkbm1,cbcmin,cbcmax,cbc(im,jm)
       real(kind=rk) uboscil,utau2,fsinhinv,utau2min
       real(kind=rk) pi,btoba,utauwind,const
-      real(kind=rk) wusrf(im,jm),wvsrf(im,jm),
-     &     wubot(im,jm),wvbot(im,jm)
+      real(kind=rk), intent(in) :: wusrf(im,jm),wvsrf(im,jm)
+     &                            ,wubot(im,jm),wvbot(im,jm)
       data kappa/0.4/,grav/9.807/
       data btoba/0.062/,pi/3.1415927/
       data utau2min/1.e-5/

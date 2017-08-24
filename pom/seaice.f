@@ -9,12 +9,6 @@
       include 'pom.h'
 
 
-      real(kind=rk), dimension( im_local ) ::
-     $     cibn_a, cibs_a, cibn_b, cibs_b
-
-      real(kind=rk), dimension( jm_local ) ::
-     $     cibe_a, cibw_a, cibe_b, cibw_b
-     
       real(kind=rk), dimension( im_local, jm_local ) ::
      &     ice_a, ice_b
 
@@ -135,11 +129,11 @@
 
         implicit none
 
-        real(kind=rk), dimension(im_local,jm_local) ::
-     &                 fx, fy, divu, pice, delx, dely, cidx, cidy
+        real(kind=rk), dimension(im,jm) ::
+     &                 fx, fy, divu, pice, delx, dely
      &                ,rhoi, duvi, uidx, vidy, fluxcx, fluxcy
      &                ,tauiau, tauiav
-        real(kind=rk) dteM, eeta, tmp
+        real(kind=rk) eeta, tmp
         integer i,j
 
         eeta = 1.e2 !1.01e-7 ! 1010 cm2/s? ! The source claims the coefficient equals to 10^10 cm2/s! This gives unreallistic Infinities.
@@ -152,9 +146,6 @@
         fluxcx = 0.
         fluxcy = 0.
 
-        icb = icb*fsm
-        
-        
 !        u(:,:,1) = 0.
 !        v(:,:,1) =  .2
 !        el = 0.
@@ -177,8 +168,8 @@
 ! Calculate water-ice stress
         duvi=abs(sqrt((ui-u(1:im,1:jm,1))**2+(vi-v(1:im,1:jm,1))**2))
 
-        tauiwu= dum*5.5e-3*rhoref*(ui-u(1:im,1:jm,1))*duvi
-        tauiwv= dvm*5.5e-3*rhoref*(vi-v(1:im,1:jm,1))*duvi
+        tauiwu= fsm*5.5e-3*rhoref*(ui-u(1:im,1:jm,1))*duvi
+        tauiwv= fsm*5.5e-3*rhoref*(vi-v(1:im,1:jm,1))*duvi
 
 ! Compute ice concentration fluxes
         do j=1,jm
