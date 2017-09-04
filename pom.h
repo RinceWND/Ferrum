@@ -532,7 +532,8 @@
      $  calc_interp,    !fhx:interp_flag
      $  calc_tsurf_mc,  !fhx:mcsst
      $  calc_tide,       !fhx:tide
-     $  calc_uvforce     !eda:uvforce
+     $  calc_uvforce,    !eda:uvforce
+     &  calc_ice
 
 
       common/blkcon2/

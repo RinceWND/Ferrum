@@ -34,7 +34,7 @@
         real(kind=rk) secs
 
 
-        d_2 = str2date("1979-01-00 00:00:00")
+        d_2 = str2date("1979-01-01 00:00:00") ! TODO: Fix ice date generation
         d_2%year = d_in%year
         secs = d_in-d_2
 
@@ -82,7 +82,7 @@
         real(kind=rk), dimension(im_local,jm_local) :: ci
 
 
-        d_2 = str2date("1979-01-00 00:00:00")
+        d_2 = str2date("1979-01-01 00:00:00")
         d_2%year = d_in%year
         secs = d_in-d_2
 
