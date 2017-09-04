@@ -786,17 +786,18 @@
         call sum0d_mpi(  vol_tot, master_task )
         call sum0d_mpi( area_tot, master_task )
 
-        temp_ave = temp_ave / vol_tot
-        salt_ave = salt_ave / vol_tot
-        elev_ave = elev_ave / area_tot
-
-
 ! print averages
-        if(my_task.eq.master_task) 
-     $       write(*,'(a,e15.8,2(a,f11.8),a)') 
+        if(my_task.eq.master_task) then
+
+          temp_ave = temp_ave / vol_tot
+          salt_ave = salt_ave / vol_tot
+          elev_ave = elev_ave / area_tot
+          write(*,'(a,e15.8,2(a,f11.8),a)') 
      $       "mean ; et = ",elev_ave," m, tb = ",
      $       temp_ave + tbias," deg, sb = ",
      $       salt_ave + sbias ," psu"
+
+        end if
 
       end if
 
