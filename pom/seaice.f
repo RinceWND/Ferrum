@@ -31,14 +31,14 @@
 
         type(date), intent(in) :: d_in 
         type(date) d_2
-        real(kind=rk) secs
+        integer secs
 
 
-        d_2 = str2date("1979-01-01 00:00:00") ! TODO: Fix ice date generation
+        d_2 = str2date("1979-01-02 00:00:00") ! TODO: Fix ice date generation
         d_2%year = d_in%year
         secs = d_in-d_2
 
-        day_b = 2*(int(secs/172800.)+1)
+        day_b = 2*(secs/172800+1)
         day_a = day_b-2
 
         d_2 = d_2 + day_a*86400
@@ -51,7 +51,7 @@
      &                                      d_2%year, d_2%month, d_2%day  
         call read_ice_pnetcdf( ice_a, infile_a )
 
-        d_2 = d_2 + 2*86400
+        if (secs>0) d_2 = d_2 + 2*86400
 
         write( infile_b, '( "ice.",i4,2(i2.2),".nc" )' )
      &                                      d_2%year, d_2%month, d_2%day  
@@ -78,15 +78,15 @@
 
         type(date), intent(in) :: d_in
         type(date) d_2
-        real(kind=rk) secs
+        integer secs
         real(kind=rk), dimension(im_local,jm_local) :: ci
 
 
-        d_2 = str2date("1979-01-01 00:00:00")
+        d_2 = str2date("1979-01-02 00:00:00")
         d_2%year = d_in%year
         secs = d_in-d_2
 
-        day_b = 2*(int(secs/172800.)+1)
+        day_b = 2*(secs/172800+1)
 
         d_2 = d_2 + day_b*86400
 
