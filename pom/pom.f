@@ -58,7 +58,7 @@
 ! main loop
       do iint=1,iend
 
-        
+
 !     external forcings
         if (iint==1 .or. .not.spinup) then
           if ( calc_uvforce ) call uvforce_main(dtime)  !eda:uvforce
@@ -112,7 +112,7 @@
 !_______________________________________________________________________
       real(kind=8) function realtime()
       call system_clock(i,j,k)
-      realtime=i/dble(j)
+      realtime=dble(i)/dble(j)
       return
       end
 

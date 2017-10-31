@@ -167,7 +167,7 @@
      $                 ,iperx,ipery,n1d !lyo:scs1d:add iper* & n1d in pom.nml
                                         !n1d .ne. 0 for 1d simulation
      $                 ,windf           !lyo: windf = ccmp, ecmw, or gfsw etc
-     $                 ,nbct,nbcs,tprni,umol
+     $                 ,nbct,nbcs,tprni,umol,z0b,ntp
      
       namelist/switch_nml/ 
      $     calc_wind, calc_tsforce, calc_river, calc_assim,
@@ -311,7 +311,7 @@
       dtime = str2date(read_rst_file(1:13)//":"//
      &  read_rst_file(15:16)//":"//read_rst_file(18:19) )
 
-       time0=( dtime - dtime0 ) / 86400
+      time0 = real( (dtime-dtime0)/86400, rk )
        
 !      if (my_task == master_task) then
 !         print*, 'dtime',dtime
@@ -320,7 +320,7 @@
 !      endif
 
 !      time0=0.e0
-       time=time0 !lyo:20110224:alu:stcc:!lyo:pac10:
+      time=time0 !lyo:20110224:alu:stcc:!lyo:pac10:
 
 ! print initial summary
       if(my_task.eq.master_task) then
@@ -695,7 +695,7 @@
 !eda:uvforce
       if (.not. calc_uvforce) then
         write(in_file,'(a)') "bc.nc"
-        call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file, 1) 
+        call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file, 1)
       endif
 
 !     Radiation factors for use in subroutine bcond !alu:20101216 
@@ -1080,7 +1080,7 @@
       endif
       h=xa(khi)-xa(klo)
       if (h.eq.0.)  then
-        error_staus=1
+        error_status=1
         write(6,'(/a)') 'Error: bad xa input in splint'
       end if
       a=(xa(khi)-x)/h

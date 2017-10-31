@@ -10,7 +10,7 @@
 
       integer, parameter :: wn = 4
 
-      real(kind=rk), dimension( im_local, jm_local ) ::
+      real(kind=rk), dimension( im_local, jm_local ), public ::
      $  uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd_fine, vwnd_fine
 
 !lyo:pac10:more efficient:Comment out the followings
@@ -84,7 +84,7 @@
          if(lexist) then
            d_off = str2date("1979-01-01 00:00:00")
            d_off%year = d_in%year
-           n = int(dif_date(d_in, d_off)/86400.)*4+1
+           n = int((d_in-d_off)/86400.)*4+1
 
            call read_wind_pnetcdfc
      $             ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
@@ -164,7 +164,7 @@
             vwnd_a = vwnd_buf( :, :, wn )
             
             d_fwd = d_in + 24 * 3600
-            n = int(dif_date(d_fwd, d_off)/86400.)*4+1
+            n = int((d_fwd-d_off)/86400.)*4+1
             n = mod(n, 1460 + 4*inc_leap(d_in%year))
 
 !!*      write( infile, '( //trim(windf)//"_",i4.4,2i2.2,".nc" )' )
@@ -280,7 +280,7 @@
 
       d_off = str2date("1979-01-01 00:00:00")
       d_off%year = d_in%year
-      n = int(dif_date(d_in, d_off)/86400.)
+      n = int((d_in-d_off)/86400.)
 
       do i=1,wn-1
          
@@ -307,7 +307,7 @@
             vwnd_a = vwnd_buf( :, :, wn )
          
          d_fwd = d_in + 24 * 3600
-         n = int(dif_date(d_fwd, d_off)/86400.)*4+1
+         n = int((d_fwd-d_off)/86400.)*4+1
          n = mod(n, 1460 + 4*inc_leap(d_in%year))
 
 !!*      write( infile, '( //trim(windf)//"_",i4.4,2i2.2,".nc" )' )

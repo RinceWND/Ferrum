@@ -2130,7 +2130,7 @@
 
 !      subroutine read_uabe_pnetcdf(uabe_out) !lyo:pac10:use stcc version
       subroutine read_bc_pnetcdf(ube_out, ubw_out,
-     $                           vbs_out, vbn_out, in_file, n) !eda: read all boundaries
+     &                           vbs_out, vbn_out, in_file, n) !eda: read all boundaries
 
       implicit none
 # include "mpif.h"
@@ -2540,7 +2540,7 @@
 !_______________________________________________________________________
 
 !_______________________________________________________________________
-      subroutine read_heat_pnetcdf( hfl, swr, air, emp,  filename, n )
+      subroutine read_heat_pnetcdf( hfl, swr, air, emp, filename, n )
 ! read wind stress
       implicit none
 # include "mpif.h"
@@ -2569,7 +2569,7 @@
 !!    write(netcdf_wind_file,'(''in/gfsw/'',a )') trim(filename)
       if(my_task.eq.0) write(*,'(/''reading heat '',a,'' @ '',i4)')
      $                                    trim(netcdf_heat_file),n
-      status=nfmpi_open(pom_comm_coarse,netcdf_heat_file,nf_nowrite,
+      status=nfmpi_open(pom_comm,netcdf_heat_file,nf_nowrite,
      $                  mpi_info_null,ncid)
       call handle_error_pnetcdf('nfmpi_open: '//netcdf_heat_file,
      $                          status,nf_noerr)
@@ -2603,10 +2603,75 @@
 
       status = get_var_real_2d(ncid,air_varid,start,edge,air)
       call handle_error_pnetcdf('get_var_real: tempa',status,nf_noerr)
-      air = fsm(1:im,1:jm)*air-273.15
 
       status = get_var_real_2d(ncid,emp_varid,start,edge,emp)
       call handle_error_pnetcdf('get_var_real: evmpr',status,nf_noerr)
+
+! close file
+      status=nfmpi_close(ncid)
+      call handle_error_pnetcdf('nf_close',status,nf_noerr)
+
+      return
+      end
+!_______________________________________________________________________
+      subroutine read_heat_aux_pnetcdf( shm, prt, cld, filename, n )
+! read wind stress
+      implicit none
+# include "mpif.h"
+# include "pnetcdf.inc"
+      include 'pom.h'
+      integer get_var_real_2d
+      integer n
+      real(kind=rk), dimension(im,jm) :: shm, prt, cld
+      character(len=14) filename
+      character(len=24) netcdf_heat_aux_file
+      integer ncid,status
+      integer shm_varid, prt_varid, cld_varid
+      integer(mpi_offset_kind) start(4),edge(4)
+
+      start = 1
+      edge  = 1
+
+
+! open netcdf wind file
+      netcdf_heat_aux_file="in/heat/"//trim(filename)
+      if(my_task.eq.0) write(*,'(/''reading aux heat '',a,'' @ '',i4)')
+     $                                    trim(netcdf_heat_aux_file),n
+      status=nfmpi_open(pom_comm,netcdf_heat_aux_file,nf_nowrite,
+     $                  mpi_info_null,ncid)
+      call handle_error_pnetcdf('nfmpi_open: '//netcdf_heat_aux_file,
+     $                          status,nf_noerr)
+
+! get variables
+      status=nfmpi_inq_varid(ncid,'shum',shm_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: shum'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'rain',prt_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: prate'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'cloud',cld_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: cloud'
+     $                          ,status,nf_noerr)
+
+! get data
+      start(1)=i_global(1)
+      start(2)=j_global(1)
+      start(3)=n
+      edge(1)=im
+      edge(2)=jm
+      edge(3)=1
+
+      status = get_var_real_2d(ncid,shm_varid,start,edge,shm)
+      call handle_error_pnetcdf('get_var_real: shum',status,nf_noerr)
+      shm = shm*fsm
+
+      status = get_var_real_2d(ncid,prt_varid,start,edge,prt)
+      call handle_error_pnetcdf('get_var_real: prate',status,nf_noerr)
+      prt = prt*fsm
+
+      status = get_var_real_2d(ncid,cld_varid,start,edge,cld)
+      call handle_error_pnetcdf('get_var_real: cloud',status,nf_noerr)
+      cld = cld*fsm
 
 ! close file
       status=nfmpi_close(ncid)
@@ -3162,7 +3227,7 @@
       call def_var_pnetcdf(ncid,'wtsurf',3,vdims,wtsurf_varid,nf_float,
      $                     'temperature flux','deg m/s',
      $                     'east_e north_e',.true.)
-      call def_var_pnetcdf(ncid,'uhtfl',3,vdims,uhtfl_varid,nf_float,
+      call def_var_pnetcdf(ncid,'swrad',3,vdims,uhtfl_varid,nf_float,
      $                     'upward net heat flux','K m/s',
      $                     'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'wssurf',3,vdims,wssurf_varid,nf_float,
@@ -3329,8 +3394,8 @@
       status=nfmpi_inq_varid(ncid,'wtsurf',wtsurf_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: wtsurf'
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'uhtfl',uhtfl_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: uhtfl'
+      status=nfmpi_inq_varid(ncid,'swrad',uhtfl_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: swrad'
      $                          ,status,nf_noerr)
       status=nfmpi_inq_varid(ncid,'wssurf',wssurf_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: wssurf'
@@ -3411,8 +3476,8 @@
       call handle_error_pnetcdf('nf_put_vara_real: wtsurf'
      &                                                 ,status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,uhtfl_varid,start,edge
-     &                                            ,real(swrad+wtsurf,4))
-      call handle_error_pnetcdf('nf_put_vara_real: uhtfl'
+     &                                                   ,real(swrad,4))
+      call handle_error_pnetcdf('nf_put_vara_real: swrad'
      &                                                 ,status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,wssurf_varid,start,edge
      &                                                  ,real(wssurf,4))
@@ -3493,8 +3558,8 @@
       call handle_error_pnetcdf('nf_put_vara_real: wtsurf'
      &                                                 ,status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,uhtfl_varid,start,edge
-     &                                            ,real(swrad+wtsurf,4))
-      call handle_error_pnetcdf('nf_put_vara_real: uhtfl'
+     &                                                   ,real(swrad,4))
+      call handle_error_pnetcdf('nf_put_vara_real: swrad'
      &                                                 ,status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,wssurf_varid,start,edge
      &                                             ,real(wssurf_mean,4))
@@ -4591,7 +4656,7 @@
 !        real(kind=16)  , dimension(:), allocatable :: rF  ! quadruple (not supported by netcdf?)
 
         fk = 1. ! scale factor
-        ok = 0  ! add offset
+        ok = 0. ! add offset
         k = edge(1)
         l = edge(2)
         m = edge(3)
@@ -4673,9 +4738,9 @@
         
         integer       status, vtype
         integer(mpi_offset_kind) k,l,m,n
-        real(kind=4)  f4, o4
-        real(kind=8)  f8, o8
-        real(kind=rk) fk, ok
+        real(kind=4)  f4, o4, m4
+        real(kind=8)  f8, o8, m8
+        real(kind=rk) fk, ok, mv
         
         integer(kind=1), dimension(:,:), allocatable :: i1  ! byte
         integer(kind=2), dimension(:,:), allocatable :: i2  ! short
@@ -4686,11 +4751,34 @@
 !        real(kind=16)  , dimension(:,:), allocatable :: rF  ! quadruple (not supported by netcdf?)
 
         fk = 1. ! scale factor
-        ok = 0  ! add offset
+        ok = 0. ! add offset
+        mv = 9.96920996838687e+36 ! missing value
         k = edge(1)
         l = edge(2)
         m = edge(3)
         n = edge(4)
+
+        status = nfmpi_inq_atttype(ncid, varid, "add_offset", vtype)
+        if (status==NF_NOERR) then
+          if (vtype==NF_FLOAT) then
+            status = nfmpi_get_att_real(ncid,varid,"add_offset",o4)
+            ok = real(o4)
+          else if (vtype==NF_DOUBLE) then
+            status = nfmpi_get_att_double(ncid,varid,"add_offset",o8)
+            ok = real(o8)
+          end if
+        end if
+
+        status = nfmpi_inq_atttype(ncid, varid, "scale_factor", vtype)
+        if (status==NF_NOERR) then
+          if (vtype==NF_FLOAT) then
+            status = nfmpi_get_att_real(ncid,varid,"scale_factor",f4)
+            fk = real(f4)
+          else if (vtype==NF_DOUBLE) then
+            status = nfmpi_get_att_double(ncid,varid,"scale_factor",f8)
+            fk = real(f8)
+          end if
+        end if
 
         status = nfmpi_inq_vartype(ncid, varid, vtype)
 
@@ -4703,32 +4791,9 @@
           deallocate(i1)
 ! SHORT to REAL
         else if (vtype==NF_SHORT) then
-! unpack
-          status = nfmpi_inq_atttype(ncid, varid, "add_offset", vtype)
-          if (vtype==NF_FLOAT) then
-            status = nfmpi_get_att_real(ncid,varid,"add_offset",o4)
-            ok = real(o4)
-          else if (vtype==NF_DOUBLE) then
-            status = nfmpi_get_att_double(ncid,varid,"add_offset",o8)
-            ok = real(o8)
-          else
-            call handle_error_pnetcdf('Failed reading `add_offset`',
-     $                                status,nf_noerr)
-          end if
-          status = nfmpi_inq_atttype(ncid, varid, "scale_factor", vtype)
-          if (vtype==NF_FLOAT) then
-            status = nfmpi_get_att_real(ncid,varid,"scale_factor",f4)
-            fk = real(f4)
-          else if (vtype==NF_DOUBLE) then
-            status = nfmpi_get_att_double(ncid,varid,"scale_factor",f8)
-            fk = real(f8)
-          else
-            call handle_error_pnetcdf('Failed reading `scale_factor`',
-     $                                status,nf_noerr)
-          end if
           allocate(i2(k,l))
           status=nfmpi_get_vara_int2_all(ncid,varid,start,edge,i2)
-          var = real(i2)*fk+ok
+          var = real(i2)
           deallocate(i2)
         else if (vtype==NF_INT) then
           allocate(i4(k,l))
@@ -4747,6 +4812,25 @@
           deallocate(r8)
         end if
         get_var_real_2d = status
+
+        status = nfmpi_inq_atttype(ncid, varid, "_FillValue", vtype)
+        if (status==NF_NOERR) then
+          if (vtype==NF_FLOAT) then
+            status = nfmpi_get_att_real(ncid,varid,"_FillValue",m4)
+            mv = real(m4)
+          else if (vtype==NF_DOUBLE) then
+            status = nfmpi_get_att_double(ncid,varid,"_FillValue",m8)
+            mv = real(m8)
+          else
+            call handle_error_pnetcdf('Failed reading `_FillValue`',
+     $                                status,nf_noerr)
+          end if
+
+          where (var==mv) var = 0.
+        end if
+        status = nf_noerr
+
+        var = var*fk+ok
 
       end function
 
@@ -4786,8 +4870,29 @@
         m = edge(3)
         n = edge(4)
 
-        status = nfmpi_inq_vartype(ncid, varid, vtype)
+        status = nfmpi_inq_atttype(ncid, varid, "add_offset", vtype)
+        if (status==NF_NOERR) then
+          if (vtype==NF_FLOAT) then
+            status = nfmpi_get_att_real(ncid,varid,"add_offset",o4)
+            ok = real(o4)
+          else if (vtype==NF_DOUBLE) then
+            status = nfmpi_get_att_double(ncid,varid,"add_offset",o8)
+            ok = real(o8)
+          end if
+        end if
 
+        status = nfmpi_inq_atttype(ncid, varid, "scale_factor", vtype)
+        if (status==NF_NOERR) then
+          if (vtype==NF_FLOAT) then
+            status = nfmpi_get_att_real(ncid,varid,"scale_factor",f4)
+            fk = real(f4)
+          else if (vtype==NF_DOUBLE) then
+            status = nfmpi_get_att_double(ncid,varid,"scale_factor",f8)
+            fk = real(f8)
+          end if
+        end if
+
+        status = nfmpi_inq_vartype(ncid, varid, vtype)
 ! BYTE to REAL
         if (vtype==NF_BYTE) then
           allocate(i1(k,l,m))
@@ -4797,32 +4902,9 @@
           deallocate(i1)
 ! SHORT to REAL
         else if (vtype==NF_SHORT) then
-! unpack
-          status = nfmpi_inq_atttype(ncid, varid, "add_offset", vtype)
-          if (vtype==NF_FLOAT) then
-            status = nfmpi_get_att_real(ncid,varid,"add_offset",o4)
-            ok = real(o4)
-          else if (vtype==NF_DOUBLE) then
-            status = nfmpi_get_att_double(ncid,varid,"add_offset",o8)
-            ok = real(o8)
-          else
-            call handle_error_pnetcdf('Failed reading `add_offset`',
-     $                                status,nf_noerr)
-          end if
-          status = nfmpi_inq_atttype(ncid, varid, "scale_factor", vtype)
-          if (vtype==NF_FLOAT) then
-            status = nfmpi_get_att_real(ncid,varid,"scale_factor",f4)
-            fk = real(f4)
-          else if (vtype==NF_DOUBLE) then
-            status = nfmpi_get_att_double(ncid,varid,"scale_factor",f8)
-            fk = real(f8)
-          else
-            call handle_error_pnetcdf('Failed reading `scale_factor`',
-     $                                status,nf_noerr)
-          end if
           allocate(i2(k,l,m))
           status=nfmpi_get_vara_int2_all(ncid,varid,start,edge,i2)
-          var = real(i2)*fk+ok
+          var = real(i2)
           deallocate(i2)
         else if (vtype==NF_INT) then
           allocate(i4(k,l,m))
@@ -4849,7 +4931,7 @@
 
         ! the below code is optional
         status = nfmpi_inq_atttype(ncid, varid, "_FillValue", vtype)
-        if (status==nf_noerr) then
+        if (status==NF_NOERR) then
           if (vtype==NF_FLOAT) then
             status = nfmpi_get_att_real(ncid,varid,"_FillValue",m4)
             mv = real(m4)
@@ -4863,5 +4945,7 @@
 
           where (var==mv) var = 0.
         end if
+
+        var = var*fk+ok
 
       end function

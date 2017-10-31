@@ -1,13 +1,17 @@
       module tsforce
 
+      use wind
+
       implicit none
 
       private
 
       public :: tsforce_init, tsforce_main, tsforce_tsflx
+      public :: uwnd_a, vwnd_a, uwnd_b, vwnd_b
 
       include 'pom.h'
 
+      logical, parameter :: calc_bulk = .true.
 !     days in month
       integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,               
      $                          31, 31, 30, 31, 30, 31/)
@@ -23,6 +27,7 @@
 !     buffers for tsurf, ssurf etc
       real(kind=rk), dimension( im_local, jm_local ) ::
      $     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, tair, emp
+     $    ,shum, rain, cloud, uwnd, vwnd
   
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
@@ -33,8 +38,8 @@
 !     $     uw_a, vw_a, uw_b, vw_b
     
       integer :: mon_a, mon_b, sec_in_month, mid_in_month
-      integer :: i, j, k, nb
-      character(len=13) :: infile_b
+      integer :: i, j, k, nb, mb
+      character(len=14) :: infile_b
       real(kind=rk) :: aa
 
 
@@ -58,6 +63,7 @@
       wtsurf = 0.0
       wssurf = 0.0
       nb = 0
+      mb = 0
 
 !     Read backward and forward TS climatology in initial state
 
@@ -79,7 +85,7 @@
 !     mid-point [sec] in the month.
       
       mid_in_month = int( real( mday( d_in%month ) )/ 2.0  
-     $             * 24 * 3600 )
+     $             * 24. * 3600. )
 
 
 !     decide between which two months.
@@ -179,7 +185,7 @@
 !     mid-point [sec] in the month.
       
       mid_in_month = int( real( mday( d_in%month ) )/ 2.0  
-     $             * 24 * 3600 )
+     $             * 24. * 3600. )
 
 
 !     decide between which two months.
@@ -342,7 +348,7 @@
 
       d_tmp = str2date("1979-01-01 00:00:00")
       d_tmp%year = d_in%year
-      n = int(dif_date(d_in, d_tmp)/(86400.)*4.)+1
+      n = int((d_in-d_tmp)/86400.*4.)+1
       
       if (n/=nb) then
         nb = n
@@ -357,8 +363,8 @@
           call read_heat_pnetcdf(
      $                  uht,swr,tair,emp,infile_b,n)
 !     $                 wtsurf(1:im,1:jm),swrad(1:im,1:jm),infile_b,n)
-          swrad(1:im,1:jm)  = swr
-          swrad  = -swrad/(rhoref*3986.)
+!          swrad(1:im,1:jm)  = swr
+!          swrad  = -swrad/(rhoref*3986.)
         else
           if ( my_task == master_task ) then
             write(*,'(/2a)') 
@@ -369,23 +375,47 @@
 
       end if
 
-      do j=1,jm
-         do i=1,im
+      if (calc_bulk) then
+          if (d_in%month /= mb) then
+            mb = d_in%month
+            infile_b = "hfl.aux.mon.nc"
+            call read_heat_aux_pnetcdf(shum,rain,cloud,infile_b,mb)
+          end if
+          uwnd = ( 1.0 - aa ) * uwnd_a + aa * uwnd_b
+          vwnd = ( 1.0 - aa ) * vwnd_a + aa * vwnd_b
+          call bulk(im,jm,tbias,fsm,tsurf,east_e,north_e,
+     $              d_in%year,d_in%month,d_in%day,
+     $              d_in%hour,d_in%min,
+     $              wusurf,wvsurf,wtsurf,swrad,emp,
+     $              uwnd,vwnd,
+     $              tair,shum,rain,cloud)
+          wssurf = emp*(s(:,:,1)+sbias)
+          write(*,*) my_task, "WT:", minval(wtsurf),maxval(wtsurf)
+          write(*,*) my_task, "SW:", minval(swrad),maxval(swrad)
+          write(*,*) my_task, "MP:", minval(emp),maxval(emp)
+      else
+          do j=1,jm
+             do i=1,im
 
-            sstrelx = 1.0d0
+                sstrelx = 1.
+                sssrelx = 1.
 !lyo:20110202:
 !           sssrelx = ( 1.0d0 + tanh( 0.002d0 * (h(i,j)-1000.d0)))*0.5d0
 !           sssrelx = ( 1.0d0 + tanh(0.0005d0 * (h(i,j)-2500.d0)))*0.5d0
 
-            wtsurf( i, j ) = sf_hf *
-     $           ( uht(i,j)/3986.+emp(i,j)*(tair(i,j)-t(i,j,1)) )/rhoref
-            wtsurf( i, j ) = wtsurf(i,j)
+                wtsurf( i, j ) = sf_hf *
+     $           ( uht(i,j)/3986.+emp(i,j)*(tair(i,j)-t(i,j,1)) )
+     $           /rhoref
+                wssurf( i, j ) = -emp(i,j)*(s(i,j,1)+sbias)
+                wtsurf( i, j ) = wtsurf(i,j)
      $           + c1 * sstrelx * ( tb( i, j, 1 ) - tsurf( i, j ) )
-            wssurf( i, j )
-     $           = c1 * sssrelx * ( sb( i, j, 1 ) - ssurf( i, j ) )
+                wssurf( i, j ) = wssurf(i,j)
+     $           + c1 * sssrelx * ( sb( i, j, 1 ) - ssurf( i, j ) )
 
-         enddo
-      enddo
+             enddo
+          enddo
+
+      end if
 
 ! TODO: interpolation
 
