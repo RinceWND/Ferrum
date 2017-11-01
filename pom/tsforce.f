@@ -377,7 +377,7 @@
 
       if (calc_bulk) then
           if (d_in%month /= mb) then
-            mb = d_in%month
+            mb = (d_in%year-1979)*12+d_in%month
             infile_b = "hfl.aux.mon.nc"
             call read_heat_aux_pnetcdf(shum,rain,cloud,infile_b,mb)
           end if
@@ -390,9 +390,9 @@
      $              uwnd,vwnd,
      $              tair,shum,rain,cloud)
           wssurf = emp*(s(:,:,1)+sbias)
-          write(*,*) my_task, "WT:", minval(wtsurf),maxval(wtsurf)
-          write(*,*) my_task, "SW:", minval(swrad),maxval(swrad)
-          write(*,*) my_task, "MP:", minval(emp),maxval(emp)
+!          write(*,*) my_task, "WT:", minval(wtsurf),maxval(wtsurf)
+!          write(*,*) my_task, "SW:", minval(swrad),maxval(swrad)
+!          write(*,*) my_task, "MP:", minval(emp),maxval(emp)
       else
           do j=1,jm
              do i=1,im

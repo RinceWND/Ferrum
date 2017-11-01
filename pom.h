@@ -16,8 +16,8 @@
      $  jm_global_coarse,! number of global grid points in y for coarse grids
      $  im_local_coarse ,
      $  jm_local_coarse ,
-     $  x_division      ,! number of divisions from coarse to fine grids in x 
-     $  y_division      ,! number of divisions from coarse to fine grids in y 
+     $  x_division      ,! number of divisions from coarse to fine grids in x
+     $  y_division      ,! number of divisions from coarse to fine grids in y
      $  n_proc           ! number of processors
 
 
@@ -39,16 +39,16 @@
 !     $  jm_global_coarse=452  ,
 !     $  im_local_coarse=42, !90   ,   !num_of_nodes = 16  4x4
 !     $  jm_local_coarse=47, !52   ,   !num_of_nodes = 16  4x4
-!     $  x_division=2          ,     
-!     $  y_division=2          ,    
+!     $  x_division=2          ,
+!     $  y_division=2          ,
 !     $  n_proc= 110) !45             ) !num_of_nodes = 16  4x4
-        
+
       include 'domain_dist'
 
 
 ! tide parameters !fhx:tide
       integer
-     $  ntide            ! number of tidal components  
+     $  ntide            ! number of tidal components
       parameter(ntide=1) ! =0 may not work below & in solver.f !lyo:pac10:
 !_______________________________________________________________________
 ! Efective grid size
@@ -90,7 +90,7 @@
      $  j_global       ,! global j index for each point in local domain
      $  pom_comm_coarse ,! satellite data MPI group communicator
      $  i_global_coarse ,! global i index for each point in local domain
-     $  j_global_coarse ,! global j index for each point in local domain     
+     $  j_global_coarse ,! global j index for each point in local domain
      $  n_west         ,! western parallel processor ID
      $  n_east         ,! eastern parallel processor ID
      $  n_south        ,! southern parallel processor ID
@@ -249,7 +249,7 @@
      $  z              ,! sigma coordinate from z=0 (surface) to z=-1 (bottom)
      $  zz              ! sigma coordinate, intermediate between z
 
-      common/blk1d/ 
+      common/blk1d/
      $  dz(kb)         ,
      $  dzz(kb)        ,
      $  z(kb)          ,
@@ -496,9 +496,9 @@
      $  zflux(im_local,jm_local,kb)
 
 ! ================================================
-! ayumi 2010/4/15 
+! ayumi 2010/4/15
 
-      logical 
+      logical
      $  calc_wind, calc_tsforce,
      $  calc_river, calc_assim,
      $  calc_assimdrf, !eda
@@ -507,7 +507,7 @@
      $  calc_tide,       !fhx:tide
      $  calc_uvforce,    !eda:uvforce
      &  calc_ice
-      integer 
+      integer
      $  num, iout
 
 ! 2-d
@@ -520,11 +520,11 @@
       real(kind=rk)
      $  u_mean, v_mean, w_mean,
      $  t_mean, s_mean, rho_mean,
-     $  kh_mean, km_mean 
+     $  kh_mean, km_mean
 
 
-      common/blklog/ 
-     $  calc_wind, 
+      common/blklog/
+     $  calc_wind,
      $  calc_tsforce,
      $  calc_river,
      $  calc_assim,
@@ -537,7 +537,7 @@
 
 
       common/blkcon2/
-     $  num, iout          
+     $  num, iout
 
       common/blk2d2/
      $  uab_mean(im_local,jm_local)    ,
@@ -546,17 +546,17 @@
      $  wusurf_mean(im_local,jm_local) ,
      $  wvsurf_mean(im_local,jm_local) ,
      $  wtsurf_mean(im_local,jm_local) ,
-     $  wssurf_mean(im_local,jm_local)    
+     $  wssurf_mean(im_local,jm_local)
 
       common/blk3d2/
      $  u_mean(im_local,jm_local,kb)   ,
      $  v_mean(im_local,jm_local,kb)   ,
      $  w_mean(im_local,jm_local,kb)   ,
-     $  t_mean(im_local,jm_local,kb)   , 
+     $  t_mean(im_local,jm_local,kb)   ,
      $  s_mean(im_local,jm_local,kb)   ,
      $  rho_mean(im_local,jm_local,kb) ,
-     $  kh_mean(im_local,jm_local,kb)  ,  
-     $  km_mean(im_local,jm_local,kb)   
+     $  kh_mean(im_local,jm_local,kb)  ,
+     $  km_mean(im_local,jm_local,kb)
 
 
 
@@ -739,22 +739,22 @@
 
 
 ! ================================================
-      integer 
+      integer
      $  output_flag, SURF_flag  !fhx:20110131:
 !fhx:20110131:beg:
-      integer 
+      integer
      $  nums, iprints,iouts
 ! 2-d
-      real(kind=rk) 
+      real(kind=rk)
      $  usrf_mean, vsrf_mean, elsrf_mean,
      $  uwsrf_mean, vwsrf_mean,uwsrf,vwsrf
 
-      common/blkflag/ 
-     $  output_flag, 
-     $  SURF_flag 
+      common/blkflag/
+     $  output_flag,
+     $  SURF_flag
 
       common/blk0dsurf/
-     $  nums, iprints,iouts          
+     $  nums, iprints,iouts
 
       common/blk2dsurf/
      $  usrf_mean(im_local,jm_local)    ,
