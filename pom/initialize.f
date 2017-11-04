@@ -513,6 +513,11 @@
 !lyo:scs1d:end:
 !
 ! derived vertical grid variables
+!      z(kb) = -1. ! :DIRTY HACK!!! (for stupid grid)
+!      zz(kb-1) = .5*(z(kb-1)+z(kb)) ! :
+!      zz(kb) = 2.*zz(kb-1)-zz(kb-2) ! :
+!!      if (my_task==1) fsm(:,jm-8:jm) = 0.
+!      h = 1500.
       do k=1,kb-1
         dz(k) = z(k)- z(k+1)
         dzz(k)=zz(k)-zz(k+1)
@@ -606,6 +611,10 @@
         call read_clim_ts_pnetcdf(tclim,sclim,n)
       endif
       
+!      tb = 15.
+!      sb = 33.
+!      tclim = 15.
+!      sclim = 33.
 ! calc. initial density
       call dens(sb,tb,rho)
 
@@ -699,7 +708,8 @@
       endif
 
 !     Radiation factors for use in subroutine bcond !alu:20101216 
-      rfe=0.; rfw=0.; rfn=0.; rfs=0. !=1 Flather; =0 clamped
+!      rfe=0.; rfw=0.; rfn=0.; rfs=0. !=1 Flather; =0 clamped
+      rfe=1.; rfw=1.; rfn=1.; rfs=1. !=1 Flather; =0 clamped
 
 ! Periodic in "x" and/or "y"?  !lyo:20110224:alu:stcc:
 !     iperx.ne.0 if x-periodic; ipery.ne.0 if y-periodic               !

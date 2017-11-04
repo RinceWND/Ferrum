@@ -12,6 +12,7 @@
       include 'pom.h'
 
       logical, parameter :: calc_bulk = .true.
+     $                    , calc_bulk_ncep = .true.
 !     days in month
       integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,               
      $                          31, 31, 30, 31, 30, 31/)
@@ -27,7 +28,7 @@
 !     buffers for tsurf, ssurf etc
       real(kind=rk), dimension( im_local, jm_local ) ::
      $     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, tair, emp
-     $    ,shum, rain, cloud, uwnd, vwnd
+     $    ,shum, rain, cloud, uwnd, vwnd, pres
   
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
@@ -64,6 +65,7 @@
       wssurf = 0.0
       nb = 0
       mb = 0
+      pres = 1013.
 
 !     Read backward and forward TS climatology in initial state
 
@@ -360,11 +362,16 @@
 
         swrad  = 0.
         if(lexist) then
-          call read_heat_pnetcdf(
+          if (calc_bulk_ncep) then
+            call read_ncep_bulk_pnetcdf(pres,tair,shum,rain
+     $                                 ,cloud,uwnd,vwnd,infile_b,n)
+          else
+            call read_heat_pnetcdf(
      $                  uht,swr,tair,emp,infile_b,n)
 !     $                 wtsurf(1:im,1:jm),swrad(1:im,1:jm),infile_b,n)
 !          swrad(1:im,1:jm)  = swr
 !          swrad  = -swrad/(rhoref*3986.)
+          end if
         else
           if ( my_task == master_task ) then
             write(*,'(/2a)') 
@@ -376,6 +383,8 @@
       end if
 
       if (calc_bulk) then
+
+        if (.not.calc_bulk_ncep) then
           if (d_in%month /= mb) then
             mb = (d_in%year-1979)*12+d_in%month
             infile_b = "hfl.aux.mon.nc"
@@ -383,13 +392,14 @@
           end if
           uwnd = ( 1.0 - aa ) * uwnd_a + aa * uwnd_b
           vwnd = ( 1.0 - aa ) * vwnd_a + aa * vwnd_b
-          call bulk(im,jm,tbias,fsm,tsurf,east_e,north_e,
+        end if
+        call bulk(im,jm,tbias,fsm,tsurf,east_e,north_e,
      $              d_in%year,d_in%month,d_in%day,
      $              d_in%hour,d_in%min,
      $              wusurf,wvsurf,wtsurf,swrad,emp,
      $              uwnd,vwnd,
-     $              tair,shum,rain,cloud)
-          wssurf = emp*(s(:,:,1)+sbias)
+     $              tair,shum,rain,cloud,pres)
+        wssurf = emp*(s(:,:,1)+sbias)
 !          write(*,*) my_task, "WT:", minval(wtsurf),maxval(wtsurf)
 !          write(*,*) my_task, "SW:", minval(swrad),maxval(swrad)
 !          write(*,*) my_task, "MP:", minval(emp),maxval(emp)

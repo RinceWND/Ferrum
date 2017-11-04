@@ -3,7 +3,7 @@
       subroutine bulk(im,jm,tbias,fsm,tsurf,alon,alat,iyr,imo,iday,
      $    ihour,imin,wusurf,wvsurf,wtsurf,swrad,pme,
      $                                             uair,vair,
-     $                                        tair,rhum,rain,cloud)
+     $                                    tair,rhum,rain,cloud,pres)
 !*******************************************************************************
 ! THIS SUBROUTINE PROVIDES SURFACE BOUNDARY CONDITIONS FOR MOMENTUM,
 ! HEAT AND SALT EQUATIONS SOLVED BY THE HYDRODYNAMIC MODEL IN CASES WHEN
@@ -63,6 +63,7 @@
 ! 9.  RHUM() : RELATIVE HUMIDITY (%) AT 2m ABOVE SEA SURFACE
 ! 10. RAIN() : PRECIPITATION RATE (in m/s)
 ! 11. CLOUD()  : CLOUD COVERAGE IN TENTHS (0.-->1.)
+! 12. PRES() : ATMOSPHERIC PRESSURE AT SURFACE (hPa)
 !
 !
 ! Important:
@@ -87,7 +88,7 @@
 
       real(kind=rk), dimension(im, jm) ::
      $  uair(im,jm),vair(im,jm),tair(im,jm),rhum(im,jm),
-     $  rain(im,jm),cloud(im,jm)
+     $  rain(im,jm),cloud(im,jm),pres(im,jm)
 !
 !--------------------------------------------------------------------
 !       coefficients ( in MKS )  :
@@ -129,8 +130,9 @@
             unow      = uair(i,j)
             vnow      = vair(i,j)
             tnow      = tair(i,j)+ckelv
+            pnow      = pres(i,j)
             rhnow     = rhum(i,j)
-     $                 *ps*0.263/exp(17.67*tair(i,j)/(tnow-29.65)) ! rwnd: specific to relative humidity
+     $                 *pnow*0.263/exp(17.67*tair(i,j)/(tnow-29.65)) ! rwnd: specific to relative humidity
             if (rhnow>1.) rhnow=1.
             if (rhnow<0.) rhnow=0.
             precip    = rain(i,j)/1000. ! rwnd: precipitation rate from kg/(m2*s) to m/s
@@ -160,8 +162,8 @@
 ! --- calculates the saturation mixing ratios at air temp. and sea temp.
 ! --- wsat(Ta) , wsat(Ts)
 !
-            wsatair = (expsi/ps) * esatair
-            wsatoce = (expsi/ps) * esatoce
+            wsatair = (expsi/pnow) * esatair
+            wsatoce = (expsi/pnow) * esatoce
 !
 ! --- calculates the mixing ratio of the air 
 ! --- w(Ta)
@@ -170,7 +172,7 @@
 !
 ! --- calculates the density of  moist air
 !     
-            rhom = 100.*(ps/rd) * (expsi*(1.+wair)/(tnowk*(expsi+wair)))
+            rhom = 100.*(pnow/rd)*(expsi*(1.+wair)/(tnowk*(expsi+wair)))
 !
 !---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 ! Calculate the net longwave radiation flux at the sea surface (QBW)

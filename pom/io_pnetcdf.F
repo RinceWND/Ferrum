@@ -2680,6 +2680,98 @@
       return
       end
 !_______________________________________________________________________
+      subroutine read_ncep_bulk_pnetcdf( pres, tair, shum, rain, cloud
+     $                                  ,uwnd, vwnd, filename, n )
+! read wind stress
+      implicit none
+# include "mpif.h"
+# include "pnetcdf.inc"
+      include 'pom.h'
+      integer get_var_real_2d
+      integer n
+      real(kind=rk), dimension(im,jm) :: pres, tair, shum, rain, cloud
+     $                                  ,uwnd, vwnd
+      character(len=14) filename
+      character(len=24) netcdf_heat_aux_file
+      integer ncid,status
+      integer pres_varid, tair_varid, shum_varid, rain_varid
+     $       ,cloud_varid, uwnd_varid, vwnd_varid
+      integer(mpi_offset_kind) start(4),edge(4)
+
+      start = 1
+      edge  = 1
+
+
+! open netcdf wind file
+      netcdf_heat_aux_file="in/heat/"//trim(filename)
+      if(my_task.eq.0) write(*,'(/''reading bulk data '',a,'' @ '',i4)')
+     $                                    trim(netcdf_heat_aux_file),n
+      status=nfmpi_open(pom_comm,netcdf_heat_aux_file,nf_nowrite,
+     $                  mpi_info_null,ncid)
+      call handle_error_pnetcdf('nfmpi_open: '//netcdf_heat_aux_file,
+     $                          status,nf_noerr)
+
+! get variables
+      status=nfmpi_inq_varid(ncid,'pres',pres_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: pres'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'tair',tair_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: tair'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'shum',shum_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: shum'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'prate',rain_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: rain'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'cloud',cloud_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: cloud'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'uwnd',uwnd_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: uwnd'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'vwnd',vwnd_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: vwnd'
+     $                          ,status,nf_noerr)
+
+! get data
+      start(1)=i_global(1)
+      start(2)=j_global(1)
+      start(3)=n
+      edge(1)=im
+      edge(2)=jm
+      edge(3)=1
+
+      status = get_var_real_2d(ncid,pres_varid,start,edge,pres)
+      call handle_error_pnetcdf('get_var_real: pres',status,nf_noerr)
+      pres = pres/100.
+
+      status = get_var_real_2d(ncid,tair_varid,start,edge,tair)
+      call handle_error_pnetcdf('get_var_real: tair',status,nf_noerr)
+      tair = tair-273.15
+
+      status = get_var_real_2d(ncid,shum_varid,start,edge,shum)
+      call handle_error_pnetcdf('get_var_real: shum',status,nf_noerr)
+
+      status = get_var_real_2d(ncid,rain_varid,start,edge,rain)
+      call handle_error_pnetcdf('get_var_real: rain',status,nf_noerr)
+
+      status = get_var_real_2d(ncid,cloud_varid,start,edge,cloud)
+      call handle_error_pnetcdf('get_var_real: cloud',status,nf_noerr)
+
+      status = get_var_real_2d(ncid,uwnd_varid,start,edge,uwnd)
+      call handle_error_pnetcdf('get_var_real: uwnd',status,nf_noerr)
+
+      status = get_var_real_2d(ncid,vwnd_varid,start,edge,vwnd)
+      call handle_error_pnetcdf('get_var_real: vwnd',status,nf_noerr)
+
+! close file
+      status=nfmpi_close(ncid)
+      call handle_error_pnetcdf('nf_close',status,nf_noerr)
+
+      return
+      end
+!_______________________________________________________________________
       subroutine read_ice_pnetcdf( ci, filename )
 ! read wind stress
       implicit none
