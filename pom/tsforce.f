@@ -393,7 +393,7 @@
           uwnd = ( 1.0 - aa ) * uwnd_a + aa * uwnd_b
           vwnd = ( 1.0 - aa ) * vwnd_a + aa * vwnd_b
         end if
-        call bulk(im,jm,tbias,fsm,tsurf,east_e,north_e,
+        call bulk(im,jm,tbias,fsm,t(:,:,1),east_e,north_e,
      $              d_in%year,d_in%month,d_in%day,
      $              d_in%hour,d_in%min,
      $              wusurf,wvsurf,wtsurf,swrad,emp,
