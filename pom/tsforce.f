@@ -137,10 +137,10 @@
 !          tsurf_b = tm_b(:,:,1)
 !          ssurf_a = sm_a(:,:,1)
 !          ssurf_b = sm_b(:,:,1)
-          tsurf_a = tc_a(:,:,1)
-          tsurf_b = tc_b(:,:,1)
-          ssurf_a = sc_a(:,:,1)
-          ssurf_b = sc_b(:,:,1)
+!          tsurf_a = tc_a(:,:,1)
+!          tsurf_b = tc_b(:,:,1)
+!          ssurf_a = sc_a(:,:,1)
+!          ssurf_b = sc_b(:,:,1)
 
 
       if ( my_task == master_task ) 
@@ -227,8 +227,8 @@
 !         uw_a = uw_b
 !         vw_a = vw_b
 
-         tsurf_a = tsurf_b
-         ssurf_a = ssurf_b
+!         tsurf_a = tsurf_b
+!         ssurf_a = ssurf_b
 
 !         write( infile_b, '( "tsclimib",i2.2,".nc" )' ) mon_b
          call read_tsclim_monthly_pnetcdf
@@ -242,8 +242,8 @@
 !         call read_ssts_monthly_pnetcdf
 !     $        ( tsurf_b, ssurf_b, "ts_clim.nc", mon_b )
      
-         tsurf_b = tc_b(:,:,1)
-         ssurf_b = sc_b(:,:,1)
+!         tsurf_b = tc_b(:,:,1)
+!         ssurf_b = sc_b(:,:,1)
 
       endif
 
@@ -260,8 +260,8 @@
 !      wusurf = ( 1.0 - aa ) * uw_a + aa * uw_b
 !      wvsurf = ( 1.0 - aa ) * vw_a + aa * vw_b
 
-      tsurf = ( 1.0 - aa ) * tsurf_a + aa * tsurf_b
-      ssurf = ( 1.0 - aa ) * ssurf_a + aa * ssurf_b
+      tsurf = t(:,:,1) !( 1.0 - aa ) * tsurf_a + aa * tsurf_b
+      ssurf = s(:,:,1) !( 1.0 - aa ) * ssurf_a + aa * ssurf_b
       
 
 !     calculation of rmean.
