@@ -27,8 +27,8 @@
 
 !     buffers for tsurf, ssurf etc
       real(kind=rk), dimension( im_local, jm_local ) ::
-     $     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, tair, emp
-     $    ,shum, rain, cloud, uwnd, vwnd, pres
+     $     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, emp, shum
+     $    ,tair_a, tair_b, tair, rain, cloud, uwnd, vwnd, pres
   
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
@@ -56,7 +56,10 @@
       implicit none
 
 !     intent(in)
-      type(date), intent(in) :: d_in 
+      type(date), intent(in) :: d_in
+      type(date) d_tmp
+      logical lexist
+      integer n
   
 
 !     initialize
@@ -141,6 +144,22 @@
 !          tsurf_b = tc_b(:,:,1)
 !          ssurf_a = sc_a(:,:,1)
 !          ssurf_b = sc_b(:,:,1)
+      d_tmp = str2date("1979-01-01 00:00:00")
+      d_tmp%year = d_in%year
+      n = int((d_in-d_tmp)/86400.*4.)+1
+
+      write( infile_b, '( a3,".",i4.4,".nc" )' )
+     $        "hfl", d_in%year
+
+      inquire(file='in/heat/'//trim(infile_b),
+     $           exist=lexist)
+
+      if(lexist) then
+        if (calc_bulk_ncep) then
+          call read_ncep_bulk_pnetcdf(pres,tair_a,shum,rain
+     $                                 ,cloud,uwnd,vwnd,infile_b,n)
+        end if
+      end if
 
 
       if ( my_task == master_task ) 
@@ -341,12 +360,14 @@
       ! intent(in)
       type(date), intent(in) :: d_in
       type(date) d_tmp
-      real(kind=rk) sec_in_day
+      real(kind=rk) bb
+      integer sec_in_day
 
       logical :: lexist    
 
 
       sec_in_day = d_in%hour*3600 + d_in%min*60 + d_in%sec
+      bb = real( mod( sec_in_day, 6 * 3600 ) ) / ( 6. * 3600. )
 
       d_tmp = str2date("1979-01-01 00:00:00")
       d_tmp%year = d_in%year
@@ -354,6 +375,7 @@
       
       if (n/=nb) then
         nb = n
+        tair_a = tair_b
         write( infile_b, '( a3,".",i4.4,".nc" )' )
      $        "hfl", d_in%year
 
@@ -363,7 +385,7 @@
         swrad  = 0.
         if(lexist) then
           if (calc_bulk_ncep) then
-            call read_ncep_bulk_pnetcdf(pres,tair,shum,rain
+            call read_ncep_bulk_pnetcdf(pres,tair_b,shum,rain
      $                                 ,cloud,uwnd,vwnd,infile_b,n)
           else
             call read_heat_pnetcdf(
@@ -382,6 +404,7 @@
 
       end if
 
+      tair = (1.-bb)*tair_a + bb*tair_b
       if (calc_bulk) then
 
         if (.not.calc_bulk_ncep) then
@@ -390,9 +413,9 @@
             infile_b = "hfl.aux.mon.nc"
             call read_heat_aux_pnetcdf(shum,rain,cloud,infile_b,mb)
           end if
-          uwnd = ( 1.0 - aa ) * uwnd_a + aa * uwnd_b
-          vwnd = ( 1.0 - aa ) * vwnd_a + aa * vwnd_b
         end if
+        uwnd = ( 1.0 - bb ) * uwnd_a + bb * uwnd_b
+        vwnd = ( 1.0 - bb ) * vwnd_a + bb * vwnd_b
         call bulk(im,jm,tbias,fsm,t(:,:,1),east_e,north_e,
      $              d_in%year,d_in%month,d_in%day,
      $              d_in%hour,d_in%min,

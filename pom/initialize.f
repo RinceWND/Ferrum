@@ -598,23 +598,30 @@
 
 ! read initial temperature and salinity from ic file
 !      call read_initial_ts_pnetcdf(kb,tb,sb)
-      call read_clim_ts_pnetcdf(tb,sb,n)
+      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_clim.nc"
+      inquire(file=trim(netcdf_ic_file),exist=fexist)
+      
+      if (fexist) then
+        call read_clim_ts_pnetcdf(tb,sb,n)
 !      call read_clim_ts_pnetcdf_obs(tb,sb,rho,n)
 
 ! read annual-mean, xy-ave t,sclim if avail !lyo:20110202:
-      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean.nc"
-      inquire(file=trim(netcdf_ic_file),exist=fexist)
-      if(fexist) then  !annual-mean xy-ave t,sclim
-        call read_mean_ts_pnetcdf(tclim,sclim,n)
-      else             !annual-mean *clim* - dangerous for rmean
+        write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean.nc"
+        inquire(file=trim(netcdf_ic_file),exist=fexist)
+        if(fexist) then  !annual-mean xy-ave t,sclim
+          call read_mean_ts_pnetcdf(tclim,sclim,n)
+        else             !annual-mean *clim* - dangerous for rmean
 !      call read_clim_ts_pnetcdf_obs(tclim,sclim,rmean,n)
-        call read_clim_ts_pnetcdf(tclim,sclim,n)
-      endif
+          call read_clim_ts_pnetcdf(tclim,sclim,n)
+        endif
       
-!      tb = 15.
-!      sb = 33.
-!      tclim = 15.
-!      sclim = 33.
+      else
+        if (my_task==0) write(*,*) "Failed reading clim..."
+        tb = 15.
+        sb = 33.
+        tclim = 15.
+        sclim = 33.
+      end if
 ! calc. initial density
       call dens(sb,tb,rho)
 

@@ -1891,6 +1891,15 @@
      $  trim(netcdf_ic_file)
       status=nfmpi_open(pom_comm,netcdf_ic_file,nf_nowrite,
      $                  mpi_info_null,ncid)
+      write(*,*) my_task, "!!", status
+      if (status/=NF_NOERR) then
+          if (my_task==0) write(*,*) 'Failed reading clim! Fallback...'
+          tm = 15.
+          sm = 33.
+          tc = 15.
+          sc = 33.
+          return
+      end if
       call handle_error_pnetcdf('nfmpi_open: '//netcdf_ic_file,
      $                          status,nf_noerr)
 
