@@ -371,13 +371,18 @@
 
       d_tmp = str2date("1979-01-01 00:00:00")
       d_tmp%year = d_in%year
-      n = int((d_in-d_tmp)/86400.*4.)+1
+      d_tmp = d_tmp + 6*3600
+      if (d_tmp%year/=d_in%year) then
+          n = 1 ! rwnd: dirty hack
+      else
+        n = int((d_in-d_tmp)/86400.*4.)+1
+      end if
       
       if (n/=nb) then
         nb = n
         tair_a = tair_b
         write( infile_b, '( a3,".",i4.4,".nc" )' )
-     $        "hfl", d_in%year
+     $        "hfl", d_tmp%year
 
         inquire(file='in/heat/'//trim(infile_b),
      $           exist=lexist)
