@@ -341,10 +341,10 @@
          if(lexist) then
 
            if (calc_mflx) then
-             call read_mflx_pnetcdf
+             call read_wind_pnetcdfc
      &        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
            else
-             call read_wind_pnetcdfc
+             call read_mflx_pnetcdf
      $        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
            end if
 
