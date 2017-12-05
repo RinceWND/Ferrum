@@ -9,7 +9,7 @@
       include 'pom.h'
 
       integer, parameter :: wn = 4
-      logical, parameter :: calc_mflx = .false.
+      logical, parameter :: calc_mflx = .true.
 
       real(kind=rk), dimension( im_local, jm_local ), public ::
      $  uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd_fine, vwnd_fine
@@ -87,8 +87,13 @@
            d_off%year = d_in%year
            n = int((d_in-d_off)/86400.)*4+1
 
-           call read_wind_pnetcdfc
-     $             ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           if (calc_mflx) then
+             call read_mflx_pnetcdf
+     &         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           else
+             call read_wind_pnetcdfc
+     $         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           end if
 
            uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
            vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
@@ -182,8 +187,8 @@
 
 ! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010             
          inquire(file='in/'//trim(windf)//'/'//trim(infile),
-     $           exist=lexist)   
-!!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)   
+     $           exist=lexist)
+!!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)
 
          if(lexist) then
 

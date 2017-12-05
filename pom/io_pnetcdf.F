@@ -1908,7 +1908,6 @@
      $  trim(netcdf_ic_file)
       status=nfmpi_open(pom_comm,netcdf_ic_file,nf_nowrite,
      $                  mpi_info_null,ncid)
-      write(*,*) my_task, "!!", status
       if (status/=NF_NOERR) then
           if (my_task==0) write(*,*) 'Failed reading clim! Fallback...'
           tm = 15.
@@ -2414,9 +2413,10 @@
       include 'pom.h'
       integer get_var_real_3d,k
       integer, parameter :: wind_npd = 4
+      character(len=*), intent(in) :: filename
       real(kind=rk),dimension(im,jm,wind_npd),intent(out) ::
      &                                            uflx, vflx
-      character :: filename*16, netcdf_mflx_file*24
+      character :: netcdf_mflx_file*24
       integer ncid,status,n
       integer uflx_varid,vflx_varid
       integer(mpi_offset_kind) start(4),edge(4)
