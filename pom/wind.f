@@ -9,7 +9,7 @@
       include 'pom.h'
 
       integer, parameter :: wn = 4
-      logical, parameter :: calc_mflx = .true.
+      logical, parameter :: calc_mflx = .false.
 
       real(kind=rk), dimension( im_local, jm_local ), public ::
      $  uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd_fine, vwnd_fine
@@ -88,10 +88,10 @@
            n = int((d_in-d_off)/86400.)*4+1
 
            if (calc_mflx) then
-             call read_mflx_pnetcdf
+             call read_wind_pnetcdfc
      &         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
            else
-             call read_wind_pnetcdfc
+             call read_mflx_pnetcdf
      $         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
            end if
 
@@ -193,10 +193,10 @@
          if(lexist) then
 
            if (calc_mflx) then
-             call read_mflx_pnetcdf
+             call read_wind_pnetcdfc
      &         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
            else
-             call read_wind_pnetcdfc
+             call read_mflx_pnetcdf
      $         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
            end if
 
