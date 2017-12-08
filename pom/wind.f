@@ -11,7 +11,7 @@
       integer, parameter :: wn = 4
       logical, parameter :: calc_mflx = .false.
 
-      real(kind=rk), dimension( im_local, jm_local ), public ::
+      real(kind=rk), dimension( im_local, jm_local ) ::
      $  uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd_fine, vwnd_fine
 
 !lyo:pac10:more efficient:Comment out the followings
@@ -450,8 +450,8 @@
             wusurf(i,j) = - rhoa / rhow * cda * uvabs * (uwnd-u(i,j,1)) !- uwnd / rhow
             wvsurf(i,j) = - rhoa / rhow * cda * uvabs * (vwnd-v(i,j,1)) !- vwnd / rhow
           else
-            wusurf(i,j) = - uwnd / rhow
-            wvsurf(i,j) = - vwnd / rhow
+            wusurf(i,j) = uwnd / rhow   ! NCEP momentum flux is ALREADY INVERSED?!
+            wvsurf(i,j) = vwnd / rhow
           end if
 
          enddo

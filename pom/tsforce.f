@@ -7,7 +7,6 @@
       private
 
       public :: tsforce_init, tsforce_main, tsforce_tsflx
-      public :: uwnd_a, vwnd_a, uwnd_b, vwnd_b
 
       include 'pom.h'
 
@@ -28,7 +27,8 @@
 !     buffers for tsurf, ssurf etc
       real(kind=rk), dimension( im_local, jm_local ) ::
      $     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, emp, shum
-     $    ,tair_a, tair_b, tair, rain, cloud, uwnd, vwnd, pres
+     $    ,tair_a, tair_b, tair, rain, cloud, pres
+     $    ,uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd, vwnd
   
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
@@ -157,7 +157,7 @@
       if(lexist) then
         if (calc_bulk_ncep) then
           call read_ncep_bulk_pnetcdf(pres,tair_a,shum,rain
-     $                                 ,cloud,uwnd,vwnd,infile_b,n)
+     $                             ,cloud,uwnd_a,vwnd_a,infile_b,n)
         end if
       end if
 
@@ -372,11 +372,8 @@
       d_tmp = str2date("1979-01-01 00:00:00")
       d_tmp%year = d_in%year
       d_tmp = d_tmp + 6*3600
-      if (d_tmp%year/=d_in%year) then
-          n = 1 ! rwnd: dirty hack
-      else
-        n = int((d_in-d_tmp)/86400.*4.)+1
-      end if
+      n = 4*(365+inc_leap(d_in%year))
+      n = mod(int((d_in-d_tmp)/86400.*4.),n)+1
       
       if (n/=nb) then
         nb = n
@@ -391,7 +388,7 @@
         if(lexist) then
           if (calc_bulk_ncep) then
             call read_ncep_bulk_pnetcdf(pres,tair_b,shum,rain
-     $                                 ,cloud,uwnd,vwnd,infile_b,n)
+     $                             ,cloud,uwnd_b,vwnd_b,infile_b,n)
           else
             call read_heat_pnetcdf(
      $                  uht,swr,tair,emp,infile_b,n)
