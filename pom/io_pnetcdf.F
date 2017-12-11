@@ -2426,8 +2426,9 @@
 
 ! open netcdf wind file
       netcdf_mflx_file="in/"//windf//"/"//trim(filename)
-      if(my_task.eq.0) write(*,'(/''reading file '',a)')
-     $                                    trim(netcdf_mflx_file)
+      if(my_task.eq.0)
+     &       write(*,'(/''reading wind stress '',a,'' @ '',i4)')
+     &                                  trim(netcdf_mflx_file), n
       status=nfmpi_open(pom_comm,netcdf_mflx_file,nf_nowrite,
      $                  mpi_info_null,ncid)
       call handle_error_pnetcdf('nfmpi_open: '//netcdf_mflx_file,
@@ -2484,7 +2485,7 @@
 
 ! open netcdf wind file
       netcdf_wind_file="in/"//windf//"/"//trim(filename)
-      if(my_task.eq.0) write(*,'(/''reading file '',a,'' @ '',i4)')
+      if(my_task.eq.0) write(*,'(/''reading wind '',a,'' @ '',i4)')
      $                                    trim(netcdf_wind_file),n
       status=nfmpi_open(pom_comm_coarse,netcdf_wind_file,nf_nowrite,
      $                  mpi_info_null,ncid)
