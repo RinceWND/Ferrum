@@ -25,7 +25,7 @@
       open(73, file='switch.nml',status='old')
       read(73, nml=misc_nml)
       close(73)
-      
+
 ! initialize model
       call initialize
 
@@ -43,7 +43,7 @@
       call river_init( dtime )
       call assim_init( dtime )
       if ( calc_ice ) call ice_init( dtime )
-    
+
       if(my_task == master_task) then
         write(*,'(a)') 'End of initialization'
         write(*,*) 

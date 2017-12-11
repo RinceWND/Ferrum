@@ -371,9 +371,11 @@
 
       d_tmp = str2date("1979-01-01 00:00:00")
       d_tmp%year = d_in%year
-      d_tmp = d_tmp + 6*3600
-      n = 4*(365+inc_leap(d_in%year))
-      n = mod(int((d_in-d_tmp)/86400.*4.),n)+1
+      n = int((d_in-d_tmp+6*3600)/86400.*4.)+1
+      if (n > 4*(365+inc_leap(d_in%year))) then
+        n = mod(n,4*(365+inc_leap(d_in%year)))
+        d_tmp%year = d_tmp%year+1
+      end if
       
       if (n/=nb) then
         nb = n
