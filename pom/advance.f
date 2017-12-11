@@ -556,6 +556,18 @@
 
 
           call bcond(4)
+          if (t_lo > -999.) then
+            if (my_task==master_task) then
+              write(*,*) "Temp low threshold detected"
+            end if
+            where (uf<t_lo) uf = t_lo
+          end if
+          if (t_hi <  999.) then
+            if (my_task==master_task) then
+              write(*,*) "Temp high threshold detected"
+            end if
+            where (uf>t_hi) uf = t_hi
+          end if
 
 
           call exchange3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)

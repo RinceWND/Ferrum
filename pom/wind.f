@@ -400,7 +400,7 @@
            vwnd_b = vwnd_buf( :, :, 1 )
 
       endif
- 
+
 
       aa = real( mod( sec_in_day, 6 * 3600 ) ) / ( 6. * 3600. )
 

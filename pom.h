@@ -775,3 +775,9 @@
      $  sf_bf                           ,
      $  sf_hf                           ,
      $  sf_wi
+
+      real(kind=rk)
+     &  t_lo, t_hi
+
+      common/misc/
+     &  t_lo, t_hi

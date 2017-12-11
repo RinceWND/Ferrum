@@ -178,7 +178,9 @@
      $     output_flag, SURF_flag !fhx:20110131:
       type(date) ::  dtime, dtime0
 
+      logical spinup
       namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
+      namelist/misc_nml/ spinup, t_lo, t_hi
 
 ! Input of filenames and constants
 
@@ -275,6 +277,12 @@
 ! Initial value of aam:
       aam_init=500.
 
+! Other parameters and flags
+      sf_bf = 1.
+      sf_hf = 1.
+      sf_wi = 1.
+      t_lo = -999.
+      t_hi =  999.
 
 ! read input namelist
       open(73,file='pom.nml',status='old')
@@ -284,6 +292,7 @@
 ! read main switches
       open(73,file='switch.nml',status='old')
       read(73,nml=switch_nml)
+      read(73,nml=misc_nml)
       read(73,nml=sensitivity_nml)
       close(73)
 

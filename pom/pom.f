@@ -18,7 +18,7 @@
       include 'pom.h'
 
       logical spinup
-      namelist/misc_nml/ spinup
+      namelist/misc_nml/ spinup, t_lo, t_hi
 
       type(date) :: dtime
 
@@ -70,7 +70,7 @@
           if ( calc_ice )     call ice_main( dtime )
         end if
 
-       
+
 !     advance model
 !       call advance( dtime )    !lyo:???
         call advance    
