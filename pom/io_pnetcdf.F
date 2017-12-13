@@ -432,7 +432,7 @@
       integer(mpi_offset_kind) length
       integer(mpi_offset_kind) start(3),edge(3)
       logical spinup
-      namelist/misc_nml/ spinup
+      namelist/misc_nml/ spinup, t_lo, t_hi
 
       open(73, file='switch.nml',status='old')
       read(73, nml=misc_nml)
