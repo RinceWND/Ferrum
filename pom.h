@@ -242,18 +242,18 @@
 !     $  period         ,
 
 !_______________________________________________________________________
-! 1-D arrays
-      real(kind=rk)
+! no more 1-D arrays
+      real(kind=rk), dimension(im_local, jm_local, kb) ::
      $  dz             ,! z(k)-z(k+1)
      $  dzz            ,! zz(k)-zz(k+1)
      $  z              ,! sigma coordinate from z=0 (surface) to z=-1 (bottom)
      $  zz              ! sigma coordinate, intermediate between z
 
       common/blk1d/
-     $  dz(kb)         ,
-     $  dzz(kb)        ,
-     $  z(kb)          ,
-     $  zz(kb)
+     $  dz            ,
+     $  dzz           ,
+     $  z             ,
+     $  zz
 
 !_______________________________________________________________________
 ! 2-D arrays
@@ -357,8 +357,8 @@
      $  drx2d(im_local,jm_local)   ,
      $  dry2d(im_local,jm_local)   ,
      $  dt(im_local,jm_local)      ,
-     $  dum(im_local,jm_local)     ,
-     $  dvm(im_local,jm_local)     ,
+     $  dum(im_local,jm_local,kb)     ,
+     $  dvm(im_local,jm_local,kb)     ,
      $  dx(im_local,jm_local)      ,
      $  dy(im_local,jm_local)      ,
      $  east_c(im_local,jm_local)  ,
@@ -376,7 +376,7 @@
      $  etf(im_local,jm_local)     ,
      $  fluxua(im_local,jm_local)  ,
      $  fluxva(im_local,jm_local)  ,
-     $  fsm(im_local,jm_local)     ,
+     $  fsm(im_local,jm_local,kb)     ,
      $  h(im_local,jm_local)       ,
      $  hi(im_local,jm_local)      ,    !:rwnd
      $  north_c(im_local,jm_local) ,

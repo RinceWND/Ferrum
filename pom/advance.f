@@ -88,9 +88,9 @@
 ! oscilations near the boundary (Jamart and Ozer, JGR, 91, 10621-10631)
 !          wusurf(i,j)=0.e0
 !     test ayumi 2010/5/8
-!          wusurf(i,j) = 2.e-4 
-!     $     * cos( pi *( north_e(i,j) - 10.e0 ) / 40.e0 ) 
-     
+!          wusurf(i,j) = 2.e-4
+!     $     * cos( pi *( north_e(i,j) - 10.e0 ) / 40.e0 )
+
 !          wvsurf(i,j)=0.e0
 
           e_atmos(i,j)=0.
@@ -108,7 +108,7 @@
 ! only the evaporative component of vflux) and the long wave
 ! radiation
 
-! ayumi 2010/4/19 
+! ayumi 2010/4/19
 ! wtsurf & wssurf are calculated in tsclim_monthly
 !          wtsurf(i,j)=0.e0
 
@@ -223,11 +223,11 @@
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              adx2d(i,j)=adx2d(i,j)+advx(i,j,k)*dz(k)
-              ady2d(i,j)=ady2d(i,j)+advy(i,j,k)*dz(k)
-              drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(k)
-              dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)*dz(k)
-              aam2d(i,j)=aam2d(i,j)+aam(i,j,k)*dz(k)
+              adx2d(i,j)=adx2d(i,j)+advx(i,j,k)*dz(i,j,k)
+              ady2d(i,j)=ady2d(i,j)+advy(i,j,k)*dz(i,j,k)
+              drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(i,j,k)
+              dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)*dz(i,j,k)
+              aam2d(i,j)=aam2d(i,j)+aam(i,j,k)*dz(i,j,k)
             end do
           end do
         end do
@@ -310,7 +310,7 @@
      $                         +elf(i,j)-elf(i-1,j))
      $                  +e_atmos(i,j)-e_atmos(i-1,j))
      $              +drx2d(i,j)+aru(i,j)*(wusurf(i,j)-wubot(i,j))
-           
+
         end do
       end do
 
@@ -375,7 +375,7 @@
 
         do j=1,jm
           do i=1,im
-            etf(i,j)=(etf(i,j)+.5*elf(i,j))*fsm(i,j)
+            etf(i,j)=(etf(i,j)+.5*elf(i,j))*fsm(i,j,1)
           end do
         end do
 
@@ -438,7 +438,7 @@
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              tps(i,j)=tps(i,j)+u(i,j,k)*dz(k)
+              tps(i,j)=tps(i,j)+u(i,j,k)*dz(i,j,k)
             end do
           end do
         end do
@@ -461,7 +461,7 @@
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              tps(i,j)=tps(i,j)+v(i,j,k)*dz(k)
+              tps(i,j)=tps(i,j)+v(i,j,k)*dz(i,j,k)
             end do
           end do
         end do
@@ -481,7 +481,7 @@
 !     IF(MOD(IINT,16).EQ.0) THEN   ! 16 = 3.*3600./dti, every 3 hours
 !--      IF(iint.eq.1 .or. MOD(IINT,16).EQ.0) THEN
 !--      IF(MOD(IINT,IASSIM).EQ.0) THEN
-!        call assimdrf_OIpsLag(time, itime1, mins, sec, 
+!        call assimdrf_OIpsLag(time, itime1, mins, sec,
 !    1     IM, JM, KB, u, v, Nx, Ny, beta, alon, alat, zz, D,
 !    2     igs, ige, jgs, jge, ndrfmax,
 !    3     ub, vb, dz, DrfDir)
@@ -609,7 +609,7 @@
           do j=1,jm
             do i=1,im
               tps(i,j)=tps(i,j)
-     $                  +(uf(i,j,k)+ub(i,j,k)-2.*u(i,j,k))*dz(k)
+     $              +(uf(i,j,k)+ub(i,j,k)-2.*u(i,j,k))*dz(i,j,k)
             end do
           end do
         end do
@@ -634,7 +634,7 @@
           do j=1,jm
             do i=1,im
               tps(i,j)=tps(i,j)
-     $                  +(vf(i,j,k)+vb(i,j,k)-2.*v(i,j,k))*dz(k)
+     $              +(vf(i,j,k)+vb(i,j,k)-2.*v(i,j,k))*dz(i,j,k)
             end do
           end do
         end do
@@ -686,7 +686,7 @@
       do k=1,kbm1
         do j=1,jm
           do i=1,im
-            tps(i,j)=zz(k)*dt(i,j) + et(i,j)
+            tps(i,j)=zz(i,j,k)*dt(i,j) + et(i,j)
           end do
         end do
         do j=2,jmm1
@@ -700,7 +700,7 @@
      $                 u(i,j,k)*(tps(i,j)-tps(i-1,j))*dxl+
      $                 v(i,j+1,k)*(tps(i,j+1)-tps(i,j))*dyt+
      $                 v(i,j,k)*(tps(i,j)-tps(i,j-1))*dyb)
-     $                +(1.0+zz(k))*(etf(i,j)-etb(i,j))/dti2
+     $             +(1.0+zz(i,j,k))*(etf(i,j)-etb(i,j))/dti2
           end do
         end do
       end do
@@ -723,7 +723,7 @@
       do k=1,kbm1
         do j=1,jm
           do i=1,im
-            wr(i,j,k)=fsm(i,j)*wr(i,j,k)
+            wr(i,j,k)=fsm(i,j,k)*wr(i,j,k)
           end do
         end do
       end do
@@ -769,7 +769,7 @@
            do j=1,jm
               do i=1,im
                  d_area   = dx(i,j) * dy(i,j)
-                 d_vol    = d_area * dt(i,j) * dz(k) * fsm(i,j)
+                 d_vol    = d_area*dt(i,j)*dz(i,j,k)*fsm(i,j,k)
                  vol_tot  = vol_tot + d_vol
                  temp_ave = temp_ave + tb(i,j,k)*d_vol
                  salt_ave = salt_ave + sb(i,j,k)*d_vol
@@ -798,7 +798,7 @@
           temp_ave = temp_ave / vol_tot
           salt_ave = salt_ave / vol_tot
           elev_ave = elev_ave / area_tot
-          write(*,'(a,e15.8,2(a,f11.8),a)') 
+          write(*,'(a,e15.8,2(a,f11.8),a)')
      $       "mean ; et = ",elev_ave," m, tb = ",
      $       temp_ave + tbias," deg, sb = ",
      $       salt_ave + sbias ," psu"
@@ -883,8 +883,8 @@
       vsrf_mean    = vsrf_mean    + v(:,:,1)
       elsrf_mean    = elsrf_mean    + elb
       uwsrf_mean = uwsrf_mean + uwsrf
-      vwsrf_mean = vwsrf_mean + vwsrf      
-      
+      vwsrf_mean = vwsrf_mean + vwsrf
+
       nums = nums + 1
 
       return
@@ -904,7 +904,7 @@
 !
 !      if(netcdf_file.ne.'nonetcdf' .and. mod(iint,iprint).eq.0) then
 !
-!         
+!
 !         uab_mean    = uab_mean    / real ( num )
 !         vab_mean    = vab_mean    / real ( num )
 !         elb_mean    = elb_mean    / real ( num )
@@ -922,23 +922,23 @@
 !         km_mean     = km_mean     / real ( num )
 !
 !
-!         
-!!         if ( my_task == 41 ) 
+!
+!!         if ( my_task == 41 )
 !!     $        print*, im/2,jm/2,rot(im/2,jm/2),
 !!     $        uab_mean(im/2,jm/2),vab_mean(im/2,jm/2)
 !!         do j = 1, jm
 !!            do i = 1, im
 !!               u_tmp = uab_mean(i,j)
 !!               v_tmp = vab_mean(i,j)
-!!               uab_mean(i,j) 
+!!               uab_mean(i,j)
 !!     $              = u_tmp * cos( rot(i,j) * deg2rad )
 !!     $              - v_tmp * sin( rot(i,j) * deg2rad )
-!!               vab_mean(i,j) 
+!!               vab_mean(i,j)
 !!     $              = u_tmp * sin( rot(i,j) * deg2rad )
 !!     $              + v_tmp * cos( rot(i,j) * deg2rad )
 !!            enddo
 !!         enddo
-!!         if ( my_task == 41 ) 
+!!         if ( my_task == 41 )
 !!     $        print*, im/2,jm/2,
 !!     $        cos(rot(im/2,jm/2)*deg2rad),
 !!     $        uab_mean(im/2,jm/2),vab_mean(im/2,jm/2)
@@ -948,10 +948,10 @@
 !!            do i = 1, im
 !!               u_tmp = wusurf_mean(i,j)
 !!               v_tmp = wvsurf_mean(i,j)
-!!               wusurf_mean(i,j) 
+!!               wusurf_mean(i,j)
 !!     $              = u_tmp * cos( rot(i,j) * deg2rad )
 !!     $              - v_tmp * sin( rot(i,j) * deg2rad )
-!!               wvsurf_mean(i,j) 
+!!               wvsurf_mean(i,j)
 !!     $              = u_tmp * sin( rot(i,j) * deg2rad )
 !!     $              + v_tmp * cos( rot(i,j) * deg2rad )
 !!            enddo
@@ -961,16 +961,16 @@
 !!               do i = 1, im
 !!                  u_tmp = u_mean(i,j,k)
 !!                  v_tmp = v_mean(i,j,k)
-!!                  u_mean(i,j,k) 
+!!                  u_mean(i,j,k)
 !!     $                 = u_tmp * cos( rot(i,j) * deg2rad )
 !!     $                 - v_tmp * sin( rot(i,j) * deg2rad )
-!!                  v_mean(i,j,k) 
+!!                  v_mean(i,j,k)
 !!     $                 = u_tmp * sin( rot(i,j) * deg2rad )
 !!     $                 + v_tmp * cos( rot(i,j) * deg2rad )
 !!               enddo
 !!            enddo
 !!         enddo
-!         
+!
 !
 !         write( filename, '("out/",2a,".nc")' )
 !     $        trim( netcdf_file ), date2str( d_in )
@@ -992,7 +992,7 @@
 !         rho_mean    = 0.0
 !         kh_mean     = 0.0
 !         km_mean     = 0.0
-!         
+!
 !         num = 0
 !
 !      endif
@@ -1002,11 +1002,11 @@
 !
 !_______________________________________________________________________
       subroutine check_nan
-      
+
       implicit none
 
       include 'pom.h'
-      
+
       call detect_nan( u, "u" )
       call detect_nan( v, "v" )
       call detect_nan( t, "t" )
@@ -1017,12 +1017,12 @@
 
 !_______________________________________________________________________
       subroutine detect_nan( var, varname )
-      
+
       implicit none
       include 'pom.h'
 
       integer i, j, k, num_nan
-      real(kind=rk), intent(in) :: var(im,jm,kb) 
+      real(kind=rk), intent(in) :: var(im,jm,kb)
       character(len=*),intent(in)  :: varname
 !      logical isnanf
 
@@ -1056,11 +1056,11 @@
 !_______________________________________________________________________
 !fhx:tide:debug
       subroutine check_nan_2d
-      
+
       implicit none
 
       include 'pom.h'
-      
+
       call detect_nan_2d( uaf, "uaf" )
       call detect_nan_2d( vaf, "vaf" )
       call detect_nan_2d( elf, "elf" )
@@ -1071,12 +1071,12 @@
 !_______________________________________________________________________
 !fhx:tide;debug
       subroutine detect_nan_2d( var, varname )
-      
+
       implicit none
       include 'pom.h'
 
       integer i, j, num_nan
-      real(kind=rk), intent(in) :: var(im,jm) 
+      real(kind=rk), intent(in) :: var(im,jm)
       character(len=*),intent(in)  :: varname
 !      logical isnanf
 
@@ -1091,7 +1091,7 @@
      $                 var(i,j),h(i,j),time
                        num_nan = num_nan + 1
                endif
- 
+
          enddo
       enddo
 

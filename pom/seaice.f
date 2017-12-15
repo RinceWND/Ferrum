@@ -214,9 +214,9 @@
 !        el = 0.
 
 ! Calculate sea surface elevation gradient
-        delx(2:im,:) = dum(2:im,:)*2.*(el(2:im,:)-el(1:imm1,:))
+        delx(2:im,:) = dum(2:im,:,1)*2.*(el(2:im,:)-el(1:imm1,:))
      &                     /(dx(2:im,:)+dx(1:imm1,:))
-        dely(:,2:jm) = dvm(:,2:jm)*2.*(el(:,2:jm)-el(:,1:jmm1))
+        dely(:,2:jm) = dvm(:,2:jm,1)*2.*(el(:,2:jm)-el(:,1:jmm1))
      &                     /(dy(:,2:jm)+dy(:,1:jmm1))
         call exchange2d_mpi(delx,im,jm)
         call exchange2d_mpi(dely,im,jm)
@@ -231,8 +231,8 @@
 ! Calculate water-ice stress
         duvi=abs(sqrt((ui-u(1:im,1:jm,1))**2+(vi-v(1:im,1:jm,1))**2))
 
-        tauiwu= fsm*5.5e-3*rhoref*(ui-u(1:im,1:jm,1))*duvi
-        tauiwv= fsm*5.5e-3*rhoref*(vi-v(1:im,1:jm,1))*duvi
+        tauiwu= fsm(:,:,1)*5.5e-3*rhoref*(ui-u(1:im,1:jm,1))*duvi
+        tauiwv= fsm(:,:,1)*5.5e-3*rhoref*(vi-v(1:im,1:jm,1))*duvi
 
 ! Compute ice concentration fluxes
         do j=1,jm
@@ -400,7 +400,7 @@
               end if
             end do
           end do
-          icf = icf*fsm
+          icf = icf*fsm(:,:,1)
         end if
         call exchange2d_mpi(icf,im,jm)
 
@@ -469,8 +469,8 @@
           vif(:,jm) = vif(:,jmm1)
         end if
 
-        uif = uif*dum
-        vif = vif*dvm
+        uif = uif*dum(:,:,1)
+        vif = vif*dvm(:,:,1)
 
         uib = ui
         ui  = uif

@@ -39,7 +39,7 @@
 
           if(my_task.eq.master_task) write(*,'(a//a)')
      $   'Incompatible number of *_global and *_global_coarse',
-     $   'POM terminated with error' 
+     $   'POM terminated with error'
           stop
 
       end if
@@ -64,27 +64,27 @@
 !
       do i=2,im
       do j=1,jm
-      dum(i,j)=fsm(i,j)*fsm(i-1,j)
+      dum(i,j,:)=fsm(i,j,:)*fsm(i-1,j,:)
       end do
       end do
-      dum(1,:)=dum(2,:)
+      dum(1,:,:)=dum(2,:,:)
       do j=2,jm
       do i=1,im
-      dvm(i,j)=fsm(i,j)*fsm(i,j-1)
+      dvm(i,j,:)=fsm(i,j,:)*fsm(i,j-1,:)
       end do
       end do
-      dvm(:,1)=dvm(:,2)
-      
+      dvm(:,1,:)=dvm(:,2,:)
+
       call exchange2d_mpi(h,im,jm)
-      call exchange2d_mpi(fsm,im,jm)
-      call exchange2d_mpi(dum,im,jm)
-      call exchange2d_mpi(dvm,im,jm)
+      call exchange3d_mpi(fsm,im,jm,kb)
+      call exchange3d_mpi(dum,im,jm,kb)
+      call exchange3d_mpi(dvm,im,jm,kb)
 !
 
 ! read initial and lateral boundary conditions
       call initial_conditions
 
-! read laterel boundary conditions 
+! read laterel boundary conditions
       call lateral_boundary_conditions !ayumi:20100407
 
 !lyo:pac10:beg:
@@ -95,7 +95,7 @@
 !     For FRZ in bcond: T[n+1]={ (1-frz)*T[n] + frz*Tobs },
 !     the inverse-relax-time = frz/dti,
 !     so that since "bfrz" gives frz=1 @boundaries,
-!     frz=1 (=dti/dti) -> inverse-relax-time = 1/dti @boundaries, and 
+!     frz=1 (=dti/dti) -> inverse-relax-time = 1/dti @boundaries, and
 !     frz=dti/86400.   -> inverse-relax-time = 1/86400 @boundaries etc.
       rdisp=dti/86400.; frz(:,:)=frz(:,:)*rdisp !lyo:stcc:mar_:dec_:
 !     rdisp=1.;         frz(:,:)=frz(:,:)*rdisp !lyo:stcc:
@@ -126,16 +126,16 @@
 
 ! write grid and initial conditions
       if (output_flag == 1) then
-       if(netcdf_file.ne.'nonetcdf') 
+       if(netcdf_file.ne.'nonetcdf')
      $     call write_output_pnetcdf(
      $     "out/"//trim(netcdf_file)//".nc")
       end if
 
       if (SURF_flag == 2) then  !fhx:20110131: flag=2 for initial SURF output
-      if(netcdf_file.ne.'nonetcdf') 
+      if(netcdf_file.ne.'nonetcdf')
      $     call write_SURF_pnetcdf(
-     $     "out/SRF."//trim(netcdf_file)//".nc")      
-      end if    
+     $     "out/SRF."//trim(netcdf_file)//".nc")
+      end if
 
 ! check for errors
       call   sum0i_mpi(error_status,master_task)
@@ -148,7 +148,7 @@
       end if
 !      if(my_task.eq.master_task) then !lyo:???why comment out?
 !   write(*,'(/a)') 'End of initialization'
-!   write(*,*) 
+!   write(*,*)
 !      endif
 
       return
@@ -161,18 +161,18 @@
 
       implicit none
       include 'pom.h'
-      namelist/pom_nml/ title,netcdf_file,mode,nadv,nitera,sw,npg,dte, !fhx:Toni:npg 
+      namelist/pom_nml/ title,netcdf_file,mode,nadv,nitera,sw,npg,dte, !fhx:Toni:npg
      $                  isplit,time_start,nread_rst,read_rst_file
      $                 ,write_rst,write_rst_file,days,prtd1,prtd2
      $                 ,iperx,ipery,n1d !lyo:scs1d:add iper* & n1d in pom.nml
                                         !n1d .ne. 0 for 1d simulation
      $                 ,windf           !lyo: windf = ccmp, ecmw, or gfsw etc
      $                 ,nbct,nbcs,tprni,umol,z0b,ntp
-     
-      namelist/switch_nml/ 
+
+      namelist/switch_nml/
      $     calc_wind, calc_tsforce, calc_river, calc_assim,
      $     calc_assimdrf,         !eda
-     $     calc_tsurf_mc, calc_tide,!fhx:mcsst; fhx:tide     
+     $     calc_tsurf_mc, calc_tide,!fhx:mcsst; fhx:tide
      $     calc_uvforce,         !eda:uvforce
      $     calc_ice,
      $     output_flag, SURF_flag !fhx:20110131:
@@ -219,7 +219,7 @@
 ! Inverse horizontal turbulent Prandtl number (ah/am; dimensionless):
 ! NOTE that tprni=0.e0 yields zero horizontal diffusivity!
       tprni=.2
-       
+
 
 ! Background viscosity used in subroutines profq, proft, profu and
 ! profv (S.I. units):
@@ -321,7 +321,7 @@
      &  read_rst_file(15:16)//":"//read_rst_file(18:19) )
 
       time0 = real( (dtime-dtime0)/86400, rk )
-       
+
 !      if (my_task == master_task) then
 !         print*, 'dtime',dtime
 !         print*, 'dtime0',dtime0
@@ -398,14 +398,14 @@
       subroutine initialize_arrays
 ! initialize arrays for safety
 
-!     ayumi 2010/5/14 
+!     ayumi 2010/5/14
 !      use river, only : totq
 
       implicit none
       include 'pom.h'
       integer i,j,k
 
-!     ayumi 2010/5/14 
+!     ayumi 2010/5/14
 !      totq = 0.e0
 
 !     ayumi 2010/6/13
@@ -481,8 +481,8 @@
         end do
       end do
 
-      
-      
+
+
       return
       end
 
@@ -497,7 +497,7 @@
 ! degrees to radians
       deg2rad=pi/180.
 
-! read grid 
+! read grid
 !lyomoving:call idealized setup subr instead of reading grid:
 !
       call read_grid_pnetcdf !_obs
@@ -528,17 +528,18 @@
 !!      if (my_task==1) fsm(:,jm-8:jm) = 0.
 !      h = 1500.
       do k=1,kb-1
-        dz(k) = z(k)- z(k+1)
-        dzz(k)=zz(k)-zz(k+1)
+        dz(:,:,k) = z(:,:,k)- z(:,:,k+1)
+        dzz(:,:,k)=zz(:,:,k)-zz(:,:,k+1)
       end do
-      dz(kb) = dz(kb-1) !=0. !lyo:20110202 =0 is dangerous but checked
-      dzz(kb)=dzz(kb-1) !=0. !thro' code - and found to be ok.
+      dz(:,:,kb) = dz(:,:,kb-1) !=0. !lyo:20110202 =0 is dangerous but checked
+      dzz(:,:,kb)=dzz(:,:,kb-1) !=0. !thro' code - and found to be ok.
 
 ! print vertical grid information
       if(my_task.eq.master_task) then
         write(6,'(/2x,a,7x,a,9x,a,9x,a,9x,a)') 'k','z','zz','dz','dzz'
         do k=1,kb
-          write(6,'(1x,i5,4f10.3)') k,z(k),zz(k),dz(k),dzz(k)
+          write(6,'(1x,i5,4f10.3)')
+     &          k,z(1,1,k),zz(1,1,k),dz(1,1,k),dzz(1,1,k)
         end do
       end if
 
@@ -609,7 +610,7 @@
 !      call read_initial_ts_pnetcdf(kb,tb,sb)
       write(netcdf_ic_file,'(a)') "./in/tsclim/ts_clim.nc"
       inquire(file=trim(netcdf_ic_file),exist=fexist)
-      
+
       if (fexist) then
         call read_clim_ts_pnetcdf(tb,sb,n)
 !      call read_clim_ts_pnetcdf_obs(tb,sb,rho,n)
@@ -623,7 +624,7 @@
 !      call read_clim_ts_pnetcdf_obs(tclim,sclim,rmean,n)
           call read_clim_ts_pnetcdf(tclim,sclim,n)
         endif
-      
+
       else
         if (my_task==0) write(*,*) "Failed reading clim..."
         tb = 15.
@@ -652,9 +653,9 @@
 ! thereafter - users may create variable boundary conditions)
 !lyo:pac10:Comment out - replace by tobe etc below:
 !     do k=1,kbm1
-!       do j=1,jm                           
-!         tbe(j,k) = tb(im,j,k) * fsm(im,j) !lyo:20110202:use initial 
-!         sbe(j,k) = sb(im,j,k) * fsm(im,j) ! t,sb instead of t,sclim 
+!       do j=1,jm
+!         tbe(j,k) = tb(im,j,k) * fsm(im,j) !lyo:20110202:use initial
+!         sbe(j,k) = sb(im,j,k) * fsm(im,j) ! t,sb instead of t,sclim
 !         tbw(j,k) = tb( 1,j,k) * fsm( 1,j) !lyo:20110202:add west
 !         sbw(j,k) = sb( 1,j,k) * fsm( 1,j)
 !       end do
@@ -670,33 +671,33 @@
       do k=1,kb
          do j=1,jm
             do i=1,nfw
-               tobw(i,j,k) = tclim( i, j, k) * fsm( i, j)
-               sobw(i,j,k) = sclim( i, j, k) * fsm( i, j)
+               tobw(i,j,k) = tclim( i, j, k) * fsm( i, j, k)
+               sobw(i,j,k) = sclim( i, j, k) * fsm( i, j, k)
                enddo
             do i=1,nfe
                ii=im-i+1
-               tobe(i,j,k) = tclim(ii, j, k) * fsm(ii, j)
-               sobe(i,j,k) = sclim(ii, j, k) * fsm(ii, j)
+               tobe(i,j,k) = tclim(ii, j, k) * fsm(ii, j, k)
+               sobe(i,j,k) = sclim(ii, j, k) * fsm(ii, j, k)
                enddo
                tbw(j,k) = tobw(1,j,k); sbw(j,k) = sobw(1,j,k)
                tbe(j,k) = tobe(1,j,k); sbe(j,k) = sobe(1,j,k)
           enddo
          do i=1,im
             do j=1,nfs
-               tobs(i,j,k) = tclim( i, j, k) * fsm( i, j)
-               sobs(i,j,k) = sclim( i, j, k) * fsm( i, j)
+               tobs(i,j,k) = tclim( i, j, k) * fsm( i, j, k)
+               sobs(i,j,k) = sclim( i, j, k) * fsm( i, j, k)
                enddo
             do j=1,nfn
                jj=jm-j+1
-               tobn(i,j,k) = tclim( i,jj, k) * fsm( i,jj)
-               sobn(i,j,k) = sclim( i,jj, k) * fsm( i,jj)
+               tobn(i,j,k) = tclim( i,jj, k) * fsm( i,jj, k)
+               sobn(i,j,k) = sclim( i,jj, k) * fsm( i,jj, k)
                enddo
                tbs(i,k) = tobs(i,1,k); sbs(i,k) = sobs(i,1,k)
                tbn(i,k) = tobn(i,1,k); sbn(i,k) = sobn(i,1,k)
           enddo
       enddo
 !lyo:pac10:end:
-      
+
 !      call read_ice_pnetcdf( "ice.19790102.nc", icb )
 
       return
@@ -707,7 +708,7 @@
 !lyo:pac10:beg:Here thro *end: replaced subr.lateral_boundary_conditions
       subroutine lateral_boundary_conditions
 ! read lateral boundary conditions
-! transport at eastern boundary for PROFS in GOM 
+! transport at eastern boundary for PROFS in GOM
 ! ayumi 2010/4/7
 
       include 'pom.h'
@@ -723,7 +724,7 @@
         call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file, 1)
       endif
 
-!     Radiation factors for use in subroutine bcond !alu:20101216 
+!     Radiation factors for use in subroutine bcond !alu:20101216
 !      rfe=0.; rfw=0.; rfn=0.; rfs=0. !=1 Flather; =0 clamped
       rfe=1.; rfw=1.; rfn=1.; rfs=1. !=1 Flather; =0 clamped
 
@@ -733,11 +734,11 @@
 !     iperx=-1; ipery= 0 !--> x-periodic & free-slip S/N boundaries
 !     iperx= 0; ipery= 0 !--> x-periodic & free-slip S/N boundaries
 !lyo:scs1d:moved to namelist: pom.nml
-!lyo:scs1d:cannot be beta-plane if double-periodic (note cor(*,*) 
+!lyo:scs1d:cannot be beta-plane if double-periodic (note cor(*,*)
 !     was previously defined in "call read_grid")
       if (iperx.eq.1 .and. ipery.eq.1) then
       ic = (im_global+1)/2; jc = (jm_global+1)/2
-         here = judge_inout( ic, jc, 
+         here = judge_inout( ic, jc,
      $                       i_global(1), i_global(im),
      $                       j_global(1), j_global(jm) )
          if ( here ) then
@@ -749,7 +750,7 @@
             enddo; enddo
          endif !if (iperx.eq.1 .and. ipery.eq.1) then
 
-      return 
+      return
       end
 
 !_______________________________________________________________________
@@ -809,7 +810,7 @@
         write(nu,'(''Stopped in subr.bfrz, mw ='',i4)') mw
         write( *,'(''Stopped in bfrz. proc# ,mw ='',2i4)') my_task,mw
         stop
-       endif 
+       endif
       endif
 !
 !     East:
@@ -870,7 +871,7 @@
        endif
       endif
 !
-      return 
+      return
       end
 !lyo:pac10:end:
 
@@ -880,15 +881,15 @@
 !fhx:tide:read tidal amplitude & phase at the eastern boundary for PROFS
 
       include 'pom.h'
-      
+
 !      call read_tide_east_pnetcdf(ampe,phae)
        call read_tide_east_pnetcdf(ampe,phae,amue,phue)
 
 !      if(my_task.eq.0)print*,ampe(10,1),phae(10,1),amue(10,1),phue(10,1)
 !      if(my_task.eq.0)print*,ampe(10,2),phae(10,2),amue(10,2),phue(10,2)
-      return 
+      return
       end
-!fhx:tide:read_tide end 
+!fhx:tide:read_tide end
 !_______________________________________________________________________
       subroutine update_initial
 ! update the initial conditions and set the remaining initial conditions
@@ -952,8 +953,8 @@
       do k=1,kbm1
         do j=1,jm
           do i=1,im
-            drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(k)
-            dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)*dz(k)
+            drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(i,j,k)
+            dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)*dz(i,j,k)
           end do
         end do
       end do
@@ -971,7 +972,7 @@
       do i=1,im
         do j=1,jm
 !lyo:correct:cbc(i,j)=(kappa/log((1.+zz(kbm1))*h(i,j)/z0b))**2 !lyo:bug:
-          cbc(i,j)=(kappa/log(1.+(1.0+zz(kbm1))*h(i,j)/z0b))**2
+          cbc(i,j)=(kappa/log(1.+(1.0+zz(i,j,kbm1))*h(i,j)/z0b))**2
           cbc(i,j)=max(cbcmin,cbc(i,j))
 ! if the following is invoked, then it is probable that the wrong
 ! choice of z0b or vertical spacing has been made:
@@ -1089,7 +1090,7 @@
 !_______________________________________________________________________
       subroutine splint(xa,ya,y2a,n,x,y)
       include 'realkind'
-      
+
       real(kind=rk), dimension(n) :: xa,ya,y2a
       real(kind=rk) h,a,b,x,y
 
@@ -1130,7 +1131,7 @@
       integer :: im,jm,kb,i,j,k
       real(kind=rk) :: aam(im,jm,kb),x(im,jm),y(im,jm)
       real(kind=rk) :: lono,lato,xs,ys,fac,factor,expon
-      
+
 !      print*,'incmix:', lono,lato
       do k=1,kb
       do j=1,jm
@@ -1152,11 +1153,11 @@
 !=============================================================
 ! If the processor has ( i_in, j_in ) in its local domain.
 !-------------------------------------------------------------
-      logical function judge_inout( i_in, j_in, 
-     $                              imin_in, imax_in, 
-     $                              jmin_in, jmax_in ) 
+      logical function judge_inout( i_in, j_in,
+     $                              imin_in, imax_in,
+     $                              jmin_in, jmax_in )
       integer :: i_in, j_in, imin_in, imax_in, jmin_in, jmax_in
-      
+
       if ( ( i_in >= imin_in .and. i_in <= imax_in )
      $     .and.( j_in >= jmin_in .and. j_in <= jmax_in ) ) then
 

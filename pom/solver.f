@@ -441,13 +441,13 @@
      $                    -.25*(aam(i,j,k)+aam(i-1,j,k)
      $                            +aam(i,j,k-1)+aam(i-1,j,k-1))
      $                          *(h(i,j)+h(i-1,j))
-     $                          *(qb(i,j,k)-qb(i-1,j,k))*dum(i,j)
+     $                          *(qb(i,j,k)-qb(i-1,j,k))*dum(i,j,k)
      $                          /(dx(i,j)+dx(i-1,j))
             yflux(i,j,k)=yflux(i,j,k)
      $                    -.25*(aam(i,j,k)+aam(i,j-1,k)
      $                            +aam(i,j,k-1)+aam(i,j-1,k-1))
      $                          *(h(i,j)+h(i,j-1))
-     $                          *(qb(i,j,k)-qb(i,j-1,k))*dvm(i,j)
+     $                          *(qb(i,j,k)-qb(i,j-1,k))*dvm(i,j,k)
      $                          /(dy(i,j)+dy(i,j-1))
             xflux(i,j,k)=.5*(dy(i,j)+dy(i-1,j))*xflux(i,j,k)
             yflux(i,j,k)=.5*(dx(i,j)+dx(i,j-1))*yflux(i,j,k)
@@ -460,7 +460,7 @@
         do j=2,jmm1
           do i=2,imm1
             qf(i,j,k)=(w(i,j,k-1)*q(i,j,k-1)-w(i,j,k+1)*q(i,j,k+1))
-     $                 *art(i,j)/(dz(k)+dz(k-1))
+     $                 *art(i,j)/(dz(i,j,k)+dz(i,j,k-1))
      $                 +xflux(i+1,j,k)-xflux(i,j,k)
      $                 +yflux(i,j+1,k)-yflux(i,j,k)
             qf(i,j,k)=((h(i,j)+etb(i,j))*art(i,j)
@@ -521,12 +521,12 @@
             xflux(i,j,k)=xflux(i,j,k)
      $                    -.5*(aam(i,j,k)+aam(i-1,j,k))
      $                         *(h(i,j)+h(i-1,j))*tprni
-     $                         *(fb(i,j,k)-fb(i-1,j,k))*dum(i,j)
+     $                         *(fb(i,j,k)-fb(i-1,j,k))*dum(i,j,k)
      $                         /(dx(i,j)+dx(i-1,j))
             yflux(i,j,k)=yflux(i,j,k)
      $                    -.5*(aam(i,j,k)+aam(i,j-1,k))
      $                         *(h(i,j)+h(i,j-1))*tprni
-     $                         *(fb(i,j,k)-fb(i,j-1,k))*dvm(i,j)
+     $                         *(fb(i,j,k)-fb(i,j-1,k))*dvm(i,j,k)
      $                         /(dy(i,j)+dy(i,j-1))
             xflux(i,j,k)=.5*(dy(i,j)+dy(i-1,j))*xflux(i,j,k)
             yflux(i,j,k)=.5*(dx(i,j)+dx(i,j-1))*yflux(i,j,k)
@@ -570,11 +570,11 @@
 !exp301:!exp302:
 !b420120325:relax=1.586e-8*(1.e0-exp(zz(k)*h(i,j)*5.e-4)) !730 days, 2000m
 !           relax=3.171e-8*(1.e0-exp(zz(k)*h(i,j)*1.e-3)) !365 days, 1000m
-            relax=6.43e-8*(1.-exp(zz(k)*h(i,j)*2.e-3)) !180 days, 500m
+            relax=6.43e-8*(1.-exp(zz(i,j,k)*h(i,j)*2.e-3)) !180 days, 500m
 !           relax=0.0 !lyo:pac10:debug:
             ff(i,j,k)=xflux(i+1,j,k)-xflux(i,j,k)
      $                 +yflux(i,j+1,k)-yflux(i,j,k)
-     $                 +(zflux(i,j,k)-zflux(i,j,k+1))/dz(k)
+     $                 +(zflux(i,j,k)-zflux(i,j,k+1))/dz(i,j,k)
      $                 -relax*fclim(i,j,k)*dt(i,j)*art(i,j) !lyo:relax
             ff(i,j,k)=(fb(i,j,k)*(h(i,j)+etb(i,j))*art(i,j)
      $                 -dti2*ff(i,j,k))
@@ -606,7 +606,7 @@
       integer i,j,k,itera
 
       character(len=1), intent(in) :: var
-      
+
 !      if (var=='T') then
 !        eps = 0.01
 !      else if (var=='S') then
@@ -679,9 +679,9 @@
 !            if(itera.eq.1) zflux(i,j,1)=w(i,j,1)*f(i,j,1)*art(i,j)
 !     for rivers 2010/5/08 ayumi
             if (itera == 1 ) then
-               if ( var == 'T' ) 
+               if ( var == 'T' )
      $              zflux(i,j,1)=tsurf(i,j)*w(i,j,1)*art(i,j)
-               if ( var == 'S' ) 
+               if ( var == 'S' )
      $              zflux(i,j,1)=0.
             endif
             zflux(i,j,kb)=0.
@@ -707,7 +707,7 @@
             do i=2,imm1
               ff(i,j,k)=xflux(i+1,j,k)-xflux(i,j,k)
      $                 +yflux(i,j+1,k)-yflux(i,j,k)
-     $                 +(zflux(i,j,k)-zflux(i,j,k+1))/dz(k)
+     $                 +(zflux(i,j,k)-zflux(i,j,k+1))/dz(i,j,k)
               ff(i,j,k)=(fbmem(i,j,k)*(h(i,j)+eta(i,j))*art(i,j)
      $                   -dti2*ff(i,j,k))/((h(i,j)+etf(i,j))*art(i,j))
             end do
@@ -718,9 +718,9 @@
 
 ! calculate antidiffusion velocity
         call smol_adif(xmassflux,ymassflux,zwflux,ff)
-        
+
 !        epsval = maxval(abs(ff(:,:,1:kbm1)-fbmem(:,:,1:kbm1))) ! rwnd: iteration check
-!        
+!
 !        call max0d_mpi(epsval,master_task) ! rwnd: iteration check
 !        call bcast0d_mpi(epsval,my_task) ! rwnd: iteration check
 
@@ -737,7 +737,7 @@
 
 ! end of Smolarkiewicz scheme
       end do
-      
+
 !      write(*,*) my_task, ": ", var, ": nitera = ", itera  ! rwnd: iteration check
 
 ! add horizontal diffusive fluxes
@@ -762,10 +762,10 @@
         do j=2,jm
           do i=2,im
            xflux(i,j,k)=-xmassflux(i,j,k)*(h(i,j)+h(i-1,j))*tprni
-     $                   *(fb(i,j,k)-fb(i-1,j,k))*dum(i,j)
+     $                   *(fb(i,j,k)-fb(i-1,j,k))*dum(i,j,k)
      $                   *(dy(i,j)+dy(i-1,j))*0.5/(dx(i,j)+dx(i-1,j))
            yflux(i,j,k)=-ymassflux(i,j,k)*(h(i,j)+h(i,j-1))*tprni
-     $                   *(fb(i,j,k)-fb(i,j-1,k))*dvm(i,j)
+     $                   *(fb(i,j,k)-fb(i,j-1,k))*dvm(i,j,k)
      $                   *(dx(i,j)+dx(i,j-1))*0.5/(dy(i,j)+dy(i,j-1))
           end do
         end do
@@ -871,9 +871,9 @@
 
 ! calculate antidiffusion velocity
         call smol_adifC(xmassflux,ymassflux,cf)
-        
+
 !        epsval = maxval(abs(ff(:,:,1:kbm1)-fbmem(:,:,1:kbm1))) ! rwnd: iteration check
-!        
+!
 !        call max0d_mpi(epsval,master_task) ! rwnd: iteration check
 !        call bcast0d_mpi(epsval,my_task) ! rwnd: iteration check
 
@@ -888,7 +888,7 @@
 
 ! end of Smolarkiewicz scheme
       end do
-      
+
 !      write(*,*) my_task, ": ", var, ": nitera = ", itera  ! rwnd: iteration check
 
 ! add horizontal diffusive fluxes
@@ -954,7 +954,7 @@
         do j=2,jmm1
           do i=2,imm1
             uf(i,j,k)=advx(i,j,k)
-     $                 +(uf(i,j,k)-uf(i,j,k+1))*aru(i,j)/dz(k)
+     $                 +(uf(i,j,k)-uf(i,j,k+1))*aru(i,j)/dz(i,j,k)
      $                 -aru(i,j)*.25
      $                   *(cor(i,j)*dt(i,j)
      $                      *(v(i,j+1,k)+v(i,j,k))
@@ -1017,7 +1017,7 @@
         do j=2,jmm1
           do i=2,imm1
             vf(i,j,k)=advy(i,j,k)
-     $                 +(vf(i,j,k)-vf(i,j,k+1))*arv(i,j)/dz(k)
+     $                 +(vf(i,j,k)-vf(i,j,k+1))*arv(i,j)/dz(i,j,k)
      $                 +arv(i,j)*.25
      $                   *(cor(i,j)*dt(i,j)
      $                      *(u(i+1,j,k)+u(i,j,k))
@@ -1066,7 +1066,7 @@
 ! calculate x-component of baroclinic pressure gradient
       do j=2,jmm1
         do i=2,imm1
-          drhox(i,j,1)=.5*grav*(-zz(1))*(dt(i,j)+dt(i-1,j))
+          drhox(i,j,1)=.5*grav*(-zz(i,j,1))*(dt(i,j)+dt(i-1,j))
      $                  *(rho(i,j,1)-rho(i-1,j,1))
         end do
       end do
@@ -1075,11 +1075,11 @@
         do j=2,jmm1
           do i=2,imm1
             drhox(i,j,k)=drhox(i,j,k-1)
-     $                    +grav*.25*(zz(k-1)-zz(k))
+     $                    +grav*.25*(zz(i,j,k-1)-zz(i,j,k))
      $                      *(dt(i,j)+dt(i-1,j))
      $                      *(rho(i,j,k)-rho(i-1,j,k)
      $                        +rho(i,j,k-1)-rho(i-1,j,k-1))
-     $                    +grav*.25*(zz(k-1)+zz(k))
+     $                    +grav*.25*(zz(i,j,k-1)+zz(i,j,k))
      $                      *(dt(i,j)-dt(i-1,j))
      $                      *(rho(i,j,k)+rho(i-1,j,k)
      $                        -rho(i,j,k-1)-rho(i-1,j,k-1))
@@ -1091,7 +1091,7 @@
         do j=2,jmm1
           do i=2,imm1
             drhox(i,j,k)=.25*(dt(i,j)+dt(i-1,j))
-     $                        *drhox(i,j,k)*dum(i,j)
+     $                        *drhox(i,j,k)*dum(i,j,k)
      $                        *(dy(i,j)+dy(i-1,j))
           end do
         end do
@@ -1100,7 +1100,7 @@
 ! calculate y-component of baroclinic pressure gradient
       do j=2,jmm1
         do i=2,imm1
-          drhoy(i,j,1)=.5*grav*(-zz(1))*(dt(i,j)+dt(i,j-1))
+          drhoy(i,j,1)=.5*grav*(-zz(i,j,1))*(dt(i,j)+dt(i,j-1))
      $                  *(rho(i,j,1)-rho(i,j-1,1))
         end do
       end do
@@ -1109,11 +1109,11 @@
         do j=2,jmm1
           do i=2,imm1
             drhoy(i,j,k)=drhoy(i,j,k-1)
-     $                    +grav*.25*(zz(k-1)-zz(k))
+     $                    +grav*.25*(zz(i,j,k-1)-zz(i,j,k))
      $                      *(dt(i,j)+dt(i,j-1))
      $                      *(rho(i,j,k)-rho(i,j-1,k)
      $                        +rho(i,j,k-1)-rho(i,j-1,k-1))
-     $                    +grav*.25*(zz(k-1)+zz(k))
+     $                    +grav*.25*(zz(i,j,k-1)+zz(i,j,k))
      $                      *(dt(i,j)-dt(i,j-1))
      $                      *(rho(i,j,k)+rho(i,j-1,k)
      $                        -rho(i,j,k-1)-rho(i,j-1,k-1))
@@ -1125,7 +1125,7 @@
         do j=2,jmm1
           do i=2,imm1
             drhoy(i,j,k)=.25*(dt(i,j)+dt(i,j-1))
-     $                        *drhoy(i,j,k)*dvm(i,j)
+     $                        *drhoy(i,j,k)*dvm(i,j,k)
      $                        *(dx(i,j)+dx(i,j-1))
           end do
         end do
@@ -1194,11 +1194,11 @@
       do j=1,jm
         do i=2,im
           do k=1,kbm1
-            drho(i,j,k)=   (rho(i,j,k)-rho(i-1,j,k))*dum(i,j)
-            rhou(i,j,k)=.5*(rho(i,j,k)+rho(i-1,j,k))*dum(i,j)
+            drho(i,j,k)=   (rho(i,j,k)-rho(i-1,j,k))*dum(i,j,k)
+            rhou(i,j,k)=.5*(rho(i,j,k)+rho(i-1,j,k))*dum(i,j,k)
           end do
-          ddx(i,j)=   (d(i,j)-d(i-1,j))*dum(i,j)
-          d4(i,j) =.5*(d(i,j)+d(i-1,j))*dum(i,j)
+          ddx(i,j)=   (d(i,j)-d(i-1,j))*dum(i,j,k)
+          d4(i,j) =.5*(d(i,j)+d(i-1,j))*dum(i,j,k)
         end do
       end do
 
@@ -1207,20 +1207,20 @@
           do i=3,imm1
             do k=1,kbm1
               drho(i,j,k)=drho(i,j,k) - (1./24.)*
-     $                    (dum(i+1,j)*(rho(i+1,j,k)-rho(i,j,k))-
-     $                    2.*(rho(i,j,k)-rho(i-1,j,k))+
-     $                    dum(i-1,j)*(rho(i-1,j,k)-rho(i-2,j,k)))
+     $                 (dum(i+1,j,k)*(rho(i+1,j,k)-rho(i,j,k))-
+     $                  2.*(rho(i,j,k)-rho(i-1,j,k))+
+     $                  dum(i-1,j,k)*(rho(i-1,j,k)-rho(i-2,j,k)))
               rhou(i,j,k)=rhou(i,j,k) + (1./16.)*
-     $                    (dum(i+1,j)*(rho(i,j,k)-rho(i+1,j,k))+
-     $                    dum(i-1,j)*(rho(i-1,j,k)-rho(i-2,j,k)))
+     $                  (dum(i+1,j,k)*(rho(i,j,k)-rho(i+1,j,k))+
+     $                  dum(i-1,j,k)*(rho(i-1,j,k)-rho(i-2,j,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dum(i+1,j)*(d(i+1,j)-d(i,j))-
+     $               (dum(i+1,j,k)*(d(i+1,j)-d(i,j))-
      $               2.*(d(i,j)-d(i-1,j))+
-     $               dum(i-1,j)*(d(i-1,j)-d(i-2,j)))
+     $               dum(i-1,j,k)*(d(i-1,j)-d(i-2,j)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dum(i+1,j)*(d(i,j)-d(i+1,j))+
-     $              dum(i-1,j)*(d(i-1,j)-d(i-2,j)))
+     $              (dum(i+1,j,k)*(d(i,j)-d(i+1,j))+
+     $              dum(i-1,j,k)*(d(i-1,j)-d(i-2,j)))
           end do
         end do
       else
@@ -1228,27 +1228,27 @@
           do i=2,imm1
             do k=1,kbm1
               drho(i,j,k)=drho(i,j,k) - (1./24.)*
-     $                   (dum(i+1,j)*(rho(i+1,j,k)-rho(i,j,k))-
-     $                    2.*(rho(i,j,k)-rho(i-1,j,k))+
-     $                    dum(i-1,j)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
+     $                 (dum(i+1,j,k)*(rho(i+1,j,k)-rho(i,j,k))-
+     $                  2.*(rho(i,j,k)-rho(i-1,j,k))+
+     $                  dum(i-1,j,k)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
               rhou(i,j,k)=rhou(i,j,k) + (1./16.)*
-     $                    (dum(i+1,j)*(rho(i,j,k)-rho(i+1,j,k))+
-     $                    dum(i-1,j)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
+     $                  (dum(i+1,j,k)*(rho(i,j,k)-rho(i+1,j,k))+
+     $                  dum(i-1,j,k)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dum(i+1,j)*(d(i+1,j)-d(i,j))-
+     $               (dum(i+1,j,k)*(d(i+1,j)-d(i,j))-
      $               2.*(d(i,j)-d(i-1,j))+
-     $               dum(i-1,j)*(d(i-1,j)-d4th(i-2,j)))
+     $               dum(i-1,j,k)*(d(i-1,j)-d4th(i-2,j)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dum(i+1,j)*(d(i,j)-d(i+1,j))+
-     $              dum(i-1,j)*(d(i-1,j)-d4th(i-2,j)))
+     $              (dum(i+1,j,k)*(d(i,j)-d(i+1,j))+
+     $              dum(i-1,j,k)*(d(i-1,j)-d4th(i-2,j)))
           end do
         end do
       end if
 ! calculate x-component of baroclinic pressure gradient
       do j=2,jmm1
         do i=2,imm1
-          drhox(i,j,1)=grav*(-zz(1))*d4(i,j)*drho(i,j,1)
+          drhox(i,j,1)=grav*(-zz(i,j,1))*d4(i,j)*drho(i,j,1)
         end do
       end do
 
@@ -1256,10 +1256,10 @@
         do j=2,jmm1
           do i=2,imm1
             drhox(i,j,k)=drhox(i,j,k-1)
-     $                   +grav*0.5*dzz(k-1)*d4(i,j)
-     $                   *(drho(i,j,k-1)+drho(i,j,k))
-     $                   +grav*0.5*(zz(k-1)+zz(k))*ddx(i,j)
-     $                   *(rhou(i,j,k)-rhou(i,j,k-1))
+     $               +grav*0.5*dzz(i,j,k-1)*d4(i,j)
+     $               *(drho(i,j,k-1)+drho(i,j,k))
+     $               +grav*0.5*(zz(i,j,k-1)+zz(i,j,k))*ddx(i,j)
+     $               *(rhou(i,j,k)-rhou(i,j,k-1))
           end do
         end do
       end do
@@ -1268,7 +1268,7 @@
         do j=2,jmm1
           do i=2,imm1
             drhox(i,j,k)=.25*(dt(i,j)+dt(i-1,j))
-     $                      *drhox(i,j,k)*dum(i,j)
+     $                      *drhox(i,j,k)*dum(i,j,k)
      $                      *(dy(i,j)+dy(i-1,j))
           end do
         end do
@@ -1294,11 +1294,11 @@
       do j=2,jm
         do i=1,im
           do k=1,kbm1
-            drho(i,j,k)=   (rho(i,j,k)-rho(i,j-1,k))*dvm(i,j)
-            rhou(i,j,k)=.5*(rho(i,j,k)+rho(i,j-1,k))*dvm(i,j)
+            drho(i,j,k)=   (rho(i,j,k)-rho(i,j-1,k))*dvm(i,j,k)
+            rhou(i,j,k)=.5*(rho(i,j,k)+rho(i,j-1,k))*dvm(i,j,k)
           end do
-          ddx(i,j)=   (d(i,j)-d(i,j-1))*dvm(i,j)
-          d4(i,j) =.5*(d(i,j)+d(i,j-1))*dvm(i,j)
+          ddx(i,j)=   (d(i,j)-d(i,j-1))*dvm(i,j,k)
+          d4(i,j) =.5*(d(i,j)+d(i,j-1))*dvm(i,j,k)
         end do
       end do
 
@@ -1307,20 +1307,20 @@
           do i=1,im
             do k=1,kbm1
               drho(i,j,k)=drho(i,j,k)-(1./24.)*
-     $                    (dvm(i,j+1)*(rho(i,j+1,k)-rho(i,j,k))-
-     $                    2.*(rho(i,j,k)-rho(i,j-1,k))+
-     $                    dvm(i,j-1)*(rho(i,j-1,k)-rho(i,j-2,k)))
+     $                 (dvm(i,j+1,k)*(rho(i,j+1,k)-rho(i,j,k))-
+     $                  2.*(rho(i,j,k)-rho(i,j-1,k))+
+     $                  dvm(i,j-1,k)*(rho(i,j-1,k)-rho(i,j-2,k)))
               rhou(i,j,k)=rhou(i,j,k)+(1./16.)*
-     $                    (dvm(i,j+1)*(rho(i,j,k)-rho(i,j+1,k))+
-     $                    dvm(i,j-1)*(rho(i,j-1,k)-rho(i,j-2,k)))
+     $                 (dvm(i,j+1,k)*(rho(i,j,k)-rho(i,j+1,k))+
+     $                  dvm(i,j-1,k)*(rho(i,j-1,k)-rho(i,j-2,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dvm(i,j+1)*(d(i,j+1)-d(i,j))-
+     $               (dvm(i,j+1,k)*(d(i,j+1)-d(i,j))-
      $               2.*(d(i,j)-d(i,j-1))+
-     $               dvm(i,j-1)*(d(i,j-1)-d(i,j-2)))
+     $               dvm(i,j-1,k)*(d(i,j-1)-d(i,j-2)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dvm(i,j+1)*(d(i,j)-d(i,j+1))+
-     $              dvm(i,j-1)*(d(i,j-1)-d(i,j-2)))
+     $              (dvm(i,j+1,k)*(d(i,j)-d(i,j+1))+
+     $              dvm(i,j-1,k)*(d(i,j-1)-d(i,j-2)))
           end do
         end do
       else
@@ -1328,20 +1328,20 @@
           do i=1,im
             do k=1,kbm1
               drho(i,j,k)=drho(i,j,k)-(1./24.)*
-     $                    (dvm(i,j+1)*(rho(i,j+1,k)-rho(i,j,k))-
-     $                    2.*(rho(i,j,k)-rho(i,j-1,k))+
-     $                    dvm(i,j-1)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
+     $                 (dvm(i,j+1,k)*(rho(i,j+1,k)-rho(i,j,k))-
+     $                  2.*(rho(i,j,k)-rho(i,j-1,k))+
+     $                  dvm(i,j-1,k)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
               rhou(i,j,k)=rhou(i,j,k)+(1./16.)*
-     $                    (dvm(i,j+1)*(rho(i,j,k)-rho(i,j+1,k))+
-     $                    dvm(i,j-1)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
+     $                 (dvm(i,j+1,k)*(rho(i,j,k)-rho(i,j+1,k))+
+     $                  dvm(i,j-1,k)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dvm(i,j+1)*(d(i,j+1)-d(i,j))-
+     $               (dvm(i,j+1,k)*(d(i,j+1)-d(i,j))-
      $               2.*(d(i,j)-d(i,j-1))+
-     $               dvm(i,j-1)*(d(i,j-1)-d4th(i,j-2)))
+     $               dvm(i,j-1,k)*(d(i,j-1)-d4th(i,j-2)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dvm(i,j+1)*(d(i,j)-d(i,j+1))+
-     $              dvm(i,j-1)*(d(i,j-1)-d4th(i,j-2)))
+     $              (dvm(i,j+1,k)*(d(i,j)-d(i,j+1))+
+     $              dvm(i,j-1,k)*(d(i,j-1)-d4th(i,j-2)))
           end do
         end do
       end if
@@ -1349,7 +1349,7 @@
 ! calculate y-component of baroclinic pressure gradient
       do j=2,jmm1
         do i=2,imm1
-          drhoy(i,j,1)=grav*(-zz(1))*d4(i,j)*drho(i,j,1)
+          drhoy(i,j,1)=grav*(-zz(i,j,1))*d4(i,j)*drho(i,j,1)
         end do
       end do
 
@@ -1357,10 +1357,10 @@
         do j=2,jmm1
           do i=2,imm1
             drhoy(i,j,k)=drhoy(i,j,k-1)
-     $                   +grav*0.5*dzz(k-1)*d4(i,j)
-     $                   *(drho(i,j,k-1)+drho(i,j,k))
-     $                   +grav*0.5*(zz(k-1)+zz(k))*ddx(i,j)
-     $                   *(rhou(i,j,k)-rhou(i,j,k-1))
+     $               +grav*0.5*dzz(i,j,k-1)*d4(i,j)
+     $               *(drho(i,j,k-1)+drho(i,j,k))
+     $               +grav*0.5*(zz(i,j,k-1)+zz(i,j,k))*ddx(i,j)
+     $               *(rhou(i,j,k)-rhou(i,j,k-1))
           end do
         end do
       end do
@@ -1369,7 +1369,7 @@
         do j=2,jmm1
           do i=2,imm1
             drhoy(i,j,k)=.25*(dt(i,j)+dt(i,j-1))
-     $                        *drhoy(i,j,k)*dvm(i,j)
+     $                        *drhoy(i,j,k)*dvm(i,j,k)
      $                        *(dx(i,j)+dx(i,j-1))
           end do
         end do
@@ -1405,12 +1405,13 @@
       real(kind=rk) dh,cff,cff1
 
 !      rho = rho-rmean
-        
+
       p(:,:,1) = 0.
       do k = 1,kbm1
         p(:,:,k+1) = p(:,:,k)
-     &            +dz(k)*dt(1:im,1:jm)*rho(1:im,1:jm,k)
-        fx(:,:,k) = .5*dz(k)*dt(1:im,1:jm)*(p(:,:,k)+p(:,:,k+1))
+     &            +dz(i,j,k)*dt(1:im,1:jm)*rho(1:im,1:jm,k)
+        fx(:,:,k) = .5*dz(i,j,k)
+     &            *dt(1:im,1:jm)*(p(:,:,k)+p(:,:,k+1))
       end do
 
       cff = .5*grav
@@ -1423,11 +1424,11 @@
         do j = 1,jm
           do i = 2,im
 !            if (dum(i,j)/=0.) then
-              dh = z(k+1)*(dt(i,j)-dt(i-1,j))!+et(i,j)-et(i-1,j)
+              dh = z(i,j,k+1)*(dt(i,j)-dt(i-1,j))!+et(i,j)-et(i-1,j)
               fc(i,j,k+1) = .5*dh*(p(i,j,k+1)+p(i-1,j,k+1))
-              drhox(i,j,k) = .5*(cff*(dz(k)*dt(i-1,j)+
-     &                                dz(k)*dt(i  ,j))
-     &                             *( z(1)*(dt(i-1,j)-dt(i,j)))
+              drhox(i,j,k) = .5*(cff*(dz(i,j,k)*dt(i-1,j)+
+     &                                dz(i,j,k)*dt(i  ,j))
+     &                         *( z(i,j,1)*(dt(i-1,j)-dt(i,j)))
 !     &                              *( et(i,j)-et(i-1,j) ) ! invert et?
      &                         +cff1*(fx(i-1,j,k)-
      &                                fx(i  ,j,k)+
@@ -1445,11 +1446,11 @@
         do j = 2,jm
           do i = 1,im
 !            if (dvm(i,j)/=0.) then
-              dh = z(k+1)*(dt(i,j)-dt(i,j-1))!+et(i,j)-et(i,j-1)
+              dh = z(i,j,k+1)*(dt(i,j)-dt(i,j-1))!+et(i,j)-et(i,j-1)
               fc(i,j,k+1) = .5*dh*(p(i,j,k+1)+p(i,j-1,k+1))
-              drhoy(i,j,k) = .5*(cff*(dz(k)*dt(i,j-1)+
-     &                                dz(k)*dt(i,j  ))
-     &                             *( z(1)*(dt(i,j-1)-dt(i,j)))
+              drhoy(i,j,k) = .5*(cff*(dz(i,j,k)*dt(i,j-1)+
+     &                                dz(i,j,k)*dt(i,j  ))
+     &                         *( z(i,j,1)*(dt(i,j-1)-dt(i,j)))
 !     &                              *( et(i,j)-et(i,j-1) )
      &                         +cff1*(fx(i,j-1,k)-
      &                                fx(i,j  ,k)+
@@ -1481,13 +1482,13 @@
 
       do j = 1,jm
         do i = 2,im
-          cff1 = (z(1)-zz(1))*(dt(i,j)+dt(i-1,j))
+          cff1 = (z(i,j,1)-zz(i,j,1))*(dt(i,j)+dt(i-1,j))
           phix(i) = fac1*(rho(i,j,1)-rho(i-1,j,1))*cff1
           phix(i) = phix(i)+                                              &
      &            (fac2+fac1*(rho(i,j,1)+rho(i-1,j,1)))*
-     &            (z(1)*(dt(i,j)-dt(i-1,j)))
-          drhox(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i-1,j))*
-     &                      phix(i)*(dy(i,j)+dy(i-1,j))
+     &            (z(i,j,1)*(dt(i,j)-dt(i-1,j)))
+          drhox(i,j,1) = -.25*dz(i,j,1)*(dt(i,j)+dt(i-1,j))*
+     &                          phix(i)*(dy(i,j)+dy(i-1,j))
          end do
 !
 !  Compute interior baroclinic pressure gradient.  Differentiate and
@@ -1495,21 +1496,21 @@
 !
         do k = 2,kbm1
           do i = 2,im
-            cff1 = 1./(dt(i  ,j)*(zz(k-1)-zz(k))*
-     &                 dt(i-1,j)*(zz(k-1)-zz(k)))
-            cff2 = (dt(i,j)-dt(i-1,j))*(zz(k)+zz(k-1))
-            cff3 = (zz(k-1)-zz(k))*(dt(i,j)-dt(i-1,j))
+            cff1 = 1./(dt(i  ,j)*(zz(i,j,k-1)-zz(i,j,k))*
+     &                 dt(i-1,j)*(zz(i,j,k-1)-zz(i,j,k)))
+            cff2 = (dt(i,j)-dt(i-1,j))*(zz(i,j,k)+zz(i,j,k-1))
+            cff3 = (zz(i,j,k-1)-zz(i,j,k))*(dt(i,j)-dt(i-1,j))
             gamma = .125*cff1*cff2*cff3
 
             cff1 = (1.+gamma)*(rho(i,j,k-1)-rho(i-1,j,k-1))+
      &             (1.-gamma)*(rho(i,j,k  )-rho(i-1,j,k  ))
             cff2 = rho(i,j,k-1)+rho(i-1,j,k-1)-                           &
      &             rho(i,j,k  )-rho(i-1,j,k  )
-            cff3 = (dt(i,j)+dt(i-1,j))*(zz(k-1)-zz(k))
+            cff3 = (dt(i,j)+dt(i-1,j))*(zz(i,j,k-1)-zz(i,j,k))
             cff4 = (1.+gamma)*
-     &               (zz(k-1)*(dt(i,j)-dt(i-1,j)))+
+     &               (zz(i,j,k-1)*(dt(i,j)-dt(i-1,j)))+
      &             (1.-gamma)*
-     &               (zz(k  )*(dt(i,j)-dt(i-1,j)))
+     &               (zz(i,j,k  )*(dt(i,j)-dt(i-1,j)))
             phix(i) = phix(i)+                                            &
      &                fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1523,8 +1524,8 @@
 !     &           z_r(i,j,k  )-z_r(i-1,j,k  )
 !            phix(i)=phix(i)+                                            &
 !     &              fac3*(cff1*cff3-cff2*cff4)
-            drhox(i,j,k) = -.25*dz(k)*(dt(i,j)+dt(i-1,j))*
-     &                        phix(i)*(dy(i,j)+dy(i-1,j))
+            drhox(i,j,k) = -.25*dz(i,j,k)*(dt(i,j)+dt(i-1,j))*
+     &                            phix(i)*(dy(i,j)+dy(i-1,j))
           end do
         end do
 !
@@ -1536,13 +1537,13 @@
 !
         if (j>=2) then
           do i = 1,im
-            cff1 = (z(1)-zz(1))*(dt(i,j)+dt(i,j-1))
+            cff1 = (z(i,j,1)-zz(i,j,1))*(dt(i,j)+dt(i,j-1))
             phie(i) = fac1*(rho(i,j,1)-rho(i,j-1,1))*cff1
             phie(i) = phie(i)+                                            &
      &              (fac2+fac1*(rho(i,j,1)+rho(i,j-1,1)))*
-     &              (z(1)*(dt(i,j)-dt(i,j-1)))
-            drhoy(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i,j-1))*
-     &                        phie(i)*(dy(i,j)+dy(i,j-1))
+     &              (z(i,j,1)*(dt(i,j)-dt(i,j-1)))
+            drhoy(i,j,1) = -.25*dz(i,j,1)*(dt(i,j)+dt(i,j-1))*
+     &                            phie(i)*(dy(i,j)+dy(i,j-1))
           end do
 !
 !  Compute interior baroclinic pressure gradient.  Differentiate and
@@ -1550,21 +1551,21 @@
 !
           do k = 2,kbm1
             do i = 1,im
-              cff1 = 1./(dt(i,j  )*(z(k-1)-z(k))*
-     &                   dt(i,j-1)*(z(k-1)-z(k)))
-              cff2 = (dt(i,j)-dt(i,j-1))*(zz(k)+zz(k-1))
-              cff3 = (zz(k-1)-zz(k))*(dt(i,j)-dt(i,j-1))
+              cff1 = 1./(dt(i,j  )*(z(i,j,k-1)-z(i,j,k))*
+     &                   dt(i,j-1)*(z(i,j,k-1)-z(i,j,k)))
+              cff2 = (dt(i,j)-dt(i,j-1))*(zz(i,j,k)+zz(i,j,k-1))
+              cff3 = (zz(i,j,k-1)-zz(i,j,k))*(dt(i,j)-dt(i,j-1))
               gamma = .125*cff1*cff2*cff3
 
               cff1 = (1.+gamma)*(rho(i,j,k-1)-rho(i,j-1,k-1))+
      &               (1.-gamma)*(rho(i,j,k  )-rho(i,j-1,k  ))
               cff2 = rho(i,j,k-1)+rho(i,j-1,k-1)-                         &
      &               rho(i,j,k  )-rho(i,j-1,k  )
-              cff3 = (dt(i,j)+dt(i,j-1))*(zz(k-1)-zz(k))
+              cff3 = (dt(i,j)+dt(i,j-1))*(zz(i,j,k-1)-zz(i,j,k))
               cff4 = (1.+gamma)*
-     &                 (zz(k-1)*(dt(i,j)-dt(i,j-1)))+
+     &                 (zz(i,j,k-1)*(dt(i,j)-dt(i,j-1)))+
      &               (1.-gamma)*
-     &                 (zz(k  )*(dt(i,j)-dt(i,j-1)))
+     &                 (zz(i,j,k  )*(dt(i,j)-dt(i,j-1)))
               phie(i) = phie(i)+                                          &
      &                  fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1578,8 +1579,8 @@
 !     &             z_r(i,j,k  )-z_r(i,j-1,k  )
 !              phie(i)=phie(i)+                                          &
 !     &                fac3*(cff1*cff3-cff2*cff4)
-              drhoy(i,j,k) = -.25*dz(k)*(dt(i,j)+dt(i,j-1))*
-     &                          phie(i)*(dx(i,j)+dx(i,j-1))
+              drhoy(i,j,k) = -.25*dz(i,j,k)*(dt(i,j)+dt(i,j-1))*
+     &                              phie(i)*(dx(i,j)+dx(i,j-1))
 !              if (isnan(drhoy(i,j,k))) write(*,*) my_task,"::",i,j,k
             end do
           end do
@@ -1595,7 +1596,7 @@
 !lyo:pac10:beg:
 !lyo:20110224:alu:stcc:
 !     bcond_PeriodicFRZ.f:
-   
+
 !     (modified from /wrk/newshoni/hunglu/model/sbPOM/stcc_ideal/
 !     stcc_alu_30TSrelx_60aam_timescle1d/pom/bcond.f)
 !     See also /archive/lyo/gfdexwithpom/wmo09training/bcond_standrd.f
@@ -1603,7 +1604,7 @@
 !     bcond_standrd.f
 !
       subroutine bcond(idx)
-!     boundary conditions for idelaized STCC simulation with 
+!     boundary conditions for idelaized STCC simulation with
 !     x-periodic and y-FRZ; the y-periodic part not yet completed
 !     need also subroutines xperi2d_mpi & xperi3d_mpi
 !     included in this file also
@@ -1617,7 +1618,7 @@
       real(kind=rk) ga,u1,wm
       integer ii,jj
       real(kind=rk), parameter :: hmax = 8000.0 !lyo:20110224:alu:stcc:
-      
+
       if(idx.eq.1) then
 
 ! external (2-D) elevation boundary conditions
@@ -1629,7 +1630,7 @@
            end do
           endif
 !east
-          if(n_east.eq.-1) then 
+          if(n_east.eq.-1) then
            do j=1,jm
              elf(im,j)=elf(imm1,j)
            end do
@@ -1651,13 +1652,13 @@
          call xperi2d_mpi(elf,im,jm)
          endif
 !
-        if (ipery.ne.0) then 
+        if (ipery.ne.0) then
          call yperi2d_mpi(elf,im,jm) !lyo:scs1d:add yperi*:ipery:
          endif
 !
           do j=1,jm
              do i=1,im
-                elf(i,j)=elf(i,j)*fsm(i,j)
+                elf(i,j)=elf(i,j)*fsm(i,j,1)
              end do
           end do
 
@@ -1666,7 +1667,7 @@
       else if(idx.eq.2) then
 
 ! external (2-D) velocity boundary conditions
-        
+
 ! east
           if(n_east.eq.-1) then
            do j=2,jmm1
@@ -1709,13 +1710,13 @@
           call xperi2d_mpi(uaf,im,jm)
           call xperi2d_mpi(vaf,im,jm)
         if (iperx.lt.0) then !free-slip north&south
-           if(n_north.eq.-1) then 
+           if(n_north.eq.-1) then
              uaf(:,jm)=uaf(:,jmm1)
-             dum(:,jm)=1.0
+             dum(:,jm,:)=1.0
            endif
-           if(n_south.eq.-1) then 
+           if(n_south.eq.-1) then
               uaf(:,1)=uaf(:,2)
-              dum(:,1)=1.0
+              dum(:,1,:)=1.0
            endif
          endif
         endif !end if (iperx.ne.0)
@@ -1724,21 +1725,21 @@
           call yperi2d_mpi(uaf,im,jm) !lyo:scs1d:add yperi*:ipery:
           call yperi2d_mpi(vaf,im,jm)
         if (ipery.lt.0) then !free-slip east&west
-           if(n_east.eq.-1) then 
+           if(n_east.eq.-1) then
              vaf(im,:)=vaf(imm1,:)
-             dvm(im,:)=1.0
+             dvm(im,:,:)=1.0
            endif
-           if(n_west.eq.-1) then 
+           if(n_west.eq.-1) then
               vaf(1,:)=vaf(2,:)
-              dvm(1,:)=1.0
+              dvm(1,:,:)=1.0
            endif
          endif
         endif !end if (ipery.ne.0)
 !
          do j=1,jm
             do i=1,im
-               uaf(i,j)=uaf(i,j)*dum(i,j)
-               vaf(i,j)=vaf(i,j)*dvm(i,j)
+               uaf(i,j)=uaf(i,j)*dum(i,j,1)
+               vaf(i,j)=vaf(i,j)*dvm(i,j,1)
             end do
          end do
 
@@ -1751,14 +1752,14 @@
 !     EAST
 !     radiation boundary conditions.
 
-         if(n_east.eq.-1) then                  
+         if(n_east.eq.-1) then
             do k=1,kbm1
                do j=2,jmm1
-                  ga = sqrt( h(im,j) / hmax )    
-                  uf(im,j,k)  
-     $                 = ga * ( 0.25 * u(imm1,j-1,k) 
+                  ga = sqrt( h(im,j) / hmax )
+                  uf(im,j,k)
+     $                 = ga * ( 0.25 * u(imm1,j-1,k)
      $                 + 0.5 * u(imm1,j,k) + 0.25 * u(imm1,j+1,k) )
-     $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k) 
+     $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k)
      $                 + 0.5 * u(im,j,k) + 0.25 * u(im,j+1,k) )
                   vf(im,j,k)=0.
                enddo
@@ -1768,14 +1769,14 @@
 !     WEST
 !     radiation boundary conditions.
 
-         if(n_west.eq.-1) then                  
+         if(n_west.eq.-1) then
             do k=1,kbm1
                do j=2,jmm1
                   ga = sqrt( h(1,j) / hmax )
-                  uf(2,j,k)  
-     $                 = ga * ( 0.25 * u(3,j-1,k) 
+                  uf(2,j,k)
+     $                 = ga * ( 0.25 * u(3,j-1,k)
      $                 + 0.5 * u(3,j,k) + 0.25 * u(3,j+1,k) )
-     $                 + ( 1.0 - ga ) * ( 0.25 * u(2,j-1,k) 
+     $                 + ( 1.0 - ga ) * ( 0.25 * u(2,j-1,k)
      $                 + 0.5 * u(2,j,k) + 0.25 * u(2,j+1,k) )
                   uf(1,j,k)=uf(2,j,k)
                   vf(1,j,k)=0.
@@ -1786,15 +1787,15 @@
 !     NORTH
 !     radiation boundary conditions.
 
-         if(n_north.eq.-1) then                  
-            
+         if(n_north.eq.-1) then
+
             do k=1,kbm1
                do i=2,imm1
                   ga = sqrt( h(i,jm) / hmax )
-                  vf(i,jm,k)  
-     $                 = ga * ( 0.25 * v(i-1,jmm1,k) 
+                  vf(i,jm,k)
+     $                 = ga * ( 0.25 * v(i-1,jmm1,k)
      $                 + 0.5 * v(i,jmm1,k) + 0.25 * v(i+1,jmm1,k) )
-     $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,jm,k) 
+     $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,jm,k)
      $                 + 0.5 * v(i,jm,k) + 0.25 * v(i+1,jm,k) )
                   uf(i,jm,k)=0.
                enddo
@@ -1804,15 +1805,15 @@
 !     SOUTH
 !     radiation boundary conditions.
 
-         if(n_south.eq.-1) then                  
-            
+         if(n_south.eq.-1) then
+
             do k=1,kbm1
                do i=2,imm1
                   ga = sqrt( h(i,1) / hmax )
-                  vf(i,2,k)  
-     $                 = ga * ( 0.25 * v(i-1,3,k) 
+                  vf(i,2,k)
+     $                 = ga * ( 0.25 * v(i-1,3,k)
      $                 + 0.5 * v(i,3,k) + 0.25 * v(i+1,3,k) )
-     $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,2,k) 
+     $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,2,k)
      $                 + 0.5 * v(i,2,k) + 0.25 * v(i+1,2,k) )
                   vf(i,1,k)=vf(i,2,k)
 !                 uf(i,jm,k)=0.e0 !lyo:debug:lyo:20110224:alu:stcc:
@@ -1828,14 +1829,14 @@
         call xperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
 
         if (iperx.lt.0) then !free-slip north&south
-           if(n_north.eq.-1)           then 
+           if(n_north.eq.-1)           then
               wubot(:,jm)=wubot(:,jmm1)
               do k=1,kbm1
                uf(:,jm,k)=uf(:,jmm1,k)
               enddo
             endif
            if(n_south.eq.-1)           then
-              wubot(:,1)=wubot(:,2)        
+              wubot(:,1)=wubot(:,2)
               do k=1,kbm1
                uf(:,1,k)=uf(:,2,k)
               enddo
@@ -1850,14 +1851,14 @@
         call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
 
         if (ipery.lt.0) then !free-slip east&west
-           if(n_east.eq.-1)           then 
+           if(n_east.eq.-1)           then
               wvbot(im,:)=wvbot(imm1,:)
               do k=1,kbm1
                vf(im,:,k)=vf(imm1,:,k)
               enddo
             endif
            if(n_west.eq.-1)           then
-              wvbot(1,:)=wvbot(2,:)        
+              wvbot(1,:)=wvbot(2,:)
               do k=1,kbm1
                vf(1,:,k)=vf(2,:,k)
               enddo
@@ -1868,8 +1869,8 @@
          do k=1,kbm1
             do j=1,jm
                do i=1,im
-                  uf(i,j,k)=uf(i,j,k)*dum(i,j)
-                  vf(i,j,k)=vf(i,j,k)*dvm(i,j)
+                  uf(i,j,k)=uf(i,j,k)*dum(i,j,k)
+                  vf(i,j,k)=vf(i,j,k)*dvm(i,j,k)
                end do
             end do
          end do
@@ -1882,11 +1883,11 @@
 ! temperature and salinity boundary conditions (using uf and vf,
 ! respectively)
 
-!    west 
+!    west
       if(n_west.eq.-1) then
 
       do k=1,kbm1
-      do j=1,jm 
+      do j=1,jm
       u1=2.*u(2,j,k)*dti/(dx(1,j)+dx(2,j))
       if(u1.ge.0.) then
       uf(1,j,k)=t(1,j,k)-u1*(t(1,j,k)-tbw(j,k))
@@ -1896,13 +1897,13 @@
       vf(1,j,k)=s(1,j,k)-u1*(s(2,j,k)-s(1,j,k))
       if(k.ne.1.and.k.ne.kbm1) then
       wm=.5*(w(2,j,k)+w(2,j,k+1))*dti
-     $   /((zz(k-1)-zz(k+1))*dt(2,j))
+     $   /((zz(2,j,k-1)-zz(2,j,k+1))*dt(2,j))
       uf(1,j,k)=uf(1,j,k)-wm*(t(2,j,k-1)-t(2,j,k+1))
       vf(1,j,k)=vf(1,j,k)-wm*(s(2,j,k-1)-s(2,j,k+1))
       end if
       end if !endif u1
       enddo  !enddo j
-      enddo  !enddo k 
+      enddo  !enddo k
 
       if(nfw.gt.3) then  !west FRZ needs at least 4 pts !lyo:20110224:alu:stcc:
       do k=1,kbm1; do j=1,jm; do i=1,nfw
@@ -1927,7 +1928,7 @@
       vf(im,j,k)=s(im,j,k)-u1*(s(im,j,k)-s(imm1,j,k))
       if(k.ne.1.and.k.ne.kbm1) then
       wm=.5*(w(imm1,j,k)+w(imm1,j,k+1))*dti
-     $    /((zz(k-1)-zz(k+1))*dt(imm1,j))
+     $    /((zz(imm1,j,k-1)-zz(imm1,j,k+1))*dt(imm1,j))
       uf(im,j,k)=uf(im,j,k)-wm*(t(imm1,j,k-1)-t(imm1,j,k+1))
       vf(im,j,k)=vf(im,j,k)-wm*(s(imm1,j,k-1)-s(imm1,j,k+1))
       end if
@@ -1959,7 +1960,7 @@
       vf(i,jm,k)=s(i,jm,k)-u1*(s(i,jm,k)-s(i,jmm1,k))
       if(k.ne.1.and.k.ne.kbm1) then
       wm=.5*(w(i,jmm1,k)+w(i,jmm1,k+1))*dti
-     $   /((zz(k-1)-zz(k+1))*dt(i,jmm1))
+     $   /((zz(i,jmm1,k-1)-zz(i,jmm1,k+1))*dt(i,jmm1))
       uf(i,jm,k)=uf(i,jm,k)-wm*(t(i,jmm1,k-1)-t(i,jmm1,k+1))
       vf(i,jm,k)=vf(i,jm,k)-wm*(s(i,jmm1,k-1)-s(i,jmm1,k+1))
       end if
@@ -1981,7 +1982,7 @@
       if(n_south.eq.-1) then
 
       do k=1,kbm1
-      do i=1,im 
+      do i=1,im
       u1=2.*v(i,2,k)*dti/(dy(i,1)+dy(i,2))
       if(u1.ge.0.) then
       uf(i,1,k)=t(i,1,k)-u1*(t(i,1,k)-tbs(i,k))
@@ -1991,7 +1992,7 @@
       vf(i,1,k)=s(i,1,k)-u1*(s(i,2,k)-s(i,1,k))
       if(k.ne.1.and.k.ne.kbm1) then
       wm=.5*(w(i,2,k)+w(i,2,k+1))*dti
-     $   /((zz(k-1)-zz(k+1))*dt(i,2))
+     $   /((zz(i,2,k-1)-zz(i,2,k+1))*dt(i,2))
       uf(i,1,k)=uf(i,1,k)-wm*(t(i,2,k-1)-t(i,2,k+1))
       vf(i,1,k)=vf(i,1,k)-wm*(s(i,2,k-1)-s(i,2,k+1))
       end if
@@ -2017,16 +2018,16 @@
           call yperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
           call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
         endif
-!         
+!
          do k=1,kbm1
             do j=1,jm
                do i=1,im
-                  uf(i,j,k)=uf(i,j,k)*fsm(i,j)
-                  vf(i,j,k)=vf(i,j,k)*fsm(i,j)
+                  uf(i,j,k)=uf(i,j,k)*fsm(i,j,k)
+                  vf(i,j,k)=vf(i,j,k)*fsm(i,j,k)
                end do
             end do
          end do
-        
+
         return
 
       else if(idx.eq.5) then
@@ -2044,7 +2045,7 @@
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              w(i,j,k)=w(i,j,k)*fsm(i,j)
+              w(i,j,k)=w(i,j,k)*fsm(i,j,k)
             end do
           end do
         end do
@@ -2072,7 +2073,7 @@
          enddo
 
        end if
-                       
+
 ! west
        if(n_west.eq.-1) then
 
@@ -2087,7 +2088,7 @@
                 vf(1,j,k)=q2l(1,j,k)-u1*(q2l(2,j,k)-q2l(1,j,k))
               endif
            enddo
-         enddo 
+         enddo
 
        end if
 
@@ -2148,8 +2149,8 @@
         do k=1,kb
           do j=1,jm
             do i=1,im
-              uf(i,j,k)=uf(i,j,k)*fsm(i,j)
-              vf(i,j,k)=vf(i,j,k)*fsm(i,j)
+              uf(i,j,k)=uf(i,j,k)*fsm(i,j,k)
+              vf(i,j,k)=vf(i,j,k)*fsm(i,j,k)
             end do
           end do
         end do
@@ -2188,7 +2189,7 @@
         enddo
       else
 !
-! The most east sudomains    
+! The most east sudomains
       if(n_east.eq.-1) then
         dest_task=my_task-nproc_x+1
         sour_task=my_task-nproc_x+1
@@ -2217,7 +2218,7 @@
 
       endif !if(n_east.eq.-1)
 
-! The most west sudomains    
+! The most west sudomains
       if(n_west.eq.-1) then
         sour_task=my_task+nproc_x-1
         dest_task=my_task+nproc_x-1
@@ -2285,7 +2286,7 @@
         enddo; enddo
       else
 !
-C  !The most east sudomains    
+C  !The most east sudomains
       if(n_east.eq.-1) then
         dest_task=my_task-nproc_x+1
         sour_task=my_task-nproc_x+1
@@ -2322,7 +2323,7 @@ C  !The most east sudomains
 
       endif!if(n_east.eq.-1)
 
-C  !The most west sudomains    
+C  !The most west sudomains
       if(n_west.eq.-1) then
        sour_task=my_task+nproc_x-1
        dest_task=my_task+nproc_x-1
@@ -2393,7 +2394,7 @@ C  !The most west sudomains
         enddo
       else
 !
-C  !The most north sudomains    
+C  !The most north sudomains
       if(n_north.eq.-1) then
         dest_task=my_task-nproc_y+1
         sour_task=my_task-nproc_y+1
@@ -2422,7 +2423,7 @@ C  !The most north sudomains
 
       endif !if(n_north.eq.-1)
 
-C  !The most south sudomains    
+C  !The most south sudomains
       if(n_south.eq.-1) then
         sour_task=my_task+nproc_y-1
         dest_task=my_task+nproc_y-1
@@ -2489,7 +2490,7 @@ C  !The most south sudomains
         enddo; enddo
       else
 !
-C  !The most north sudomains    
+C  !The most north sudomains
       if(n_north.eq.-1) then
         dest_task=my_task-nproc_y+1
         sour_task=my_task-nproc_y+1
@@ -2526,7 +2527,7 @@ C  !The most north sudomains
 
       endif!if(n_north.eq.-1)
 
-C  !The most south sudomains    
+C  !The most south sudomains
       if(n_south.eq.-1) then
        sour_task=my_task+nproc_y-1
        dest_task=my_task+nproc_y-1
@@ -2589,20 +2590,20 @@ C  !The most south sudomains
       real(kind=rk) dum_area(jm), dum_flow(jm)
       real(kind=rk) sum_area, sum_flow, mean_uabe, uriv
       real(kind=rk) rdisp,rad_param,ome(6),ramt(6),phi0(6)   !fhx:tide
-      
+
       if(idx.eq.1) then
 
 ! external (2-D) elevation boundary conditions
-         
+
          if(n_east.eq.-1) then
             do j=1,jm
                elf(im,j)=elf(imm1,j)
             end do
          endif
-         
+
          do j=1,jm
             do i=1,im
-               elf(i,j)=elf(i,j)*fsm(i,j)
+               elf(i,j)=elf(i,j)*fsm(i,j,1)
             end do
          end do
 
@@ -2611,33 +2612,33 @@ C  !The most south sudomains
       else if(idx.eq.2) then
 
 ! external (2-D) velocity boundary conditions
-        
-                                
+
+
 !       east
 
 !     calculate net transport
-            
+
          dum_area = 0d0
          dum_flow = 0d0
 
 
-         if(n_east.eq.-1) then                  
+         if(n_east.eq.-1) then
          do j=2,jmm1
             dum_area(j) = 0.25
      $           * ( h(im,j) + elf (im,j) + h(im-1,j) + elf(im-1,j) )
-     $           * ( dy(im,j) + dy(im-1,j) ) * dum(im,j)
-            
+     $           * ( dy(im,j) + dy(im-1,j) ) * dum(im,j,1)
+
             dum_flow(j) = 0.25
      $           * ( h(im,j) + elf (im,j) + h(im-1,j) + elf(im-1,j) )
-     $           * ( dy(im,j) + dy(im-1,j) ) * uabe(j) * dum(im,j)                              
+     $           * ( dy(im,j) + dy(im-1,j) ) * uabe(j) * dum(im,j,1)
          end do
          endif
 
 
          call psum_mpi( dum_area, jm, sum_area )
          call psum_mpi( dum_flow, jm, sum_flow )
-         
-         
+
+
          if ( my_task == master_task ) then
 
 !     mean u-velocoty at the eastern boundary.
@@ -2649,7 +2650,7 @@ C  !The most south sudomains
             uriv = totq / max( sum_area, small )
 
          endif
-         
+
 !     broadcasting to all the nodes.
 
          call bcast0d_mpi( mean_uabe, 0 )
@@ -2657,11 +2658,11 @@ C  !The most south sudomains
 
 
 !     adjust velocity at eastern boundary.
-         
-         if(n_east.eq.-1) then                  
-            
+
+         if(n_east.eq.-1) then
+
          do j=1,jm
-            uaf(im,j) = ( uabe(j) - mean_uabe + uriv ) * dum(im,j)
+            uaf(im,j) = ( uabe(j)-mean_uabe+uriv ) * dum(im,j,1)
             vaf(im,j) = 0.0
          enddo
 
@@ -2670,10 +2671,10 @@ C  !The most south sudomains
           ramt = 0.
           ome  = 0.
           phi0 = 0.
-       if(calc_tide) then  
-            
-          rad_param=pi/180.0                
-          ome(1) = .08051140       !M2 in cycles per hour 
+       if(calc_tide) then
+
+          rad_param=pi/180.0
+          ome(1) = .08051140       !M2 in cycles per hour
           ome(2) = .08333333       !S2
           ome(5) = .04178075       !K1
           ome(6) = .03873066       !O1
@@ -2687,8 +2688,8 @@ C  !The most south sudomains
           phi0(2) = 106.*rad_param
           phi0(5) = 60.*rad_param
           phi0(6) = -40.*rad_param
-       do j=1,jm   
-       rdisp=sqrt(grav/h(imm1,j)) 
+       do j=1,jm
+       rdisp=sqrt(grav/h(imm1,j))
        do k=1,ntide
        uaf(im,j)=uaf(im,j)+ramt(k)*(
      $   ramp*amue(j,k)*cos(ome(k)*time-phue(j,k)*rad_param+phi0(k))-
@@ -2696,10 +2697,10 @@ C  !The most south sudomains
        enddo
 
 !      UAF(IM,J)=UAF(IM,J)+RAMT*( RAMP*AMUE(J,K)*COS(OME(K)*TIME-
-!     1    PHUE(J,K)) - COVRHE(J)*AMPE(J,K)*COS(OME(K)*TIME-PHAE(J,K)) )     
+!     1    PHUE(J,K)) - COVRHE(J)*AMPE(J,K)*COS(OME(K)*TIME-PHAE(J,K)) )
 
        enddo
-    
+
        end if ! if(calc_tide)
 !fhx:tide:end
 
@@ -2709,8 +2710,8 @@ C  !The most south sudomains
 
          do j=1,jm
             do i=1,im
-               uaf(i,j)=uaf(i,j)*dum(i,j)
-               vaf(i,j)=vaf(i,j)*dvm(i,j)
+               uaf(i,j)=uaf(i,j)*dum(i,j,1)
+               vaf(i,j)=vaf(i,j)*dvm(i,j,1)
             end do
          end do
 
@@ -2724,18 +2725,18 @@ C  !The most south sudomains
 !     east
 !     ratdiation boundary conditions.
 
-         if(n_east.eq.-1) then                  
-            
+         if(n_east.eq.-1) then
+
             hmax = 5300.
 
             do k=1,kbm1
                do j=2,jmm1
                   ga = sqrt( h(imm1,j) / hmax )
-!                  ga = sqrt( h(im,j) / hmax )  !fhx:tide 
-                  uf(im,j,k)  
-     $                 = ga * ( 0.25 * u(imm1,j-1,k) 
+!                  ga = sqrt( h(im,j) / hmax )  !fhx:tide
+                  uf(im,j,k)
+     $                 = ga * ( 0.25 * u(imm1,j-1,k)
      $                 + 0.5 * u(imm1,j,k) + 0.25 * u(imm1,j+1,k) )
-     $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k) 
+     $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k)
      $                 + 0.5 * u(im,j,k) + 0.25 * u(im,j+1,k) )
                enddo
             enddo
@@ -2745,8 +2746,8 @@ C  !The most south sudomains
          do k=1,kbm1
             do j=1,jm
                do i=1,im
-                  uf(i,j,k)=uf(i,j,k)*dum(i,j)
-                  vf(i,j,k)=vf(i,j,k)*dvm(i,j)
+                  uf(i,j,k)=uf(i,j,k)*dum(i,j,k)
+                  vf(i,j,k)=vf(i,j,k)*dvm(i,j,k)
                end do
             end do
          end do
@@ -2760,7 +2761,7 @@ C  !The most south sudomains
 ! respectively)
 
 !     east
-         
+
          if(n_east.eq.-1) then
 
             do k=1,kbm1
@@ -2783,17 +2784,17 @@ C  !The most south sudomains
             enddo
 
          end if
-            
-         
+
+
          do k=1,kbm1
             do j=1,jm
                do i=1,im
-                  uf(i,j,k)=uf(i,j,k)*fsm(i,j)
-                  vf(i,j,k)=vf(i,j,k)*fsm(i,j)
+                  uf(i,j,k)=uf(i,j,k)*fsm(i,j,k)
+                  vf(i,j,k)=vf(i,j,k)*fsm(i,j,k)
                end do
             end do
          end do
-        
+
         return
 
       else if(idx.eq.5) then
@@ -2802,7 +2803,7 @@ C  !The most south sudomains
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              w(i,j,k)=w(i,j,k)*fsm(i,j)
+              w(i,j,k)=w(i,j,k)*fsm(i,j,k)
             end do
           end do
         end do
@@ -2812,16 +2813,16 @@ C  !The most south sudomains
       else if(idx.eq.6) then
 
 ! q2 and q2l boundary conditions
-                       
+
 !     east
-         
+
          if(n_east.eq.-1) then
             do k=1,kb
                do j=1,jm
-                  uf(im,j,k)=1.e-10 
-                  vf(im,j,k)=1.e-10 
-                  uf(1,j,k)=1.e-10 
-                  vf(1,j,k)=1.e-10 
+                  uf(im,j,k)=1.e-10
+                  vf(im,j,k)=1.e-10
+                  uf(1,j,k)=1.e-10
+                  vf(1,j,k)=1.e-10
                enddo
             end do
          end if
@@ -2830,8 +2831,8 @@ C  !The most south sudomains
         do k=1,kb
           do j=1,jm
             do i=1,im
-              uf(i,j,k)=uf(i,j,k)*fsm(i,j)
-              vf(i,j,k)=vf(i,j,k)*fsm(i,j)
+              uf(i,j,k)=uf(i,j,k)*fsm(i,j,k)
+              vf(i,j,k)=vf(i,j,k)*fsm(i,j,k)
             end do
           end do
         end do
@@ -2869,7 +2870,7 @@ C  !The most south sudomains
 
         do j=1,jm
           do i=1,im
-            elf(i,j)=elf(i,j)*fsm(i,j)
+            elf(i,j)=elf(i,j)*fsm(i,j,1)
           end do
         end do
 
@@ -2901,7 +2902,7 @@ C  !The most south sudomains
           gae=dte*sqrt(grav*h(imm1,j))/dx(imm1,j)
           vaf(im,j)=(va(im,j)+gae*vaf(imm1,j))/(1.+gae)
 !          vaf(im,j)=0.e0
-          
+
 
 ! ayumi 2010/4/7 ---------------------------------
           uaf(im,j) = uabe(j)
@@ -2932,8 +2933,8 @@ C  !The most south sudomains
 
         do j=1,jm
           do i=1,im
-            uaf(i,j)=uaf(i,j)*dum(i,j)
-            vaf(i,j)=vaf(i,j)*dvm(i,j)
+            uaf(i,j)=uaf(i,j)*dum(i,j,1)
+            vaf(i,j)=vaf(i,j)*dvm(i,j,1)
           end do
         end do
 
@@ -2946,8 +2947,8 @@ C  !The most south sudomains
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              uf(i,j,k)=uf(i,j,k)*dum(i,j)
-              vf(i,j,k)=vf(i,j,k)*dvm(i,j)
+              uf(i,j,k)=uf(i,j,k)*dum(i,j,k)
+              vf(i,j,k)=vf(i,j,k)*dvm(i,j,k)
             end do
           end do
         end do
@@ -2971,7 +2972,7 @@ C  !The most south sudomains
                 vf(im,j,k)=s(im,j,k)-u1*(s(im,j,k)-s(imm1,j,k))
                 if(k.ne.1.and.k.ne.kbm1) then
                   wm=.5*(w(imm1,j,k)+w(imm1,j,k+1))*dti
-     $                /((zz(k-1)-zz(k+1))*dt(imm1,j))
+     $                /((zz(imm1,j,k-1)-zz(imm1,j,k+1))*dt(imm1,j))
                   uf(im,j,k)=uf(im,j,k)-wm*(t(imm1,j,k-1)-t(imm1,j,k+1))
                   vf(im,j,k)=vf(im,j,k)-wm*(s(imm1,j,k-1)-s(imm1,j,k+1))
                 endif
@@ -2989,7 +2990,7 @@ C  !The most south sudomains
                 vf(1,j,k)=s(1,j,k)-u1*(s(2,j,k)-s(1,j,k))
                 if(k.ne.1.and.k.ne.kbm1) then
                   wm=.5*(w(2,j,k)+w(2,j,k+1))*dti
-     $                /((zz(k-1)-zz(k+1))*dt(2,j))
+     $                /((zz(2,j,k-1)-zz(2,j,k+1))*dt(2,j))
                   uf(1,j,k)=uf(1,j,k)-wm*(t(2,j,k-1)-t(2,j,k+1))
                   vf(1,j,k)=vf(1,j,k)-wm*(s(2,j,k-1)-s(2,j,k+1))
                 end if
@@ -3009,7 +3010,7 @@ C  !The most south sudomains
                 vf(i,1,k)=s(i,1,k)-u1*(s(i,2,k)-s(i,1,k))
                 if(k.ne.1.and.k.ne.kbm1) then
                   wm=.5*(w(i,2,k)+w(i,2,k+1))*dti
-     $                /((zz(k-1)-zz(k+1))*dt(i,2))
+     $                /((zz(i,2,k-1)-zz(i,2,k+1))*dt(i,2))
                   uf(i,1,k)=uf(i,1,k)-wm*(t(i,2,k-1)-t(i,2,k+1))
                   vf(i,1,k)=vf(i,1,k)-wm*(s(i,2,k-1)-s(i,2,k+1))
                 end if
@@ -3027,7 +3028,7 @@ C  !The most south sudomains
                 vf(i,jm,k)=s(i,jm,k)-u1*(s(i,jm,k)-s(i,jmm1,k))
                 if(k.ne.1.and.k.ne.kbm1) then
                   wm=.5*(w(i,jmm1,k)+w(i,jmm1,k+1))*dti
-     $                /((zz(k-1)-zz(k+1))*dt(i,jmm1))
+     $                /((zz(i,jmm1,k-1)-zz(i,jmm1,k+1))*dt(i,jmm1))
                   uf(i,jm,k)=uf(i,jm,k)-wm*(t(i,jmm1,k-1)-t(i,jmm1,k+1))
                   vf(i,jm,k)=vf(i,jm,k)-wm*(s(i,jmm1,k-1)-s(i,jmm1,k+1))
                 end if
@@ -3039,8 +3040,8 @@ C  !The most south sudomains
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              uf(i,j,k)=uf(i,j,k)*fsm(i,j)
-              vf(i,j,k)=vf(i,j,k)*fsm(i,j)
+              uf(i,j,k)=uf(i,j,k)*fsm(i,j,k)
+              vf(i,j,k)=vf(i,j,k)*fsm(i,j,k)
             end do
           end do
         end do
@@ -3053,7 +3054,7 @@ C  !The most south sudomains
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              w(i,j,k)=w(i,j,k)*fsm(i,j)
+              w(i,j,k)=w(i,j,k)*fsm(i,j,k)
             end do
           end do
         end do
@@ -3121,8 +3122,8 @@ C  !The most south sudomains
         do k=1,kb
           do j=1,jm
             do i=1,im
-              uf(i,j,k)=uf(i,j,k)*fsm(i,j)+1.e-10
-              vf(i,j,k)=vf(i,j,k)*fsm(i,j)+1.e-10
+              uf(i,j,k)=uf(i,j,k)*fsm(i,j,k)+1.e-10
+              vf(i,j,k)=vf(i,j,k)*fsm(i,j,k)+1.e-10
             end do
           end do
         end do
@@ -3145,7 +3146,7 @@ C  !The most south sudomains
       integer i,j,k
 
       if(idx.eq.1) then
-      
+
 ! external (2-D) elevation boundary conditions
         do  j=1,jm
           if(n_west.eq.-1) elf(1,j)=elf(2,j)
@@ -3154,7 +3155,7 @@ C  !The most south sudomains
 
         do j=1,jm
           do i=1,im
-            elf(i,j)=elf(i,j)*fsm(i,j)
+            elf(i,j)=elf(i,j)*fsm(i,j,1)
           end do
         end do
 
@@ -3192,8 +3193,8 @@ C  !The most south sudomains
 
         do j=1,jm
           do i=1,im
-            uaf(i,j)=uaf(i,j)*dum(i,j)
-            vaf(i,j)=vaf(i,j)*dvm(i,j)
+            uaf(i,j)=uaf(i,j)*dum(i,j,1)
+            vaf(i,j)=vaf(i,j)*dvm(i,j,1)
           end do
         end do
 
@@ -3235,8 +3236,8 @@ C  !The most south sudomains
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              uf(i,j,k)=uf(i,j,k)*dum(i,j)
-              vf(i,j,k)=vf(i,j,k)*dvm(i,j)
+              uf(i,j,k)=uf(i,j,k)*dum(i,j,k)
+              vf(i,j,k)=vf(i,j,k)*dvm(i,j,k)
             end do
           end do
         end do
@@ -3296,8 +3297,8 @@ C  !The most south sudomains
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              uf(i,j,k)=uf(i,j,k)*fsm(i,j)
-              vf(i,j,k)=vf(i,j,k)*fsm(i,j)
+              uf(i,j,k)=uf(i,j,k)*fsm(i,j,k)
+              vf(i,j,k)=vf(i,j,k)*fsm(i,j,k)
             end do
           end do
         end do
@@ -3310,7 +3311,7 @@ C  !The most south sudomains
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              w(i,j,k)=w(i,j,k)*fsm(i,j)
+              w(i,j,k)=w(i,j,k)*fsm(i,j,k)
             end do
           end do
         end do
@@ -3334,8 +3335,8 @@ C  !The most south sudomains
 
           do j=1,jm
             do i=1,im
-              uf(i,j,k)=uf(i,j,k)*fsm(i,j)
-              vf(i,j,k)=vf(i,j,k)*fsm(i,j)
+              uf(i,j,k)=uf(i,j,k)*fsm(i,j,k)
+              vf(i,j,k)=vf(i,j,k)*fsm(i,j,k)
             end do
           end do
         end do
@@ -3369,7 +3370,7 @@ C  !The most south sudomains
             tr4=tr3*tr
 
 ! approximate pressure in units of bars
-            p=grav*rhoref*(-zz(k)*d(i,j))*1.e-5
+            p=grav*rhoref*(-zz(i,j,k)*d(i,j))*1.e-5
 
             rhor=-0.157406+6.793952e-2*tr
      $           -9.095290e-3*tr2+1.001685e-4*tr3
@@ -3386,7 +3387,7 @@ C  !The most south sudomains
      $                 +1.34*(sr-35.)
             rhor=rhor+1.e5*p/(cr*cr)*(1.-2.*p/(cr*cr))
 
-            rhoo(i,j,k)=rhor/rhoref*fsm(i,j)
+            rhoo(i,j,k)=rhor/rhoref*fsm(i,j,k)
 
           end do
         end do
@@ -3435,13 +3436,13 @@ C  !The most south sudomains
         do j=1,jm
           do i=1,im
             a(i,j,k)=-dti2*(kq(i,j,k+1)+kq(i,j,k)+2.*umol)*.5
-     $                                 /(dzz(k-1)*dz(k)*dh(i,j)*dh(i,j))
+     $                         /(dzz(i,j,k-1)*dz(i,j,k)*dh(i,j)*dh(i,j))
             c(i,j,k)=-dti2*(kq(i,j,k-1)+kq(i,j,k)+2.*umol)*.5
-     $                               /(dzz(k-1)*dz(k-1)*dh(i,j)*dh(i,j))
+     $                       /(dzz(i,j,k-1)*dz(i,j,k-1)*dh(i,j)*dh(i,j))
           end do
         end do
       end do
-      
+
 ! the following section solves the equation:
 !     dti2*(kq*q2')' - q2*(2.*dti2*dtef+1.) = -q2b
 
@@ -3475,7 +3476,7 @@ C  !The most south sudomains
           ! wave breaking energy- a variant of Craig & Banner (1994)
           ! see Mellor and Blumberg, 2003.
           ee(i,j,1)=0.
-          gg(i,j,1)=(15.8*cbcnst)**(2./3.)*utau2 
+          gg(i,j,1)=(15.8*cbcnst)**(2./3.)*utau2
           ! surface length scale following Stacey (1999).
           l0(i,j)=surfl*utau2/grav
           uf(i,j,kb)=sqrt((.5*(wubot(i,j)+wubot(i+1,j)))**2
@@ -3493,7 +3494,7 @@ C  !The most south sudomains
             tp=t(i,j,k)+tbias
             sp=s(i,j,k)+sbias
             ! calculate pressure in units of decibars
-            p=grav*rhoref*(-zz(k)* h(i,j))*1.e-4
+            p=grav*rhoref*(-zz(i,j,k)* h(i,j))*1.e-4
             cc(i,j,k)=1449.1+.00821*p+4.55*tp -.045*tp**2
      $                                               +1.34*(sp-35.0)
             cc(i,j,k)=cc(i,j,k)/sqrt((1.-.01642*p/cc(i,j,k))
@@ -3509,7 +3510,7 @@ C  !The most south sudomains
             q2b(i,j,k)=abs(q2b(i,j,k))
             q2lb(i,j,k)=abs(q2lb(i,j,k))
             boygr(i,j,k)=grav*(rho(i,j,k-1)-rho(i,j,k))
-     $                                               /(dzz(k-1)* h(i,j))
+     $                                           /(dzz(i,j,k-1)* h(i,j))
          ! note: comment out next line if dens does not include pressure
      $                    +(grav**2)*2./(cc(i,j,k-1)**2+cc(i,j,k)**2)
           end do
@@ -3522,7 +3523,7 @@ C  !The most south sudomains
 !            l(i,j,k)=abs(q2lb(i,j,k)/q2b(i,j,k))
 ! ayumi 2010/4/12
             l(i,j,k)=abs(q2lb(i,j,k)/(q2b(i,j,k)+small))
-            if(z(k).gt.-0.5) l(i,j,k)=max(l(i,j,k),kappa*l0(i,j))
+            if(z(i,j,k).gt.-0.5) l(i,j,k)=max(l(i,j,k),kappa*l0(i,j))
 !            gh(i,j,k)=(l(i,j,k)**2)*boygr(i,j,k)/q2b(i,j,k)
 ! ayumi 2010/4/12
             gh(i,j,k)=(l(i,j,k)**2)*boygr(i,j,k)
@@ -3548,7 +3549,7 @@ C  !The most south sudomains
             prod(i,j,k)=km(i,j,k)*.25*sef
      $                *((u(i,j,k)-u(i,j,k-1)+u(i+1,j,k)-u(i+1,j,k-1))**2
      $                +(v(i,j,k)-v(i,j,k-1)+v(i,j+1,k)-v(i,j+1,k-1))**2)
-     $                                            /(dzz(k-1)*dh(i,j))**2
+     $                                        /(dzz(i,j,k-1)*dh(i,j))**2
                                   ! add shear due to internal wave field
      $                                      -shiw*km(i,j,k)*boygr(i,j,k)
             prod(i,j,k)=prod(i,j,k)+kh(i,j,k)*boygr(i,j,k)
@@ -3603,15 +3604,15 @@ C  !The most south sudomains
           vf(i,j,1)=0.
           vf(i,j,kb)=0.
           ee(i,j,2)=0.
-          gg(i,j,2)=-kappa*z(2)*dh(i,j)*q2(i,j,2)
-          vf(i,j,kb-1)=kappa*(1+z(kbm1))*dh(i,j)*q2(i,j,kbm1)
+          gg(i,j,2)=-kappa*z(i,j,2)*dh(i,j)*q2(i,j,2)
+          vf(i,j,kb-1)=kappa*(1+z(i,j,kbm1))*dh(i,j)*q2(i,j,kbm1)
         end do
       end do
       do k=2,kbm1
         do j=1,jm
           do i=1,im
-            dtef(i,j,k)=dtef(i,j,k)*(1.+e2*((1./abs(z(k)-z(1))
-     $              +1./abs(z(k)-z(kb)))*l(i,j,k)/(dh(i,j)*kappa))**2)
+            dtef(i,j,k)=dtef(i,j,k)*(1.+e2*((1./abs(z(i,j,k)-z(i,j,1))
+     $      +1./abs(z(i,j,k)-z(i,j,kb)))*l(i,j,k)/(dh(i,j)*kappa))**2)
           end do
         end do
       end do
@@ -3695,22 +3696,22 @@ C  !The most south sudomains
       do k=1,kb
         do i=1,im
           if(n_north.eq.-1) then
-            km(i,jm,k)=km(i,jmm1,k)*fsm(i,jm)
-            kh(i,jm,k)=kh(i,jmm1,k)*fsm(i,jm)
+            km(i,jm,k)=km(i,jmm1,k)*fsm(i,jm,k)
+            kh(i,jm,k)=kh(i,jmm1,k)*fsm(i,jm,k)
           end if
           if(n_south.eq.-1) then
-            km(i,1,k)=km(i,2,k)*fsm(i,1)
-            kh(i,1,k)=kh(i,2,k)*fsm(i,1)
+            km(i,1,k)=km(i,2,k)*fsm(i,1,k)
+            kh(i,1,k)=kh(i,2,k)*fsm(i,1,k)
           end if
         end do
         do j=1,jm
           if(n_east.eq.-1) then
-            km(im,j,k)=km(imm1,j,k)*fsm(im,j)
-            kh(im,j,k)=kh(imm1,j,k)*fsm(im,j)
+            km(im,j,k)=km(imm1,j,k)*fsm(im,j,k)
+            kh(im,j,k)=kh(imm1,j,k)*fsm(im,j,k)
           end if
           if(n_west.eq.-1) then
-            km(1,j,k)=km(2,j,k)*fsm(1,j)
-            kh(1,j,k)=kh(2,j,k)*fsm(1,j)
+            km(1,j,k)=km(2,j,k)*fsm(1,j,k)
+            kh(1,j,k)=kh(2,j,k)*fsm(1,j,k)
           end if
         end do
       end do
@@ -3760,11 +3761,11 @@ C  !The most south sudomains
 
       do k=2,kbm1
         do j=1,jm
-          do i=1,im          
+          do i=1,im
             a(i,j,k-1)=-dti2*(kh(i,j,k)+umol)
-     $                  /(dz(k-1)*dzz(k-1)*dh(i,j)*dh(i,j))
+     $                  /(dz(i,j,k-1)*dzz(i,j,k-1)*dh(i,j)*dh(i,j))
             c(i,j,k)=-dti2*(kh(i,j,k)+umol)
-     $                  /(dz(k)*dzz(k-1)*dh(i,j)*dh(i,j))
+     $                  /(dz(i,j,k)*dzz(i,j,k-1)*dh(i,j)*dh(i,j))
           end do
         end do
       end do
@@ -3785,10 +3786,10 @@ C  !The most south sudomains
           do j=1,jm
             do i=1,im
               rad(i,j,k)=swrad(i,j)
-     &               *real(
-     &                (r(ntp)*exp(real(z(k)*dh(i,j)/ad1(ntp),16))
-     &                 +(1.-r(ntp))*exp(real(z(k)*dh(i,j)/ad2(ntp),16)))
-     &                ,rk)
+     &           *real(
+     &            (r(ntp)*exp(real(z(i,j,k)*dh(i,j)/ad1(ntp),16))
+     &             +(1.-r(ntp))*exp(real(z(i,j,k)*dh(i,j)/ad2(ntp),16)))
+     &            ,rk)
             end do
           end do
         end do
@@ -3800,7 +3801,7 @@ C  !The most south sudomains
         do j=1,jm
           do i=1,im
             ee(i,j,1)=a(i,j,1)/(a(i,j,1)-1.)
-            gg(i,j,1)=-dti2*wfsurf(i,j)/(-dz(1)*dh(i,j))-f(i,j,1)
+            gg(i,j,1)=-dti2*wfsurf(i,j)/(-dz(i,j,1)*dh(i,j))-f(i,j,1)
             gg(i,j,1)=gg(i,j,1)/(a(i,j,1)-1.)
           end do
         end do
@@ -3812,7 +3813,7 @@ C  !The most south sudomains
           do i=1,im
             ee(i,j,1)=a(i,j,1)/(a(i,j,1)-1.)
             gg(i,j,1)=dti2*(wfsurf(i,j)+rad(i,j,1)-rad(i,j,2))
-     $                 /(dz(1)*dh(i,j))
+     $                 /(dz(i,j,1)*dh(i,j))
      $                   -f(i,j,1)
             gg(i,j,1)=gg(i,j,1)/(a(i,j,1)-1.)
           end do
@@ -3838,7 +3839,7 @@ C  !The most south sudomains
             ee(i,j,k)=a(i,j,k)*gg(i,j,k)
             gg(i,j,k)=(c(i,j,k)*gg(i,j,k-1)-f(i,j,k)
      $                 +dti2*(rad(i,j,k)-rad(i,j,k+1))
-     $                   /(dh(i,j)*dz(k)))
+     $                   /(dh(i,j)*dz(i,j,k)))
      $                 *gg(i,j,k)
           end do
         end do
@@ -3850,7 +3851,7 @@ C  !The most south sudomains
         do i=1,im
           f(i,j,kbm1)=(c(i,j,kbm1)*gg(i,j,kbm2)-f(i,j,kbm1)
      $                 +dti2*(rad(i,j,kbm1)-rad(i,j,kb))
-     $                   /(dh(i,j)*dz(kbm1)))
+     $                   /(dh(i,j)*dz(i,j,kbm1)))
      $                 /(c(i,j,kbm1)*(1.-ee(i,j,kbm2))-1.)
         end do
       end do
@@ -3905,9 +3906,9 @@ C  !The most south sudomains
         do j=1,jm
           do i=1,im
             a(i,j,k-1)=-dti2*(c(i,j,k)+umol)
-     $                  /(dz(k-1)*dzz(k-1)*dh(i,j)*dh(i,j))
+     $                /(dz(i,j,k-1)*dzz(i,j,k-1)*dh(i,j)*dh(i,j))
             c(i,j,k)=-dti2*(c(i,j,k)+umol)
-     $                /(dz(k)*dzz(k-1)*dh(i,j)*dh(i,j))
+     $                /(dz(i,j,k)*dzz(i,j,k-1)*dh(i,j)*dh(i,j))
           end do
         end do
       end do
@@ -3915,7 +3916,7 @@ C  !The most south sudomains
       do j=1,jm
         do i=1,im
           ee(i,j,1)=a(i,j,1)/(a(i,j,1)-1.)
-          gg(i,j,1)=(-dti2*wusurf(i,j)/(-dz(1)*dh(i,j))
+          gg(i,j,1)=(-dti2*wusurf(i,j)/(-dz(i,j,1)*dh(i,j))
      $               -uf(i,j,1))
      $               /(a(i,j,1)-1.)
         end do
@@ -3938,9 +3939,9 @@ C  !The most south sudomains
      $                +(.25*(vb(i,j,kbm1)+vb(i,j+1,kbm1)
      $                         +vb(i-1,j,kbm1)+vb(i-1,j+1,kbm1)))**2)
           uf(i,j,kbm1)=(c(i,j,kbm1)*gg(i,j,kbm2)-uf(i,j,kbm1))
-     $                  /(tps(i,j)*dti2/(-dz(kbm1)*dh(i,j))-1.
+     $                  /(tps(i,j)*dti2/(-dz(i,j,kbm1)*dh(i,j))-1.
      $                    -(ee(i,j,kbm2)-1.)*c(i,j,kbm1))
-          uf(i,j,kbm1)=uf(i,j,kbm1)*dum(i,j)
+          uf(i,j,kbm1)=uf(i,j,kbm1)*dum(i,j,k)
         end do
       end do
 
@@ -3948,7 +3949,7 @@ C  !The most south sudomains
         ki=kb-k
         do j=2,jmm1
           do i=2,imm1
-            uf(i,j,ki)=(ee(i,j,ki)*uf(i,j,ki+1)+gg(i,j,ki))*dum(i,j)
+            uf(i,j,ki)=(ee(i,j,ki)*uf(i,j,ki+1)+gg(i,j,ki))*dum(i,j,k)
           end do
         end do
       end do
@@ -4000,9 +4001,9 @@ C  !The most south sudomains
         do j=1,jm
           do i=1,im
             a(i,j,k-1)=-dti2*(c(i,j,k)+umol)
-     $                  /(dz(k-1)*dzz(k-1)*dh(i,j)*dh(i,j))
+     $                /(dz(i,j,k-1)*dzz(i,j,k-1)*dh(i,j)*dh(i,j))
             c(i,j,k)=-dti2*(c(i,j,k)+umol)
-     $                /(dz(k)*dzz(k-1)*dh(i,j)*dh(i,j))
+     $                /(dz(i,j,k)*dzz(i,j,k-1)*dh(i,j)*dh(i,j))
           end do
         end do
       end do
@@ -4010,7 +4011,7 @@ C  !The most south sudomains
       do j=1,jm
         do i=1,im
           ee(i,j,1)=a(i,j,1)/(a(i,j,1)-1.)
-          gg(i,j,1)=(-dti2*wvsurf(i,j)/(-dz(1)*dh(i,j))-vf(i,j,1))
+          gg(i,j,1)=(-dti2*wvsurf(i,j)/(-dz(i,j,1)*dh(i,j))-vf(i,j,1))
      $               /(a(i,j,1)-1.)
         end do
       end do
@@ -4032,9 +4033,9 @@ C  !The most south sudomains
      $                            +ub(i,j-1,kbm1)+ub(i+1,j-1,kbm1)))**2
      $                    +vb(i,j,kbm1)**2)
           vf(i,j,kbm1)=(c(i,j,kbm1)*gg(i,j,kbm2)-vf(i,j,kbm1))
-     $                  /(tps(i,j)*dti2/(-dz(kbm1)*dh(i,j))-1.
+     $                  /(tps(i,j)*dti2/(-dz(i,j,kbm1)*dh(i,j))-1.
      $                    -(ee(i,j,kbm2)-1.)*c(i,j,kbm1))
-          vf(i,j,kbm1)=vf(i,j,kbm1)*dvm(i,j)
+          vf(i,j,kbm1)=vf(i,j,kbm1)*dvm(i,j,k)
         end do
       end do
 
@@ -4042,7 +4043,7 @@ C  !The most south sudomains
         ki=kb-k
         do j=2,jmm1
           do i=2,imm1
-            vf(i,j,ki)=(ee(i,j,ki)*vf(i,j,ki+1)+gg(i,j,ki))*dvm(i,j)
+            vf(i,j,ki)=(ee(i,j,ki)*vf(i,j,ki+1)+gg(i,j,ki))*dvm(i,j,k)
           end do
         end do
       end do
@@ -4077,7 +4078,7 @@ C  !The most south sudomains
       do k=1,kb
         do i=1,im
           do j=1,jm
-            ff(i,j,k)=ff(i,j,k)*fsm(i,j)
+            ff(i,j,k)=ff(i,j,k)*fsm(i,j,k)
           end do
         end do
       end do
@@ -4133,7 +4134,8 @@ C  !The most south sudomains
               zwflux(i,j,k)=0.
             else
               wdz=abs(zwflux(i,j,k))
-              w2dt=dti2*zwflux(i,j,k)*zwflux(i,j,k)/(dzz(k-1)*dt(i,j))
+              w2dt=dti2*zwflux(i,j,k)*zwflux(i,j,k)
+     &                               /(dzz(i,j,k-1)*dt(i,j))
               mol=(ff(i,j,k-1)-ff(i,j,k))
      $             /(ff(i,j,k)+ff(i,j,k-1)+epsilon)
               zwflux(i,j,k)=(wdz-w2dt)*mol*sw
@@ -4164,8 +4166,8 @@ C  !The most south sudomains
       integer i,j
       parameter (value_min=1.e-9,epsilon=1.0e-14)
 
-! apply temperature and salinity mask
-      cf = cf*fsm
+! apply surface mask
+      cf = cf*fsm(:,:,1)
 
 ! recalculate mass fluxes with antidiffusion velocity
       do j=2,jmm1
@@ -4248,7 +4250,7 @@ C  !The most south sudomains
         do j=2,jmm1
           do i=2,imm1
             w(i,j,k+1)=w(i,j,k)
-     $                +dz(k)*((xflux(i+1,j,k)-xflux(i,j,k)
+     $            +dz(i,j,k)*((xflux(i+1,j,k)-xflux(i,j,k)
      $                        +yflux(i,j+1,k)-yflux(i,j,k))
      $                        /(dx(i,j)*dy(i,j))
      $                        +(etf(i,j)-etb(i,j))/dti2)
@@ -4300,18 +4302,18 @@ C  !The most south sudomains
 ! Nielson, P., 1992, Coastal bottom boundary layers and sediment
 ! transport. World Scientific.
 ! This aspect needs more basic research.
-! 
+!
 !  Input:
 !    fsm(I,j) = 1 for water cell, = 0 for land cell
 !    wusrf(i,j),wvsrf(i,j) = kinematic wind stress vector
-!    kp      = peak frequency wave number (m-1), assumed = 
+!    kp      = peak frequency wave number (m-1), assumed =
 !              the Significant wavenumber, a constant
 !    wubot(i,j),wvbot(i,j) = bottom stress vector as determned
 !      by bottom current (at zz(kb-1)) and cbc found here
 !    zzkbm1 = zz(kb-1) (non-d.)
 !    d(i,j) = water column depth (m)
 !    z0b = roughness parameter (m)
-!    cbcmin,cbcmax = limits on cbs (non-d.)    
+!    cbcmin,cbcmax = limits on cbs (non-d.)
 !
 !  Output:
 !    cbc(i,j) = bottom drag coefficient (non-d.)
@@ -4324,7 +4326,7 @@ C  !The most south sudomains
       integer i,j,im,jm
       real(kind=rk), intent(in) :: kp
       real(kind=rk) kappa,grav,fsm(im,jm),d(im,jm)
-      real(kind=rk) z0b,z0a,zzkbm1,cbcmin,cbcmax,cbc(im,jm)
+      real(kind=rk) z0b,z0a,zzkbm1(im,jm),cbcmin,cbcmax,cbc(im,jm)
       real(kind=rk) uboscil,utau2,fsinhinv,utau2min
       real(kind=rk) pi,btoba,utauwind,const
       real(kind=rk), intent(in) :: wusrf(im,jm),wvsrf(im,jm)
@@ -4344,10 +4346,10 @@ C  !The most south sudomains
             uboscil=const*utauwind*fsinhinv(kp*d(i,j))
             utau2=sqrt(wubot(i,j)**2+wvbot(i,j)**2)+utau2min
             z0a=z0b*(1.+0.05*uboscil**2/utau2)
-            cbc(i,j)=(kappa/log(1.+(1.0+zzkbm1)*d(i,j)/z0a))**2
-!     WRITE(10,'(''(1+zzkbm1)*d(i,j)='',1p1e13.5)')(1.0+zzkbm1)*d(i,j)
+            cbc(i,j)=(kappa/log(1.+(1.0+zzkbm1(i,j))*d(i,j)/z0a))**2
+!     WRITE(10,'(''(1+zzkbm1(i,j))*d(i,j)='',1p1e13.5)')(1.0+zzkbm1(i,j))*d(i,j)
 !     WRITE(10,'('' cbc = '',1p1e13.5)') cbc(i,j)
-!     WRITE(10,'('' log = '',1p1e13.5)')log(1.+(1.0+zzkbm1)*d(i,j)/z0a)
+!     WRITE(10,'('' log = '',1p1e13.5)')log(1.+(1.0+zzkbm1(i,j))*d(i,j)/z0a)
             cbc(i,j)=max(cbcmin,cbc(i,j))
 !     WRITE(10,'('' cbc = '',1p1e13.5)') cbc(i,j)
 !
@@ -4378,7 +4380,7 @@ C  !The most south sudomains
       data xd/0.,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7./
       data fdat/1.919,1.919,0.851,0.470,0.276,0.165,0.100,0.060,
      &         0.037,0.022,0.013,0.008,0.005,0.003,0.002/
-      fsinhinv=0.0 
+      fsinhinv=0.0
       if(x.lt.7.0) then
         ixd=int(2.0*x)+1
         fsinhinv=fdat(ixd)+(fdat(ixd+1)-fdat(ixd))*(x-xd(ixd))*2.0

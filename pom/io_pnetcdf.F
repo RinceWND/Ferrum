@@ -846,9 +846,9 @@
      $        north_e_varid,north_u_varid,north_v_varid,rot_varid,
      $        h_varid,fsm_varid!,dum_varid,dvm_varid
       integer ncid,status
-      integer i,j
+      integer i,j,k
       integer(mpi_offset_kind) start(4),edge(4)
-      real(kind=rk) minh
+      real(kind=rk) minh, z1d(kb), zz1d(kb), loz
 
       start = 1
       edge  = 1
@@ -918,9 +918,9 @@
 ! get data
       start(1)=1
       edge(1)=kb
-      status = get_var_real_1d(ncid, z_varid,start,edge, z)
+      status = get_var_real_1d(ncid, z_varid,start,edge, z1d)
       call handle_error_pnetcdf('get_var_real: z' ,status,nf_noerr)
-      status = get_var_real_1d(ncid,zz_varid,start,edge,zz)
+      status = get_var_real_1d(ncid,zz_varid,start,edge,zz1d)
       call handle_error_pnetcdf('get_var_real: zz',status,nf_noerr)
 
       start(1)=i_global(1)
@@ -951,181 +951,58 @@
       call handle_error_pnetcdf('get_var_real: rot',status,nf_noerr)
       status = get_var_real_2d(ncid,h_varid,start,edge,h)
       call handle_error_pnetcdf('get_var_real: h',status,nf_noerr)
-      status = get_var_real_2d(ncid,fsm_varid,start,edge,fsm)
+      status = get_var_real_2d(ncid,fsm_varid,start,edge,fsm(:,:,1))
       call handle_error_pnetcdf('get_var_real: fsm',status,nf_noerr)
+      do k=2,kb
+        fsm(:,:,k) = fsm(:,:,1)
+      end do
+
+      ! 10 unifom levels for first 50 meters
+      do j=1,jm
+        do i=1,im
+          loz = -h(i,j)*z1d(10)
+          if (loz < 50.) then
+            z(i,j,:)  = z1d
+            zz(i,j,:) = zz1d
+          else
+            z(i,j,1) =  0./h(i,j)
+            z(i,j,2) = -5./h(i,j)
+            z(i,j,3) =-10./h(i,j)
+            z(i,j,4) =-15./h(i,j)
+            z(i,j,5) =-20./h(i,j)
+            z(i,j,6) =-25./h(i,j)
+            z(i,j,7) =-30./h(i,j)
+            z(i,j,8) =-35./h(i,j)
+            z(i,j,9) =-40./h(i,j)
+            z(i,j,10)=-45./h(i,j)
+            do k=11,kb
+              loz = (z1d(k)-z1d(11))/(z1d(kb)-z1d(11))
+              z(i,j,k) = -(loz*(h(i,j)-50.)+50.)/h(i,j)
+            end do
+            zz(i,j,1:kb-1) = .5*(z(i,j,1:kb-1)+z(i,j,2:kb))
+            zz(i,j,kb) = zz(i,j,kb-1) + (zz(i,j,kb-1)-zz(i,j,kb-2))
+          end if
+        end do
+      end do
 
       minh =  minval(h)
       where (h==minh) h = 1.
       dvm = fsm
       dum = fsm
-      do j=1,jm-1
-        do i=1,im
-          if (fsm(i,j)==0..and.fsm(i,j+1)/=0.) dvm(i,j+1) = 0.
+      do k=1,kb
+        do j=1,jm-1
+          do i=1,im
+            if (fsm(i,j,k)==0..and.fsm(i,j+1,k)/=0.) dvm(i,j+1,k) = 0.
+          end do
+        end do
+        do j=1,jm
+          do i=1,im-1
+            if (fsm(i,j,k)==0..and.fsm(i+1,j,k)/=0.) dum(i+1,j,k) = 0.
+          end do
         end do
       end do
-      do j=1,jm
-        do i=1,im-1
-          if (fsm(i,j)==0..and.fsm(i+1,j)/=0.) dum(i+1,j) = 0.
-        end do
-      end do
-      call exchange2d_mpi(dum,im_local,jm_local)
-      call exchange2d_mpi(dvm,im_local,jm_local)
-
-! close file:
-      status=nfmpi_close(ncid)
-      call handle_error_pnetcdf('nf_close: grid',status,nf_noerr)
-
-      return
-      end
-!_______________________________________________________________________
-      subroutine read_grid_pnetcdf_obs
-! read grid data
-      implicit none
-# include "mpif.h"
-# include "pnetcdf.inc"
-      include 'pom.h'
-
-      integer get_var_real_1d
-     &       ,get_var_real_2d
-
-      character(len=120) netcdf_grid_file
-      integer z_varid,zz_varid,dx_varid,dy_varid,east_e_varid,
-     $        north_e_varid,rot_varid,h_varid,fsm_varid
-      integer ncid,status
-      integer i,j
-      integer(mpi_offset_kind) start(4),edge(4)
-
-      start = 1
-      edge  = 1
-
-! open netcdf file
-      write(netcdf_grid_file,'(a)') "./in/grid/grid_old.nc"
-
-      if(my_task.eq.0) write(*,'(/''reading file '',a)')
-     $  trim(netcdf_grid_file)
-      status=nfmpi_open(pom_comm,netcdf_grid_file,nf_nowrite,
-     $                  mpi_info_null,ncid)
-      call handle_error_pnetcdf('nfmpi_open: '//netcdf_grid_file,
-     $                          status,nf_noerr)
-
-! get variables
-      status=nfmpi_inq_varid(ncid,'z',z_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: z'
-     $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'zz',zz_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: zz'
-     $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'dx',dx_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: dx'
-     $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'dy',dy_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: dy'
-     $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'longitude',east_e_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: east_e'
-     $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'latitude',north_e_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: north_e'
-     $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'rot',rot_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: rot'
-     $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'h',h_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: h'
-     $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'fsm',fsm_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: fsm'
-     $                          ,status,nf_noerr)
-! get data
-      start(1)=1
-      edge(1)=kb
-      status = get_var_real_1d(ncid, z_varid,start,edge, z)
-      call handle_error_pnetcdf('get_var_real: z' ,status,nf_noerr)
-      status = get_var_real_1d(ncid,zz_varid,start,edge,zz)
-      call handle_error_pnetcdf('get_var_real: zz',status,nf_noerr)
-
-      start(1)=i_global(1)
-      start(2)=j_global(1)
-      edge(1)=im
-      edge(2)=jm
-      status = get_var_real_2d(ncid,dx_varid,start,edge,dx)
-      call handle_error_pnetcdf('get_var_real: dx',status,nf_noerr)
-      status = get_var_real_2d(ncid,dy_varid,start,edge,dy)
-      call handle_error_pnetcdf('get_var_real: dy',status,nf_noerr)
-      status = get_var_real_2d(ncid,east_e_varid,start,edge,east_e)
-      call handle_error_pnetcdf('get_var_real: east_e',status,nf_noerr)
-      status = get_var_real_2d(ncid,north_e_varid,start,edge,north_e)
-      call handle_error_pnetcdf('get_var_real: north_e',status,nf_noerr)
-      status = get_var_real_2d(ncid,rot_varid,start,edge,rot)
-      call handle_error_pnetcdf('get_var_real: rot',status,nf_noerr)
-      status = get_var_real_2d(ncid,h_varid,start,edge,h)
-      call handle_error_pnetcdf('get_var_real: h',status,nf_noerr)
-      status = get_var_real_2d(ncid,fsm_varid,start,edge,fsm)
-      call handle_error_pnetcdf('get_var_real: fsm',status,nf_noerr)
-!
-!     u-points:
-!
-      do j=1,jm-1
-        do i=1,im
-           east_u(i,j) = ( east_e(i,j)+ east_e(i,j+1))/2.
-          north_u(i,j) = (north_e(i,j)+north_e(i,j+1))/2.
-        end do
-      end do
-!
-!     Extrapolate ends:
-!
-      do i=1,im
-         east_u(i,jm) = ( east_e(i,jm)*3.- east_e(i,jm-1))/2.
-        north_u(i,jm) = (north_e(i,jm)*3.-north_e(i,jm-1))/2.
-      end do
-!
-!     v-points:
-!
-      do j=1,jm
-        do i=1,im-1
-           east_v(i,j) = ( east_e(i,j)+ east_e(i+1,j))/2.
-          north_v(i,j) = (north_e(i,j)+north_e(i+1,j))/2.
-        end do
-      end do
-!
-!     Extrapolate ends:
-!
-      do j=1,jm
-         east_v(im,j) = ( east_e(im,j)*3.- east_e(im-1,j))/2.
-        north_v(im,j) = (north_e(im,j)*3.-north_e(im-1,j))/2.
-      end do
-!
-!     c-points:
-!
-      do j=1,jm
-        do i=1,im-1
-           east_c(i,j) = ( east_v(i,j)+ east_v(i+1,j))/2.
-          north_c(i,j) = (north_u(i,j)+north_u(i+1,j))/2.
-        end do
-      end do
-!
-!     Extrapolate ends:
-!
-      do j=1,jm
-         east_c(im,j) = ( east_v(im,j)*3.- east_v(im-1,j))/2.
-        north_c(im,j) = (north_u(im,j)*3.-north_u(im-1,j))/2.
-      end do
-
-      write(*,*) my_task,"::::",minval(h),maxval(h)
-      dvm = fsm
-      dum = fsm
-      do j=1,jm-1
-        do i=1,im
-          if (fsm(i,j)==0..and.fsm(i,j+1)/=0.) dvm(i,j+1) = 0.
-        end do
-      end do
-      do j=1,jm
-        do i=1,im-1
-          if (fsm(i,j)==0..and.fsm(i+1,j)/=0.) dum(i+1,j) = 0.
-        end do
-      end do
-      call exchange2d_mpi(dum,im_local,jm_local)
-      call exchange2d_mpi(dvm,im_local,jm_local)
+      call exchange3d_mpi(dum,im_local,jm_local,kb)
+      call exchange3d_mpi(dvm,im_local,jm_local,kb)
 
 ! close file:
       status=nfmpi_close(ncid)
@@ -1546,12 +1423,11 @@
      $                                                ,salt(:,:,1:kb-1))
       call handle_error_pnetcdf('nfmpi_get_vara_real_all',
      $                          status,nf_noerr)
-      do k=1,kb-1
-        where (fsm==0.)
-          temp(:,:,k) = 0.
-          salt(:,:,k) = 0.
-        end where
-      end do
+      where (fsm==0.)
+        temp = 0.
+        salt = 0.
+      end where
+
       temp(:,:,kb) = temp(:,:,kb-1)
       salt(:,:,kb) = salt(:,:,kb-1)
 
@@ -1609,12 +1485,10 @@
       status = get_var_real_3d(ncid,sclim_varid,start,edge,salt)
       call handle_error_pnetcdf('get_var_real: sclim',status,nf_noerr)
 
-      do k=1,kbm1
-        where (fsm==0.)
-          temp(:,:,k) = 0.
-          salt(:,:,k) = 0.
-        end where
-      end do
+      where (fsm==0.)
+        temp = 0.
+        salt = 0.
+      end where
       temp(:,:,kb) = temp(:,:,kbm1)
       salt(:,:,kb) = salt(:,:,kbm1)
 
@@ -1677,15 +1551,13 @@
       status = get_var_real_3d(ncid,rm_varid,start,edge,rm)
       call handle_error_pnetcdf('get_var_real: rmean',status,nf_noerr)
 
-      do k=1,kb
-        where (fsm==0.)
-          temp(:,:,k) = 0.
-          salt(:,:,k) = 0.
-            rm(:,:,k) = 0.
-        end where
-      end do
+      where (fsm==0.)
+        temp = 0.
+        salt = 0.
+          rm = 0.
+      end where
 
-        rm(:,:,kb) =   rm(:,:,kbm1)
+      rm(:,:,kb) =   rm(:,:,kbm1)
 
 ! close file
       status=nfmpi_close(ncid)
@@ -2003,14 +1875,12 @@
       status = get_var_real_3d(ncid,sc_varid,start,edge,sc)
       call handle_error_pnetcdf('get_var_real: sc',status,nf_noerr)
 
-      do k=1,kbm1
-        where (fsm(:,:)==0.)
-          tm(:,:,k) = 0.
-          sm(:,:,k) = 0.
-          tc(:,:,k) = 0.
-          sc(:,:,k) = 0.
-        end where
-      end do
+      where (fsm==0.)
+        tm = 0.
+        sm = 0.
+        tc = 0.
+        sc = 0.
+      end where
 
       tm(:,:,kb) = tm(:,:,kb-1)
       sm(:,:,kb) = sm(:,:,kb-1)
@@ -2076,13 +1946,11 @@
       status = get_var_real_3d(ncid,sc_varid,start,edge,sc)
       call handle_error_pnetcdf('get_var_real: sc',status,nf_noerr)
 
-      do k=1,kbm1
-        where (fsm(:,:)==0.)
-          rm(:,:,k) = 0.
-          tc(:,:,k) = 0.
-          sc(:,:,k) = 0.
-        end where
-      end do
+      where (fsm==0.)
+        rm = 0.
+        tc = 0.
+        sc = 0.
+      end where
 
       rm(:,:,kb) = rm(:,:,kb-1)
       tc(:,:,kb) = tc(:,:,kb-1)
@@ -2140,7 +2008,7 @@
       status = get_var_real_2d(ncid,vw_varid,start,edge,vw)
       call handle_error_pnetcdf('get_var_real: vw',status,nf_noerr)
 
-      where (fsm==0.)
+      where (fsm(:,:,1)==0.)
         uw = 0.
         vw = 0.
       end where
@@ -2568,37 +2436,41 @@
 
       do k=1,wind_npd
         uwnd_out(2:imm1,2:jmm1,k) = uwnd_out(2:imm1,2:jmm1,k)*.25
-     &                        *(fsm(2:imm1,3:jm)+fsm(3:im,2:jmm1)
-     &                         +fsm(2:imm1,1:jmm2)+fsm(1:imm2,2:jmm1))
+     &                        *(fsm(2:imm1,3:jm,1)+fsm(3:im,2:jmm1,1)
+     &                       +fsm(2:imm1,1:jmm2,1)+fsm(1:imm2,2:jmm1,1))
         vwnd_out(2:imm1,2:jmm1,k) = vwnd_out(2:imm1,2:jmm1,k)*.25
-     &                        *(fsm(2:imm1,3:jm)+fsm(3:im,2:jmm1)
-     &                         +fsm(2:imm1,1:jmm2)+fsm(1:imm2,2:jmm1))
+     &                        *(fsm(2:imm1,3:jm,1)+fsm(3:im,2:jmm1,1)
+     &                       +fsm(2:imm1,1:jmm2,1)+fsm(1:imm2,2:jmm1,1))
         uwnd_out(1,2:jmm1,k) = uwnd_out(1,2:jmm1,k)/3.
-     &                        *(fsm(1,1:jmm2)+fsm(2,2:jmm1)+fsm(1,3:jm))
+     &                  *(fsm(1,1:jmm2,1)+fsm(2,2:jmm1,1)+fsm(1,3:jm,1))
         vwnd_out(1,2:jmm1,k) = vwnd_out(1,2:jmm1,k)/3.
-     &                        *(fsm(1,1:jmm2)+fsm(2,2:jmm1)+fsm(1,3:jm))
+     &                  *(fsm(1,1:jmm2,1)+fsm(2,2:jmm1,1)+fsm(1,3:jm,1))
         uwnd_out(im,2:jmm1,k) = uwnd_out(im,2:jmm1,k)/3.
-     &                   *(fsm(im,1:jmm2)+fsm(imm1,2:jmm1)+fsm(im,3:jm))
+     &             *(fsm(im,1:jmm2,1)+fsm(imm1,2:jmm1,1)+fsm(im,3:jm,1))
         vwnd_out(im,2:jmm1,k) = vwnd_out(im,2:jmm1,k)/3.
-     &                   *(fsm(im,1:jmm2)+fsm(imm1,2:jmm1)+fsm(im,3:jm))
+     &             *(fsm(im,1:jmm2,1)+fsm(imm1,2:jmm1,1)+fsm(im,3:jm,1))
         uwnd_out(2:imm1,1,k) = uwnd_out(2:imm1,1,k)/3.
-     &                        *(fsm(1:imm2,1)+fsm(2:imm1,2)+fsm(3:im,1))
+     &                  *(fsm(1:imm2,1,1)+fsm(2:imm1,2,1)+fsm(3:im,1,1))
         vwnd_out(2:imm1,1,k) = vwnd_out(2:imm1,1,k)/3.
-     &                        *(fsm(1:imm2,1)+fsm(2:imm1,2)+fsm(3:im,1))
+     &                  *(fsm(1:imm2,1,1)+fsm(2:imm1,2,1)+fsm(3:im,1,1))
         uwnd_out(2:imm1,jm,k) = uwnd_out(2:imm1,jm,k)/3.
-     &                   *(fsm(1:imm2,jm)+fsm(2:imm1,jmm1)+fsm(3:im,jm))
+     &             *(fsm(1:imm2,jm,1)+fsm(2:imm1,jmm1,1)+fsm(3:im,jm,1))
         vwnd_out(2:imm1,jm,k) = vwnd_out(2:imm1,jm,k)/3.
-     &                   *(fsm(1:imm2,jm)+fsm(2:imm1,jmm1)+fsm(3:im,jm))
-        uwnd_out(1,1,k) = uwnd_out(1,1,k)*.5*(fsm(1,2)+fsm(2,1))
-        vwnd_out(1,1,k) = vwnd_out(1,1,k)*.5*(fsm(1,2)+fsm(2,1))
-        uwnd_out(im,1,k) = uwnd_out(im,1,k)*.5*(fsm(im,2)+fsm(imm1,1))
-        vwnd_out(im,1,k) = vwnd_out(im,1,k)*.5*(fsm(im,2)+fsm(imm1,1))
-        uwnd_out(1,jm,k) = uwnd_out(1,jm,k)*.5*(fsm(1,jmm1)+fsm(2,jm))
-        vwnd_out(1,jm,k) = vwnd_out(1,jm,k)*.5*(fsm(1,jmm1)+fsm(2,jm))
+     &             *(fsm(1:imm2,jm,1)+fsm(2:imm1,jmm1,1)+fsm(3:im,jm,1))
+        uwnd_out(1,1,k) = uwnd_out(1,1,k)*.5*(fsm(1,2,1)+fsm(2,1,1))
+        vwnd_out(1,1,k) = vwnd_out(1,1,k)*.5*(fsm(1,2,1)+fsm(2,1,1))
+        uwnd_out(im,1,k) = uwnd_out(im,1,k)*.5
+     &                     *(fsm(im,2,1)+fsm(imm1,1,1))
+        vwnd_out(im,1,k) = vwnd_out(im,1,k)*.5
+     &                     *(fsm(im,2,1)+fsm(imm1,1,1))
+        uwnd_out(1,jm,k) = uwnd_out(1,jm,k)*.5
+     &                     *(fsm(1,jmm1,1)+fsm(2,jm,1))
+        vwnd_out(1,jm,k) = vwnd_out(1,jm,k)*.5
+     &                     *(fsm(1,jmm1,1)+fsm(2,jm,1))
         uwnd_out(im,jm,k) = uwnd_out(im,jm,k)*.5
-     &                     *(fsm(im,jmm1)+fsm(imm1,jm))
+     &                     *(fsm(im,jmm1,1)+fsm(imm1,jm,1))
         vwnd_out(im,jm,k) = vwnd_out(im,jm,k)*.5
-     &                     *(fsm(im,jmm1)+fsm(imm1,jm))
+     &                     *(fsm(im,jmm1,1)+fsm(imm1,jm,1))
       end do
 
 ! close file
@@ -2733,15 +2605,15 @@
 
       status = get_var_real_2d(ncid,shm_varid,start,edge,shm)
       call handle_error_pnetcdf('get_var_real: shum',status,nf_noerr)
-      shm = shm*fsm
+      shm = shm*fsm(:,:,1)
 
       status = get_var_real_2d(ncid,prt_varid,start,edge,prt)
       call handle_error_pnetcdf('get_var_real: prate',status,nf_noerr)
-      prt = prt*fsm
+      prt = prt*fsm(:,:,1)
 
       status = get_var_real_2d(ncid,cld_varid,start,edge,cld)
       call handle_error_pnetcdf('get_var_real: cloud',status,nf_noerr)
-      cld = cld*fsm
+      cld = cld*fsm(:,:,1)
 
 ! close file
       status=nfmpi_close(ncid)
@@ -2884,7 +2756,7 @@
       status = get_var_real_2d(ncid,ci_varid,start,edge,ci)
       call handle_error_pnetcdf('get_var_real: sice',status,nf_noerr)
 !      where(ci<=minval(ci,ci>0.)) ci = 0.
-      ci = fsm*ci/100.
+      ci = fsm(:,:,1)*ci/100.
 !      write(*,*) my_task,"::",minval(ci, ci>0.),maxval(ci)
 
 ! close file
@@ -3297,8 +3169,10 @@
      $                     'time',str_tmp,
      $                     ' ',.false.)
 
-      vdims(1)=z_dimid
-      call def_var_pnetcdf(ncid,'z',1,vdims,z_varid,nf_float,
+      vdims(1)=x_dimid
+      vdims(2)=y_dimid
+      vdims(3)=z_dimid
+      call def_var_pnetcdf(ncid,'z',3,vdims,z_varid,nf_float,
      $                     'sigma of cell face','sigma_level',
      $                     ' ',.false.)
       length=22
@@ -3309,7 +3183,7 @@
      $                          length,'sigma: z eta: elb depth: h')
       call handle_error_pnetcdf('nf_put_att_text: z',status,nf_noerr)
 
-      call def_var_pnetcdf(ncid,'zz',1,vdims,zz_varid,nf_float,
+      call def_var_pnetcdf(ncid,'zz',3,vdims,zz_varid,nf_float,
      $                     'sigma of cell centre','sigma_level',
      $                     ' ',.false.)
       length=22
@@ -3358,15 +3232,6 @@
       call def_var_pnetcdf(ncid,'h',2,vdims,h_varid,nf_float,
      $                     'undisturbed water depth','metre',
      $                     'east_e north_e',.true.)
-      call def_var_pnetcdf(ncid,'fsm',2,vdims,fsm_varid,nf_float,
-     $                     'free surface mask','dimensionless',
-     $                     'east_e north_e',.true.)
-      call def_var_pnetcdf(ncid,'dum',2,vdims,dum_varid,nf_float,
-     $                     'u-velocity mask','dimensionless',
-     $                     'east_u north_u',.true.)
-      call def_var_pnetcdf(ncid,'dvm',2,vdims,dvm_varid,nf_float,
-     $                     'v-velocity mask','dimensionless',
-     $                     'east_v north_v',.true.)
 
       vdims(1)=x_dimid
       vdims(2)=y_dimid
@@ -3407,6 +3272,20 @@
       call def_var_pnetcdf(ncid,'vi',3,vdims,vi_varid,nf_float,
      $                     'sea ice y-velocity','m/s',
      $                     'east_v north_v',.true.)
+
+      vdims(1)=x_dimid
+      vdims(2)=y_dimid
+      vdims(3)=z_dimid
+      call def_var_pnetcdf(ncid,'fsm',3,vdims,fsm_varid,nf_float,
+     $                     'free surface mask','dimensionless',
+     $                     'east_e north_e',.true.)
+      call def_var_pnetcdf(ncid,'dum',3,vdims,dum_varid,nf_float,
+     $                     'u-velocity mask','dimensionless',
+     $                     'east_u north_u',.true.)
+      call def_var_pnetcdf(ncid,'dvm',3,vdims,dvm_varid,nf_float,
+     $                     'v-velocity mask','dimensionless',
+     $                     'east_v north_v',.true.)
+
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=z_dimid
@@ -3445,14 +3324,6 @@
 !      edge(1)=1
 !      status=nfmpi_put_vara_real_all(ncid,time_varid,start,edge,time)
 !      call handle_error_pnetcdf('nf_put_vara_real:time',status,nf_noerr)
-
-      start(1)=1
-      edge(1)=kb
-      status=nfmpi_put_vara_real_all(ncid,z_varid,start,edge,real(z,4))
-      call handle_error_pnetcdf('nf_put_var_real: z',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,zz_varid,start,edge
-     &                                                      ,real(zz,4))
-      call handle_error_pnetcdf('nf_put_var_real: zz',status,nf_noerr)
 
       start(1)=i_global(1)
       start(2)=j_global(1)
@@ -3501,6 +3372,18 @@
       call handle_error_pnetcdf('nf_put_var_real: rot',status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,h_varid,start,edge,real(h,4))
       call handle_error_pnetcdf('nf_put_var_real: h',status,nf_noerr)
+
+      start(1)=i_global(1)
+      start(2)=j_global(1)
+      start(3)=1
+      edge(1)=im
+      edge(2)=jm
+      edge(3)=kb
+      status=nfmpi_put_vara_real_all(ncid,z_varid,start,edge,real(z,4))
+      call handle_error_pnetcdf('nf_put_var_real: z',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,zz_varid,start,edge
+     &                                                      ,real(zz,4))
+      call handle_error_pnetcdf('nf_put_var_real: zz',status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,fsm_varid,start,edge
      &                                                     ,real(fsm,4))
       call handle_error_pnetcdf('nf_put_var_real: fsm',status,nf_noerr)
@@ -3510,7 +3393,6 @@
       status=nfmpi_put_vara_real_all(ncid,dvm_varid,start,edge
      &                                                     ,real(dvm,4))
       call handle_error_pnetcdf('nf_put_var_real: dvm',status,nf_noerr)
-
 
       else
 
@@ -4126,8 +4008,10 @@
      $                     'time',str_tmp,
      $                     ' ',.false.)
 
-      vdims(1)=z_dimid
-      call def_var_pnetcdf(ncid,'sigma',1,vdims,z_varid,nf_float,
+      vdims(1)=x_dimid
+      vdims(2)=y_dimid
+      vdims(3)=z_dimid
+      call def_var_pnetcdf(ncid,'sigma',3,vdims,z_varid,nf_float,
      $                     'sigma of cell face','sigma_level',
      $                     ' ',.false.)
       str_tmp='ocean_sigma_coordinate'
@@ -4139,8 +4023,7 @@
       status=nfmpi_put_att_text(ncid,z_varid,'formula_terms',
      $                          length,str_tmp)
       call handle_error_pnetcdf('nf_put_att_text: z',status,nf_noerr)
-
-      call def_var_pnetcdf(ncid,'zz',1,vdims,zz_varid,nf_float,
+      call def_var_pnetcdf(ncid,'zz',3,vdims,zz_varid,nf_float,
      $                     'sigma of cell centre','sigma_level',
      $                     ' ',.false.)
       str_tmp='ocean_sigma_coordinate'
@@ -4152,6 +4035,16 @@
       status=nfmpi_put_att_text(ncid,zz_varid,'formula_terms',
      $                          length,str_tmp)
       call handle_error_pnetcdf('nf_put_att_text: zz',status,nf_noerr)
+
+      call def_var_pnetcdf(ncid,'fsm',3,vdims,fsm_varid,nf_float,
+     $                     'free surface mask','dimensionless',
+     $                     'east_e north_e',.true.)
+      call def_var_pnetcdf(ncid,'dum',3,vdims,dum_varid,nf_float,
+     $                     'u-velocity mask','dimensionless',
+     $                     'east_u north_u',.true.)
+      call def_var_pnetcdf(ncid,'dvm',3,vdims,dvm_varid,nf_float,
+     $                     'v-velocity mask','dimensionless',
+     $                     'east_v north_v',.true.)
 
 !alu:add calculated elebc output
       vdims(1)=x_dimid
@@ -4208,15 +4101,6 @@
       call def_var_pnetcdf(ncid,'h',2,vdims,h_varid,nf_float,
      $                     'undisturbed water depth','metre',
      $                     'east_e north_e',.true.)
-      call def_var_pnetcdf(ncid,'fsm',2,vdims,fsm_varid,nf_float,
-     $                     'free surface mask','dimensionless',
-     $                     'east_e north_e',.true.)
-      call def_var_pnetcdf(ncid,'dum',2,vdims,dum_varid,nf_float,
-     $                     'u-velocity mask','dimensionless',
-     $                     'east_u north_u',.true.)
-      call def_var_pnetcdf(ncid,'dvm',2,vdims,dvm_varid,nf_float,
-     $                     'v-velocity mask','dimensionless',
-     $                     'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'frz',2,vdims,frz_varid,nf_float,
      $                     'frz coeffi','dimensionless',
      $                     'east_v north_v',.true.)
@@ -4272,15 +4156,6 @@
      &                                                    ,real(time,4))
       call handle_error_pnetcdf('nf_put_vara_real:time',status
      & ,nf_noerr)
-
-      start(1)=1
-      edge(1)=kb
-      status=nfmpi_put_vara_real_all(ncid,z_varid,start,edge
-     &                                                       ,real(z,4))
-      call handle_error_pnetcdf('nf_put_var_real: z',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,zz_varid,start,edge
-     &                                                      ,real(zz,4))
-      call handle_error_pnetcdf('nf_put_var_real: zz',status,nf_noerr)
 
 !alu:add elebc
 !--East
@@ -4357,15 +4232,6 @@
       call handle_error_pnetcdf('nf_put_var_real: rot',status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,h_varid,start,edge,real(h,4))
       call handle_error_pnetcdf('nf_put_var_real: h',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,fsm_varid,start,edge
-     &                                                     ,real(fsm,4))
-      call handle_error_pnetcdf('nf_put_var_real: fsm',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,dum_varid,start,edge
-     &                                                     ,real(dum,4))
-      call handle_error_pnetcdf('nf_put_var_real: dum',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,dvm_varid,start,edge
-     &                                                     ,real(dvm,4))
-      call handle_error_pnetcdf('nf_put_var_real: dvm',status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,frz_varid,start,edge
      &                                                     ,real(frz,4))
       call handle_error_pnetcdf('nf_put_var_real: frz',status,nf_noerr)
@@ -4397,6 +4263,27 @@
       call handle_error_pnetcdf('
      $     nf_put_vara_real: wssurf',status,nf_noerr)
 
+      start(1)=i_global(1)
+      start(2)=j_global(1)
+      start(3)=1
+      edge(1)=im
+      edge(2)=jm
+      edge(3)=kb
+      status=nfmpi_put_vara_real_all(ncid,z_varid,start,edge
+     &                                                       ,real(z,4))
+      call handle_error_pnetcdf('nf_put_var_real: z',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,zz_varid,start,edge
+     &                                                      ,real(zz,4))
+      call handle_error_pnetcdf('nf_put_var_real: zz',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,fsm_varid,start,edge
+     &                                                     ,real(fsm,4))
+      call handle_error_pnetcdf('nf_put_var_real: fsm',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,dum_varid,start,edge
+     &                                                     ,real(dum,4))
+      call handle_error_pnetcdf('nf_put_var_real: dum',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,dvm_varid,start,edge
+     &                                                     ,real(dvm,4))
+      call handle_error_pnetcdf('nf_put_var_real: dvm',status,nf_noerr)
 
       start(1)=i_global(1)
       start(2)=j_global(1)
@@ -4490,8 +4377,10 @@
      $                     'time',str_tmp,
      $                     ' ',.false.)
 
-        vdims(1)=z_dimid
-        call def_var_pnetcdf(ncid,'sigma',1,vdims,z_varid,nf_float,
+        vdims(1)=x_dimid
+        vdims(2)=y_dimid
+        vdims(3)=z_dimid
+        call def_var_pnetcdf(ncid,'sigma',3,vdims,z_varid,nf_float,
      $                     'sigma of cell face','sigma_level',
      $                     ' ',.false.)
         str_tmp='ocean_sigma_coordinate'
@@ -4504,7 +4393,7 @@
      $                          length,str_tmp)
         call handle_error_pnetcdf('nf_put_att_text: z',status,nf_noerr)
 
-        call def_var_pnetcdf(ncid,'zz',1,vdims,zz_varid,nf_float,
+        call def_var_pnetcdf(ncid,'zz',3,vdims,zz_varid,nf_float,
      $                     'sigma of cell centre','sigma_level',
      $                     ' ',.false.)
         str_tmp='ocean_sigma_coordinate'
@@ -4644,15 +4533,6 @@
       call handle_error_pnetcdf('nf_put_vara_real:time',status
      & ,nf_noerr)
 
-      start(1)=1
-      edge(1)=kb
-      status=nfmpi_put_vara_real_all(ncid,z_varid,start,edge
-     &                                                       ,real(z,4))
-      call handle_error_pnetcdf('nf_put_var_real: z',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,zz_varid,start,edge
-     &                                                      ,real(zz,4))
-      call handle_error_pnetcdf('nf_put_var_real: zz',status,nf_noerr)
-
 !alu:add elebc
 !--East
        start(1)=j_global(1)
@@ -4771,6 +4651,20 @@
      $     ncid,vf_varid,start,edge,real(flv,4))
       call handle_error_pnetcdf(
      $     'nf_put_vara_real: flxv',status,nf_noerr)
+
+
+      start(1)=i_global(1)
+      start(2)=j_global(1)
+      start(3)=1
+      edge(1)=im
+      edge(2)=jm
+      edge(3)=kb
+      status=nfmpi_put_vara_real_all(ncid,z_varid,start,edge
+     &                                                       ,real(z,4))
+      call handle_error_pnetcdf('nf_put_var_real: z',status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,zz_varid,start,edge
+     &                                                      ,real(zz,4))
+      call handle_error_pnetcdf('nf_put_var_real: zz',status,nf_noerr)
 !
 !
 !      start(1)=i_global(1)

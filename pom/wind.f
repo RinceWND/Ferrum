@@ -9,7 +9,7 @@
       include 'pom.h'
 
       integer, parameter :: wn = 4
-      logical, parameter :: calc_mflx = .false.
+      logical, parameter :: calc_mflx = .true.
 
       real(kind=rk), dimension( im_local, jm_local ) ::
      $  uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd_fine, vwnd_fine
@@ -25,11 +25,11 @@
      $  uwnd_buf_coarse, vwnd_buf_coarse
 
       real(kind=rk), dimension( im_local, jm_local, wn ) ::
-     $  uwnd_buf, vwnd_buf 
+     $  uwnd_buf, vwnd_buf
 
       integer :: nsec(4)=(/ 0, 6*3600, 12*3600, 18*3600 /)
       integer :: sec_in_day, i, j, k
-      
+
       real(kind=rk), parameter :: rhoa = 1.22, rhow = 1025.0
       real(kind=rk) :: aa, uwnd, vwnd, cda, uvabs!, rdisp !lyo:pac10:add rdisp
 
@@ -39,19 +39,19 @@
       contains
 
 !==================================================================
-! Initialize variables for wind 
+! Initialize variables for wind
 !------------------------------------------------------------------
       subroutine wind_init( d_in )
-      
+
       use module_time
       use interp
-      
+
       implicit none
 
       ! intent(in)
       type(date), intent(in) :: d_in
 
-      ! local     
+      ! local
       type(date) :: d_off, d_fwd
 
       logical :: lexist
@@ -77,10 +77,10 @@
 !!       write( infile, '( "gfsw_",i4.4,2i2.2,".nc" )' )   ! fhx:read gfsw wind
 !!    $        d_in%year, d_in%month, d_in%day
 
-! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010  
+! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010
          inquire(file='in/'//trim(windf)//'/'//trim(infile),
-     $           exist=lexist)   
-!!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)   
+     $           exist=lexist)
+!!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)
 
          if(lexist) then
            d_off = str2date("1979-01-01 00:00:00")
@@ -100,17 +100,17 @@
 
          else
              if ( my_task == master_task ) then
-                  write(*,'(/2a)') 
+                  write(*,'(/2a)')
      $              "missing wind data at wind_init : "
      $              , trim(infile)
              endif
              uwnd_buf_coarse = 0.
-             vwnd_buf_coarse = 0.         
-            
+             vwnd_buf_coarse = 0.
+
          endif
 
 ! interpolation
-      if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.  
+      if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.
 
        do k=1,wn
         uwnd_coarse = uwnd_buf_coarse( :, :, k )
@@ -124,7 +124,7 @@
 !         print*, vwnd_fine(1,1),vwnd_fine(1,2),vwnd_fine(2,1)
 !         print*, ''
        do i=1,2
-         uwnd_fine(i,:)=uwnd_fine(3,:)      
+         uwnd_fine(i,:)=uwnd_fine(3,:)
          vwnd_fine(i,:)=vwnd_fine(3,:)
        enddo
 
@@ -132,22 +132,22 @@
 
       if(n_south.eq.-1) then
        do j=1,2
-         uwnd_fine(:,j)=uwnd_fine(:,3)       
-         vwnd_fine(:,j)=vwnd_fine(:,3)        
-       enddo 
+         uwnd_fine(:,j)=uwnd_fine(:,3)
+         vwnd_fine(:,j)=vwnd_fine(:,3)
+       enddo
       endif
          uwnd_buf(:,:,k)=uwnd_fine
          vwnd_buf(:,:,k)=vwnd_fine
- 
+
        enddo ! k=1,wn
-              
+
        else
 
-          uwnd_buf = reshape(uwnd_buf_coarse, shape(uwnd_buf))    
-          vwnd_buf = reshape(vwnd_buf_coarse, shape(vwnd_buf))  
-  
+          uwnd_buf = reshape(uwnd_buf_coarse, shape(uwnd_buf))
+          vwnd_buf = reshape(vwnd_buf_coarse, shape(vwnd_buf))
+
        endif !  if(calc_interp) then fhx:interp_flag
-                
+
          do i=1,wn-1
 
             if (  sec_in_day >= nsec(i) .and.
@@ -157,18 +157,18 @@
             vwnd_a = vwnd_buf( :, :, i )
             uwnd_b = uwnd_buf( :, :, i+1 )
             vwnd_b = vwnd_buf( :, :, i+1 )
-           
+
                exit
-               
-            endif   
+
+            endif
 
          enddo
-         
+
          if (  sec_in_day >= nsec(wn) ) then
 
             uwnd_a = uwnd_buf( :, :, wn )
             vwnd_a = vwnd_buf( :, :, wn )
-            
+
             d_fwd = d_in + 24 * 3600
             n = int((d_fwd-d_off)/86400.)*4+1
             n = mod(n, 1460 + 4*inc_leap(d_in%year))
@@ -185,7 +185,7 @@
 !            write( infile, '( "gfs_",i4.4,2i2.2,".nc" )' ) ! fhx:read gfs wind
 !     $           d_off%year, d_off%month, d_off%day
 
-! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010             
+! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010
          inquire(file='in/'//trim(windf)//'/'//trim(infile),
      $           exist=lexist)
 !!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)
@@ -205,17 +205,17 @@
 
          else
               if ( my_task == master_task ) then
-                 write(*,'(/2a)') 
+                 write(*,'(/2a)')
      $              "missing wind data at wind_init : "
      $              , trim(infile)
                endif
              uwnd_buf_coarse = 0.
              vwnd_buf_coarse = 0.
-             
+
          endif
 
 ! interpolation
-      if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.  
+      if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.
 
        do k=1,wn
         uwnd_coarse = uwnd_buf_coarse( :, :, k )
@@ -234,18 +234,18 @@
        do j=1,2
          uwnd_fine(:,j)=uwnd_fine(:,3)
          vwnd_fine(:,j)=vwnd_fine(:,3)
-       enddo 
+       enddo
       endif
          uwnd_buf(:,:,k)=uwnd_fine
          vwnd_buf(:,:,k)=vwnd_fine
- 
+
        enddo ! k=1,wn
 
        else
 
-          uwnd_buf = reshape(uwnd_buf_coarse, shape(uwnd_buf))    
-          vwnd_buf = reshape(vwnd_buf_coarse, shape(vwnd_buf))  
-  
+          uwnd_buf = reshape(uwnd_buf_coarse, shape(uwnd_buf))
+          vwnd_buf = reshape(vwnd_buf_coarse, shape(vwnd_buf))
+
        endif !  if(calc_interp) then !fhx:interp_flag
 
             uwnd_b = uwnd_buf( :, :, 1 )
@@ -266,7 +266,7 @@
 !-----------------------------------------------------------------
 
 !=================================================================
-! Read & time-interpolate wind data. 
+! Read & time-interpolate wind data.
 ! Calclate wind stress wusurf and wvsurf.
 !-----------------------------------------------------------------
       subroutine wind_main( d_in )
@@ -275,17 +275,17 @@
       use interp
 
       implicit none
-      
+
 
       ! intent(in)
       type(date), intent(in) :: d_in
 !      logical, intent(in) :: initial
 
-      ! local     
+      ! local
       type(date) :: d_off, d_fwd
       integer n
 
-      logical :: lexist     
+      logical :: lexist
 
       sec_in_day = d_in%hour*3600 + d_in%min*60 + d_in%sec
 
@@ -294,29 +294,29 @@
       n = int((d_in-d_off)/86400.)
 
       do i=1,wn-1
-         
+
          if (  sec_in_day >= nsec(i) .and.
      $         sec_in_day - nsec(i) < int( dti )  ) then
-            
+
             uwnd_a = uwnd_buf( :, :, i )
             vwnd_a = vwnd_buf( :, :, i )
             uwnd_b = uwnd_buf( :, :, i+1 )
             vwnd_b = vwnd_buf( :, :, i+1 )
 
             exit
-            
+
          endif
-         
+
       enddo
 
 
-         
+
       if (  sec_in_day >= nsec(wn) .and.
      $      sec_in_day - nsec(wn) < int ( dti )  ) then
 
             uwnd_a = uwnd_buf( :, :, wn )
             vwnd_a = vwnd_buf( :, :, wn )
-         
+
          d_fwd = d_in + 24 * 3600
          n = int((d_fwd-d_off)/86400.)*4+1
          n = mod(n, 1460 + 4*inc_leap(d_in%year))
@@ -335,8 +335,8 @@
 
 ! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010
          inquire(file='in/'//trim(windf)//'/'//trim(infile),
-     $           exist=lexist)   
-!!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)   
+     $           exist=lexist)
+!!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)
 
          if(lexist) then
 
@@ -353,19 +353,19 @@
 
          else
             if ( my_task == master_task ) then
-                 write(*,'(/2a)') 
+                 write(*,'(/2a)')
      $              "missing wind data at wind_main : "
      $              , trim(infile)
              endif
              uwnd_buf_coarse = 0.
              vwnd_buf_coarse = 0.
-             
+
          endif
 
 ! interpolation
-      if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.  
+      if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.
 
-       do k=1,4  
+       do k=1,4
         uwnd_coarse = uwnd_buf_coarse( :, :, k )
         vwnd_coarse = vwnd_buf_coarse( :, :, k )
         call interp_mask_2d(uwnd_coarse,1,east_e,north_e,uwnd_fine)
@@ -373,29 +373,29 @@
 !fhx: after interpolation, i=1,2 and j=1,2 seem to have problems
       if (n_west.eq.-1) then
        do i=1,2
-         uwnd_fine(i,:)=uwnd_fine(3,:)      
+         uwnd_fine(i,:)=uwnd_fine(3,:)
          vwnd_fine(i,:)=vwnd_fine(3,:)
        enddo
       endif
 
       if(n_south.eq.-1) then
        do j=1,2
-         uwnd_fine(:,j)=uwnd_fine(:,3)       
-         vwnd_fine(:,j)=vwnd_fine(:,3)        
-       enddo 
+         uwnd_fine(:,j)=uwnd_fine(:,3)
+         vwnd_fine(:,j)=vwnd_fine(:,3)
+       enddo
       endif
          uwnd_buf(:,:,k)=uwnd_fine
          vwnd_buf(:,:,k)=vwnd_fine
- 
-       enddo ! k=1,4 
+
+       enddo ! k=1,4
 
        else
 
-          uwnd_buf = reshape(uwnd_buf_coarse, shape(uwnd_buf))    
-          vwnd_buf = reshape(vwnd_buf_coarse, shape(vwnd_buf))          
-  
-       endif !  if(calc_interp) then fhx:interp_flag  
-         
+          uwnd_buf = reshape(uwnd_buf_coarse, shape(uwnd_buf))
+          vwnd_buf = reshape(vwnd_buf_coarse, shape(vwnd_buf))
+
+       endif !  if(calc_interp) then fhx:interp_flag
+
            uwnd_b = uwnd_buf( :, :, 1 )
            vwnd_b = vwnd_buf( :, :, 1 )
 
@@ -462,10 +462,10 @@
         call botwavedrag (im,jm,fsm
      &                   ,(1.-ice)*wusurf,(1.-ice)*wvsurf,
      $  0.0314159_rk,          !kp=2.*pi/200.=0.0314159
-     $  wubot,wvbot,h,zz(kbm1),z0b,cbcmin,cbcmax,cbc)
-      
+     $  wubot,wvbot,h,zz(:,:,kbm1),z0b,cbcmin,cbcmax,cbc)
 
-      
+
+
       return
 
       end subroutine wind_main

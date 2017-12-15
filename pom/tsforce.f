@@ -319,26 +319,26 @@
       do k=1,kb
          do j=1,jm
             do i=1,nfw
-               tobw(i,j,k) = tclim( i, j, k) * fsm( i, j)
-               sobw(i,j,k) = sclim( i, j, k) * fsm( i, j)
+               tobw(i,j,k) = tclim( i, j, k) * fsm( i, j, k)
+               sobw(i,j,k) = sclim( i, j, k) * fsm( i, j, k)
                enddo
             do i=1,nfe
                ii=im-i+1
-               tobe(i,j,k) = tclim(ii, j, k) * fsm(ii, j)
-               sobe(i,j,k) = sclim(ii, j, k) * fsm(ii, j)
+               tobe(i,j,k) = tclim(ii, j, k) * fsm(ii, j, k)
+               sobe(i,j,k) = sclim(ii, j, k) * fsm(ii, j, k)
                enddo
                tbw(j,k) = tobw(1,j,k); sbw(j,k) = sobw(1,j,k)
                tbe(j,k) = tobe(1,j,k); sbe(j,k) = sobe(1,j,k)
           enddo
          do i=1,im
             do j=1,nfs
-               tobs(i,j,k) = tclim( i, j, k) * fsm( i, j)
-               sobs(i,j,k) = sclim( i, j, k) * fsm( i, j)
+               tobs(i,j,k) = tclim( i, j, k) * fsm( i, j, k)
+               sobs(i,j,k) = sclim( i, j, k) * fsm( i, j, k)
                enddo
             do j=1,nfn
                jj=jm-j+1
-               tobn(i,j,k) = tclim( i,jj, k) * fsm( i,jj)
-               sobn(i,j,k) = sclim( i,jj, k) * fsm( i,jj)
+               tobn(i,j,k) = tclim( i,jj, k) * fsm( i,jj, k)
+               sobn(i,j,k) = sclim( i,jj, k) * fsm( i,jj, k)
                enddo
                tbs(i,k) = tobs(i,1,k); sbs(i,k) = sobs(i,1,k)
                tbn(i,k) = tobn(i,1,k); sbn(i,k) = sobn(i,1,k)
