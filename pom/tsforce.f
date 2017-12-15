@@ -7,7 +7,6 @@
       private
 
       public :: tsforce_init, tsforce_main, tsforce_tsflx
-      public :: uwnd_a, vwnd_a, uwnd_b, vwnd_b
 
       include 'pom.h'
 
@@ -27,8 +26,9 @@
 
 !     buffers for tsurf, ssurf etc
       real(kind=rk), dimension( im_local, jm_local ) ::
-     $     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, tair
-     $    ,tair_a, tair_b, emp, shum, rain, cloud, uwnd, vwnd, pres
+     $     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, emp, shum
+     $    ,tair_a, tair_b, tair, rain, cloud, pres
+     $    ,uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd, vwnd
 
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
@@ -59,6 +59,7 @@
       type(date), intent(in) :: d_in
       type(date) d_tmp
 
+      logical lexist
       integer n
 
 !     initialize
@@ -139,10 +140,26 @@
 !          tsurf_b = tm_b(:,:,1)
 !          ssurf_a = sm_a(:,:,1)
 !          ssurf_b = sm_b(:,:,1)
-          tsurf_a = tc_a(:,:,1)
-          tsurf_b = tc_b(:,:,1)
-          ssurf_a = sc_a(:,:,1)
-          ssurf_b = sc_b(:,:,1)
+!          tsurf_a = tc_a(:,:,1)
+!          tsurf_b = tc_b(:,:,1)
+!          ssurf_a = sc_a(:,:,1)
+!          ssurf_b = sc_b(:,:,1)
+      d_tmp = str2date("1979-01-01 00:00:00")
+      d_tmp%year = d_in%year
+      n = int((d_in-d_tmp)/86400.*4.)+1
+
+      write( infile_b, '( a3,".",i4.4,".nc" )' )
+     $        "hfl", d_in%year
+
+      inquire(file='in/heat/'//trim(infile_b),
+     $           exist=lexist)
+
+      if(lexist) then
+        if (calc_bulk_ncep) then
+          call read_ncep_bulk_pnetcdf(pres,tair_a,shum,rain
+     $                             ,cloud,uwnd_a,vwnd_a,infile_b,n)
+        end if
+      end if
 
           d_tmp = str2date("1979-01-01 00:00:00")
           d_tmp%year = d_in%year
@@ -236,8 +253,8 @@
 !         uw_a = uw_b
 !         vw_a = vw_b
 
-         tsurf_a = tsurf_b
-         ssurf_a = ssurf_b
+!         tsurf_a = tsurf_b
+!         ssurf_a = ssurf_b
 
 !         write( infile_b, '( "tsclimib",i2.2,".nc" )' ) mon_b
          call read_tsclim_monthly_pnetcdf
@@ -251,8 +268,8 @@
 !         call read_ssts_monthly_pnetcdf
 !     $        ( tsurf_b, ssurf_b, "ts_clim.nc", mon_b )
 
-         tsurf_b = tc_b(:,:,1)
-         ssurf_b = sc_b(:,:,1)
+!         tsurf_b = tc_b(:,:,1)
+!         ssurf_b = sc_b(:,:,1)
 
       endif
 
@@ -350,6 +367,7 @@
       ! intent(in)
       type(date), intent(in) :: d_in
       type(date) d_tmp
+      real(kind=rk) bb
       integer sec_in_day
 
       logical :: lexist
@@ -360,13 +378,17 @@
 
       d_tmp = str2date("1979-01-01 00:00:00")
       d_tmp%year = d_in%year
-      n = int((d_in-d_tmp)/86400.*4.)+1
+      n = int((d_in-d_tmp+6*3600)/86400.*4.)+1
+      if (n > 4*(365+inc_leap(d_in%year))) then
+        n = mod(n,4*(365+inc_leap(d_in%year)))
+        d_tmp%year = d_tmp%year+1
+      end if
 
       if (n/=nb) then
         nb = n
         tair_a = tair_b
         write( infile_b, '( a3,".",i4.4,".nc" )' )
-     $        "hfl", d_in%year
+     $        "hfl", d_tmp%year
 
         inquire(file='in/heat/'//trim(infile_b),
      $           exist=lexist)
@@ -375,7 +397,7 @@
         if(lexist) then
           if (calc_bulk_ncep) then
             call read_ncep_bulk_pnetcdf(pres,tair_b,shum,rain
-     $                                 ,cloud,uwnd,vwnd,infile_b,n)
+     $                             ,cloud,uwnd_b,vwnd_b,infile_b,n)
           else
             call read_heat_pnetcdf(
      $                  uht,swr,tair_b,emp,infile_b,n)
@@ -393,6 +415,7 @@
 
       end if
 
+      tair = (1.-bb)*tair_a + bb*tair_b
       if (calc_bulk) then
 
         tair = ( 1.0 - bb ) * tair_a + bb * tair_b
@@ -405,6 +428,8 @@
             call read_heat_aux_pnetcdf(shum,rain,cloud,infile_b,mb)
           end if
         end if
+        uwnd = ( 1.0 - bb ) * uwnd_a + bb * uwnd_b
+        vwnd = ( 1.0 - bb ) * vwnd_a + bb * vwnd_b
         call bulk(im,jm,tbias,fsm,t(:,:,1),east_e,north_e,
      $              d_in%year,d_in%month,d_in%day,
      $              d_in%hour,d_in%min,

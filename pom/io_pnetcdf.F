@@ -257,66 +257,76 @@
 ! write data
       start(1)=1
       edge(1)=1
-      status=nfmpi_put_vara_real_all(ncid,time_varid,start,edge,time)
+      status=nfmpi_put_vara_real_all(ncid,time_varid,start,edge
+     $                                                  ,real(time,4))
       call handle_error_pnetcdf('nf_put_vara_real:time',status
      $ ,nf_noerr)
 
       start(1)=1
       edge(1)=kb
-      status=nfmpi_put_vara_real_all(ncid,z_varid,start,edge,z)
+      status=nfmpi_put_vara_real_all(ncid,z_varid,start,edge
+     $                                                     ,real(z,4))
       call handle_error_pnetcdf('nf_put_var_real: z',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,zz_varid,start,edge,zz)
+      status=nfmpi_put_vara_real_all(ncid,zz_varid,start,edge
+     $                                                    ,real(zz,4))
       call handle_error_pnetcdf('nf_put_var_real: zz',status,nf_noerr)
 
       start(1)=i_global(1)
       start(2)=j_global(1)
       edge(1)=im
       edge(2)=jm
-      status=nfmpi_put_vara_real_all(ncid,dx_varid,start,edge,dx)
+      status=nfmpi_put_vara_real_all(ncid,dx_varid,start,edge
+     $                                                    ,real(dx,4))
       call handle_error_pnetcdf('nf_put_var_real: dx',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,dy_varid,start,edge,dy)
+      status=nfmpi_put_vara_real_all(ncid,dy_varid,start,edge
+     $                                                    ,real(dy,4))
       call handle_error_pnetcdf('nf_put_var_real: dy',status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,east_u_varid,start,edge,
-     $                               east_u)
+     $                                                 real(east_u,4))
       call handle_error_pnetcdf('nf_put_var_real: east_u',status,
      $                          nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,east_v_varid,start,edge,
-     $                               east_v)
+     $                                                 real(east_v,4))
       call handle_error_pnetcdf('nf_put_var_real: east_v',status,
      $                          nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,east_e_varid,start,edge,
-     $                               east_e)
+     $                                                 real(east_e,4))
       call handle_error_pnetcdf('nf_put_var_real: east_e',status,
      $                          nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,east_c_varid,start,edge,
-     $                               east_c)
+     $                                                 real(east_c,4))
       call handle_error_pnetcdf('nf_put_var_real: east_c',status,
      $                          nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,north_u_varid,start,edge,
-     $                               north_u)
+     $                                                real(north_u,4))
       call handle_error_pnetcdf('nf_put_var_real: north_u',status,
      $                          nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,north_v_varid,start,edge,
-     $                               north_v)
+     $                                                real(north_v,4))
       call handle_error_pnetcdf('nf_put_var_real: north_v',status,
      $                          nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,north_e_varid,start,edge,
-     $                               north_e)
+     $                                                real(north_e,4))
       call handle_error_pnetcdf('nf_put_var_real: north_e',status,
      $                          nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,north_c_varid,start,edge,
-     $                               north_c)
+     $                                                real(north_c,4))
       call handle_error_pnetcdf('nf_put_var_real: north_c',status,
      $                          nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,rot_varid,start,edge,rot)
+      status=nfmpi_put_vara_real_all(ncid,rot_varid,start,edge
+     $                                                   ,real(rot,4))
       call handle_error_pnetcdf('nf_put_var_real: rot',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,h_varid,start,edge,h)
+      status=nfmpi_put_vara_real_all(ncid,h_varid,start,edge
+     $                                                      ,real(h,4))
       call handle_error_pnetcdf('nf_put_var_real: h',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,fsm_varid,start,edge,fsm)
+      status=nfmpi_put_vara_real_all(ncid,fsm_varid,start,edge
+     $                                                    ,real(fsm,4))
       call handle_error_pnetcdf('nf_put_var_real: fsm',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,dum_varid,start,edge,dum)
+      status=nfmpi_put_vara_real_all(ncid,dum_varid,start,edge
+     $                                                    ,real(dum,4))
       call handle_error_pnetcdf('nf_put_var_real: dum',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,dvm_varid,start,edge,dvm)
+      status=nfmpi_put_vara_real_all(ncid,dvm_varid,start,edge
+     $                                                    ,real(dvm,4))
       call handle_error_pnetcdf('nf_put_var_real: dvm',status,nf_noerr)
 
       start(1)=i_global(1)
@@ -326,31 +336,31 @@
       edge(2)=jm
       edge(3)=1
       status=nfmpi_put_vara_real_all(ncid,uab_varid,start,edge
-     $ ,uab_mean)
+     $                                               ,real(uab_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: uab',status
      $ ,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,vab_varid,start,edge
-     $ ,vab_mean)
+     $                                               ,real(vab_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: vab',status
      $ ,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,elb_varid,start,edge
-     $ ,elb_mean)
+     $                                               ,real(elb_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: elb',status
      $ ,nf_noerr)
       status=nfmpi_put_vara_real_all(
-     $     ncid,wusurf_varid,start,edge,wusurf_mean)
+     $     ncid,wusurf_varid,start,edge,real(wusurf_mean,4))
       call handle_error_pnetcdf(
      $     'nf_put_vara_real: wusurf',status,nf_noerr)
       status=nfmpi_put_vara_real_all(
-     $     ncid,wvsurf_varid,start,edge,wvsurf_mean)
+     $     ncid,wvsurf_varid,start,edge,real(wvsurf_mean,4))
       call handle_error_pnetcdf(
      $     'nf_put_vara_real: wvsurf',status,nf_noerr)
       status=nfmpi_put_vara_real_all(
-     $     ncid,wtsurf_varid,start,edge,wtsurf_mean)
+     $     ncid,wtsurf_varid,start,edge,real(wtsurf_mean,4))
       call handle_error_pnetcdf(
      $     'nf_put_vara_real: wtsurf',status,nf_noerr)
       status=nfmpi_put_vara_real_all(
-     $     ncid,wssurf_varid,start,edge,wssurf_mean)
+     $     ncid,wssurf_varid,start,edge,real(wssurf_mean,4))
       call handle_error_pnetcdf('
      $     nf_put_vara_real: wssurf',status,nf_noerr)
 
@@ -362,24 +372,31 @@
       edge(2)=jm
       edge(3)=kb
       edge(4)=1
-      status=nfmpi_put_vara_real_all(ncid,u_varid,start,edge,u_mean)
+      status=nfmpi_put_vara_real_all(ncid,u_varid,start,edge
+     $                                                ,real(u_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: u',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,v_varid,start,edge,v_mean)
+      status=nfmpi_put_vara_real_all(ncid,v_varid,start,edge
+     $                                                ,real(v_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: v',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,w_varid,start,edge,w_mean)
+      status=nfmpi_put_vara_real_all(ncid,w_varid,start,edge
+     $                                                ,real(w_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: w',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,t_varid,start,edge,t_mean)
+      status=nfmpi_put_vara_real_all(ncid,t_varid,start,edge
+     $                                                ,real(t_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: t',status,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,s_varid,start,edge,s_mean)
+      status=nfmpi_put_vara_real_all(ncid,s_varid,start,edge
+     $                                                ,real(s_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: s',status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,rho_varid,start,edge
-     $ ,rho_mean)
+     $                                              ,real(rho_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: rho',status
      $ ,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,kh_varid,start,edge,kh_mean)
+      status=nfmpi_put_vara_real_all(ncid,kh_varid,start,edge
+     $                                               ,real(kh_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: kh',status
      $ ,nf_noerr)
-      status=nfmpi_put_vara_real_all(ncid,km_varid,start,edge,km_mean)
+      status=nfmpi_put_vara_real_all(ncid,km_varid,start,edge
+     $                                               ,real(km_mean,4))
       call handle_error_pnetcdf('nf_put_vara_real: km',status
      $ ,nf_noerr)
 
@@ -416,7 +433,7 @@
       integer(mpi_offset_kind) length
       integer(mpi_offset_kind) start(3),edge(3)
       logical spinup
-      namelist/misc_nml/ spinup
+      namelist/misc_nml/ spinup, t_lo, t_hi
 
       open(73, file='switch.nml',status='old')
       read(73, nml=misc_nml)
@@ -1943,6 +1960,14 @@
      $  trim(netcdf_ic_file)
       status=nfmpi_open(pom_comm,netcdf_ic_file,nf_nowrite,
      $                  mpi_info_null,ncid)
+      if (status/=NF_NOERR) then
+          if (my_task==0) write(*,*) 'Failed reading clim! Fallback...'
+          tm = 15.
+          sm = 33.
+          tc = 15.
+          sc = 33.
+          return
+      end if
       call handle_error_pnetcdf('nfmpi_open: '//netcdf_ic_file,
      $                          status,nf_noerr)
 
@@ -2432,43 +2457,41 @@
 !_______________________________________________________________________
 
 !_______________________________________________________________________
-      subroutine read_wind_pnetcdf( uwnd_out, vwnd_out, filename, n ) !lyo:pac10:use stcc version !lyo:pac10:not used!
+      subroutine read_mflx_pnetcdf( uflx, vflx, filename, n ) !lyo:pac10:use stcc version !lyo:pac10:not used!
 ! read wind stress
       implicit none
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      integer get_var_real_2d
-      integer, parameter :: wind_npd = 1
-      real(kind=rk) uwnd_out(im,jm,wind_npd),vwnd_out(im,jm,wind_npd)
-      character :: filename*16, netcdf_wind_file*24
+      integer get_var_real_3d,k
+      integer, parameter :: wind_npd = 4
+      character(len=*), intent(in) :: filename
+      real(kind=rk),dimension(im,jm,wind_npd),intent(out) ::
+     &                                            uflx, vflx
+      character :: netcdf_mflx_file*24
       integer ncid,status,n
-      integer uwnd_varid,vwnd_varid
+      integer uflx_varid,vflx_varid
       integer(mpi_offset_kind) start(4),edge(4)
 
       start = 1
       edge  = 1
 
 ! open netcdf wind file
-      netcdf_wind_file="in/"//windf//"/"//trim(filename)
-!*    write(netcdf_wind_file,'("in/"//windf//"/",a )')
-!     write(netcdf_wind_file,'("in/"//trim(windf)//"/",a )')
-!!    write(netcdf_wind_file,'("in/"trim(windf)"/",a )')
-!*   $                         trim(filename)
-!!    write(netcdf_wind_file,'(''in/gfsw/'',a )') trim(filename)
-      if(my_task.eq.0) write(*,'(/''reading file '',a)')
-     $                                    trim(netcdf_wind_file)
-      status=nfmpi_open(pom_comm,netcdf_wind_file,nf_nowrite,
+      netcdf_mflx_file="in/"//windf//"/"//trim(filename)
+      if(my_task.eq.0)
+     &       write(*,'(/''reading wind stress '',a,'' @ '',i4)')
+     &                                  trim(netcdf_mflx_file), n
+      status=nfmpi_open(pom_comm,netcdf_mflx_file,nf_nowrite,
      $                  mpi_info_null,ncid)
-      call handle_error_pnetcdf('nfmpi_open: '//netcdf_wind_file,
+      call handle_error_pnetcdf('nfmpi_open: '//netcdf_mflx_file,
      $                          status,nf_noerr)
 
 ! get variables
-      status=nfmpi_inq_varid(ncid,'uwnd',uwnd_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: uwnd'
+      status=nfmpi_inq_varid(ncid,'uflx',uflx_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: uflx'
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'vwnd',vwnd_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: vwnd'
+      status=nfmpi_inq_varid(ncid,'vflx',vflx_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: vflx'
      $                          ,status,nf_noerr)
 
 ! get data
@@ -2479,10 +2502,10 @@
       edge(2)=jm
       edge(3)=wind_npd
 
-      status = get_var_real_2d(ncid,uwnd_varid,start,edge,uwnd_out)
-      call handle_error_pnetcdf('get_var_real: uwnd',status,nf_noerr)
-      status = get_var_real_2d(ncid,vwnd_varid,start,edge,vwnd_out)
-      call handle_error_pnetcdf('get_var_real: vwnd',status,nf_noerr)
+      status = get_var_real_3d(ncid,uflx_varid,start,edge,uflx)
+      call handle_error_pnetcdf('get_var_real: uflx',status,nf_noerr)
+      status = get_var_real_3d(ncid,vflx_varid,start,edge,vflx)
+      call handle_error_pnetcdf('get_var_real: vflx',status,nf_noerr)
 
 ! close file
       status=nfmpi_close(ncid)
@@ -2514,12 +2537,7 @@
 
 ! open netcdf wind file
       netcdf_wind_file="in/"//windf//"/"//trim(filename)
-!*    write(netcdf_wind_file,'("in/"//windf//"/",a )')
-!     write(netcdf_wind_file,'("in/"//trim(windf)//"/",a )')
-!!    write(netcdf_wind_file,'("in/"trim(windf)"/",a )')
-!*   $                         trim(filename)
-!!    write(netcdf_wind_file,'(''in/gfsw/'',a )') trim(filename)
-      if(my_task.eq.0) write(*,'(/''reading file '',a,'' @ '',i4)')
+      if(my_task.eq.0) write(*,'(/''reading wind '',a,'' @ '',i4)')
      $                                    trim(netcdf_wind_file),n
       status=nfmpi_open(pom_comm_coarse,netcdf_wind_file,nf_nowrite,
      $                  mpi_info_null,ncid)

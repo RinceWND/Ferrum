@@ -78,8 +78,9 @@
 
       include 'realkind'
 
-      logical BIGNAMI_FORMULA, MAY_FORMULA
-      parameter (BIGNAMI_FORMULA=.true., MAY_FORMULA=.false.)
+      logical BIGNAMI_FORMULA, MAY_FORMULA, herzfeld_formula
+      parameter (BIGNAMI_FORMULA=.true., MAY_FORMULA=.false.,
+     $           herzfeld_formula=.false. )
 
       integer, intent(in) :: im, jm
 
@@ -193,6 +194,12 @@
               QBW = (1.-0.75*(cld**3.4))
      $             * (sigma*(tnowk**4.)*(0.4 -0.05*sqrt(ea12))
      $           + 4.*sigma*(tnowk**3.)*(sstk-tnowk))
+            end if
+
+            if (herzfeld_formula) then
+              QBW = (sigma*0.96*(1-(0.92e-5*tnowk*tnowk))*tnowk**4 +
+     $             4*sigma*0.96*(ckelv+tair(i,j)**3)*(sstk-tnowk)) *
+     $              (1-cos(alat(i,j))*cld) ! cos(phi) here is an improvised `beta` coefficient as a function of latitude from Herzfeld
             end if
 
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

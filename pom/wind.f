@@ -9,8 +9,9 @@
       include 'pom.h'
 
       integer, parameter :: wn = 4
+      logical, parameter :: calc_mflx = .false.
 
-      real(kind=rk), dimension( im_local, jm_local ), public ::
+      real(kind=rk), dimension( im_local, jm_local ) ::
      $  uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd_fine, vwnd_fine
 
 !lyo:pac10:more efficient:Comment out the followings
@@ -86,8 +87,13 @@
            d_off%year = d_in%year
            n = int((d_in-d_off)/86400.)*4+1
 
-           call read_wind_pnetcdfc
-     $             ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           if (calc_mflx) then
+             call read_wind_pnetcdfc
+     &         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           else
+             call read_mflx_pnetcdf
+     $         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           end if
 
            uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
            vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
@@ -181,13 +187,18 @@
 
 ! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010             
          inquire(file='in/'//trim(windf)//'/'//trim(infile),
-     $           exist=lexist)   
-!!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)   
+     $           exist=lexist)
+!!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)
 
          if(lexist) then
 
-            call read_wind_pnetcdfc
+           if (calc_mflx) then
+             call read_wind_pnetcdfc
+     &         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           else
+             call read_mflx_pnetcdf
      $         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           end if
 
            uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
            vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
@@ -322,15 +333,20 @@
 !         write( infile, '( "gfs_",i4.4,2i2.2,".nc" )' )  ! fhx:read gfs wind
 !     $        d_off%year, d_off%month, d_off%day
 
-! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010         
+! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010
          inquire(file='in/'//trim(windf)//'/'//trim(infile),
      $           exist=lexist)   
 !!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)   
 
          if(lexist) then
 
-         call read_wind_pnetcdfc
+           if (calc_mflx) then
+             call read_wind_pnetcdfc
+     &        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           else
+             call read_mflx_pnetcdf
      $        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           end if
 
            uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
            vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
@@ -384,7 +400,7 @@
            vwnd_b = vwnd_buf( :, :, 1 )
 
       endif
- 
+
 
       aa = real( mod( sec_in_day, 6 * 3600 ) ) / ( 6. * 3600. )
 
@@ -404,6 +420,7 @@
 !lyo:pac10:exp016:reduce wind to zero west of 129
 !           rdisp=0.5*(1.+tanh((east_e(i,j)-129.0)*0.5))
 !           uwnd=uwnd*rdisp; vwnd=vwnd*rdisp
+          if (calc_mflx) then
 !lyo:pac10:more efficient:
             uwsrf(i,j)=uwnd; vwsrf(i,j)=vwnd;
 
@@ -432,6 +449,10 @@
 
             wusurf(i,j) = - rhoa / rhow * cda * uvabs * (uwnd-u(i,j,1)) !- uwnd / rhow
             wvsurf(i,j) = - rhoa / rhow * cda * uvabs * (vwnd-v(i,j,1)) !- vwnd / rhow
+          else
+            wusurf(i,j) = uwnd / rhow   ! NCEP momentum flux is ALREADY INVERSED?!
+            wvsurf(i,j) = vwnd / rhow
+          end if
 
          enddo
       enddo
