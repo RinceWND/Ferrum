@@ -459,7 +459,7 @@
           wubot(i,j)  =0.     !lyo:20110315:botwavedrag:
           wvbot(i,j)  =0.     !lyo:20110315:botwavedrag:
           aamfac(i,j) =1.     !fhx:incmix
-          hi(i,j)=.35
+          hi(i,j)=0.05
         end do
       end do
 

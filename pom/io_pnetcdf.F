@@ -80,11 +80,11 @@
       integer vdims(4)
       integer(mpi_offset_kind) length
       integer(mpi_offset_kind) start(4),edge(4)
-      
+
 
 ! create netcdf file
 !      nprint=(iint+time0*86400/dti)/iprint
-!      write(netcdf_out_file,'(''out/'',a,''.'',i4.4,''.nc'')') 
+!      write(netcdf_out_file,'(''out/'',a,''.'',i4.4,''.nc'')')
 !     $                                          trim(netcdf_file),nprint
       if(my_task.eq.0) write(*,'(/''writing file '',a)')
      $     trim(netcdf_out_file)
@@ -196,7 +196,7 @@
       call def_var_pnetcdf(ncid,'dvm',2,vdims,dvm_varid,nf_float,
      $                     'v-velocity mask','dimensionless',
      $                     'east_v north_v',.true.)
-     
+
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=time_dimid
@@ -410,7 +410,8 @@
      $        w_varid,v_varid,vb_varid,t_varid,tb_varid,s_varid,
      $        sb_varid,rho_varid,adx2d_varid,ady2d_varid,advua_varid,
      $        advva_varid,km_varid,kh_varid,kq_varid,l_varid,q2_varid,
-     $        q2b_varid,aam_varid,q2l_varid,q2lb_varid
+     $        q2b_varid,aam_varid,q2l_varid,q2lb_varid,
+     &        icec_varid,iceh_varid,iceu_varid,icev_varid
       integer vdims(3)
       integer(mpi_offset_kind) length
       integer(mpi_offset_kind) start(3),edge(3)
@@ -423,7 +424,7 @@
 
 ! create netcdf restart file
       nprint=int((iint+time0*86400./dti)/irestart)
-!      write(netcdf_out_file,'(''out/'',a,''.'',i4.4,''.nc'')') 
+!      write(netcdf_out_file,'(''out/'',a,''.'',i4.4,''.nc'')')
 !     $     trim(write_rst_file),nprint
       if(my_task.eq.0) write(*,'(/''writing file '',a)')
      $ trim(netcdf_out_file)
@@ -549,6 +550,24 @@
      $                     'sum of 2nd, 3rd and 4th terms in eq (19)',
      $                     '-',
      $                     'east_v north_v',.true.)
+      if (calc_ice) then
+        call def_var_pnetcdf(ncid,'icec',2,vdims,icec_varid,nf_double,
+     $                     'ice concentration',
+     $                     '-',
+     $                     'east_c north_c',.true.)
+        call def_var_pnetcdf(ncid,'iceh',2,vdims,iceh_varid,nf_double,
+     $                     'ice thickness',
+     $                     '-',
+     $                     'east_c north_c',.true.)
+        call def_var_pnetcdf(ncid,'iceu',2,vdims,iceu_varid,nf_double,
+     $                     'x-velocity of ice',
+     $                     '-',
+     $                     'east_u north_u',.true.)
+        call def_var_pnetcdf(ncid,'icev',2,vdims,icev_varid,nf_double,
+     $                     'y-velocity of ice',
+     $                     '-',
+     $                     'east_v north_v',.true.)
+      end if
 
       vdims(1)=x_dimid
       vdims(2)=y_dimid
@@ -709,6 +728,18 @@
       status=nfmpi_put_vara_double_all(ncid,advva_varid,start,edge
      $ ,real(advva,8))
       call handle_error_pnetcdf('nf_put_vara_real',status,nf_noerr)
+      status=nfmpi_put_vara_double_all(ncid,icec_varid,start,edge
+     $ ,real(ice,8))
+      call handle_error_pnetcdf('nf_put_vara_real:icec',status,nf_noerr)
+      status=nfmpi_put_vara_double_all(ncid,iceh_varid,start,edge
+     $ ,real(hi,8))
+      call handle_error_pnetcdf('nf_put_vara_real:iceh',status,nf_noerr)
+      status=nfmpi_put_vara_double_all(ncid,iceu_varid,start,edge
+     $ ,real(ui,8))
+      call handle_error_pnetcdf('nf_put_vara_real:iceu',status,nf_noerr)
+      status=nfmpi_put_vara_double_all(ncid,icev_varid,start,edge
+     $ ,real(vi,8))
+      call handle_error_pnetcdf('nf_put_vara_real:icev',status,nf_noerr)
 
       start(1)=i_global(1)
       start(2)=j_global(1)
@@ -788,10 +819,10 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      
+
       integer get_var_real_1d
      &       ,get_var_real_2d
-      
+
       character(len=120) netcdf_grid_file
       integer z_varid,zz_varid,dx_varid,dy_varid,east_c_varid,
      $        east_e_varid,east_u_varid,east_v_varid,north_c_varid,
@@ -801,20 +832,20 @@
       integer i,j
       integer(mpi_offset_kind) start(4),edge(4)
       real(kind=rk) minh
-      
+
       start = 1
       edge  = 1
 
 ! open netcdf file
       write(netcdf_grid_file,'(a)') "./in/grid/grid.nc"
-   
+
       if(my_task.eq.0) write(*,'(/''reading file '',a)')
      $  trim(netcdf_grid_file)
       status=nfmpi_open(pom_comm,netcdf_grid_file,nf_nowrite,
      $                  mpi_info_null,ncid)
       call handle_error_pnetcdf('nfmpi_open: '//netcdf_grid_file,
      $                          status,nf_noerr)
-     
+
 ! get variables
       status=nfmpi_inq_varid(ncid,'z',z_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: z'
@@ -936,30 +967,30 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      
+
       integer get_var_real_1d
      &       ,get_var_real_2d
-      
+
       character(len=120) netcdf_grid_file
       integer z_varid,zz_varid,dx_varid,dy_varid,east_e_varid,
      $        north_e_varid,rot_varid,h_varid,fsm_varid
       integer ncid,status
       integer i,j
       integer(mpi_offset_kind) start(4),edge(4)
-      
+
       start = 1
       edge  = 1
 
 ! open netcdf file
       write(netcdf_grid_file,'(a)') "./in/grid/grid_old.nc"
-   
+
       if(my_task.eq.0) write(*,'(/''reading file '',a)')
      $  trim(netcdf_grid_file)
       status=nfmpi_open(pom_comm,netcdf_grid_file,nf_nowrite,
      $                  mpi_info_null,ncid)
       call handle_error_pnetcdf('nfmpi_open: '//netcdf_grid_file,
      $                          status,nf_noerr)
-     
+
 ! get variables
       status=nfmpi_inq_varid(ncid,'z',z_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: z'
@@ -1086,7 +1117,7 @@
       return
       end
 !_______________________________________________________________________
-      subroutine read_grid_pnetcdf0  ! fhx:called by subroutine "interp_init"  
+      subroutine read_grid_pnetcdf0  ! fhx:called by subroutine "interp_init"
 ! read original grid data for wind and satellite data
       implicit none
 # include "mpif.h"
@@ -1099,14 +1130,14 @@
 
 ! open netcdf file, /wrk/newshoni/fayumi/work/mpi-profs/netcdf_files/grid/grid_i402j252_hmin12m.nc
       write(netcdf_grid_file,'(a)') "./in/grid_i402j252_hmin12m.nc"
-   
+
       if(my_task.eq.0) write(*,'(/''reading file '',a)')
      $  trim(netcdf_grid_file)
       status=nfmpi_open(pom_comm_coarse,netcdf_grid_file,nf_nowrite,
      $                  mpi_info_null,ncid)
       call handle_error_pnetcdf('nfmpi_open: '//netcdf_grid_file,
      $                          status,nf_noerr)
-     
+
 ! get variables
 
       status=nfmpi_inq_varid(ncid,'east_e',alon_coarse_varid)
@@ -1168,11 +1199,12 @@
      $        w_varid,v_varid,vb_varid,t_varid,tb_varid,s_varid,
      $        sb_varid,rho_varid,adx2d_varid,ady2d_varid,advua_varid,
      $        advva_varid,km_varid,kh_varid,kq_varid,l_varid,q2_varid,
-     $        q2b_varid,aam_varid,q2l_varid,q2lb_varid
-! ayumi 2010/4/8 
-      integer wusurf_varid, wvsurf_varid 
+     $        q2b_varid,aam_varid,q2l_varid,q2lb_varid,
+     &        icec_varid,iceh_varid,iceu_varid,icev_varid
+! ayumi 2010/4/8
+      integer wusurf_varid, wvsurf_varid
       integer(mpi_offset_kind) start(4),edge(4)
-      
+
       start = 1
       edge  = 1
 
@@ -1308,6 +1340,18 @@
       status=nfmpi_inq_varid(ncid,'q2lb',q2lb_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: q2lb'
      $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'icec',icec_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: icec'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'iceh',iceh_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: iceh'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'iceu',iceu_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: iceu'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'icev',icev_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: icev'
+     $                          ,status,nf_noerr)
 
 ! get data
 ! ayumi 2010/4/8
@@ -1363,6 +1407,14 @@
       call handle_error_pnetcdf('get_var_real: advua',status,nf_noerr)
       status = get_var_real_2d(ncid,advva_varid,start,edge,advva)
       call handle_error_pnetcdf('get_var_real: advva',status,nf_noerr)
+      status = get_var_real_2d(ncid,icec_varid,start,edge,ice)
+      call handle_error_pnetcdf('get_var_real: icec',status,nf_noerr)
+      status = get_var_real_2d(ncid,iceh_varid,start,edge,hi)
+      call handle_error_pnetcdf('get_var_real: iceh',status,nf_noerr)
+      status = get_var_real_2d(ncid,iceu_varid,start,edge,ui)
+      call handle_error_pnetcdf('get_var_real: iceu',status,nf_noerr)
+      status = get_var_real_2d(ncid,icev_varid,start,edge,vi)
+      call handle_error_pnetcdf('get_var_real: icev',status,nf_noerr)
 
       start(1)=i_global(1)
       start(2)=j_global(1)
@@ -1438,7 +1490,7 @@
       integer ncid,status
       integer tb_varid,sb_varid
       integer(mpi_offset_kind) start(4),edge(4)
-      
+
       start = 1
       edge  = 1
 
@@ -1539,7 +1591,7 @@
       call handle_error_pnetcdf('get_var_real: tclim',status,nf_noerr)
       status = get_var_real_3d(ncid,sclim_varid,start,edge,salt)
       call handle_error_pnetcdf('get_var_real: sclim',status,nf_noerr)
-      
+
       do k=1,kbm1
         where (fsm==0.)
           temp(:,:,k) = 0.
@@ -1615,7 +1667,7 @@
             rm(:,:,k) = 0.
         end where
       end do
-      
+
         rm(:,:,kb) =   rm(:,:,kbm1)
 
 ! close file
@@ -1624,7 +1676,7 @@
 
       return
       end
-      
+
 !_______________________________________________________________________
       subroutine read_mean_ts_pnetcdf(temp,salt)  !lyo:20110202
 ! read xy-averaged, annual-mean temp & salt
@@ -1640,7 +1692,7 @@
       integer ncid,status
       integer tmean_varid,smean_varid
       integer(mpi_offset_kind) start(4),edge(4)
-      
+
       start = 1
       edge  = 1
 !
@@ -1699,7 +1751,7 @@
 ! open netcdf ic file
       write(netcdf_bc_file,'(''in/'',a,''.bc.nc'')')
      $  trim(netcdf_file)
-   
+
       if(my_task.eq.0) write(*,'(/''reading file '',a)')
      $  trim(netcdf_bc_file)
       status=nfmpi_open(pom_comm,netcdf_bc_file,nf_nowrite,
@@ -1867,7 +1919,7 @@
 
 
 
-! followings are for MAB model 
+! followings are for MAB model
 ! ayumi since 2010/4/?
 !_______________________________________________________________________
       subroutine read_tsclim_monthly_pnetcdf(tm,sm,tc,sc,in_file,n)
@@ -1925,7 +1977,7 @@
       call handle_error_pnetcdf('get_var_real: tc',status,nf_noerr)
       status = get_var_real_3d(ncid,sc_varid,start,edge,sc)
       call handle_error_pnetcdf('get_var_real: sc',status,nf_noerr)
-      
+
       do k=1,kbm1
         where (fsm(:,:)==0.)
           tm(:,:,k) = 0.
@@ -1998,7 +2050,7 @@
       call handle_error_pnetcdf('get_var_real: tc',status,nf_noerr)
       status = get_var_real_3d(ncid,sc_varid,start,edge,sc)
       call handle_error_pnetcdf('get_var_real: sc',status,nf_noerr)
-      
+
       do k=1,kbm1
         where (fsm(:,:)==0.)
           rm(:,:,k) = 0.
@@ -2062,7 +2114,7 @@
       call handle_error_pnetcdf('get_var_real: uw',status,nf_noerr)
       status = get_var_real_2d(ncid,vw_varid,start,edge,vw)
       call handle_error_pnetcdf('get_var_real: vw',status,nf_noerr)
-      
+
       where (fsm==0.)
         uw = 0.
         vw = 0.
@@ -2146,7 +2198,7 @@
       logical :: fexist !lyo:20110224:alu:stcc:
       character(len=*), intent(in) :: in_file
       integer, intent(in) :: n
-      
+
       start = 1
       edge  = 1
 !
@@ -2158,7 +2210,7 @@
 
       inquire(file=trim(netcdf_bc_file),exist=fexist)
 !
-      if(fexist) then 
+      if(fexist) then
 !
       if(my_task.eq.0) write(*,'(/''reading file '',a)')
      $  trim(netcdf_bc_file)
@@ -2235,7 +2287,7 @@
       logical :: fexist !lyo:20110224:alu:stcc:
       character(len=*), intent(in) :: in_file
       integer, intent(in) :: n
-      
+
       start = 1
       edge  = 1
 !
@@ -2247,7 +2299,7 @@
 
       inquire(file=trim(netcdf_bc_file),exist=fexist)
 !
-      if(fexist) then 
+      if(fexist) then
 !
       if(my_task.eq.0) write(*,'(/''reading file '',a)')
      $  trim(netcdf_bc_file)
@@ -2344,7 +2396,7 @@
 
       status=nfmpi_inq_varid(ncid,'phue',phue_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: phue',status,nf_noerr)
-      
+
 
 ! get data
       start(1)=j_global(1)
@@ -2831,7 +2883,7 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      real(kind=rk)ssha_out(im,jm)    
+      real(kind=rk)ssha_out(im,jm)
       real(kind=rk)errval
       character :: filename*16, netcdf_msla_file*25
       integer ncid,status
@@ -2856,7 +2908,7 @@
      $     'missing_value', errval )
 !      if(my_task.eq.0) write(*,'(a,f12.3)')
 !     $                                  " missing_value = ", errval
-      
+
 
 ! get data
       start(1)=i_global(1)
@@ -2886,7 +2938,7 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      real(kind=rk)ssha_out(im_coarse,jm_coarse)    
+      real(kind=rk)ssha_out(im_coarse,jm_coarse)
       real(kind=rk)errval
       character :: filename*16, netcdf_msla_file*25
       integer ncid,status
@@ -2911,7 +2963,7 @@
      $     'missing_value', errval )
 !      if(my_task.eq.0) write(*,'(a,f12.3)')
 !     $                                  " missing_value = ", errval
-      
+
 
 ! get data
       start(1)=i_global_coarse(1)
@@ -2944,7 +2996,7 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       real(kind=rk), dimension(im_local,jm_local) :: frs_out
-      real(kind=rk), dimension(im_local,jm_local,kb) 
+      real(kind=rk), dimension(im_local,jm_local,kb)
      $     :: tav_out, fac_out, cof_out
       character :: netcdf_assiminfo_file*21
       integer ncid,status
@@ -2972,7 +3024,7 @@
       status=nfmpi_inq_varid(ncid,'cof',cof_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: cof'
      $                          ,status,nf_noerr)
-  
+
 
 
 ! get data
@@ -3027,7 +3079,7 @@
 # include "pnetcdf.inc"
       include 'pom.h'
       real(kind=rk),dimension(im_local_coarse,jm_local_coarse)::frs_out
-      real(kind=rk),dimension(im_local_coarse,jm_local_coarse,kb) 
+      real(kind=rk),dimension(im_local_coarse,jm_local_coarse,kb)
      $     :: tav_out, fac_out, cof_out
       character :: netcdf_assiminfo_file*21
       integer ncid,status
@@ -3055,7 +3107,7 @@
       status=nfmpi_inq_varid(ncid,'cof',cof_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: cof'
      $                          ,status,nf_noerr)
-  
+
 
 
 ! get data
@@ -3109,7 +3161,7 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      real(kind=rk) mcsst_out(im_local,jm_local)    
+      real(kind=rk) mcsst_out(im_local,jm_local)
       real(kind=rk) errval
       character :: filename*17, netcdf_mcsst_file*26
       integer ncid,status
@@ -3134,7 +3186,7 @@
      $     'missing_value', errval )
 !      if(my_task.eq.0) write(*,'(a,f12.3)')
 !     $                                  " missing_value = ", errval
-      
+
 
 ! get data
       start(1)=i_global(1)
@@ -3174,14 +3226,14 @@
      $        north_e_varid,north_u_varid,north_v_varid,rot_varid,
      $        h_varid,fsm_varid,dum_varid,dvm_varid,uhtfl_varid,
      $        wusurf_varid,wvsurf_varid,wtsurf_varid,wssurf_varid,
-     &        icec_varid, ui_varid, vi_varid
+     &        icec_varid, iceh_varid, ui_varid, vi_varid
       integer time_varid,uab_varid,vab_varid,elb_varid,u_varid,v_varid,
      $        w_varid,t_varid,s_varid,rho_varid,km_varid,kh_varid
       integer ncid,status
       integer vdims(4)
       integer(mpi_offset_kind) length
       integer(mpi_offset_kind) start(4),edge(4)
-      
+
       iout = iout + 1
 
       if ( iout == 1  ) then
@@ -3297,7 +3349,7 @@
       call def_var_pnetcdf(ncid,'dvm',2,vdims,dvm_varid,nf_float,
      $                     'v-velocity mask','dimensionless',
      $                     'east_v north_v',.true.)
-     
+
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=time_dimid
@@ -3327,6 +3379,9 @@
      $                     'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'icec',3,vdims,icec_varid,nf_float,
      $                     'sea ice concentration','fraction',
+     $                     'east_e north_e',.true.)
+      call def_var_pnetcdf(ncid,'iceh',3,vdims,iceh_varid,nf_float,
+     $                     'sea ice thickness','m',
      $                     'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'ui',3,vdims,ui_varid,nf_float,
      $                     'sea ice x-velocity','m/s',
@@ -3495,6 +3550,9 @@
       status=nfmpi_inq_varid(ncid,'icec',icec_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: icec'
      $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'iceh',iceh_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: iceh'
+     $                          ,status,nf_noerr)
       status=nfmpi_inq_varid(ncid,'ui',ui_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: ui'
      $                          ,status,nf_noerr)
@@ -3578,6 +3636,10 @@
       status=nfmpi_put_vara_real_all(ncid,icec_varid,start,edge
      &                                                     ,real(ice,4))
       call handle_error_pnetcdf('nf_put_vara_real: icec'
+     &                                                 ,status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,iceh_varid,start,edge
+     &                                                      ,real(hi,4))
+      call handle_error_pnetcdf('nf_put_vara_real: iceh'
      &                                                 ,status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,ui_varid,start,edge
      &                                                      ,real(ui,4))
@@ -3665,6 +3727,10 @@
      &                                                     ,real(ice,4))
       call handle_error_pnetcdf('nf_put_vara_real: icec'
      &                                                 ,status,nf_noerr)
+      status=nfmpi_put_vara_real_all(ncid,iceh_varid,start,edge
+     &                                                      ,real(hi,4))
+      call handle_error_pnetcdf('nf_put_vara_real: iceh'
+     &                                                 ,status,nf_noerr)
       status=nfmpi_put_vara_real_all(ncid,ui_varid,start,edge
      &                                                      ,real(ui,4))
       call handle_error_pnetcdf('nf_put_vara_real: ui',status,nf_noerr)
@@ -3736,7 +3802,7 @@
       integer vdims(4)
       integer(mpi_offset_kind) length
       integer(mpi_offset_kind) start(4),edge(4)
-      
+
 
       iouts = iouts + 1
 
@@ -3823,7 +3889,7 @@
      $                     'free surface mask','dimensionless',
      $                     'east_e north_e',.true.)
 
-     
+
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=time_dimid
@@ -3960,7 +4026,7 @@
      $     ncid,vwsrf_varid,start,edge,real(vwsrf_mean))
       call handle_error_pnetcdf(
      $     'nf_put_vara_real: vwsrf',status,nf_noerr)
- 
+
 
 ! close file
       status=nfmpi_close(ncid)
@@ -3972,7 +4038,7 @@
 !_______________________________________________________________________
 !_______________________________________________________________________
       subroutine write_output_init_pnetcdf( netcdf_out_file ) !lyo:20110224:alu:stcc:!lyo:pac10:add this subroutine
-!alu:20100614:  write output data for initial fields   
+!alu:20100614:  write output data for initial fields
 !alu:20110105: change the name and clean up a little bit
       implicit none
 # include "mpif.h"
@@ -3995,7 +4061,7 @@
       integer vdims(4)
       integer(mpi_offset_kind) length
       integer(mpi_offset_kind) start(4),edge(4)
-      
+
 
 !     netcdf_out_file='./out/out.init.nc' !lyo:20110224:alu:stcc:
       if(my_task.eq.0) write(*,'(/''writing file '',a)')
@@ -4070,7 +4136,7 @@
       call handle_error_pnetcdf('nf_put_att_text: zz',status,nf_noerr)
 
 !alu:add calculated elebc output
-      vdims(1)=x_dimid 
+      vdims(1)=x_dimid
       call def_var_pnetcdf(ncid,'els',1,vdims,els_varid,nf_float, !South
      $                      'South elebc','metre',
      $                      'east_e',.true.)
@@ -4139,7 +4205,7 @@
       call def_var_pnetcdf(ncid,'aamfrz',2,vdims,aamfrz_varid,nf_float,
      $                     'aamfrz coeffi','dimensionless',
      $                     'east_v north_v',.true.)
-     
+
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=time_dimid
@@ -4224,7 +4290,7 @@
      &                                                     ,real(eln,4))
        call handle_error_pnetcdf('nf_put_var_real: eln',status,nf_noerr)
 
-      
+
 
       start(1)=i_global(1)
       start(2)=j_global(1)
@@ -4434,7 +4500,7 @@
         call handle_error_pnetcdf('nf_put_att_text: zz',status,nf_noerr)
 
 !alu:add calculated elebc output
-        vdims(1)=x_dimid 
+        vdims(1)=x_dimid
         call def_var_pnetcdf(ncid,'vabs',1,vdims,vabs_varid,nf_float, !South
      $                      'South barotropic boundary velocity','m/s',
      $                      'east_e',.true.)
@@ -4504,7 +4570,7 @@
 !      call def_var_pnetcdf(ncid,'aamfrz',2,vdims,aamfrz_varid,nf_float,
 !     $                     'aamfrz coeffi','dimensionless',
 !     $                     'east_v north_v',.true.)
-!     
+!
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=time_dimid
@@ -4595,7 +4661,7 @@
      &                                                    ,real(vabn,4))
        call handle_error_pnetcdf('nf_put_var_real:vabn',status,nf_noerr)
 
-      
+
 
       start(1)=j_global(1)
       start(2)=1
@@ -4727,18 +4793,18 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
         include 'realkind'
-        
+
 
         integer                              ,intent(in)  :: ncid, varid
         integer(mpi_offset_kind),dimension(4),intent(in)  :: start, edge
         real(kind=rk),     dimension(edge(1)),intent(out) :: var
-        
+
         integer       status, vtype
         integer(mpi_offset_kind) k,l,m,n
         real(kind=4)  f4, o4
         real(kind=8)  f8, o8
         real(kind=rk) fk, ok
-        
+
         integer(kind=1), dimension(:), allocatable :: i1  ! byte
         integer(kind=2), dimension(:), allocatable :: i2  ! short
         integer(kind=4), dimension(:), allocatable :: i4  ! int
@@ -4827,13 +4893,13 @@
         integer(mpi_offset_kind),dimension(4),intent(in)  :: start, edge
         real(kind=rk),
      &             dimension(edge(1),edge(2)),intent(out) :: var
-        
+
         integer       status, vtype
         integer(mpi_offset_kind) k,l,m,n
         real(kind=4)  f4, o4, m4
         real(kind=8)  f8, o8, m8
         real(kind=rk) fk, ok, mv
-        
+
         integer(kind=1), dimension(:,:), allocatable :: i1  ! byte
         integer(kind=2), dimension(:,:), allocatable :: i2  ! short
         integer(kind=4), dimension(:,:), allocatable :: i4  ! int

@@ -4,7 +4,7 @@
 
       private
 
-      public :: ice_init, ice_main, ice_advance
+      public :: ice_init, ice_main, ice_advance, ice_fuse
 
       include 'pom.h'
 
@@ -12,7 +12,7 @@
       real(kind=rk), dimension( im_local, jm_local ) ::
      &     ice_a, ice_b
 
-    
+
       integer :: day_a, day_b
       character(len=16) :: infile_a, infile_b
       real(kind=rk) :: aa
@@ -21,7 +21,7 @@
       contains
 
 !==============================================================
-! Initialization variables for U & V boundary condition 
+! Initialization variables for U & V boundary condition
 !--------------------------------------------------------------
       subroutine ice_init( d_in )
 
@@ -29,9 +29,10 @@
 
         implicit none
 
-        type(date), intent(in) :: d_in 
+        type(date), intent(in) :: d_in
         type(date) d_2
         integer secs
+        logical lexist
 
 
         d_2 = str2date("1979-01-02 00:00:00") ! TODO: Fix ice date generation
@@ -48,16 +49,36 @@
 
 !     data open.
         write( infile_a, '( "ice.",i4,2(i2.2),".nc" )' )
-     &                                      d_2%year, d_2%month, d_2%day  
-        call read_ice_pnetcdf( ice_a, infile_a )
+     &                                      d_2%year, d_2%month, d_2%day
+        inquire(file='in/sice/'//trim(infile_a), exist=lexist)
+        if (lexist) then
+          call read_ice_pnetcdf( ice_a, infile_a )
+        else
+          if (my_task==master_task) then
+            write(*,'(/2a)')
+     &              "missing prev. ice data at ice_init : "
+     &              , trim(infile_a)
+          end if
+          ice_a = 0.
+        end if
 
         if (secs>0) d_2 = d_2 + 2*86400
 
         write( infile_b, '( "ice.",i4,2(i2.2),".nc" )' )
-     &                                      d_2%year, d_2%month, d_2%day  
-        call read_ice_pnetcdf( ice_b, infile_b )
-     
-        if ( my_task == master_task ) 
+     &                                      d_2%year, d_2%month, d_2%day
+        inquire(file='in/sice/'//trim(infile_b), exist=lexist)
+        if (lexist) then
+          call read_ice_pnetcdf( ice_b, infile_b )
+        else
+          if (my_task==master_task) then
+            write(*,'(/2a)')
+     &              "missing next. ice data at ice_init : "
+     &              , trim(infile_b)
+          end if
+          ice_b = 0.
+        end if
+
+        if ( my_task == master_task )
      $        write(*,'(/a/)') "---------- ice_init."
 
         ice = ( 1.0 - aa ) * ice_a + aa * ice_b
@@ -80,6 +101,7 @@
         type(date) d_2
         integer secs
         real(kind=rk), dimension(im_local,jm_local) :: ci
+        logical lexist
 
 
         d_2 = str2date("1979-01-02 00:00:00")
@@ -102,11 +124,21 @@
           aa = 0.
 
           write( infile_b, '( "ice.",i4,2(i2.2),".nc" )' )
-     &                                      d_2%year, d_2%month, d_2%day  
-          call read_ice_pnetcdf( ice_b, infile_b )
+     &                                      d_2%year, d_2%month, d_2%day
+          inquire(file='in/sice/'//trim(infile_b), exist=lexist)
+          if (lexist) then
+            call read_ice_pnetcdf( ice_b, infile_b )
+          else
+            if (my_task==master_task) then
+              write(*,'(/2a)')
+     &              "missing next. ice data at ice_main : "
+     &              , trim(infile_b)
+            end if
+            ice_b = 0.
+          end if
 
         endif
-     
+
 
 !     time interpolation.
 
@@ -121,7 +153,38 @@
 
       end subroutine ice_main
 !--------------------------------------------------------------
-      
+
+!==============================================================
+! Ice fusion
+!--------------------------------------------------------------
+      subroutine ice_fuse
+
+        implicit none
+
+        integer i,j
+
+        real(kind=rk) rho_cpw, fusion_heat_wat,
+     $                fusion_heat_ice
+        !real(kind=rk), dimension(im,jm) :: lhf, dtemp
+        rho_cpw = 4.082793e6
+        fusion_heat_wat = 3.3472e5
+        fusion_heat_ice = 3.2257e5
+
+! Form ice only if the water temperature is below its freezing point
+        do j=1,jm
+          do i=1,im
+            if (t(i,j,1)<-2.7) then
+              ice(i,j) = ice(i,j) + 0.00001*(1-ice(i,j))
+              ice(i,j) = max(ice(i,j), 0.1)
+              hi(i,j) = hi(i,j) + wtsurf(i,j)*rho_cpw
+     $                       /fusion_heat_wat/rhoref/art(i,j)/ice(i,j)
+              hi(i,j) = max(hi(i,j),0.05)
+            end if
+          end do
+        end do
+
+      end subroutine ice_fuse
+
 !==============================================================
 ! Advance ice in time
 !--------------------------------------------------------------
@@ -415,7 +478,7 @@
         vi  = vif
         icb = ice
         ice = icf
-        
+
       end subroutine ice_advance
 
       end module seaice

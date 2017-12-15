@@ -3,7 +3,7 @@
       subroutine bulk(im,jm,tbias,fsm,tsurf,alon,alat,iyr,imo,iday,
      $    ihour,imin,wusurf,wvsurf,wtsurf,swrad,pme,
      $                                             uair,vair,
-     $                                    tair,rhum,rain,cloud,pres)
+     $                         tair,rhum,rain,cloud,pres,icec,iceh)
 !*******************************************************************************
 ! THIS SUBROUTINE PROVIDES SURFACE BOUNDARY CONDITIONS FOR MOMENTUM,
 ! HEAT AND SALT EQUATIONS SOLVED BY THE HYDRODYNAMIC MODEL IN CASES WHEN
@@ -13,14 +13,14 @@
 ! ACCORDING TO THE REED FORMULA WHILE THE NET LONGWAVE RADIATION CAN BE
 ! CALCULATED ACCORDING TO BIGNAMI OR MAY FORMULA (SEE LOGICAL VARIABLES
 ! BIGNAMI_FORMULA & MAY_FORMULA BELOW)
-! 
+!
 ! MOMENTUM, HEAT AND FRESHWATER FLUXES ARE CALCULATED FROM THE ATMOSPHERIC
 ! PARAMETERS (WIND VELOCITY, AIR TEMPERATURE, RELATIVE HUMIDITY, PRECIPITATION,
-! CLOUD COVERAGE) PROVIDED BY THE 
+! CLOUD COVERAGE) PROVIDED BY THE
 ! WEATHER PREDICTION MODEL AND THE MODEL'S SST USING PROPER AIR-SEA BULK
 ! FORMULAE (Castellari et al., 1998, Korres and Lascaratos 2003).
 ! ( Castellari et al., 1998. Journal of Marine Systems, 18, 89-114 ;
-!   Korres and Lascaratos, 2003. Annales Geophysicae, 21, 205-220.) 
+!   Korres and Lascaratos, 2003. Annales Geophysicae, 21, 205-220.)
 !
 !  ALL UNITS ARE S.I. (M.K.S.)
 !
@@ -40,13 +40,13 @@
 !
 ! SUBROUTINE BULK NEEDS THE FOLLOWING INPUT:
 !
-! 
+!
 ! MODEL RELATED DATA
 ! 1. IM     : NUMBER OF GRID POINTS IN X
 ! 2. JM     : NUMBER OF GRID POINTS IN Y
-! 3. TBIAS  : CONSTANT VALUE SUBTRACTED FROM MODEL'S TEMPERATURE FIELD 
+! 3. TBIAS  : CONSTANT VALUE SUBTRACTED FROM MODEL'S TEMPERATURE FIELD
 ! 4. FSM()  : THE MODEL MASK (1.:SEA GRID POINT, 0.:LAND GRID POINT)
-! 5. TSURF(): MODEL'S TEMPERATURE FIELD AT THE TOP VERTICAL LEVEL AND AT THE 
+! 5. TSURF(): MODEL'S TEMPERATURE FIELD AT THE TOP VERTICAL LEVEL AND AT THE
 !             CENTRAL TIME LEVEL
 ! 6. ALON() : LOGNITUDE OF GRID POINTS
 ! 7. ALAT() : LATITUDE OF GRID POINTS
@@ -67,28 +67,27 @@
 !
 !
 ! Important:
-! SUBROUTINE BULK REQUIRES THAT THE ATMOSPHERIC DATA ARE ALREADY 
-! INTERPOLATED IN TIME AND SPACE (i.e. mapped onto the model grid and 
+! SUBROUTINE BULK REQUIRES THAT THE ATMOSPHERIC DATA ARE ALREADY
+! INTERPOLATED IN TIME AND SPACE (i.e. mapped onto the model grid and
 ! interpolated to the current time step. The user has to write his/her own
 ! subroutines in order to map the raw atmospheric data onto the model grid
 ! and interpolate them to the current time step)
-! 
+!
 !*******************************************************************************
 !      implicit none
 
       include 'realkind'
-     
+
       logical BIGNAMI_FORMULA, MAY_FORMULA
       parameter (BIGNAMI_FORMULA=.true., MAY_FORMULA=.false.)
 
-      real(kind=rk), dimension(im, jm) ::
-     $ fsm(im,jm),pme(im,jm),swrad(im,jm),wusurf(im,jm),
-     $ wvsurf(im,jm),wtsurf(im,jm),tsurf(im,jm),alon(im,jm),
-     $ alat(im,jm)
+      integer, intent(in) :: im, jm
 
-      real(kind=rk), dimension(im, jm) ::
-     $  uair(im,jm),vair(im,jm),tair(im,jm),rhum(im,jm),
-     $  rain(im,jm),cloud(im,jm),pres(im,jm)
+      real(kind=rk), dimension(im, jm), intent(in) ::
+     $ fsm,tsurf,alon,alat,uair,vair,tair,cloud,pres,icec,iceh,rhum,rain
+
+      real(kind=rk), dimension(im, jm), intent(out) ::
+     $ pme,swrad,wusurf,wvsurf,wtsurf
 !
 !--------------------------------------------------------------------
 !       coefficients ( in MKS )  :
@@ -102,7 +101,7 @@
 
       data rho_cpw/4.082793e6/
 
-! --- surface air pressure, expsi, dry air gas constant 
+! --- surface air pressure, expsi, dry air gas constant
 !
       data ps,expsi,rd / 1013., 0.622, 287./
 !
@@ -122,7 +121,7 @@
       data ckelv /273.16/
 !
       const = 0.622/1013.
-! 
+!
 !
       do j = 1,jm
         do i = 1,im
@@ -139,7 +138,7 @@
             cld       = cloud(i,j)/100. ! rwnd: total cloud cover from % to tenths
             sst_model = tsurf(i,j)+tbias
 
-! SST_MODEL IS THE MODEL'S TEMPERATURE (in deg Celsius) AT THE TOP LEVEL 
+! SST_MODEL IS THE MODEL'S TEMPERATURE (in deg Celsius) AT THE TOP LEVEL
 !
 ! --- compute wind speed magnitude for bulk coeff.
 !
@@ -147,7 +146,7 @@
 
 !
 ! --- SST data converted in Kelvin degrees
-! --- TNOW is already in Kelvin 
+! --- TNOW is already in Kelvin
 !
             sstk = sst_model + ckelv
             tnowk = tnow
@@ -165,13 +164,13 @@
             wsatair = (expsi/pnow) * esatair
             wsatoce = (expsi/pnow) * esatoce
 !
-! --- calculates the mixing ratio of the air 
+! --- calculates the mixing ratio of the air
 ! --- w(Ta)
 !
-            wair = 0.01 * rhnow * wsatair 
+            wair = 0.01 * rhnow * wsatair
 !
 ! --- calculates the density of  moist air
-!     
+!
             rhom = 100.*(pnow/rd)*(expsi*(1.+wair)/(tnowk*(expsi+wair)))
 !
 !---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
@@ -199,7 +198,7 @@
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
 ! --- calculate the term : ( Ts - Ta )
-            deltemp = sstk - tnowk 
+            deltemp = sstk - tnowk
 !
 ! Calculate turbulent exchange coefficients according to Kondo scheme
 ! ( Kondo, J., 1975. Boundary Layer Meteorology, 9, 91-112)
@@ -236,7 +235,7 @@
             ce2 = 1.5e-03*fe
 
 !---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-! Calculate the sensible (QH) latent (QE) heat flux 
+! Calculate the sensible (QH) latent (QE) heat flux
 !                    and the evaporation rate (EVAP)
 !---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !
@@ -258,7 +257,7 @@
 !
 !
 !---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-! Calculate the water flux (WFLUX) in m/sec 
+! Calculate the water flux (WFLUX) in m/sec
 !---- -- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !
             WFLUX =  evap/rho - precip
@@ -269,23 +268,30 @@
 ! THE SALT FLUX ( WSSURF() ) IN POM MAIN CODE (REQUIRED FOR PROFT) SHOULD
 ! BE CALCULATED AS:
 !       do 3072 j = 1, jm
-!       do 3072 i = 1, im        
+!       do 3072 i = 1, im
 !  3072 WSSURF(I,J)=PME(I,J)*(VF(I,J,1)+SBIAS)
 
 !---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 ! Calculate  the net upward flux (QU) at the sea surface
 !---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !
-! --- calculates : Qu = Qb + QH + QE  
+! --- calculates : Qu = Qb + QH + QE
 !
             QU = qbw + qh + qe
             if (QU<0.) then
                 write(*,*) i,j,":::",qbw,qh,qe
             end if
 !
-! --- 1. Devide upward heat flux by rho*Cpw 
+! --- 1. Divide upward heat flux by rho*Cpw
 !
             wtsurf(i,j) = QU/rho_cpw
+
+!
+! --- 2. \RWND\ Account for sea ice cover
+!
+            wtsurf(i,j) = (1-icec(i,j))*wtsurf(i,j)
+     $        +icec(i,j)*((sst_model+1.82)*0.1*1.03e-12*2117.*917.
+     $                      /iceh(i,j))/rho_cpw
 
 ! --- Calculate net solar radiation flux according to Reed (Reed,1977) formula
 !
@@ -303,10 +309,10 @@
 !
 
 !---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-! Calculate the wind stress components (TAUX, TAUY) 
+! Calculate the wind stress components (TAUX, TAUY)
 !---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !
-! --- Calculate  the Drag Coefficient Cd accoriding to 
+! --- Calculate  the Drag Coefficient Cd accoriding to
 !                         Hellerman & Rosenstein (1983)
 !
             cd1 = cd(sp,deltemp)
@@ -317,7 +323,7 @@
             TAUX = rhom*cd1*sp*unow
             TAUY = rhom*cd1*sp*vnow
 
-! --- Reverse Sign and divide by sea water density 
+! --- Reverse Sign and divide by sea water density
             wusurf(i,j) = -taux/rho
             wvsurf(i,j) = -tauy/rho
 
@@ -347,7 +353,7 @@
 ! --- the temperature ( Celsius degrees )
 ! --- ( from A. Gill  pag. 607 )
 !
-! --- Constant Latent Heat of Vaporization 
+! --- Constant Latent Heat of Vaporization
 !     L = 2.501e+6  (MKS)
 !
         heatlat = 2.5008e+6 -2.3e+3*t
