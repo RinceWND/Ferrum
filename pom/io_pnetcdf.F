@@ -839,13 +839,14 @@
 
       integer get_var_real_1d
      &       ,get_var_real_2d
+     &       ,get_var_real_3d
 
       character(len=120) netcdf_grid_file
       integer z_varid,zz_varid,dx_varid,dy_varid,east_c_varid,
      $        east_e_varid,east_u_varid,east_v_varid,north_c_varid,
      $        north_e_varid,north_u_varid,north_v_varid,rot_varid,
      $        h_varid,fsm_varid!,dum_varid,dvm_varid
-      integer ncid,status
+      integer ncid,status,dimn
       integer i,j,k
       integer(mpi_offset_kind) start(4),edge(4)
       real(kind=rk) minh, z1d(kb), zz1d(kb), loz
@@ -916,12 +917,29 @@
 !      call handle_error_pnetcdf('nfmpi_inq_varid: dvm'
 !     $                          ,status,nf_noerr)
 ! get data
-      start(1)=1
-      edge(1)=kb
-      status = get_var_real_1d(ncid, z_varid,start,edge, z1d)
-      call handle_error_pnetcdf('get_var_real: z' ,status,nf_noerr)
-      status = get_var_real_1d(ncid,zz_varid,start,edge,zz1d)
-      call handle_error_pnetcdf('get_var_real: zz',status,nf_noerr)
+      dimn = 0
+      status = nfmpi_inq_varndims(ncid,z_varid,dimn)
+      call handle_error_pnetcdf('inq_var: z' ,status,nf_noerr)
+
+      if (dimn==1) then
+        start(1)=1
+        edge(1)=kb
+        status = get_var_real_1d(ncid, z_varid,start,edge, z1d)
+        call handle_error_pnetcdf('get_var_real: z' ,status,nf_noerr)
+        status = get_var_real_1d(ncid,zz_varid,start,edge,zz1d)
+        call handle_error_pnetcdf('get_var_real: zz',status,nf_noerr)
+      else if (dimn==3) then
+        start(1)=i_global(1)
+        start(2)=j_global(1)
+        start(3)=1
+        edge(1)=im
+        edge(2)=jm
+        edge(3)=kb
+        status = get_var_real_3d(ncid, z_varid,start,edge, z)
+        call handle_error_pnetcdf('get_var_real: z' ,status,nf_noerr)
+        status = get_var_real_3d(ncid,zz_varid,start,edge,zz)
+        call handle_error_pnetcdf('get_var_real: zz',status,nf_noerr)
+      end if
 
       start(1)=i_global(1)
       start(2)=j_global(1)
@@ -957,33 +975,35 @@
         fsm(:,:,k) = fsm(:,:,1)
       end do
 
+      if (dimn<0) then ! disable this block for now
       ! 10 unifom levels for first 50 meters
-      do j=1,jm
-        do i=1,im
-          loz = -h(i,j)*z1d(10)
-          if (loz < 50.) then
-            z(i,j,:)  = z1d
-            zz(i,j,:) = zz1d
-          else
-            z(i,j,1) =  0./h(i,j)
-            z(i,j,2) = -5./h(i,j)
-            z(i,j,3) =-10./h(i,j)
-            z(i,j,4) =-15./h(i,j)
-            z(i,j,5) =-20./h(i,j)
-            z(i,j,6) =-25./h(i,j)
-            z(i,j,7) =-30./h(i,j)
-            z(i,j,8) =-35./h(i,j)
-            z(i,j,9) =-40./h(i,j)
-            z(i,j,10)=-45./h(i,j)
-            do k=11,kb
-              loz = (z1d(k)-z1d(11))/(z1d(kb)-z1d(11))
-              z(i,j,k) = -(loz*(h(i,j)-50.)+50.)/h(i,j)
-            end do
-            zz(i,j,1:kb-1) = .5*(z(i,j,1:kb-1)+z(i,j,2:kb))
-            zz(i,j,kb) = zz(i,j,kb-1) + (zz(i,j,kb-1)-zz(i,j,kb-2))
-          end if
+        do j=1,jm
+          do i=1,im
+            loz = -h(i,j)*z1d(10)
+            if (loz < 50.) then
+              z(i,j,:)  = z1d
+              zz(i,j,:) = zz1d
+            else
+              z(i,j,1) =  0./h(i,j)
+              z(i,j,2) = -5./h(i,j)
+              z(i,j,3) =-10./h(i,j)
+              z(i,j,4) =-15./h(i,j)
+              z(i,j,5) =-20./h(i,j)
+              z(i,j,6) =-25./h(i,j)
+              z(i,j,7) =-30./h(i,j)
+              z(i,j,8) =-35./h(i,j)
+              z(i,j,9) =-40./h(i,j)
+              z(i,j,10)=-45./h(i,j)
+              do k=11,kb
+                loz = (z1d(k)-z1d(11))/(z1d(kb)-z1d(11))
+                z(i,j,k) = -(loz*(h(i,j)-50.)+50.)/h(i,j)
+              end do
+              zz(i,j,1:kb-1) = .5*(z(i,j,1:kb-1)+z(i,j,2:kb))
+              zz(i,j,kb) = zz(i,j,kb-1) + (zz(i,j,kb-1)-zz(i,j,kb-2))
+            end if
+          end do
         end do
-      end do
+      end if
 
       minh =  minval(h)
       where (h==minh) h = 1.
