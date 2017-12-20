@@ -2807,6 +2807,7 @@
 
       status = get_var_real_2d(ncid,tskn_varid,start,edge,tskn)
       call handle_error_pnetcdf('get_var_real: skt',status,nf_noerr)
+      tskn = tskn-273.15
 
 ! close file
       status=nfmpi_close(ncid)
