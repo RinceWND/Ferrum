@@ -2770,8 +2770,8 @@
       status=nfmpi_inq_varid(ncid,'vwnd',vwnd_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: vwnd'
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'tskn',tskn_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: tskn'
+      status=nfmpi_inq_varid(ncid,'skt',tskn_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: skt'
      $                          ,status,nf_noerr)
 
 ! get data
@@ -2806,7 +2806,7 @@
       call handle_error_pnetcdf('get_var_real: vwnd',status,nf_noerr)
 
       status = get_var_real_2d(ncid,tskn_varid,start,edge,tskn)
-      call handle_error_pnetcdf('get_var_real: tskn',status,nf_noerr)
+      call handle_error_pnetcdf('get_var_real: skt',status,nf_noerr)
 
 ! close file
       status=nfmpi_close(ncid)
