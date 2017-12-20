@@ -26,14 +26,15 @@
 
 !     buffers for tsurf, ssurf etc
       real(kind=rk), dimension( im_local, jm_local ) ::
-     $     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, emp, shum
-     $    ,tair_a, tair_b, tair, rain, cloud, pres
-     $    ,uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd, vwnd
+     &     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, emp, shum
+     &    ,tair_a, tair_b, tair, rain, cloud, pres
+     &    ,uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd, vwnd
+     &    ,tskin_a, tskin_b, tskin, sskin
   
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
      $     tm_a, sm_a, tm_b, sm_b,
-     $     tmean, smean, tskin_a, tskin_b, tskin, sskin
+     $     tmean, smean
      
 !      real(kind=rk), dimension( im_local, jm_local ) ::
 !     $     uw_a, vw_a, uw_b, vw_b
@@ -410,7 +411,7 @@
 
       tair  = (1.-bb)*tair_a + bb*tair_b
       tskin = (1.-bb)*tskin_a + bb*tskin_b
-      sskin = (1.-bb)*sclim_a + bb*sclim_b
+      sskin = (1.-bb)*sc_a(:,:,1) + bb*sc_b(:,:,1)
       if (calc_bulk) then
 
         if (.not.calc_bulk_ncep) then
@@ -430,10 +431,10 @@
      $              tair,shum,rain,cloud,pres)
         wssurf = emp*(sb(:,:,1)+sbias)
 ! Relax to skin TS... Skin salinity is just climatology
-        wtsurf( i, j ) = wtsurf(i,j)
+        wtsurf = wtsurf
      &           + c1 * ( tb(:,:,1) - tskin(:,:) )
      &                / max(h(:,:)*z(1), 1.)    !rwnd: (linear) prevention of overheating a thick layer
-        wssurf( i, j ) = wssurf(i,j)
+        wssurf = wssurf
      $           + c1 * ( sb(:,:,1) - sskin(:,:) )
 !          write(*,*) my_task, "WT:", minval(wtsurf),maxval(wtsurf)
 !          write(*,*) my_task, "SW:", minval(swrad),maxval(swrad)
