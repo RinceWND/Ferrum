@@ -808,13 +808,14 @@
       
       integer get_var_real_1d
      &       ,get_var_real_2d
+     &       ,get_var_real_3d
       
       character(len=120) netcdf_grid_file
       integer z_varid,zz_varid,dx_varid,dy_varid,east_c_varid,
      $        east_e_varid,east_u_varid,east_v_varid,north_c_varid,
      $        north_e_varid,north_u_varid,north_v_varid,rot_varid,
      $        h_varid,fsm_varid!,dum_varid,dvm_varid
-      integer ncid,status
+      integer ncid,status,dimn
       integer i,j
       integer(mpi_offset_kind) start(4),edge(4)
       real(kind=rk) minh
@@ -885,12 +886,29 @@
 !      call handle_error_pnetcdf('nfmpi_inq_varid: dvm'
 !     $                          ,status,nf_noerr)
 ! get data
-      start(1)=1
-      edge(1)=kb
-      status = get_var_real_1d(ncid, z_varid,start,edge, z)
-      call handle_error_pnetcdf('get_var_real: z' ,status,nf_noerr)
-      status = get_var_real_1d(ncid,zz_varid,start,edge,zz)
-      call handle_error_pnetcdf('get_var_real: zz',status,nf_noerr)
+      status = nfmpi_inq_varndims(ncid, z_varid, dimn)
+      call handle_error_pnetcdf('inq_vardimn: z' ,status,nf_noerr)
+
+      if (dimn==1) then
+        start(1)=1
+        edge(1)=kb
+        status = get_var_real_1d(ncid, z_varid,start,edge, z)
+        call handle_error_pnetcdf('get_var_real: z' ,status,nf_noerr)
+        status = get_var_real_1d(ncid,zz_varid,start,edge,zz)
+        call handle_error_pnetcdf('get_var_real: zz',status,nf_noerr)
+      else if (dimn==3) then
+! If z and zz are 3-dimensional get just the (1,1) cell distribution
+        start(1)=1
+        start(2)=1
+        start(3)=1
+        edge(1)=1
+        edge(2)=1
+        edge(3)=kb
+        status = get_var_real_3d(ncid, z_varid,start,edge, z)
+        call handle_error_pnetcdf('get_var_real: z' ,status,nf_noerr)
+        status = get_var_real_3d(ncid,zz_varid,start,edge,zz)
+        call handle_error_pnetcdf('get_var_real: zz',status,nf_noerr)
+      end if
 
       start(1)=i_global(1)
       start(2)=j_global(1)
@@ -2699,7 +2717,7 @@
       end
 !_______________________________________________________________________
       subroutine read_ncep_bulk_pnetcdf( pres, tair, shum, rain, cloud
-     $                                  ,uwnd, vwnd, filename, n )
+     $                                  ,uwnd, vwnd, tskn, filename, n )
 ! read wind stress
       implicit none
 # include "mpif.h"
@@ -2708,12 +2726,12 @@
       integer get_var_real_2d
       integer n
       real(kind=rk), dimension(im,jm) :: pres, tair, shum, rain, cloud
-     $                                  ,uwnd, vwnd
+     $                                  ,uwnd, vwnd, tskn
       character(len=14) filename
       character(len=24) netcdf_heat_aux_file
       integer ncid,status
       integer pres_varid, tair_varid, shum_varid, rain_varid
-     $       ,cloud_varid, uwnd_varid, vwnd_varid
+     $       ,cloud_varid, uwnd_varid, vwnd_varid, tskn_varid
       integer(mpi_offset_kind) start(4),edge(4)
 
       start = 1
@@ -2751,6 +2769,9 @@
       status=nfmpi_inq_varid(ncid,'vwnd',vwnd_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: vwnd'
      $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'tskn',tskn_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: tskn'
+     $                          ,status,nf_noerr)
 
 ! get data
       start(1)=i_global(1)
@@ -2782,6 +2803,9 @@
 
       status = get_var_real_2d(ncid,vwnd_varid,start,edge,vwnd)
       call handle_error_pnetcdf('get_var_real: vwnd',status,nf_noerr)
+
+      status = get_var_real_2d(ncid,tskn_varid,start,edge,tskn)
+      call handle_error_pnetcdf('get_var_real: tskn',status,nf_noerr)
 
 ! close file
       status=nfmpi_close(ncid)

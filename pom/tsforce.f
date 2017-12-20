@@ -33,7 +33,7 @@
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
      $     tm_a, sm_a, tm_b, sm_b,
-     $     tmean, smean!, rm_a, rm_b
+     $     tmean, smean, tskin_a, tskin_b, tskin, sskin
      
 !      real(kind=rk), dimension( im_local, jm_local ) ::
 !     $     uw_a, vw_a, uw_b, vw_b
@@ -157,7 +157,7 @@
       if(lexist) then
         if (calc_bulk_ncep) then
           call read_ncep_bulk_pnetcdf(pres,tair_a,shum,rain
-     $                             ,cloud,uwnd_a,vwnd_a,infile_b,n)
+     $                     ,cloud,uwnd_a,vwnd_a,tskin_a,infile_b,n)
         end if
       end if
 
@@ -390,7 +390,7 @@
         if(lexist) then
           if (calc_bulk_ncep) then
             call read_ncep_bulk_pnetcdf(pres,tair_b,shum,rain
-     $                             ,cloud,uwnd_b,vwnd_b,infile_b,n)
+     $                       ,cloud,uwnd_b,vwnd_b,tskin_b,infile_b,n)
           else
             call read_heat_pnetcdf(
      $                  uht,swr,tair,emp,infile_b,n)
@@ -408,7 +408,9 @@
 
       end if
 
-      tair = (1.-bb)*tair_a + bb*tair_b
+      tair  = (1.-bb)*tair_a + bb*tair_b
+      tskin = (1.-bb)*tskin_a + bb*tskin_b
+      sskin = (1.-bb)*sclim_a + bb*sclim_b
       if (calc_bulk) then
 
         if (.not.calc_bulk_ncep) then
@@ -426,7 +428,13 @@
      $              wusurf,wvsurf,wtsurf,swrad,emp,
      $              uwnd,vwnd,
      $              tair,shum,rain,cloud,pres)
-        wssurf = emp*(s(:,:,1)+sbias)
+        wssurf = emp*(sb(:,:,1)+sbias)
+! Relax to skin TS... Skin salinity is just climatology
+        wtsurf( i, j ) = wtsurf(i,j)
+     &           + c1 * ( tb(:,:,1) - tskin(:,:) )
+     &                / max(h(:,:)*z(1), 1.)    !rwnd: (linear) prevention of overheating a thick layer
+        wssurf( i, j ) = wssurf(i,j)
+     $           + c1 * ( sb(:,:,1) - sskin(:,:) )
 !          write(*,*) my_task, "WT:", minval(wtsurf),maxval(wtsurf)
 !          write(*,*) my_task, "SW:", minval(swrad),maxval(swrad)
 !          write(*,*) my_task, "MP:", minval(emp),maxval(emp)
