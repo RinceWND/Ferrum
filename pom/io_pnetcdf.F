@@ -655,7 +655,8 @@
       start(1)=1
       edge(1)=1
       if (spinup) then
-        status=nfmpi_put_vara_double_all(ncid,time_varid,start,edge,0.)
+        status=nfmpi_put_vara_double_all(ncid,time_varid,start,edge
+     &                                                   ,real(time0,8))
       else
         status=nfmpi_put_vara_double_all(ncid,time_varid,start,edge
      &                                                    ,real(time,8))
