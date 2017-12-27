@@ -336,8 +336,13 @@
 !         write( infile, '( a4,"_",i4.4,2i2.2,".nc" )' )
 !debug     $        windf, d_in%year, d_in%month, d_in%day
 !     $        windf, d_off%year, d_off%month, d_off%day
-         write( infile, '( a3,".",i4.4,".nc" )' )
+         if (calc_mflx) then
+           write( infile, '( a3,".",i4.4,".nc" )' )
+     $        "hfl", d_fwd%year
+         else
+           write( infile, '( a3,".",i4.4,".nc" )' )
      $        "mfl", d_fwd%year
+         end if
 !!       write( infile, '( "gfsw_",i4.4,2i2.2,".nc" )' )   ! fhx:read gfsw wind
 !!   $        d_in%year, d_in%month, d_in%day
 !         write( infile, '( "gfs_",i4.4,2i2.2,".nc" )' )  ! fhx:read gfs wind
