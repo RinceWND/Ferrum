@@ -134,7 +134,7 @@
             pnow      = pres(i,j)
             rhnow     = rhum(i,j)
      $                 *pnow*0.263/exp(17.67*tair(i,j)/(tnow-29.65)) ! rwnd: specific to relative humidity
-            if (rhnow>1.) rhnow=1.
+            if (rhnow>100.) rhnow=100.
             if (rhnow<0.) rhnow=0.
             precip    = rain(i,j)/1000. ! rwnd: precipitation rate from kg/(m2*s) to m/s
             cld       = cloud(i,j)/100. ! rwnd: total cloud cover from % to tenths
