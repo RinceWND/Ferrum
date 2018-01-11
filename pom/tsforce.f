@@ -26,8 +26,12 @@
 
 !     buffers for tsurf, ssurf etc
       real(kind=rk), dimension( im_local, jm_local ) ::
-     &     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, emp, shum
-     &    ,tair_a, tair_b, tair, rain, cloud, pres
+     &     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, emp
+     &    ,shum_a, shum_b, shum
+     &    ,tair_a, tair_b, tair
+     &    ,rain_a, rain_b, rain
+     &    ,cloud_a, cloud_b, cloud
+     &    ,pres_a, pres_b, pres
      &    ,uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd, vwnd
      &    ,tskin_a, tskin_b, tskin, sskin
   
@@ -157,11 +161,31 @@
 
       if(lexist) then
         if (calc_bulk_ncep) then
-          call read_ncep_bulk_pnetcdf(pres,tair_a,shum,rain
-     $                     ,cloud,uwnd_a,vwnd_a,tskin_a,infile_b,n)
+          call read_ncep_bulk_pnetcdf(pres_a,tair_a,shum_a,rain_a
+     $                   ,cloud_a,uwnd_a,vwnd_a,tskin_a,infile_b,n)
         end if
       end if
 
+      n = n+1
+      if (n > 4*(365+inc_leap(d_in%year))) then
+        n = mod(n,4*(365+inc_leap(d_in%year)))
+        d_tmp%year = d_tmp%year+1
+      end if
+
+      write( infile_b, '( a3,".",i4.4,".nc" )' )
+     $        "hfl", d_tmp%year
+
+      inquire(file='in/heat/'//trim(infile_b),
+     $           exist=lexist)
+
+      if(lexist) then
+        if (calc_bulk_ncep) then
+          call read_ncep_bulk_pnetcdf(pres_b,tair_b,shum_b,rain_b
+     $                   ,cloud_b,uwnd_b,vwnd_b,tskin_b,infile_b,n)
+        end if
+      end if
+
+      nb = n
 
       if ( my_task == master_task ) 
      $        write(*,'(/a/)') "---------- tsforce_init."
@@ -363,6 +387,7 @@
       type(date) d_tmp
       real(kind=rk) bb
       integer sec_in_day
+      character(len=120) datestr
 
       logical :: lexist    
 
@@ -377,10 +402,17 @@
         n = mod(n,4*(365+inc_leap(d_in%year)))
         d_tmp%year = d_tmp%year+1
       end if
-      
+
       if (n/=nb) then
         nb = n
         tair_a = tair_b
+        pres_a = pres_b
+        shum_a = shum_b
+        rain_a = rain_b
+        cloud_a= cloud_b
+        tskin_a= tskin_b
+        uwnd_a = uwnd_b
+        vwnd_a = vwnd_b
         write( infile_b, '( a3,".",i4.4,".nc" )' )
      $        "hfl", d_tmp%year
 
@@ -390,8 +422,8 @@
         swrad  = 0.
         if(lexist) then
           if (calc_bulk_ncep) then
-            call read_ncep_bulk_pnetcdf(pres,tair_b,shum,rain
-     $                       ,cloud,uwnd_b,vwnd_b,tskin_b,infile_b,n)
+            call read_ncep_bulk_pnetcdf(pres_b,tair_b,shum_b,rain_b
+     $                     ,cloud_b,uwnd_b,vwnd_b,tskin_b,infile_b,n)
           else
             call read_heat_pnetcdf(
      $                  uht,swr,tair,emp,infile_b,n)
@@ -412,6 +444,12 @@
       tair  = (1.-bb)*tair_a + bb*tair_b
       tskin = (1.-bb)*tskin_a + bb*tskin_b
       sskin = (1.-bb)*sc_a(:,:,1) + bb*sc_b(:,:,1)
+      pres  = (1.-bb)*pres_a + bb*pres_b
+      shum  = (1.-bb)*shum_a + bb*shum_b
+      rain  = (1.-bb)*rain_a + bb*rain_b
+      cloud = (1.-bb)*cloud_a + bb*cloud_b
+      datestr = "dbg."//date2str(d_in)
+      call write_sflx(datestr, tair,shum,rain,tskin,pres,cloud )
       if (calc_bulk) then
 
         if (.not.calc_bulk_ncep) then
