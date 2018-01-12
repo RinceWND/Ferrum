@@ -2432,7 +2432,7 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      integer get_var_real_3d,k
+      integer get_var_real_3d
       integer, parameter :: wind_npd = 4
       character(len=*), intent(in) :: filename
       real(kind=rk),dimension(im,jm,wind_npd),intent(out) ::
@@ -4741,131 +4741,131 @@
       return
       end
 !_______________________________________________________________________
-      subroutine write_sflx( netcdf_out_file, ta,sh,ra,ts,pr,cl )
-
-        use mpi
-        use pnetcdf
-
-        implicit none
-
-        include 'pom.h'
-        character(len=*), intent(in) :: netcdf_out_file
-        character(len=120) str_tmp
-        integer time_dimid,x_dimid,y_dimid,z_dimid
-        integer time_varid,tair_varid,shum_varid,rain_varid
-        integer tskn_varid,pres_varid,tcld_varid
-        integer ncid,status,flags
-        integer vdims(4)
-        integer(mpi_offset_kind) length
-        integer(mpi_offset_kind) start(4),edge(4)
-        real(kind=rk),dimension(im,jm),intent(inout)::ta,sh,ra,ts,pr,cl
-        real(kind=rk),dimension(1) :: tarr
-
-!        if(my_task.eq.0) write(*,'(/''writing file '',a)')
-!     $     trim(netcdf_out_file)
-
-        flags= nf90_clobber + nf90_64bit_offset
-
-        status=nf90mpi_create(pom_comm,trim(netcdf_out_file),flags,
-     $     mpi_info_null,ncid)
-        call handle_error_pnetcdf('nf_create: '//netcdf_out_file,
-     $                          status,nf_noerr)
-
-! define global attributes
-        status=nf90mpi_put_att(ncid,nf_global,'title',trim(title))
-        call handle_error_pnetcdf('nf_put_att',status,nf_noerr)
-
-        str_tmp='output file'
-        status=nf90mpi_put_att(ncid,nf_global,'description',
-     $                          trim(str_tmp))
-        call handle_error_pnetcdf('nf_put_att_text',status,nf_noerr)
-
-! define dimensions
-        length=1
-        status=nf90mpi_def_dim(ncid,'time',length,time_dimid)
-        call handle_error_pnetcdf('nf_def_dim: time',status,nf_noerr)
-        length=jm_global
-        status=nf90mpi_def_dim(ncid,'y',length,y_dimid)
-        call handle_error_pnetcdf('nf_def_dim: y',status,nf_noerr)
-        length=im_global
-        status=nf90mpi_def_dim(ncid,'x',length,x_dimid)
-        call handle_error_pnetcdf('nf_def_dim: x',status,nf_noerr)
-
-! define variables and their attributes
-        vdims(1)=time_dimid
-        str_tmp='days since '//time_start
-        call def_var_pnetcdf(ncid,'time',1,vdims,time_varid,nf90_double,
-     $                     'time',str_tmp,
-     $                     ' ',.false.)
-
-      vdims(1)=x_dimid
-      vdims(2)=y_dimid
-      vdims(3)=time_dimid
-      status=nf90mpi_def_var(ncid,'tair',nf90_double,vdims(1:3)
-     &                      ,tair_varid)
-      status=nf90mpi_def_var(ncid,'shum',nf90_double,vdims(1:3)
-     &                      ,shum_varid)
-      status=nf90mpi_def_var(ncid,'rain',nf90_double,vdims(1:3)
-     &                      ,rain_varid)
-      status=nf90mpi_def_var(ncid,'tskn',nf90_double,vdims(1:3)
-     &                      ,tskn_varid)
-      status=nf90mpi_def_var(ncid,'pres',nf90_double,vdims(1:3)
-     &                      ,pres_varid)
-      status=nf90mpi_def_var(ncid,'tcld',nf90_double,vdims(1:3)
-     &                      ,tcld_varid)
-! end definitions
-      status=nf90mpi_enddef(ncid)
-      call handle_error_pnetcdf('nf_enddef: output',status,nf_noerr)
-
-
-! write data
-
-      start(1)=1
-      edge(1)=1
-      tarr(1) = time
-      status=nfmpi_put_vara_double_all(
-     $     ncid,time_varid,start,edge,tarr)
-      call handle_error_pnetcdf(
-     $     'nf_put_vara_real: time',status,nf_noerr)
-
-      start(1)=i_global(1)
-      start(2)=j_global(1)
-      start(3)=1
-      edge(1)=im
-      edge(2)=jm
-      edge(3)=1
-      status=nfmpi_put_vara_double_all(
-     $     ncid,tair_varid,start,edge,ta)
-      call handle_error_pnetcdf(
-     $     'nf_put_vara_real: tair',status,nf_noerr)
-      status=nfmpi_put_vara_double_all(
-     $     ncid,shum_varid,start,edge,sh)
-      call handle_error_pnetcdf(
-     $     'nf_put_vara_real: shum',status,nf_noerr)
-      status=nfmpi_put_vara_double_all(
-     $     ncid,rain_varid,start,edge,ra)
-      call handle_error_pnetcdf(
-     $     'nf_put_vara_real: rain',status,nf_noerr)
-      status=nfmpi_put_vara_double_all(
-     $     ncid,tskn_varid,start,edge,ts)
-      call handle_error_pnetcdf(
-     $     'nf_put_vara_real: tskn',status,nf_noerr)
-      status=nfmpi_put_vara_double_all(
-     $     ncid,pres_varid,start,edge,pr)
-      call handle_error_pnetcdf(
-     $     'nf_put_vara_real: pres',status,nf_noerr)
-      status=nfmpi_put_vara_double_all(
-     $     ncid,tcld_varid,start,edge,cl)
-      call handle_error_pnetcdf(
-     $     'nf_put_vara_real: tcld',status,nf_noerr)
+!      subroutine write_sflx( netcdf_out_file, ta,sh,ra,ts,pr,cl )
 !
-! close file
-      status=nfmpi_close(ncid)
-      call handle_error_pnetcdf('nf_close: output: '
-     $                           ,status,nf_noerr)
-
-      return
-      end
+!        use mpi
+!        use pnetcdf
+!
+!        implicit none
+!
+!        include 'pom.h'
+!        character(len=*), intent(in) :: netcdf_out_file
+!        character(len=120) str_tmp
+!        integer time_dimid,x_dimid,y_dimid
+!        integer time_varid,tair_varid,shum_varid,rain_varid
+!        integer tskn_varid,pres_varid,tcld_varid
+!        integer ncid,status,flags
+!        integer vdims(4)
+!        integer(mpi_offset_kind) length
+!        integer(mpi_offset_kind) start(4),edge(4)
+!        real(kind=rk),dimension(im,jm),intent(inout)::ta,sh,ra,ts,pr,cl
+!        real(kind=rk),dimension(1) :: tarr
+!
+!!        if(my_task.eq.0) write(*,'(/''writing file '',a)')
+!!     $     trim(netcdf_out_file)
+!
+!        flags= nf90_clobber + nf90_64bit_offset
+!
+!        status=nf90mpi_create(pom_comm,trim(netcdf_out_file),flags,
+!     $     mpi_info_null,ncid)
+!        call handle_error_pnetcdf('nf_create: '//netcdf_out_file,
+!     $                          status,nf_noerr)
+!
+!! define global attributes
+!        status=nf90mpi_put_att(ncid,nf_global,'title',trim(title))
+!        call handle_error_pnetcdf('nf_put_att',status,nf_noerr)
+!
+!        str_tmp='output file'
+!        status=nf90mpi_put_att(ncid,nf_global,'description',
+!     $                          trim(str_tmp))
+!        call handle_error_pnetcdf('nf_put_att_text',status,nf_noerr)
+!
+!! define dimensions
+!        length=1
+!        status=nf90mpi_def_dim(ncid,'time',length,time_dimid)
+!        call handle_error_pnetcdf('nf_def_dim: time',status,nf_noerr)
+!        length=jm_global
+!        status=nf90mpi_def_dim(ncid,'y',length,y_dimid)
+!        call handle_error_pnetcdf('nf_def_dim: y',status,nf_noerr)
+!        length=im_global
+!        status=nf90mpi_def_dim(ncid,'x',length,x_dimid)
+!        call handle_error_pnetcdf('nf_def_dim: x',status,nf_noerr)
+!
+!! define variables and their attributes
+!        vdims(1)=time_dimid
+!        str_tmp='days since '//time_start
+!        call def_var_pnetcdf(ncid,'time',1,vdims,time_varid,nf90_double,
+!     $                     'time',str_tmp,
+!     $                     ' ',.false.)
+!
+!      vdims(1)=x_dimid
+!      vdims(2)=y_dimid
+!      vdims(3)=time_dimid
+!      status=nf90mpi_def_var(ncid,'tair',nf90_double,vdims(1:3)
+!     &                      ,tair_varid)
+!      status=nf90mpi_def_var(ncid,'shum',nf90_double,vdims(1:3)
+!     &                      ,shum_varid)
+!      status=nf90mpi_def_var(ncid,'rain',nf90_double,vdims(1:3)
+!     &                      ,rain_varid)
+!      status=nf90mpi_def_var(ncid,'tskn',nf90_double,vdims(1:3)
+!     &                      ,tskn_varid)
+!      status=nf90mpi_def_var(ncid,'pres',nf90_double,vdims(1:3)
+!     &                      ,pres_varid)
+!      status=nf90mpi_def_var(ncid,'tcld',nf90_double,vdims(1:3)
+!     &                      ,tcld_varid)
+!! end definitions
+!      status=nf90mpi_enddef(ncid)
+!      call handle_error_pnetcdf('nf_enddef: output',status,nf_noerr)
+!
+!
+!! write data
+!
+!      start(1)=1
+!      edge(1)=1
+!      tarr(1) = time
+!      status=nfmpi_put_vara_double_all(
+!     $     ncid,time_varid,start,edge,tarr)
+!      call handle_error_pnetcdf(
+!     $     'nf_put_vara_real: time',status,nf_noerr)
+!
+!      start(1)=i_global(1)
+!      start(2)=j_global(1)
+!      start(3)=1
+!      edge(1)=im
+!      edge(2)=jm
+!      edge(3)=1
+!      status=nfmpi_put_vara_double_all(
+!     $     ncid,tair_varid,start,edge,ta)
+!      call handle_error_pnetcdf(
+!     $     'nf_put_vara_real: tair',status,nf_noerr)
+!      status=nfmpi_put_vara_double_all(
+!     $     ncid,shum_varid,start,edge,sh)
+!      call handle_error_pnetcdf(
+!     $     'nf_put_vara_real: shum',status,nf_noerr)
+!      status=nfmpi_put_vara_double_all(
+!     $     ncid,rain_varid,start,edge,ra)
+!      call handle_error_pnetcdf(
+!     $     'nf_put_vara_real: rain',status,nf_noerr)
+!      status=nfmpi_put_vara_double_all(
+!     $     ncid,tskn_varid,start,edge,ts)
+!      call handle_error_pnetcdf(
+!     $     'nf_put_vara_real: tskn',status,nf_noerr)
+!      status=nfmpi_put_vara_double_all(
+!     $     ncid,pres_varid,start,edge,pr)
+!      call handle_error_pnetcdf(
+!     $     'nf_put_vara_real: pres',status,nf_noerr)
+!      status=nfmpi_put_vara_double_all(
+!     $     ncid,tcld_varid,start,edge,cl)
+!      call handle_error_pnetcdf(
+!     $     'nf_put_vara_real: tcld',status,nf_noerr)
+!!
+!! close file
+!      status=nfmpi_close(ncid)
+!      call handle_error_pnetcdf('nf_close: output: '
+!     $                           ,status,nf_noerr)
+!
+!      return
+!      end
 !_______________________________________________________________________
 
       integer function get_var_real_1d(ncid, varid, start, edge, var)

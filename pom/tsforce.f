@@ -387,7 +387,7 @@
       type(date) d_tmp
       real(kind=rk) bb
       integer sec_in_day
-      character(len=120) datestr
+!      character(len=120) datestr
 
       logical :: lexist    
 
@@ -448,8 +448,8 @@
       shum  = (1.-bb)*shum_a + bb*shum_b
       rain  = (1.-bb)*rain_a + bb*rain_b
       cloud = (1.-bb)*cloud_a + bb*cloud_b
-      datestr = "dbg."//date2str(d_in)
-      call write_sflx(datestr, tair,shum,rain,tskin,pres,cloud )
+!      datestr = "dbg."//date2str(d_in)
+!      call write_sflx(datestr, tair,shum,rain,tskin,pres,cloud )
       if (calc_bulk) then
 
         if (.not.calc_bulk_ncep) then
