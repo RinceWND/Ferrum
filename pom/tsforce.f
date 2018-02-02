@@ -44,9 +44,10 @@
 !     $     uw_a, vw_a, uw_b, vw_b
     
       integer :: mon_a, mon_b, sec_in_month, mid_in_month
-      integer :: i, j, k, nb, mb
+      integer :: i, j, k, nb, mb, db
       character(len=14) :: infile_b
-      real(kind=rk) :: aa
+      real(kind=rk) :: aa, bb
+      real(kind=rk) days_in_year
 
 
       contains
@@ -73,6 +74,7 @@
       wssurf = 0.0
       nb = 0
       mb = 0
+      db = 0
       pres = 1013.
 
 !     Read backward and forward TS climatology in initial state
@@ -91,6 +93,7 @@
       sec_in_month = d_in%day * 24 * 3600  
      $             + d_in%hour * 3600 + d_in%min * 60 + d_in%sec
 
+      days_in_year = real( mday( d_in%month ) - 31 + d_in%day )
 
 !     mid-point [sec] in the month.
       
@@ -120,7 +123,9 @@
 
          call read_tsclim_monthly_pnetcdf
      $        ( tm_b, sm_b, tc_b, sc_b, "ts_clim.nc", mon_b )
-     
+
+!      call read_mean_ts_z_pnetcdf(tm_b, sm_b, 44, int(days_in_year))
+
 !         call read_tsclim_monthly_pnetcdf_obs
 !     $        ( rm_a, tc_a, sc_a, "ts_clim_old.nc", mon_a )
 !
@@ -227,6 +232,7 @@
       sec_in_month = d_in%day * 24 * 3600  
      $             + d_in%hour * 3600 + d_in%min * 60 + d_in%sec
 
+      days_in_year = real( mday( d_in%month ) - 31 + d_in%day )
 
 !     mid-point [sec] in the month.
       
@@ -291,14 +297,22 @@
 
       endif
 
+!      if ( db /= int( days_in_year ) ) then
+!        db = int( days_in_year )
+!        tm_a = tm_b
+!        sm_a = sm_b
+!        call read_mean_ts_z_pnetcdf( tm_b, sm_b, 44, db+1 )
+!      end if
      
 
 !     time interpolation.
 
       tclim = ( 1.0 - aa ) * tc_a + aa * tc_b
       sclim = ( 1.0 - aa ) * sc_a + aa * sc_b
-      tmean = ( 1.0 - aa ) * tm_a + aa * tm_b
-      smean = ( 1.0 - aa ) * sm_a + aa * sm_b
+      bb = aa
+!      bb = days_in_year - int( days_in_year )
+      tmean = ( 1.0 - bb ) * tm_a + bb * tm_b
+      smean = ( 1.0 - bb ) * sm_a + bb * sm_b
 !      rmean = ( 1.0 - aa ) * rm_a + aa * rm_b
       
 !      wusurf = ( 1.0 - aa ) * uw_a + aa * uw_b
@@ -311,6 +325,10 @@
 !     calculation of rmean.
       
       call dens( smean, tmean, rmean )
+!      if (106 > i_global(1) .and. 106 < i_global(im)
+!     & .and. 214 > j_global(1) .and. 214 < j_global(jm) ) then
+!        print *, rmean(106-i_global(1)+1,214-j_global(jm)+1,:)
+!      end if
 
 !     set boundary condition.
 

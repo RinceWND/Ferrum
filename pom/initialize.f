@@ -219,7 +219,6 @@
 ! Inverse horizontal turbulent Prandtl number (ah/am; dimensionless):
 ! NOTE that tprni=0.e0 yields zero horizontal diffusivity!
       tprni=.2
-       
 
 ! Background viscosity used in subroutines profq, proft, profu and
 ! profv (S.I. units):
@@ -251,7 +250,7 @@
 !     2        no           yes           yes
 !     3        yes          no            no
 !     4        yes          no            yes
-!      nbct=1
+      nbct=1
 
 ! Surface salinity boundary condition, used in subroutine proft:
 !    nbcs   prescribed    prescribed
@@ -259,7 +258,7 @@
 !     1        no           yes
 !     3        yes          no
 ! NOTE that only 1 and 3 are allowed for salinity.
-!      nbcs=1
+      nbcs=1
 
 ! Step interval during which external (2-D) mode advective terms are
 ! not updated (dimensionless):
@@ -716,6 +715,8 @@
       real(kind=rk)    :: corcon            !lyo:scs1d:
       character(len=120) in_file        !eda:uvforce
 
+      namelist/bry_nml/ rfn, rfe, rfs, rfw
+
 !     call read_uabe_pnetcdf(uabe)
 !eda:uvforce
       if (.not. calc_uvforce) then
@@ -726,6 +727,9 @@
 !     Radiation factors for use in subroutine bcond !alu:20101216 
 !      rfe=0.; rfw=0.; rfn=0.; rfs=0. !=1 Flather; =0 clamped
       rfe=1.; rfw=1.; rfn=1.; rfs=1. !=1 Flather; =0 clamped
+      open(73,file='bry.nml',status='old')
+      read(73,nml=bry_nml)
+      close(73)
 
 ! Periodic in "x" and/or "y"?  !lyo:20110224:alu:stcc:
 !     iperx.ne.0 if x-periodic; ipery.ne.0 if y-periodic               !

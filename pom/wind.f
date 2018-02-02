@@ -380,7 +380,7 @@
 ! interpolation
       if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.  
 
-       do k=1,4  
+       do k=1,4
         uwnd_coarse = uwnd_buf_coarse( :, :, k )
         vwnd_coarse = vwnd_buf_coarse( :, :, k )
         call interp_mask_2d(uwnd_coarse,1,east_e,north_e,uwnd_fine)
@@ -388,15 +388,15 @@
 !fhx: after interpolation, i=1,2 and j=1,2 seem to have problems
       if (n_west.eq.-1) then
        do i=1,2
-         uwnd_fine(i,:)=uwnd_fine(3,:)      
+         uwnd_fine(i,:)=uwnd_fine(3,:)
          vwnd_fine(i,:)=vwnd_fine(3,:)
        enddo
       endif
 
       if(n_south.eq.-1) then
        do j=1,2
-         uwnd_fine(:,j)=uwnd_fine(:,3)       
-         vwnd_fine(:,j)=vwnd_fine(:,3)        
+         uwnd_fine(:,j)=uwnd_fine(:,3)
+         vwnd_fine(:,j)=vwnd_fine(:,3)
        enddo 
       endif
          uwnd_buf(:,:,k)=uwnd_fine
@@ -406,8 +406,8 @@
 
        else
 
-          uwnd_buf = reshape(uwnd_buf_coarse, shape(uwnd_buf))    
-          vwnd_buf = reshape(vwnd_buf_coarse, shape(vwnd_buf))          
+          uwnd_buf = reshape(uwnd_buf_coarse, shape(uwnd_buf))
+          vwnd_buf = reshape(vwnd_buf_coarse, shape(vwnd_buf))
   
        endif !  if(calc_interp) then fhx:interp_flag  
          

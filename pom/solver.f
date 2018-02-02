@@ -1673,7 +1673,7 @@
             uaf(im,j)=uabe(j)
      $                     +rfe*sqrt(grav/h(imm1,j))*(el(imm1,j)-ele(j))
             uaf(im,j)=ramp*uaf(im,j)
-            vaf(im,j)=0.
+            vaf(im,j)=(vaf(imm1,j-1)+vaf(imm1,j)+vaf(imm1,j+1))/3. !0.
            enddo
           end if
 ! west
@@ -1682,7 +1682,7 @@
             uaf(2,j)=uabw(j)-rfw*sqrt(grav/h(2,j))*(el(2,j)-elw(j))
             uaf(2,j)=ramp*uaf(2,j)
             uaf(1,j)=uaf(2,j)
-            vaf(1,j)=0.
+            vaf(1,j)=(vaf(2,j-1)+vaf(2,j)+vaf(2,j+1))/3. !0.
            enddo
           end if
 
@@ -1692,7 +1692,7 @@
             vaf(i,jm)=vabn(i)
      $                     +rfn*sqrt(grav/h(i,jmm1))*(el(i,jmm1)-eln(i))
             vaf(i,jm)=ramp*vaf(i,jm)
-            uaf(i,jm)=0.
+            uaf(i,jm)=(uaf(i-1,jmm1)+uaf(i,jmm1)+uaf(i+1,jmm1))/3. !0.
            enddo
           end if
 ! south
@@ -1701,7 +1701,7 @@
             vaf(i,2)=vabs(i)-rfs*sqrt(grav/h(i,2))*(el(i,2)-els(i))
             vaf(i,2)=ramp*vaf(i,2)
             vaf(i,1)=vaf(i,2)
-            uaf(i,1)=0.
+            uaf(i,1)=(uaf(i-1,2)+uaf(i,2)+uaf(i+1,2))/3. !0.
            enddo
           end if
 !
@@ -1760,7 +1760,8 @@
      $                 + 0.5 * u(imm1,j,k) + 0.25 * u(imm1,j+1,k) )
      $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k) 
      $                 + 0.5 * u(im,j,k) + 0.25 * u(im,j+1,k) )
-                  vf(im,j,k)=0.
+                  vf(im,j,k)
+     &             =(vf(imm1,j-1,k)+vf(imm1,j,k)+vf(imm1,j+1,k))/3. !0.0.
                enddo
             enddo
          endif
@@ -1778,7 +1779,8 @@
      $                 + ( 1.0 - ga ) * ( 0.25 * u(2,j-1,k) 
      $                 + 0.5 * u(2,j,k) + 0.25 * u(2,j+1,k) )
                   uf(1,j,k)=uf(2,j,k)
-                  vf(1,j,k)=0.
+                  vf(1,j,k)
+     &             =(vf(2,j-1,k)+vf(2,j,k)+vf(2,j+1,k))/3. !0.0.
                enddo
             enddo
           endif
@@ -1796,7 +1798,8 @@
      $                 + 0.5 * v(i,jmm1,k) + 0.25 * v(i+1,jmm1,k) )
      $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,jm,k) 
      $                 + 0.5 * v(i,jm,k) + 0.25 * v(i+1,jm,k) )
-                  uf(i,jm,k)=0.
+                  uf(i,jm,k)
+     &             =(uf(i-1,jmm1,k)+uf(i,jmm1,k)+uf(i+1,jmm1,k))/3. !0.0.
                enddo
             enddo
           endif
@@ -1816,7 +1819,8 @@
      $                 + 0.5 * v(i,2,k) + 0.25 * v(i+1,2,k) )
                   vf(i,1,k)=vf(i,2,k)
 !                 uf(i,jm,k)=0.e0 !lyo:debug:lyo:20110224:alu:stcc:
-                  uf(i, 1,k)=0. !lyo:debug:lyo:20110224:alu:stcc:
+                  uf(i,1,k)
+     &             =(uf(i-1,2,k)+uf(i,2,k)+uf(i+1,2,k))/3. !0.0.
                enddo
             enddo
           endif

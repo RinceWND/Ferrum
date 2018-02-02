@@ -1720,6 +1720,83 @@
       end
 
 !_______________________________________________________________________
+      subroutine read_mean_ts_z_pnetcdf(temp,salt,ks,n)
+! read xy-averaged, annual-mean temp & salt
+
+      implicit none
+# include "mpif.h"
+# include "pnetcdf.inc"
+      include 'pom.h'
+      integer get_var_real_1d, get_var_real_2d, ks
+      real(kind=rk) t1(kb),s1(kb),zs(ks)
+      real(kind=rk) tz(im,jm,ks),sz(im,jm,ks)
+      real(kind=rk) temp(im,jm,kb),salt(im,jm,kb)
+      character(len=120) netcdf_ic_file
+      integer ncid,status, i,j, n
+      integer tmean_varid,smean_varid,z_varid
+      integer(mpi_offset_kind) start(4),edge(4)
+
+      start = 1
+      edge  = 1
+!
+! open netcdf ic file !lyo:try first *mean* - the correct one
+      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean_z.nc"
+
+      if(my_task.eq.0) write(*,'(/''reading file '',a)')
+     $  trim(netcdf_ic_file)
+      status=nfmpi_open(pom_comm,netcdf_ic_file,nf_nowrite,
+     $                  mpi_info_null,ncid)
+      call handle_error_pnetcdf('nfmpi_open: '//netcdf_ic_file,
+     $                          status,nf_noerr)
+
+! get variables
+      status=nfmpi_inq_varid(ncid,'z',z_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: z'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'tmean_s',tmean_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: t'
+     $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'smean_s',smean_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: s'
+     $                          ,status,nf_noerr)
+
+! get data
+      start(1)=1
+      edge(1)=ks
+      status = get_var_real_1d(ncid,z_varid,start,edge,zs)
+      call handle_error_pnetcdf('get_var_real: zs',status,nf_noerr)
+      start(1)=1
+      start(2)=n
+      edge(1)=kb
+      edge(2)=1
+      print *, my_task, "::", n, ks
+      status = get_var_real_2d(ncid,tmean_varid,start,edge,t1)
+      call handle_error_pnetcdf('get_var_real: tmean',status,nf_noerr)
+      status = get_var_real_2d(ncid,smean_varid,start,edge,s1)
+      call handle_error_pnetcdf('get_var_real: smean',status,nf_noerr)
+      print *, my_task, "::", t1
+      do j=1,jm
+        do i=1,im
+!          tz(i,j,:) = t1
+!          sz(i,j,:) = s1
+          temp(i,j,:) = t1
+          salt(i,j,:) = s1
+        end do
+      end do
+
+! close file
+      status=nfmpi_close(ncid)
+      call handle_error_pnetcdf('nf_close',status,nf_noerr)
+
+!      call ztosig(zs,tz,zz,h,temp,im,jm,ks,kb,
+!     $                                  n_west,n_east,n_south,n_north)
+!      call ztosig(zs,sz,zz,h,salt,im,jm,ks,kb,
+!     $                                  n_west,n_east,n_south,n_north)
+
+      return
+      end
+
+!_______________________________________________________________________
       subroutine read_boundary_conditions_pnetcdf !lyo:pac10:not used!
 ! read boundary conditions
       implicit none
