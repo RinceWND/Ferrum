@@ -19,6 +19,7 @@
 
       logical spinup
       namelist/misc_nml/ spinup, t_lo, t_hi
+      integer mb
 
       type(date) :: dtime
 
@@ -34,6 +35,7 @@
 !     dtime = str2date( time_start(1:19) )
       dtime = str2date(read_rst_file(1:13)//":"//
      &read_rst_file(15:16)//":"//read_rst_file(18:19) )
+      mb = dtime%month
 
       if ( calc_uvforce ) call uvforce_init(dtime) !eda:uvforce 
       call tsforce_init( dtime )
@@ -90,7 +92,7 @@
      &       write(*,'("d = ",a)')  date2str( dtime )
 
 ! write output
-      call write_output( dtime )
+      call write_output( dtime, 1, mb )
 
 ! write SURF output
       call write_output_surf !fhx:20110131:
@@ -118,7 +120,7 @@
 
 
 !_______________________________________________________________________
-      subroutine write_output( d_in )
+      subroutine write_output( d_in, output_mode, mb )
 
       use module_time
       use assim, only : assim_store_ssha
@@ -127,55 +129,61 @@
       include 'pom.h'
 
       type(date), intent(in) :: d_in
+      integer, intent(in) :: output_mode
+      integer, intent(inout) :: mb
 
-      if(netcdf_file.ne.'nonetcdf' .and. mod(iint,iprint).eq.0) then
+      if ( netcdf_file.ne.'nonetcdf' ) then
 
-         
-         uab_mean    = uab_mean    / real ( num )
-         vab_mean    = vab_mean    / real ( num )
-         elb_mean    = elb_mean    / real ( num )
-         wusurf_mean = wusurf_mean / real ( num )
-         wvsurf_mean = wvsurf_mean / real ( num )
-         wtsurf_mean = wtsurf_mean / real ( num )
-         wssurf_mean = wssurf_mean / real ( num )
-         u_mean      = u_mean      / real ( num )
-         v_mean      = v_mean      / real ( num )
-         w_mean      = w_mean      / real ( num )
-         t_mean      = t_mean      / real ( num )
-         s_mean      = s_mean      / real ( num )
-         rho_mean    = rho_mean    / real ( num )
-         kh_mean     = kh_mean     / real ( num )
-         km_mean     = km_mean     / real ( num )
+        if(( output_mode==0 .and. mod(iint,iprint).eq.0 ) .or.
+     &     ( output_mode==1 .and. mb /= d_in%month )) then
+
+          mb = d_in%month
+
+          uab_mean    = uab_mean    / real ( num )
+          vab_mean    = vab_mean    / real ( num )
+          elb_mean    = elb_mean    / real ( num )
+          wusurf_mean = wusurf_mean / real ( num )
+          wvsurf_mean = wvsurf_mean / real ( num )
+          wtsurf_mean = wtsurf_mean / real ( num )
+          wssurf_mean = wssurf_mean / real ( num )
+          u_mean      = u_mean      / real ( num )
+          v_mean      = v_mean      / real ( num )
+          w_mean      = w_mean      / real ( num )
+          t_mean      = t_mean      / real ( num )
+          s_mean      = s_mean      / real ( num )
+          rho_mean    = rho_mean    / real ( num )
+          kh_mean     = kh_mean     / real ( num )
+          km_mean     = km_mean     / real ( num )
 
 
 
 !     store ssha for data assimilation to t(k=kb)
 
-         if ( calc_assim ) 
+          if ( calc_assim )
      &        call assim_store_ssha( t_mean(:,:,kb), 't(k=kb)', d_in )
 
 !     store tsurf & ssurf in rho(k=kb) & s(k=kb) respectively
 !     note that these will be satellite &/or monthly climatology
 
-      s_mean(:,:,kb)   = ssurf(:,:) !lyo:exp301!lyo:exp302:store ssurf!lyonew:
-      rho_mean(:,:,kb) = tsurf(:,:) !lyo:exp301!lyo:exp302:store tsurf!lyonew:
+          s_mean(:,:,kb)   = ssurf(:,:) !lyo:exp301!lyo:exp302:store ssurf!lyonew:
+          rho_mean(:,:,kb) = tsurf(:,:) !lyo:exp301!lyo:exp302:store tsurf!lyonew:
 
 !     fill up ghost cells before output
-         call exchange2d_mpi( uab_mean, im, jm )
-         call exchange2d_mpi( vab_mean, im, jm )
-         call exchange2d_mpi( elb_mean, im, jm )
-         call exchange2d_mpi( wusurf_mean, im, jm )
-         call exchange2d_mpi( wvsurf_mean, im, jm )
-         call exchange2d_mpi( wtsurf_mean, im, jm )
-         call exchange2d_mpi( wssurf_mean, im, jm )
-         call exchange3d_mpi( u_mean, im, jm, kb )
-         call exchange3d_mpi( v_mean, im, jm, kb )
-         call exchange3d_mpi( w_mean, im, jm, kb )
-         call exchange3d_mpi( t_mean, im, jm, kb )
-         call exchange3d_mpi( s_mean, im, jm, kb )
-         call exchange3d_mpi( rho_mean, im, jm, kb )
-         call exchange3d_mpi( kh_mean, im, jm, kb )
-         call exchange3d_mpi( km_mean, im, jm, kb )
+          call exchange2d_mpi( uab_mean, im, jm )
+          call exchange2d_mpi( vab_mean, im, jm )
+          call exchange2d_mpi( elb_mean, im, jm )
+          call exchange2d_mpi( wusurf_mean, im, jm )
+          call exchange2d_mpi( wvsurf_mean, im, jm )
+          call exchange2d_mpi( wtsurf_mean, im, jm )
+          call exchange2d_mpi( wssurf_mean, im, jm )
+          call exchange3d_mpi( u_mean, im, jm, kb )
+          call exchange3d_mpi( v_mean, im, jm, kb )
+          call exchange3d_mpi( w_mean, im, jm, kb )
+          call exchange3d_mpi( t_mean, im, jm, kb )
+          call exchange3d_mpi( s_mean, im, jm, kb )
+          call exchange3d_mpi( rho_mean, im, jm, kb )
+          call exchange3d_mpi( kh_mean, im, jm, kb )
+          call exchange3d_mpi( km_mean, im, jm, kb )
 
 
 
@@ -232,41 +240,42 @@
 !            enddo
 !         enddo
          
-       if (output_flag == 1) then
+          if (output_flag == 1) then
 
-         call write_output_pnetcdf( 
+            call write_output_pnetcdf(
      $        "out/"//trim(netcdf_file)//".nc")
 
-       else if (output_flag == 0) then
+          else if (output_flag == 0) then
 
-         call write_output_pnetcdf0( 
+            call write_output_pnetcdf0(
      $        "out/"//trim(netcdf_file)//"."//
      $        date2str(d_in)//".nc" )
 
-       end if
+          end if
 
-         uab_mean    = 0.0
-         vab_mean    = 0.0
-         elb_mean    = 0.0
-         wusurf_mean = 0.0
-         wvsurf_mean = 0.0
-         wtsurf_mean = 0.0
-         wssurf_mean = 0.0
-         u_mean      = 0.0
-         v_mean      = 0.0
-         w_mean      = 0.0
-         t_mean      = 0.0
-         s_mean      = 0.0
-         rho_mean    = 0.0
-         kh_mean     = 0.0
-         km_mean     = 0.0
+          uab_mean    = 0.0
+          vab_mean    = 0.0
+          elb_mean    = 0.0
+          wusurf_mean = 0.0
+          wvsurf_mean = 0.0
+          wtsurf_mean = 0.0
+          wssurf_mean = 0.0
+          u_mean      = 0.0
+          v_mean      = 0.0
+          w_mean      = 0.0
+          t_mean      = 0.0
+          s_mean      = 0.0
+          rho_mean    = 0.0
+          kh_mean     = 0.0
+          km_mean     = 0.0
          
-         num = 0
+          num = 0
 
-      endif
+        end if
+      end if
 
       return
-      end
+      end !subroutine write_output
 !-------------------------------------------------------
 
 !
