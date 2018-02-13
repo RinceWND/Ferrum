@@ -1,5 +1,5 @@
 ! Updated (in/grid/grid.nc & >2GB) io_pnetcdf.F combining FH+Alu
-!     This version is for FH's case with AluUpperSST & AluUpperSSS
+!     This version is for FHs case with AluUpperSST & AluUpperSSS
 !     commented out
 !
 ! io_pnetcdf.F !lyo:pac10:Incorporating Alu's version for pac10
@@ -1443,7 +1443,10 @@
       edge  = 1
 
 ! open netcdf ic file
-      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_initial.nc"
+      ! setup prefix for input data
+      call getarg(2, netcdf_ic_file)
+
+!      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_initial.nc"
 
       if(my_task.eq.0) write(*,'(/''reading file '',a)')
      $  trim(netcdf_ic_file)
@@ -1453,10 +1456,10 @@
      $                          status,nf_noerr)
 
 ! get variables
-      status=nfmpi_inq_varid(ncid,'tclim',tb_varid)
+      status=nfmpi_inq_varid(ncid,'t',tb_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: t_init'
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'sclim',sb_varid)
+      status=nfmpi_inq_varid(ncid,'s',sb_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: s_init'
      $                          ,status,nf_noerr)
 

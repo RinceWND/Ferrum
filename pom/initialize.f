@@ -588,8 +588,11 @@
       read(read_rst_file, '(5x,i2)') n
 
 ! read initial temperature and salinity from ic file
-!      call read_initial_ts_pnetcdf(kb,tb,sb)
-      call read_clim_ts_pnetcdf(tb,sb,n)
+      if (iargc() == 2) then
+        call read_initial_ts_pnetcdf(kb,tb,sb)
+      else
+        call read_clim_ts_pnetcdf(tb,sb,n)
+      endif
 !      call read_clim_ts_pnetcdf_obs(tb,sb,rho,n)
 
 ! read annual-mean, xy-ave t,sclim if avail !lyo:20110202:
