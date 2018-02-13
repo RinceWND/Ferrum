@@ -4386,14 +4386,7 @@ C  !The most south sudomains
       if(x.lt.7.0) then
         ixd=int(2.0*x)+1
         fsinhinv=fdat(ixd)+(fdat(ixd+1)-fdat(ixd))*(x-xd(ixd))*2.0
-<<<<<<< HEAD
        endif
        return
        end
 !_______________________________________________________________________
-=======
-      endif
-      return
-      end
-!_______________________________________________________________________
->>>>>>> 79c9fb6e01f215996e7111c4e87561275c715b65

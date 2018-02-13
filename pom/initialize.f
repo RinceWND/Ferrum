@@ -609,20 +609,11 @@
       read(read_rst_file, '(5x,i2)') n
 
 ! read initial temperature and salinity from ic file
-<<<<<<< HEAD
       if (iargc() == 2) then
         call read_initial_ts_pnetcdf(kb,tb,sb)
       else
         call read_clim_ts_pnetcdf(tb,sb,n)
       endif
-=======
-!      call read_initial_ts_pnetcdf(kb,tb,sb)
-      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_clim.nc"
-      inquire(file=trim(netcdf_ic_file),exist=fexist)
-      
-      if (fexist) then
-        call read_clim_ts_pnetcdf(tb,sb,n)
->>>>>>> 79c9fb6e01f215996e7111c4e87561275c715b65
 !      call read_clim_ts_pnetcdf_obs(tb,sb,rho,n)
 
 ! read annual-mean, xy-ave t,sclim if avail !lyo:20110202:
