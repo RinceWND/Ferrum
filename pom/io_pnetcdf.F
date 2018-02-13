@@ -1994,14 +1994,23 @@
       integer get_var_real_3d
       real(kind=rk) tm(im,jm,kb),sm(im,jm,kb),tc(im,jm,kb),sc(im,jm,kb)
       character(len=120) netcdf_ic_file
+      character(len=32) his_prefix
       character(len=*) in_file
       integer ncid,status,n,k
       integer tm_varid,sm_varid,tc_varid,sc_varid
       integer(mpi_offset_kind) start(4),edge(4)
 
 ! open netcdf ic file
-      write(netcdf_ic_file,'(''in/tsclim/'',a)')
-     $     trim(in_file)
+
+! setup prefix for input data
+      if (iargc() == 2) then
+        call getarg(1, his_prefix)
+      else
+        his_prefix = '' 
+      end if
+     
+      write(netcdf_ic_file,'(a,''in/tsclim/'',a)')
+     $     trim(his_prefix), trim(in_file)
       if(my_task.eq.0) write(*,'(/''reading file '',a)')
      $  trim(netcdf_ic_file)
       status=nfmpi_open(pom_comm,netcdf_ic_file,nf_nowrite,

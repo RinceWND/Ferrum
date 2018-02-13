@@ -283,6 +283,10 @@
       t_lo = -999.
       t_hi =  999.
 
+      if (iargc() == 2) then
+        call getarg(2, netcdf_file)
+      end if       
+
 ! read input namelist
       open(73,file='pom.nml',status='old')
       read(73,nml=pom_nml)
