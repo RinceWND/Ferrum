@@ -793,6 +793,135 @@
       return
       end
 
+      subroutine advtC(cbm,cf)
+! integrate conservative scalar equations
+! this is a first-order upstream scheme, which reduces implicit
+! diffusion using the Smolarkiewicz iterative upstream scheme with an
+! antidiffusive velocity
+! it is based on the subroutines of Gianmaria Sannino (Inter-university
+! Computing Consortium, Rome, Italy) and Vincenzo Artale (Italian
+! National Agency for New Technology and Environment, Rome, Italy)
+      implicit none
+      include 'pom.h'
+      real(kind=rk), dimension(im,jm) :: cbm,cf,xflux,yflux
+     &                                 ,cbmem,xmassflux,ymassflux
+      real(kind=rk), dimension(im,jm)    :: eta
+!      real(kind=rk) eps, epsval  ! rwnd: iteration check
+      integer i,j,itera
+
+! calculate horizontal mass fluxes
+      xmassflux = 0.
+      ymassflux = 0.
+
+      do j=2,jmm1
+        do i=2,im
+          xmassflux(i,j)=.5*(dy(i-1,j)+dy(i,j))*ui(i,j)
+        end do
+      end do
+
+      do j=2,jm
+        do i=2,imm1
+          ymassflux(i,j)=.5*(dx(i,j-1)+dx(i,j))*vi(i,j)
+        end do
+      end do
+
+      do j=1,jm
+        do i=1,im
+          eta(i,j)=etb(i,j)
+        end do
+      end do
+
+      do j=1,jm
+        do i=1,im
+          cbmem(i,j)=cbm(i,j)
+        end do
+      end do
+
+! start Smolarkiewicz scheme
+      do itera=1,nitera
+
+! upwind advection scheme
+        do j=2,jm
+          do i=2,im
+            xflux(i,j) = .5
+     $                      *((xmassflux(i,j)+abs(xmassflux(i,j)))
+     $                       *cbmem(i-1,j)+
+     $                        (xmassflux(i,j)-abs(xmassflux(i,j)))
+     $                       *cbmem(i,j))
+
+            yflux(i,j) = .5
+     $                      *((ymassflux(i,j)+abs(ymassflux(i,j)))
+     $                       *cbmem(i,j-1)+
+     $                        (ymassflux(i,j)-abs(ymassflux(i,j)))
+     $                       *cbmem(i,j))
+          end do
+        end do
+
+! add net advective fluxes and step forward in time
+        do j=2,jmm1
+          do i=2,imm1
+            cf(i,j) = xflux(i+1,j)-xflux(i,j)
+     $               +yflux(i,j+1)-yflux(i,j)
+            cf(i,j) = (cbmem(i,j)*art(i,j)
+     $                   -dti2*cf(i,j))/art(i,j)
+          end do
+        end do
+        ! next line added on 22-Jul-2009 by Raffaele Bernardello
+        call exchange2d_mpi(cf,im,jm)
+
+! calculate antidiffusion velocity
+        call smol_adifC(xmassflux,ymassflux,cf)
+        
+!        epsval = maxval(abs(ff(:,:,1:kbm1)-fbmem(:,:,1:kbm1))) ! rwnd: iteration check
+!        
+!        call max0d_mpi(epsval,master_task) ! rwnd: iteration check
+!        call bcast0d_mpi(epsval,my_task) ! rwnd: iteration check
+
+        do j=1,jm
+          do i=1,im
+            eta(i,j)=etf(i,j)
+            cbmem(i,j)=cf(i,j)
+          end do
+        end do
+
+!        if (epsval < eps) exit ! rwnd: iteration check
+
+! end of Smolarkiewicz scheme
+      end do
+      
+!      write(*,*) my_task, ": ", var, ": nitera = ", itera  ! rwnd: iteration check
+
+! add horizontal diffusive fluxes
+!      do j=2,jm
+!        do i=2,im
+!          xmassflux(i,j) = .5*(aam(i,j,1)+aam(i-1,j,1))
+!          ymassflux(i,j) = .5*(aam(i,j,1)+aam(i,j-1,1))
+!        end do
+!      end do
+
+!      do j=2,jm
+!        do i=2,im
+!         xflux(i,j) = -10.e2*tprni !-xmassflux(i,j)*tprni
+!     $                   *(cb(i,j)-cb(i-1,j))*dum(i,j)
+!     $                   *(dy(i,j)+dy(i-1,j))*0.5/(dx(i,j)+dx(i-1,j))
+!         yflux(i,j) = -10.e2*tprni !-ymassflux(i,j)*tprni
+!     $                   *(cb(i,j)-cb(i,j-1))*dvm(i,j)
+!     $                   *(dx(i,j)+dx(i,j-1))*0.5/(dy(i,j)+dy(i,j-1))
+!        end do
+!      end do
+!
+!! add net horizontal fluxes and step forward in time
+!      do j=2,jmm1
+!        do i=2,imm1
+!          cf(i,j) = cf(i,j)-dti2*(xflux(i+1,j)-xflux(i,j)
+!     $                           +yflux(i,j+1)-yflux(i,j))
+!     $                          /art(i,j)
+!        end do
+!      end do
+
+      return
+      end
+
 !_______________________________________________________________________
       subroutine advu
 ! do horizontal and vertical advection of u-momentum, and includes
@@ -1544,7 +1673,7 @@
             uaf(im,j)=uabe(j)
      $                     +rfe*sqrt(grav/h(imm1,j))*(el(imm1,j)-ele(j))
             uaf(im,j)=ramp*uaf(im,j)
-            vaf(im,j)=0.
+            vaf(im,j)=(vaf(imm1,j-1)+vaf(imm1,j)+vaf(imm1,j+1))/3. !0.
            enddo
           end if
 ! west
@@ -1553,7 +1682,7 @@
             uaf(2,j)=uabw(j)-rfw*sqrt(grav/h(2,j))*(el(2,j)-elw(j))
             uaf(2,j)=ramp*uaf(2,j)
             uaf(1,j)=uaf(2,j)
-            vaf(1,j)=0.
+            vaf(1,j)=(vaf(2,j-1)+vaf(2,j)+vaf(2,j+1))/3. !0.
            enddo
           end if
 
@@ -1563,7 +1692,7 @@
             vaf(i,jm)=vabn(i)
      $                     +rfn*sqrt(grav/h(i,jmm1))*(el(i,jmm1)-eln(i))
             vaf(i,jm)=ramp*vaf(i,jm)
-            uaf(i,jm)=0.
+            uaf(i,jm)=(uaf(i-1,jmm1)+uaf(i,jmm1)+uaf(i+1,jmm1))/3. !0.
            enddo
           end if
 ! south
@@ -1572,7 +1701,7 @@
             vaf(i,2)=vabs(i)-rfs*sqrt(grav/h(i,2))*(el(i,2)-els(i))
             vaf(i,2)=ramp*vaf(i,2)
             vaf(i,1)=vaf(i,2)
-            uaf(i,1)=0.
+            uaf(i,1)=(uaf(i-1,2)+uaf(i,2)+uaf(i+1,2))/3. !0.
            enddo
           end if
 !
@@ -1631,7 +1760,8 @@
      $                 + 0.5 * u(imm1,j,k) + 0.25 * u(imm1,j+1,k) )
      $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k) 
      $                 + 0.5 * u(im,j,k) + 0.25 * u(im,j+1,k) )
-                  vf(im,j,k)=0.
+                  vf(im,j,k)
+     &             =(vf(imm1,j-1,k)+vf(imm1,j,k)+vf(imm1,j+1,k))/3. !0.0.
                enddo
             enddo
          endif
@@ -1649,7 +1779,8 @@
      $                 + ( 1.0 - ga ) * ( 0.25 * u(2,j-1,k) 
      $                 + 0.5 * u(2,j,k) + 0.25 * u(2,j+1,k) )
                   uf(1,j,k)=uf(2,j,k)
-                  vf(1,j,k)=0.
+                  vf(1,j,k)
+     &             =(vf(2,j-1,k)+vf(2,j,k)+vf(2,j+1,k))/3. !0.0.
                enddo
             enddo
           endif
@@ -1667,7 +1798,8 @@
      $                 + 0.5 * v(i,jmm1,k) + 0.25 * v(i+1,jmm1,k) )
      $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,jm,k) 
      $                 + 0.5 * v(i,jm,k) + 0.25 * v(i+1,jm,k) )
-                  uf(i,jm,k)=0.
+                  uf(i,jm,k)
+     &             =(uf(i-1,jmm1,k)+uf(i,jmm1,k)+uf(i+1,jmm1,k))/3. !0.0.
                enddo
             enddo
           endif
@@ -1687,7 +1819,8 @@
      $                 + 0.5 * v(i,2,k) + 0.25 * v(i+1,2,k) )
                   vf(i,1,k)=vf(i,2,k)
 !                 uf(i,jm,k)=0.e0 !lyo:debug:lyo:20110224:alu:stcc:
-                  uf(i, 1,k)=0. !lyo:debug:lyo:20110224:alu:stcc:
+                  uf(i,1,k)
+     &             =(uf(i-1,2,k)+uf(i,2,k)+uf(i+1,2,k))/3. !0.0.
                enddo
             enddo
           endif
@@ -4020,6 +4153,66 @@ C  !The most south sudomains
       end
 
 !_______________________________________________________________________
+      subroutine smol_adifC(xmassflux,ymassflux,cf)
+! calculate the antidiffusive velocity used to reduce the numerical
+! diffusion associated with the upstream differencing scheme
+! this is based on a subroutine of Gianmaria Sannino (Inter-university
+! Computing Consortium, Rome, Italy) and Vincenzo Artale (Italian
+! National Agency for New Technology and Environment, Rome, Italy)
+      implicit none
+      include 'pom.h'
+      real(kind=rk),dimension(im,jm) :: cf,xmassflux,ymassflux
+      real(kind=rk) mol,abs_1,abs_2
+      real(kind=rk) value_min,epsilon
+      real(kind=rk) udx,u2dt,vdy,v2dt
+      integer i,j
+      parameter (value_min=1.e-9,epsilon=1.0e-14)
+
+! apply temperature and salinity mask
+      cf = cf*fsm
+
+! recalculate mass fluxes with antidiffusion velocity
+      do j=2,jmm1
+        do i=2,im
+          if(cf(i,j).lt.value_min.or.
+     $       cf(i-1,j).lt.value_min) then
+            xmassflux(i,j) = 0.
+          else
+            udx=abs(xmassflux(i,j))
+            u2dt=dti2*xmassflux(i,j)*xmassflux(i,j)*2.
+     $          /aru(i,j)
+            mol=(cf(i,j)-cf(i-1,j))
+     $          /(cf(i-1,j)+cf(i,j)+epsilon)
+            xmassflux(i,j)=(udx-u2dt)*mol*sw
+            abs_1=abs(udx)
+            abs_2=abs(u2dt)
+            if(abs_1.lt.abs_2) xmassflux(i,j)=0.
+          end if
+        end do
+      end do
+
+      do j=2,jm
+        do i=2,imm1
+          if(cf(i,j).lt.value_min.or.
+     $       cf(i,j-1).lt.value_min) then
+            ymassflux(i,j)=0.
+          else
+            vdy=abs(ymassflux(i,j))
+            v2dt=dti2*ymassflux(i,j)*ymassflux(i,j)*2.
+     $          /arv(i,j)
+            mol=(cf(i,j)-cf(i,j-1))
+     $          /(cf(i,j-1)+cf(i,j)+epsilon)
+            ymassflux(i,j)=(vdy-v2dt)*mol*sw
+            abs_1=abs(vdy)
+            abs_2=abs(v2dt)
+            if(abs_1.lt.abs_2) ymassflux(i,j)=0.
+          end if
+        end do
+      end do
+
+      return
+      end
+!_______________________________________________________________________
       subroutine vertvl(xflux,yflux)
 ! calculates vertical velocity
       implicit none
@@ -4133,12 +4326,13 @@ C  !The most south sudomains
       implicit none
       include 'realkind'
       integer i,j,im,jm
+      real(kind=rk), intent(in) :: kp
       real(kind=rk) kappa,grav,fsm(im,jm),d(im,jm)
       real(kind=rk) z0b,z0a,zzkbm1,cbcmin,cbcmax,cbc(im,jm)
       real(kind=rk) uboscil,utau2,fsinhinv,utau2min
-      real(kind=rk) pi,btoba,utauwind,const,kp
-      real(kind=rk) wusrf(im,jm),wvsrf(im,jm),
-     &     wubot(im,jm),wvbot(im,jm)
+      real(kind=rk) pi,btoba,utauwind,const
+      real(kind=rk), intent(in) :: wusrf(im,jm),wvsrf(im,jm)
+     &                            ,wubot(im,jm),wvbot(im,jm)
       data kappa/0.4/,grav/9.807/
       data btoba/0.062/,pi/3.1415927/
       data utau2min/1.e-5/
@@ -4192,7 +4386,14 @@ C  !The most south sudomains
       if(x.lt.7.0) then
         ixd=int(2.0*x)+1
         fsinhinv=fdat(ixd)+(fdat(ixd+1)-fdat(ixd))*(x-xd(ixd))*2.0
+<<<<<<< HEAD
        endif
        return
        end
 !_______________________________________________________________________
+=======
+      endif
+      return
+      end
+!_______________________________________________________________________
+>>>>>>> 79c9fb6e01f215996e7111c4e87561275c715b65

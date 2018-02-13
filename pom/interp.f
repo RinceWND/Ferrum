@@ -213,7 +213,7 @@
          m4 = mask_coarse(i1+1, j1  )
          
          if(flag_uv.ne.0) then
-            m1=1;m2=1;m3=1;m4=1
+            m1=1.;m2=1.;m3=1.;m4=1.
          endif
 
          x = alon_fine1(i, j)
@@ -402,28 +402,28 @@
          flag = 0
 
          if(w1 < 0 .and. w3 < 0) then
-            flag = 1; w1 = 0; w2 = 1.0; w3 = 0; w4 = 0
+            flag = 1; w1 = 0.; w2 = 1.0; w3 = 0.; w4 = 0.
          endif
          if(w3 < 0 .and. w4 < 0) then
-            flag = 2; w3 = 0; w4 = 0
+            flag = 2; w3 = 0.; w4 = 0.
          endif
          if(w2 < 0 .and. w4 < 0) then
-            flag = 3; w1 = 1.0; w2 = 0; w3 = 0; w4 = 0
+            flag = 3; w1 = 1.; w2 = 0.; w3 = 0.; w4 = 0.
          endif
          if(w2 < 0 .and. w3 < 0) then
-            flag = 4; w2 = 0; w3 = 0
+            flag = 4; w2 = 0.; w3 = 0.
          endif
          if(w1 < 0 .and. w3 < 0) then
-            flag = 5; w1 = 1.0; w2 = 0; w3 = 0; w4 = 1.0
+            flag = 5; w1 = 1.; w2 = 0.; w3 = 0.; w4 = 1.
          endif
          if(w1 < 0 .and. w2 < 0) then
-            flag = 6; w1 = 0; w2 = 0
+            flag = 6; w1 = 0.; w2 = 0.
          endif
          if(w2 < 0 .and. w4 < 0) then
-            flag = 7; w1 = 1.0; w2 = 0; w3 = 1.0; w4 = 0
+            flag = 7; w1 = 1.; w2 = 0.; w3 = 1.; w4 = 0.
          endif
          if(w1 < 0 .and. w4 < 0) then
-            flag = 8; w1 = 0; w4 = 0
+            flag = 8; w1 = 0.; w4 = 0.
          endif
 
 !--------------------------------------------------------------------------------

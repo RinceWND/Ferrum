@@ -1,5 +1,7 @@
       module tsforce
 
+      use wind
+
       implicit none
 
       private
@@ -8,6 +10,8 @@
 
       include 'pom.h'
 
+      logical, parameter :: calc_bulk = .true.
+     $                    , calc_bulk_ncep = .true.
 !     days in month
       integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,               
      $                          31, 31, 30, 31, 30, 31/)
@@ -26,20 +30,28 @@
 
 !     buffers for tsurf, ssurf etc
       real(kind=rk), dimension( im_local, jm_local ) ::
-     $     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, tair, emp
+     &     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, emp
+     &    ,shum_a, shum_b, shum
+     &    ,tair_a, tair_b, tair
+     &    ,rain_a, rain_b, rain
+     &    ,cloud_a, cloud_b, cloud
+     &    ,pres_a, pres_b, pres
+     &    ,uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd, vwnd
+     &    ,tskin_a, tskin_b, tskin, sskin
   
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
      $     tm_a, sm_a, tm_b, sm_b,
-     $     tmean, smean!, rm_a, rm_b
+     $     tmean, smean
      
 !      real(kind=rk), dimension( im_local, jm_local ) ::
 !     $     uw_a, vw_a, uw_b, vw_b
     
       integer :: mon_a, mon_b, sec_in_month, mid_in_month
-      integer :: i, j, k, nb
-      character(len=13) :: infile_b
-      real(kind=rk) :: aa
+      integer :: i, j, k, nb, mb, db
+      character(len=14) :: infile_b
+      real(kind=rk) :: aa, bb
+      real(kind=rk) days_in_year
 
 
       contains
@@ -54,7 +66,10 @@
       implicit none
 
 !     intent(in)
-      type(date), intent(in) :: d_in 
+      type(date), intent(in) :: d_in
+      type(date) d_tmp
+      logical lexist
+      integer n
   
 
 !     initialize
@@ -62,6 +77,9 @@
       wtsurf = 0.0
       wssurf = 0.0
       nb = 0
+      mb = 0
+      db = 0
+      pres = 1013.
 
 !     Read backward and forward TS climatology in initial state
 
@@ -79,11 +97,12 @@
       sec_in_month = d_in%day * 24 * 3600  
      $             + d_in%hour * 3600 + d_in%min * 60 + d_in%sec
 
+      days_in_year = real( mday( d_in%month ) - 31 + d_in%day )
 
 !     mid-point [sec] in the month.
       
       mid_in_month = int( real( mday( d_in%month ) )/ 2.0  
-     $             * 24 * 3600 )
+     $             * 24. * 3600. )
 
 
 !     decide between which two months.
@@ -108,7 +127,9 @@
 
          call read_tsclim_monthly_pnetcdf
      $        ( tm_b, sm_b, tc_b, sc_b, "ts_clim.nc", mon_b )
-     
+
+!      call read_mean_ts_z_pnetcdf(tm_b, sm_b, 44, int(days_in_year))
+
 !         call read_tsclim_monthly_pnetcdf_obs
 !     $        ( rm_a, tc_a, sc_a, "ts_clim_old.nc", mon_a )
 !
@@ -133,11 +154,47 @@
 !          tsurf_b = tm_b(:,:,1)
 !          ssurf_a = sm_a(:,:,1)
 !          ssurf_b = sm_b(:,:,1)
-          tsurf_a = tc_a(:,:,1)
-          tsurf_b = tc_b(:,:,1)
-          ssurf_a = sc_a(:,:,1)
-          ssurf_b = sc_b(:,:,1)
+!          tsurf_a = tc_a(:,:,1)
+!          tsurf_b = tc_b(:,:,1)
+!          ssurf_a = sc_a(:,:,1)
+!          ssurf_b = sc_b(:,:,1)
+      d_tmp = str2date("1979-01-01 00:00:00")
+      d_tmp%year = d_in%year
+      n = int((d_in-d_tmp)/86400.*4.)+1
 
+      write( infile_b, '( a3,".",i4.4,".nc" )' )
+     $        "hfl", d_in%year
+
+      inquire(file='in/heat/'//trim(infile_b),
+     $           exist=lexist)
+
+      if(lexist) then
+        if (calc_bulk_ncep) then
+          call read_ncep_bulk_pnetcdf(pres_a,tair_a,shum_a,rain_a
+     $                   ,cloud_a,uwnd_a,vwnd_a,tskin_a,infile_b,n)
+        end if
+      end if
+
+      n = n+1
+      if (n > 4*(365+inc_leap(d_in%year))) then
+        n = mod(n,4*(365+inc_leap(d_in%year)))
+        d_tmp%year = d_tmp%year+1
+      end if
+
+      write( infile_b, '( a3,".",i4.4,".nc" )' )
+     $        "hfl", d_tmp%year
+
+      inquire(file='in/heat/'//trim(infile_b),
+     $           exist=lexist)
+
+      if(lexist) then
+        if (calc_bulk_ncep) then
+          call read_ncep_bulk_pnetcdf(pres_b,tair_b,shum_b,rain_b
+     $                   ,cloud_b,uwnd_b,vwnd_b,tskin_b,infile_b,n)
+        end if
+      end if
+
+      nb = n
 
       if ( my_task == master_task ) 
      $        write(*,'(/a/)') "---------- tsforce_init."
@@ -179,11 +236,12 @@
       sec_in_month = d_in%day * 24 * 3600  
      $             + d_in%hour * 3600 + d_in%min * 60 + d_in%sec
 
+      days_in_year = real( mday( d_in%month ) - 31 + d_in%day )
 
 !     mid-point [sec] in the month.
       
       mid_in_month = int( real( mday( d_in%month ) )/ 2.0  
-     $             * 24 * 3600 )
+     $             * 24. * 3600. )
 
 
 !     decide between which two months.
@@ -223,8 +281,8 @@
 !         uw_a = uw_b
 !         vw_a = vw_b
 
-         tsurf_a = tsurf_b
-         ssurf_a = ssurf_b
+!         tsurf_a = tsurf_b
+!         ssurf_a = ssurf_b
 
 !         write( infile_b, '( "tsclimib",i2.2,".nc" )' ) mon_b
          call read_tsclim_monthly_pnetcdf
@@ -238,31 +296,43 @@
 !         call read_ssts_monthly_pnetcdf
 !     $        ( tsurf_b, ssurf_b, "ts_clim.nc", mon_b )
      
-         tsurf_b = tc_b(:,:,1)
-         ssurf_b = sc_b(:,:,1)
+!         tsurf_b = tc_b(:,:,1)
+!         ssurf_b = sc_b(:,:,1)
 
       endif
 
+!      if ( db /= int( days_in_year ) ) then
+!        db = int( days_in_year )
+!        tm_a = tm_b
+!        sm_a = sm_b
+!        call read_mean_ts_z_pnetcdf( tm_b, sm_b, 44, db+1 )
+!      end if
      
 
 !     time interpolation.
 
       tclim = ( 1.0 - aa ) * tc_a + aa * tc_b
       sclim = ( 1.0 - aa ) * sc_a + aa * sc_b
-      tmean = ( 1.0 - aa ) * tm_a + aa * tm_b
-      smean = ( 1.0 - aa ) * sm_a + aa * sm_b
+      bb = aa
+!      bb = days_in_year - int( days_in_year )
+      tmean = ( 1.0 - bb ) * tm_a + bb * tm_b
+      smean = ( 1.0 - bb ) * sm_a + bb * sm_b
 !      rmean = ( 1.0 - aa ) * rm_a + aa * rm_b
       
 !      wusurf = ( 1.0 - aa ) * uw_a + aa * uw_b
 !      wvsurf = ( 1.0 - aa ) * vw_a + aa * vw_b
 
-      tsurf = ( 1.0 - aa ) * tsurf_a + aa * tsurf_b
-      ssurf = ( 1.0 - aa ) * ssurf_a + aa * ssurf_b
+      tsurf = t(:,:,1) !( 1.0 - aa ) * tsurf_a + aa * tsurf_b
+      ssurf = s(:,:,1) !( 1.0 - aa ) * ssurf_a + aa * ssurf_b
       
 
 !     calculation of rmean.
       
       call dens( smean, tmean, rmean )
+!      if (106 > i_global(1) .and. 106 < i_global(im)
+!     & .and. 214 > j_global(1) .and. 214 < j_global(jm) ) then
+!        print *, rmean(106-i_global(1)+1,214-j_global(jm)+1,:)
+!      end if
 
 !     set boundary condition.
 
@@ -337,32 +407,52 @@
       ! intent(in)
       type(date), intent(in) :: d_in
       type(date) d_tmp
-      real(kind=rk) sec_in_day
+      real(kind=rk) bb
+      integer sec_in_day
+!      character(len=120) datestr
 
       logical :: lexist    
 
 
       sec_in_day = d_in%hour*3600 + d_in%min*60 + d_in%sec
+      bb = real( mod( sec_in_day, 6 * 3600 ) ) / ( 6. * 3600. )
 
       d_tmp = str2date("1979-01-01 00:00:00")
       d_tmp%year = d_in%year
-      n = int(dif_date(d_in, d_tmp)/(86400.)*4.)+1
-      
+      n = int((d_in-d_tmp+6*3600)/86400.*4.)+1
+      if (n > 4*(365+inc_leap(d_in%year))) then
+        n = mod(n,4*(365+inc_leap(d_in%year)))
+        d_tmp%year = d_tmp%year+1
+      end if
+
       if (n/=nb) then
         nb = n
+        tair_a = tair_b
+        pres_a = pres_b
+        shum_a = shum_b
+        rain_a = rain_b
+        cloud_a= cloud_b
+        tskin_a= tskin_b
+        uwnd_a = uwnd_b
+        vwnd_a = vwnd_b
         write( infile_b, '( a3,".",i4.4,".nc" )' )
-     $        "hfl", d_in%year
+     $        "hfl", d_tmp%year
 
         inquire(file='in/heat/'//trim(infile_b),
      $           exist=lexist)
 
         swrad  = 0.
         if(lexist) then
-          call read_heat_pnetcdf(
+          if (calc_bulk_ncep) then
+            call read_ncep_bulk_pnetcdf(pres_b,tair_b,shum_b,rain_b
+     $                     ,cloud_b,uwnd_b,vwnd_b,tskin_b,infile_b,n)
+          else
+            call read_heat_pnetcdf(
      $                  uht,swr,tair,emp,infile_b,n)
 !     $                 wtsurf(1:im,1:jm),swrad(1:im,1:jm),infile_b,n)
-          swrad(1:im,1:jm)  = swr
-          swrad  = -swrad/(rhoref*3986.)
+!          swrad(1:im,1:jm)  = swr
+!          swrad  = -swrad/(rhoref*3986.)
+          end if
         else
           if ( my_task == master_task ) then
             write(*,'(/2a)') 
@@ -373,23 +463,65 @@
 
       end if
 
-      do j=1,jm
-         do i=1,im
+      tair  = (1.-bb)*tair_a + bb*tair_b
+      tskin = (1.-bb)*tskin_a + bb*tskin_b
+      sskin = (1.-bb)*sc_a(:,:,1) + bb*sc_b(:,:,1)
+      pres  = (1.-bb)*pres_a + bb*pres_b
+      shum  = (1.-bb)*shum_a + bb*shum_b
+      rain  = (1.-bb)*rain_a + bb*rain_b
+      cloud = (1.-bb)*cloud_a + bb*cloud_b
+!      datestr = "dbg."//date2str(d_in)
+!      call write_sflx(datestr, tair,shum,rain,tskin,pres,cloud )
+      if (calc_bulk) then
 
-            sstrelx = 1.0d0
+        if (.not.calc_bulk_ncep) then
+          if (d_in%month /= mb) then
+            mb = (d_in%year-1979)*12+d_in%month
+            infile_b = "hfl.aux.mon.nc"
+            call read_heat_aux_pnetcdf(shum,rain,cloud,infile_b,mb)
+          end if
+        end if
+        uwnd = ( 1.0 - bb ) * uwnd_a + bb * uwnd_b
+        vwnd = ( 1.0 - bb ) * vwnd_a + bb * vwnd_b
+        call bulk(im,jm,tbias,fsm,t(:,:,1),east_e,north_e,
+     $              d_in%year,d_in%month,d_in%day,
+     $              d_in%hour,d_in%min,
+     $              wusurf,wvsurf,wtsurf,swrad,emp,
+     $              uwnd,vwnd,
+     $              tair,shum,rain,cloud,pres)
+        wssurf = emp*(sb(:,:,1)+sbias)
+! Relax to skin TS... Skin salinity is just climatology
+        wtsurf = wtsurf
+     &           + c1 * ( tb(:,:,1) - tskin(:,:) )
+     &                / max(h(:,:)*z(1), 1.)    !rwnd: (linear) prevention of overheating a thick layer
+        wssurf = wssurf
+     $           + c1 * ( sb(:,:,1) - sskin(:,:) )
+!          write(*,*) my_task, "WT:", minval(wtsurf),maxval(wtsurf)
+!          write(*,*) my_task, "SW:", minval(swrad),maxval(swrad)
+!          write(*,*) my_task, "MP:", minval(emp),maxval(emp)
+      else
+          do j=1,jm
+             do i=1,im
+
+                sstrelx = 1.
+                sssrelx = 1.
 !lyo:20110202:
 !           sssrelx = ( 1.0d0 + tanh( 0.002d0 * (h(i,j)-1000.d0)))*0.5d0
 !           sssrelx = ( 1.0d0 + tanh(0.0005d0 * (h(i,j)-2500.d0)))*0.5d0
 
-            wtsurf( i, j ) = sf_hf *
-     $           ( uht(i,j)/3986.+emp(i,j)*(tair(i,j)-t(i,j,1)) )/rhoref
-            wtsurf( i, j ) = wtsurf(i,j)
+                wtsurf( i, j ) = sf_hf *
+     $           ( uht(i,j)/3986.+emp(i,j)*(tair(i,j)-t(i,j,1)) )
+     $           /rhoref
+                wssurf( i, j ) = -emp(i,j)*(s(i,j,1)+sbias)
+                wtsurf( i, j ) = wtsurf(i,j)
      $           + c1 * sstrelx * ( tb( i, j, 1 ) - tsurf( i, j ) )
-            wssurf( i, j )
-     $           = c1 * sssrelx * ( sb( i, j, 1 ) - ssurf( i, j ) )
+                wssurf( i, j ) = wssurf(i,j)
+     $           + c1 * sssrelx * ( sb( i, j, 1 ) - ssurf( i, j ) )
 
-         enddo
-      enddo
+             enddo
+          enddo
+
+      end if
 
 ! TODO: interpolation
 

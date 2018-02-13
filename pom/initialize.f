@@ -122,7 +122,7 @@
      $    call incmix(aamfac,im,jm,1,lono,lato,east_e,north_e,xs,ys,fak)
 
 ! read restart data from a previous run
-      if(nread_rst.ne.0) call read_restart_pnetcdf 
+      if(nread_rst.ne.0) call read_restart_pnetcdf
 
 ! write grid and initial conditions
       if (output_flag == 1) then
@@ -167,17 +167,20 @@
      $                 ,iperx,ipery,n1d !lyo:scs1d:add iper* & n1d in pom.nml
                                         !n1d .ne. 0 for 1d simulation
      $                 ,windf           !lyo: windf = ccmp, ecmw, or gfsw etc
-     $                 ,nbct,nbcs,tprni,umol
+     $                 ,nbct,nbcs,tprni,umol,z0b,ntp
      
       namelist/switch_nml/ 
      $     calc_wind, calc_tsforce, calc_river, calc_assim,
      $     calc_assimdrf,         !eda
      $     calc_tsurf_mc, calc_tide,!fhx:mcsst; fhx:tide     
      $     calc_uvforce,         !eda:uvforce
+     $     calc_ice,
      $     output_flag, SURF_flag !fhx:20110131:
       type(date) ::  dtime, dtime0
 
+      logical spinup
       namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
+      namelist/misc_nml/ spinup, t_lo, t_hi
 
 ! Input of filenames and constants
 
@@ -216,7 +219,6 @@
 ! Inverse horizontal turbulent Prandtl number (ah/am; dimensionless):
 ! NOTE that tprni=0.e0 yields zero horizontal diffusivity!
       tprni=.2
-       
 
 ! Background viscosity used in subroutines profq, proft, profu and
 ! profv (S.I. units):
@@ -248,7 +250,7 @@
 !     2        no           yes           yes
 !     3        yes          no            no
 !     4        yes          no            yes
-!      nbct=1
+      nbct=1
 
 ! Surface salinity boundary condition, used in subroutine proft:
 !    nbcs   prescribed    prescribed
@@ -256,7 +258,7 @@
 !     1        no           yes
 !     3        yes          no
 ! NOTE that only 1 and 3 are allowed for salinity.
-!      nbcs=1
+      nbcs=1
 
 ! Step interval during which external (2-D) mode advective terms are
 ! not updated (dimensionless):
@@ -274,6 +276,16 @@
 ! Initial value of aam:
       aam_init=500.
 
+! Other parameters and flags
+      sf_bf = 1.
+      sf_hf = 1.
+      sf_wi = 1.
+      t_lo = -999.
+      t_hi =  999.
+
+      if (iargc() == 2) then
+        call getarg(2, netcdf_file)
+      end if       
 
 ! read input namelist
       open(73,file='pom.nml',status='old')
@@ -283,6 +295,7 @@
 ! read main switches
       open(73,file='switch.nml',status='old')
       read(73,nml=switch_nml)
+      read(73,nml=misc_nml)
       read(73,nml=sensitivity_nml)
       close(73)
 
@@ -297,7 +310,7 @@
       dti2=dti*2
 
       iend=max0(nint(days*24.*3600./dti),2)
-      iprint=nint(prtd1*24.*3600./dti)
+      iprint=max(nint(prtd1*24.*3600./dti),1)
       irestart=nint(write_rst*24.*3600./dti)
       iprints=nint(prtd2*24.*3600./dti) !fhx:20110131:add 3hrly output
 
@@ -310,7 +323,7 @@
       dtime = str2date(read_rst_file(1:13)//":"//
      &  read_rst_file(15:16)//":"//read_rst_file(18:19) )
 
-       time0=( dtime - dtime0 ) / 86400
+      time0 = real( (dtime-dtime0)/86400, rk )
        
 !      if (my_task == master_task) then
 !         print*, 'dtime',dtime
@@ -319,7 +332,7 @@
 !      endif
 
 !      time0=0.e0
-       time=time0 !lyo:20110224:alu:stcc:!lyo:pac10:
+      time=time0 !lyo:20110224:alu:stcc:!lyo:pac10:
 
 ! print initial summary
       if(my_task.eq.master_task) then
@@ -446,6 +459,8 @@
           vfluxf(i,j) =0.
           wusurf(i,j) =0.
           wvsurf(i,j) =0.
+          tauiwu(i,j) =0.
+          tauiwv(i,j) =0.
           wtsurf(i,j) =0.
           wssurf(i,j) =0.
           swrad(i,j)  =0.
@@ -456,6 +471,7 @@
           wubot(i,j)  =0.     !lyo:20110315:botwavedrag:
           wvbot(i,j)  =0.     !lyo:20110315:botwavedrag:
           aamfac(i,j) =1.     !fhx:incmix
+          hi(i,j)=.35
         end do
       end do
 
@@ -509,6 +525,11 @@
 !lyo:scs1d:end:
 !
 ! derived vertical grid variables
+!      z(kb) = -1. ! :DIRTY HACK!!! (for stupid grid)
+!      zz(kb-1) = .5*(z(kb-1)+z(kb)) ! :
+!      zz(kb) = 2.*zz(kb-1)-zz(kb-2) ! :
+!!      if (my_task==1) fsm(:,jm-8:jm) = 0.
+!      h = 1500.
       do k=1,kb-1
         dz(k) = z(k)- z(k+1)
         dzz(k)=zz(k)-zz(k+1)
@@ -588,23 +609,39 @@
       read(read_rst_file, '(5x,i2)') n
 
 ! read initial temperature and salinity from ic file
+<<<<<<< HEAD
       if (iargc() == 2) then
         call read_initial_ts_pnetcdf(kb,tb,sb)
       else
         call read_clim_ts_pnetcdf(tb,sb,n)
       endif
+=======
+!      call read_initial_ts_pnetcdf(kb,tb,sb)
+      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_clim.nc"
+      inquire(file=trim(netcdf_ic_file),exist=fexist)
+      
+      if (fexist) then
+        call read_clim_ts_pnetcdf(tb,sb,n)
+>>>>>>> 79c9fb6e01f215996e7111c4e87561275c715b65
 !      call read_clim_ts_pnetcdf_obs(tb,sb,rho,n)
 
 ! read annual-mean, xy-ave t,sclim if avail !lyo:20110202:
-      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean.nc"
-      inquire(file=trim(netcdf_ic_file),exist=fexist)
-      if(fexist) then  !annual-mean xy-ave t,sclim
-        call read_mean_ts_pnetcdf(tclim,sclim,n)
-      else             !annual-mean *clim* - dangerous for rmean
+        write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean.nc"
+        inquire(file=trim(netcdf_ic_file),exist=fexist)
+        if(fexist) then  !annual-mean xy-ave t,sclim
+          call read_mean_ts_pnetcdf(tclim,sclim,n)
+        else             !annual-mean *clim* - dangerous for rmean
 !      call read_clim_ts_pnetcdf_obs(tclim,sclim,rmean,n)
-        call read_clim_ts_pnetcdf(tclim,sclim,n)
-      endif
+          call read_clim_ts_pnetcdf(tclim,sclim,n)
+        endif
       
+      else
+        if (my_task==0) write(*,*) "Failed reading clim..."
+        tb = 15.
+        sb = 33.
+        tclim = 15.
+        sclim = 33.
+      end if
 ! calc. initial density
       call dens(sb,tb,rho)
 
@@ -670,6 +707,8 @@
           enddo
       enddo
 !lyo:pac10:end:
+      
+!      call read_ice_pnetcdf( "ice.19790102.nc", icb )
 
       return
       end
@@ -688,15 +727,21 @@
       real(kind=rk)    :: corcon            !lyo:scs1d:
       character(len=120) in_file        !eda:uvforce
 
+      namelist/bry_nml/ rfn, rfe, rfs, rfw
+
 !     call read_uabe_pnetcdf(uabe)
 !eda:uvforce
       if (.not. calc_uvforce) then
         write(in_file,'(a)') "bc.nc"
-        call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file, 1) 
+        call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file, 1)
       endif
 
 !     Radiation factors for use in subroutine bcond !alu:20101216 
+!      rfe=0.; rfw=0.; rfn=0.; rfs=0. !=1 Flather; =0 clamped
       rfe=1.; rfw=1.; rfn=1.; rfs=1. !=1 Flather; =0 clamped
+      open(73,file='bry.nml',status='old')
+      read(73,nml=bry_nml)
+      close(73)
 
 ! Periodic in "x" and/or "y"?  !lyo:20110224:alu:stcc:
 !     iperx.ne.0 if x-periodic; ipery.ne.0 if y-periodic               !
@@ -1077,7 +1122,7 @@
       endif
       h=xa(khi)-xa(klo)
       if (h.eq.0.)  then
-        error_staus=1
+        error_status=1
         write(6,'(/a)') 'Error: bad xa input in splint'
       end if
       a=(xa(khi)-x)/h

@@ -12,12 +12,13 @@
       use interp
       use mcsst        !fhx:mcsst
       use uvforce      !eda:uvforce
+      use seaice
 
       implicit none
       include 'pom.h'
 
       logical spinup
-      namelist/misc_nml/ spinup
+      namelist/misc_nml/ spinup, t_lo, t_hi
 
       type(date) :: dtime
 
@@ -41,7 +42,8 @@
       call wind_init( dtime )
       call river_init( dtime )
       call assim_init( dtime )
-    
+      if ( calc_ice ) call ice_init( dtime )
+
       if(my_task == master_task) then
         write(*,'(a)') 'End of initialization'
         write(*,*) 
@@ -56,7 +58,7 @@
 ! main loop
       do iint=1,iend
 
-        
+
 !     external forcings
         if (iint==1 .or. .not.spinup) then
           if ( calc_uvforce ) call uvforce_main(dtime)  !eda:uvforce
@@ -65,12 +67,14 @@
           if ( calc_tsforce ) call tsforce_tsflx( dtime )
           if ( calc_wind )    call wind_main( dtime )
           if ( calc_river )   call river_main( dtime, .false. )
+          if ( calc_ice )     call ice_main( dtime )
         end if
 
-       
+
 !     advance model
 !       call advance( dtime )    !lyo:???
         call advance    
+!        call ice_advance
 
 !     drifter data assimilation  !eda:
 
@@ -108,7 +112,7 @@
 !_______________________________________________________________________
       real(kind=8) function realtime()
       call system_clock(i,j,k)
-      realtime=i/dble(j)
+      realtime=dble(i)/dble(j)
       return
       end
 

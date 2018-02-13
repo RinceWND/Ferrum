@@ -9,6 +9,7 @@
       include 'pom.h'
 
       integer, parameter :: wn = 4
+      logical, parameter :: calc_mflx = .true.
 
       real(kind=rk), dimension( im_local, jm_local ) ::
      $  uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd_fine, vwnd_fine
@@ -61,10 +62,6 @@
       ! initialize
       n = 1
 
-      wusurf = 0.0
-      wvsurf = 0.0
-      
-
       ! wind stresses in initial state
 
       if ( calc_wind ) then
@@ -75,8 +72,13 @@
 !!*  $        d_in%year, d_in%month, d_in%day
 !         write( infile, '( a4,"_",i4.4,2i2.2,".nc" )' )
 !     $        windf, d_in%year, d_in%month, d_in%day
-         write( infile, '( a3,".",i4.4,".nc" )' )
+         if (calc_mflx) then
+           write( infile, '( a3,".",i4.4,".nc" )' )
+     $        "hfl", d_in%year
+         else
+           write( infile, '( a3,".",i4.4,".nc" )' )
      $        "mfl", d_in%year
+         end if
 !!       write( infile, '( "gfsw_",i4.4,2i2.2,".nc" )' )   ! fhx:read gfsw wind
 !!    $        d_in%year, d_in%month, d_in%day
 
@@ -88,10 +90,15 @@
          if(lexist) then
            d_off = str2date("1979-01-01 00:00:00")
            d_off%year = d_in%year
-           n = int(dif_date(d_in, d_off)/86400.)*4+1
+           n = int((d_in-d_off)/86400.)*4+1
 
-           call read_wind_pnetcdfc
-     $             ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           if (calc_mflx) then
+             call read_wind_pnetcdfc
+     &         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           else
+             call read_mflx_pnetcdf
+     $         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           end if
 
            uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
            vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
@@ -168,7 +175,7 @@
             vwnd_a = vwnd_buf( :, :, wn )
             
             d_fwd = d_in + 24 * 3600
-            n = int(dif_date(d_fwd, d_off)/86400.)*4+1
+            n = int((d_fwd-d_off)/86400.)*4+1
             n = mod(n, 1460 + 4*inc_leap(d_in%year))
 
 !!*      write( infile, '( //trim(windf)//"_",i4.4,2i2.2,".nc" )' )
@@ -176,8 +183,13 @@
 !         write( infile, '( a4,"_",i4.4,2i2.2,".nc" )' )
 !debug     $        windf, d_in%year, d_in%month, d_in%day
 !     $        windf, d_off%year, d_off%month, d_off%day
-         write( infile, '( a3,".",i4.4,".nc" )' )
+            if (calc_mflx) then
+              write( infile, '( a3,".",i4.4,".nc" )' )
+     $        "hfl", d_fwd%year
+            else
+              write( infile, '( a3,".",i4.4,".nc" )' )
      $        "mfl", d_fwd%year
+            end if
 !!       write( infile, '( "gfsw_",i4.4,2i2.2,".nc" )' )   ! fhx:read gfsw wind
 !!   $        d_in%year, d_in%month, d_in%day
 !            write( infile, '( "gfs_",i4.4,2i2.2,".nc" )' ) ! fhx:read gfs wind
@@ -185,13 +197,18 @@
 
 ! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010             
          inquire(file='in/'//trim(windf)//'/'//trim(infile),
-     $           exist=lexist)   
-!!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)   
+     $           exist=lexist)
+!!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)
 
          if(lexist) then
 
-            call read_wind_pnetcdfc
+           if (calc_mflx) then
+             call read_wind_pnetcdfc
+     &         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           else
+             call read_mflx_pnetcdf
      $         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           end if
 
            uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
            vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
@@ -284,7 +301,7 @@
 
       d_off = str2date("1979-01-01 00:00:00")
       d_off%year = d_in%year
-      n = int(dif_date(d_in, d_off)/86400.)
+      n = int((d_in-d_off)/86400.)
 
       do i=1,wn-1
          
@@ -311,7 +328,7 @@
             vwnd_a = vwnd_buf( :, :, wn )
          
          d_fwd = d_in + 24 * 3600
-         n = int(dif_date(d_fwd, d_off)/86400.)*4+1
+         n = int((d_fwd-d_off)/86400.)*4+1
          n = mod(n, 1460 + 4*inc_leap(d_in%year))
 
 !!*      write( infile, '( //trim(windf)//"_",i4.4,2i2.2,".nc" )' )
@@ -319,22 +336,32 @@
 !         write( infile, '( a4,"_",i4.4,2i2.2,".nc" )' )
 !debug     $        windf, d_in%year, d_in%month, d_in%day
 !     $        windf, d_off%year, d_off%month, d_off%day
-         write( infile, '( a3,".",i4.4,".nc" )' )
+         if (calc_mflx) then
+           write( infile, '( a3,".",i4.4,".nc" )' )
+     $        "hfl", d_fwd%year
+         else
+           write( infile, '( a3,".",i4.4,".nc" )' )
      $        "mfl", d_fwd%year
+         end if
 !!       write( infile, '( "gfsw_",i4.4,2i2.2,".nc" )' )   ! fhx:read gfsw wind
 !!   $        d_in%year, d_in%month, d_in%day
 !         write( infile, '( "gfs_",i4.4,2i2.2,".nc" )' )  ! fhx:read gfs wind
 !     $        d_off%year, d_off%month, d_off%day
 
-! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010         
+! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010
          inquire(file='in/'//trim(windf)//'/'//trim(infile),
      $           exist=lexist)   
 !!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)   
 
          if(lexist) then
 
-         call read_wind_pnetcdfc
+           if (calc_mflx) then
+             call read_wind_pnetcdfc
+     &        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           else
+             call read_mflx_pnetcdf
      $        ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
+           end if
 
            uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
            vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
@@ -353,7 +380,7 @@
 ! interpolation
       if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.  
 
-       do k=1,4  
+       do k=1,4
         uwnd_coarse = uwnd_buf_coarse( :, :, k )
         vwnd_coarse = vwnd_buf_coarse( :, :, k )
         call interp_mask_2d(uwnd_coarse,1,east_e,north_e,uwnd_fine)
@@ -361,15 +388,15 @@
 !fhx: after interpolation, i=1,2 and j=1,2 seem to have problems
       if (n_west.eq.-1) then
        do i=1,2
-         uwnd_fine(i,:)=uwnd_fine(3,:)      
+         uwnd_fine(i,:)=uwnd_fine(3,:)
          vwnd_fine(i,:)=vwnd_fine(3,:)
        enddo
       endif
 
       if(n_south.eq.-1) then
        do j=1,2
-         uwnd_fine(:,j)=uwnd_fine(:,3)       
-         vwnd_fine(:,j)=vwnd_fine(:,3)        
+         uwnd_fine(:,j)=uwnd_fine(:,3)
+         vwnd_fine(:,j)=vwnd_fine(:,3)
        enddo 
       endif
          uwnd_buf(:,:,k)=uwnd_fine
@@ -379,8 +406,8 @@
 
        else
 
-          uwnd_buf = reshape(uwnd_buf_coarse, shape(uwnd_buf))    
-          vwnd_buf = reshape(vwnd_buf_coarse, shape(vwnd_buf))          
+          uwnd_buf = reshape(uwnd_buf_coarse, shape(uwnd_buf))
+          vwnd_buf = reshape(vwnd_buf_coarse, shape(vwnd_buf))
   
        endif !  if(calc_interp) then fhx:interp_flag  
          
@@ -388,7 +415,7 @@
            vwnd_b = vwnd_buf( :, :, 1 )
 
       endif
- 
+
 
       aa = real( mod( sec_in_day, 6 * 3600 ) ) / ( 6. * 3600. )
 
@@ -408,10 +435,11 @@
 !lyo:pac10:exp016:reduce wind to zero west of 129
 !           rdisp=0.5*(1.+tanh((east_e(i,j)-129.0)*0.5))
 !           uwnd=uwnd*rdisp; vwnd=vwnd*rdisp
+          if (calc_mflx) then
 !lyo:pac10:more efficient:
             uwsrf(i,j)=uwnd; vwsrf(i,j)=vwnd;
 
-            uvabs = sqrt( uwnd**2 + vwnd**2 )
+            uvabs = sqrt( (uwnd-u(i,j,1))**2 + (vwnd-v(i,j,1))**2 )
 
 
 !     test ayumi 2010/7/20
@@ -434,16 +462,21 @@
                cda = 0.00138821   !modify cda = 0.000138821 ---> 0.00138821
             endif
 
-            wusurf( i, j ) = - rhoa / rhow * cda * uvabs * uwnd !- uwnd / rhow
-            wvsurf( i, j ) = - rhoa / rhow * cda * uvabs * vwnd !- vwnd / rhow
+            wusurf(i,j) = - rhoa / rhow * cda * uvabs * (uwnd-u(i,j,1)) !- uwnd / rhow
+            wvsurf(i,j) = - rhoa / rhow * cda * uvabs * (vwnd-v(i,j,1)) !- vwnd / rhow
+          else
+            wusurf(i,j) = uwnd / rhow   ! NCEP momentum flux is ALREADY INVERSED?!
+            wvsurf(i,j) = vwnd / rhow
+          end if
 
          enddo
       enddo
 
 !     wind wave-induced enhanced bottom drag !lyo:20110315:botwavedrag:4lines
 !       if ( calc_botwavedrag ) call botwavedrag(...) !future use calc_..
-        call botwavedrag (im,jm,fsm,wusurf,wvsurf,
-     $  0.0314159,          !kp=2.*pi/200.=0.0314159
+        call botwavedrag (im,jm,fsm
+     &                   ,(1.-ice)*wusurf,(1.-ice)*wvsurf,
+     $  0.0314159_rk,          !kp=2.*pi/200.=0.0314159
      $  wubot,wvbot,h,zz(kbm1),z0b,cbcmin,cbcmax,cbc)
       
 

@@ -65,7 +65,7 @@
 !     mid-point [sec] in the month.
       
       mid_in_month = int( real( mday( d_in%month ) )/ 2.0  
-     $             * 24 * 3600 )
+     $             * 24. * 3600. )
 
 
 !     decide between which two months.
@@ -146,7 +146,7 @@
 
 !     mid-point [sec] in the month.
       
-      mid_in_month = int( real( mday( d_in%month ) )/ 2. * 24 * 3600 )
+      mid_in_month = int( real( mday( d_in%month ) )/ 2. * 24.*3600. )
 
 
 !     decide between which two months.
