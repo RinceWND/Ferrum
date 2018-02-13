@@ -615,7 +615,12 @@
         call read_clim_ts_pnetcdf(tb,sb,n)
       endif
 !      call read_clim_ts_pnetcdf_obs(tb,sb,rho,n)
-
+      call read_initial_ts_pnetcdf(kb,tb,sb)
+      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_clim.nc"
+      inquire(file=trim(netcdf_ic_file),exist=fexist)
+      
+      if (fexist) then
+        call read_clim_ts_pnetcdf(tb,sb,n)
 ! read annual-mean, xy-ave t,sclim if avail !lyo:20110202:
         write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean.nc"
         inquire(file=trim(netcdf_ic_file),exist=fexist)
