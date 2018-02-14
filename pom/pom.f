@@ -33,7 +33,7 @@
 ! starting date and time
 ! read date from restart file name !fhx:
 !     dtime = str2date( time_start(1:19) )
-      dtime = str2date(read_rst_file(1:13)//":"//
+      dtime = str2date( read_rst_file(1:13)//":"//
      &read_rst_file(15:16)//":"//read_rst_file(18:19) )
       mb = dtime%month
 
@@ -92,7 +92,7 @@
      &       write(*,'("d = ",a)')  date2str( dtime )
 
 ! write output
-      call write_output( dtime, 1, mb )
+      call write_output( dtime, 0, mb )
 
 ! write SURF output
       call write_output_surf !fhx:20110131:

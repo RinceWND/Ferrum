@@ -719,10 +719,10 @@
 
 !     call read_uabe_pnetcdf(uabe)
 !eda:uvforce
-      if (.not. calc_uvforce) then
-        write(in_file,'(a)') "bc.nc"
-        call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file, 1)
-      endif
+!      if (.not. calc_uvforce) then
+!        write(in_file,'(a)') "bc.nc"
+!        call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file, 1)
+!      endif
 
 !     Radiation factors for use in subroutine bcond !alu:20101216 
 !      rfe=0.; rfw=0.; rfn=0.; rfs=0. !=1 Flather; =0 clamped

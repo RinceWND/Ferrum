@@ -93,7 +93,7 @@
      
 !          wvsurf(i,j)=0.e0
 
-          e_atmos(i,j)=0.
+!          e_atmos(i,j)=0.
 !          vfluxf(i,j)=0.e0
 
 ! set w(i,j,1)=vflux(i,j).ne.0 if one wishes non-zero flow across
@@ -801,7 +801,7 @@
           write(*,'(a,e15.8,2(a,f11.8),a)') 
      $       "mean ; et = ",elev_ave," m, tb = ",
      $       temp_ave + tbias," deg, sb = ",
-     $       salt_ave + sbias ," psu"
+     $       salt_ave + sbias," psu"
 
         end if
 

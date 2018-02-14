@@ -466,6 +466,8 @@
       shum  = (1.-bb)*shum_a + bb*shum_b
       rain  = (1.-bb)*rain_a + bb*rain_b
       cloud = (1.-bb)*cloud_a + bb*cloud_b
+
+      e_atmos = 0.01 * ( pres - 1013. )
 !      datestr = "dbg."//date2str(d_in)
 !      call write_sflx(datestr, tair,shum,rain,tskin,pres,cloud )
       if (calc_bulk) then
