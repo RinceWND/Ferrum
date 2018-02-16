@@ -175,7 +175,7 @@
      $     calc_tsurf_mc, calc_tide,!fhx:mcsst; fhx:tide     
      $     calc_uvforce,         !eda:uvforce
      $     calc_ice,
-     $     output_flag, SURF_flag !fhx:20110131:
+     $     output_flag, SURF_flag, monthly_flag !fhx:20110131:
       type(date) ::  dtime, dtime0
 
       logical spinup
