@@ -132,8 +132,10 @@
             vnow      = vair(i,j)
             tnow      = tair(i,j)+ckelv
             pnow      = pres(i,j)
-            rhnow     = rhum(i,j)
-     $                 *pnow*0.263/exp(17.67*tair(i,j)/(tnow-29.65)) ! rwnd: specific to relative humidity
+            e         = rhum(i,j)*pnow / ( 0.378*rhum(i,j) + 0.622 )
+            es        = 6.112 *
+     &           exp( (( 17.67*tair(i,j) )/( tair(i,j) + 243.25 )) )
+            rhnow     = 100.*e/es ! rwnd: specific to relative humidity
             if (rhnow>100.) rhnow=100.
             if (rhnow<0.) rhnow=0.
             precip    = rain(i,j)/1000. ! rwnd: precipitation rate from kg/(m2*s) to m/s

@@ -92,18 +92,20 @@
      &       write(*,'("d = ",a)')  date2str( dtime )
 
 ! write output
-      call write_output( dtime, 0, mb )
+        call write_output( dtime, monthly_flag, mb )
 
 ! write SURF output
-      call write_output_surf !fhx:20110131:
+        call write_output_surf !fhx:20110131:
 
 ! write restart
-      call write_restart( dtime )
+        call write_restart( dtime )
 
 !      call write_debug_pnetcdf("dbg."//date2str(dtime))
 
       end do
 
+! write final restart file at all times
+      call write_restart( dtime )
 
 ! finalize mpi
       call finalize_mpi

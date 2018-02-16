@@ -740,7 +740,7 @@
 
 ! ================================================
       integer
-     $  output_flag, SURF_flag  !fhx:20110131:
+     $  output_flag, SURF_flag, monthly_flag
 !fhx:20110131:beg:
       integer
      $  nums, iprints,iouts
@@ -751,7 +751,8 @@
 
       common/blkflag/
      $  output_flag,
-     $  SURF_flag
+     $  SURF_flag,
+     &  monthly_flag
 
       common/blk0dsurf/
      $  nums, iprints,iouts
