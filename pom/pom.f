@@ -104,9 +104,6 @@
 
       end do
 
-! write final restart file at all times
-      call write_restart( dtime )
-
 ! finalize mpi
       call finalize_mpi
 
@@ -341,7 +338,8 @@
 
       irestart1d=nint(write_rst1d*86400./dti)                    !lyo:exp302:
       if(     (mod(iint,irestart)   == 0                  )        !lyo:exp302:
-     $   .or. (mod(iint,irestart1d) == 0 .and. ncount.eq.0) ) then !lyo:exp302:
+     $   .or. (mod(iint,irestart1d) == 0 .and. ncount.eq.0)        !lyo:exp302:
+     &   .or. ( iint == iend ) ) then
          ncount=1                                                  !lyo:exp302:
 !     if( mod(iint,irestart) == 0 ) then                           !lyo:exp302:
 

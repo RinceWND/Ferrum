@@ -467,6 +467,9 @@
       rain  = (1.-bb)*rain_a + bb*rain_b
       cloud = (1.-bb)*cloud_a + bb*cloud_b
 
+! Simplified version of inverse barobeter:
+!   IB(mm) = -9.948 * ( ΔRdry(mbars) – 1013.3 )
+! In POM it should be inversed in sign (it seems)
       e_atmos = 0.01 * ( pres - 1013. )
 !      datestr = "dbg."//date2str(d_in)
 !      call write_sflx(datestr, tair,shum,rain,tskin,pres,cloud )
