@@ -90,6 +90,22 @@
       real(kind=rk), dimension(im, jm) ::
      $  uair(im,jm),vair(im,jm),tair(im,jm),rhum(im,jm),
      $  rain(im,jm),cloud(im,jm),pres(im,jm)
+
+      real(kind=rk) unow, vnow, tnow, pnow, e, es, precip, cld
+     &   , sst_model, QBW
+
+      real(kind=rk), external :: cd, heatlat, esk
+
+      real(kind=rk) arho
+     &            , cd1, ce2, ch2
+     &            , deltemp
+     &            , ea12, emiss, esatair, esatoce, evap
+     &            , fe, fh
+     &            , Qe, Qh, Qu
+     &            , rhnow, rhom
+     &            , sigma, sol_net, sp, ss, sstk, stp
+     &            , taux, tauy, tnowk
+     &            , wair, wflux, wsatair, wsatoce
 !
 !--------------------------------------------------------------------
 !       coefficients ( in MKS )  :
@@ -101,7 +117,7 @@
 
 ! --- Sea water density times the specific heat of seawater
 
-      data rho_cpw/4.082793e6/
+      data rho_cpw/4.082793d6/
 
 ! --- surface air pressure, expsi, dry air gas constant
 !
@@ -109,11 +125,11 @@
 !
 ! --- turbulent exchange coefficients ( from Budyko 1963 )
 !
-      data  ce2,ch2  / 2.1e-3, 2.1e-3/
+      data  ce2,ch2  / 2.1d-3, 2.1d-3/
 !
 ! --- air density, Stefan-Boltzmann constant , ocean emissivity
 !
-      data arho,sigma,emiss   /1.2,   5.67e-8, .97/ ! 5.669e-8
+      data arho,sigma,emiss   /1.2,   5.67d-8, .97/ ! 5.669e-8
 !
 ! --- Solar constant , specific heat capacity of air
 !
@@ -288,9 +304,6 @@
 ! --- calculates : Qu = Qb + QH + QE
 !
             QU = qbw + qh + qe
-            if (QU<0.) then
-                write(*,*) i,j,":::",qbw,qh,qe
-            end if
 !
 ! --- 1. Devide upward heat flux by rho*Cpw
 !
@@ -301,10 +314,7 @@
 ! Reed, R.K.,1977: On estimating insolation over the ocean, J.Phys.
 ! Oceanogr. 17, 854-871.
 
-            alonp = alon(i,j)
-            alatp = alat(i,j)
-
-            call sol_rad(sol_net,cld,alonp,alatp
+            call sol_rad(sol_net,cld,alon(i,j),alat(i,j)
      $                  ,iyr,imo,iday,ihour,imin)
 
 ! --- 1. Divide net solar radiation flux by rho*Cpw and reverse sign
@@ -323,8 +333,8 @@
 ! --- Calculate  the wind stresses in MKS ( newton/m*m )
 ! --- taux= rhom*Cd*|V|u     tauy= rhom*Cd*|V|v
 !
-            TAUX = rhom*cd1*sp*unow
-            TAUY = rhom*cd1*sp*vnow
+            TauX = rhom*cd1*sp*unow
+            TauY = rhom*cd1*sp*vnow
 
 ! --- Reverse Sign and divide by sea water density
             wusurf(i,j) = -taux/rho
@@ -359,20 +369,33 @@
 ! --- Constant Latent Heat of Vaporization
 !     L = 2.501e+6  (MKS)
 !
-        heatlat = 2.5008e+6 -2.3e+3*t
-!
+        implicit none
+
+        include 'realkind'
+
+        real(kind=rk) heatlat
+        real(kind=rk), intent(in)  :: t
+
+        heatlat = 2.5008d+6 -2.3d+3*t
+
         return
       end
 !
-      function CD(sp,delt)
+      function cd(sp,delt)
 !
 ! --- calculates the Drag Coefficient as a function of the abs. value of the
 ! --- wind velocity
 ! --- ( Hellermann and  Rosenstein, 1983. JPO, 13,1093-1104)
+        implicit none
+
+        include 'realkind'
+
+        real(kind=rk)                  cd
+        real(kind=rk), intent(in)   :: sp, delt
+        real(kind=rk), dimension(6) :: a
 !
-        dimension a(6)
-        data a / 0.934e-3,0.788e-4,0.868e-4
-     $         ,-0.616e-6,-.120e-5,-.214e-5/
+        data a / 0.934d-3,0.788d-4,0.868d-4
+     $         ,-0.616d-6,-.120d-5,-.214d-5/
 !
         cd = a(1) + a(2)*sp + a(3)*delt + a(4)*sp*sp
      $       + a(5)*delt*delt  + a(6)*sp*delt
@@ -382,22 +405,38 @@
 !
 !==============================================================================
 !
-      real function ESK(t)
+      function ESK(t)
 !
 ! --- compute the saturation water vapor pressure from
 ! --- temperature in kelvin  (Lowe,1977; JAM,16,100,1977)
+        implicit none
+
+        include 'realkind'
+
+        real(kind=rk) esk
+        real(kind=rk), intent(in) :: t
+
+        real(kind=rk), dimension(7) :: a
 !
-        dimension a(7)
-        data  a /6984.505294,-188.9039310,2.133357675,-1.288580973e-2,
-     $           4.393587233e-5,-8.023923082e-8,6.136820929e-11  /
+        data  a /6984.505294,-188.9039310,2.133357675,-1.288580973d-2,
+     $           4.393587233d-5,-8.023923082d-8,6.136820929d-11  /
 !
         esk = a(1) +t*(a(2)+t*(a(3)+t*(a(4)+t*(a(5)+t*(a(6)+t*a(7))))))
 !
         return
       end
 !
-      subroutine SOL_RAD(SOLA,CLD,ALONP,ALATP,IYR,IMT,IDY,IHR,IME)
+      subroutine sol_rad( sola,cld,alonP,alatP,iyr,imt,idy,ihr,ime )
 !--------------------------------------------------------------------
+
+        include 'realkind'
+
+        real(kind=rk), intent(out) :: sola
+        real(kind=rk), intent(in)  :: cld, alonp, alatp
+        integer      , intent(in)  :: iyr, imt, idy, ihr, ime
+        real(kind=rk) qsw, blat, blon, acl
+
+        real(kind=rk), external :: qshort
 
         data PI/3.141593/,RAD/.01745329/
 !
@@ -417,11 +456,33 @@
       end
 
       function qshort(iyr,imt,idy,ihr,ime,alat,alon,acl)
+
+        implicit none
 !
+        include 'realkind'
+
+        real(kind=rk), intent(in)  :: alat, alon, acl
+        integer      , intent(in)  :: iyr, imt, idy, ihr, ime
+
+        real(kind=rk) degrad, eclips, raddeg, pi
+
         parameter(pi=3.1415927,degrad=pi/180.,raddeg=180./pi,
      $            eclips=23.439*degrad)
 !
         dimension alpham(12),alb1(20),za(20),dza(19)
+
+        real(kind=rk) qshort
+
+        integer imt1, iyr1, intT1, intT2, jab
+        real(kind=rk)
+     &   albedo, alb1, alpha, alpham, aozone
+     & , bb1, bb2
+     & , capC, capG, capL, cosZen, DEC, DTOR, dza, dZen
+     & , epsiln, g360, gha, gha360
+     & , solar, SolAlt, SunBet, SunDec
+     & , tau, ThSun, TRM111, TRM112, TRM11, UT, SHA, SMLT
+     & , qatten, qdiff, qdir, qtot, qzer
+     & , xl360, XLCT, yrdays, za, zen
 !
 ! ---   alat,alon - (lat, lon)  in radians !!
 !
@@ -450,63 +511,72 @@
 ! --- sun hour angle :
 !
         DTOR = DEGRAD
-        XLCT = (1.0*IHR)+(1.0*IME/60.0)
+        XLCT = ( 1.*ihr ) + ( 1.*ime / 60. )
         UT   = XLCT
-        IF (IMT.GT.2) THEN
-          IYR1=IYR
-          IMT1=IMT-3
-        ELSE
-          IYR1=IYR-1
-          IMT1=IMT+9
-        ENDIF
-        INTT1=INT(30.6*IMT1+0.5)
-        INTT2=INT(365.25*(IYR1-1976))
-        SMLT=((UT/24.0)+IDY+INTT1+INTT2-8707.5)/36525.0
-        EPSILN=23.4393-0.013*SMLT
-        CAPG=357.528+35999.050*SMLT
-        IF (CAPG.GT.360.0) THEN
-          G360=CAPG-INT(CAPG/360.0)*360.0
-        ELSE
-          G360=CAPG
-        ENDIF
-        CAPC=1.915*SIN(G360*DTOR)+0.020*SIN(2*G360*DTOR)
-        CAPL=280.460+36000.770*SMLT+CAPC
-        IF (CAPL.GT.360.0) THEN
-          XL360=CAPL-INT(CAPL/360.0)*360.0
-        ELSE
-          XL360=CAPL
-        ENDIF
-        ALPHA=XL360-2.466*SIN(2*XL360*DTOR)+0.053*SIN(4*XL360*DTOR)
-        GHA=15.0*UT-180.0-CAPC+XL360-ALPHA
-        IF (GHA.GT.360.0) THEN
-          GHA360=GHA-INT(GHA/360.0)*360.0
-        ELSE
-          GHA360=GHA
-        ENDIF
-        DEC=ATAN(TAN(EPSILN*DTOR)*SIN(ALPHA*DTOR))/DTOR
+
+        if ( imt > 2 ) then
+          iyr1 = iyr
+          imt1 = imt-3
+        else
+          iyr1 = iyr-1
+          imt1 = imt+9
+        end if
+
+        intT1 = int(  30.6 * imt1      + 0.5 )
+        intT2 = int( 365.25*(iyr1-1976)      )
+        SMLT  = ( (UT/24.) + idy + intT1 + intT2 - 8707.5) / 36525.
+        epsiln=  23.4393 -     0.013*SMLT
+        capG  = 357.528  + 35999.050*SMLT
+
+        if ( capG > 360. ) then
+          g360 = capG - int( capG/360. )*360.
+        else
+          g360 = capG
+        end if
+
+        capC = 1.915*sin( g360*DTOR ) + .020*sin( 2.*g360*DTOR )
+        capL = 280.46 + 36000.770*SMLT + capC
+
+        if ( capL > 360. ) then
+          xl360 = capL - int( capL/360. ) *360.
+        else
+          xl360 = capL
+        end if
+
+        alpha = xl360 -
+     &     2.466*sin( 2.*xl360*DTOR ) + .053*sin( 4.*xl360*DTOR )
+        gha = 15.*UT - 180.- capC + xl360 - alpha
+
+        if ( gha > 360. ) then
+          gha360 = gha - int( gha/360. )*360.
+        else
+          gha360 = gha
+        end if
+
+        DEC = atan( tan( epsiln*DTOR ) * sin( alpha*DTOR ) )/DTOR
 
 !     Calculate Solar Hour Angle
-        THSUN=(GHA360+ALON*RADDEG )*degrad
-        SHA=GHA360+(ALON*RADDEG)
+        ThSun = ( GHA360 + alon*RADDEG )*degrad
+        SHA = GHA360 + ( alon*RADDEG )
 
 
 ! --- sun declination :
-        SUNDEC = DEC*DEGRAD
+        SUNDEC = DEC * DEGRAD
 
-        TRM111=SIN(ALAT)*SIN(DEC*DTOR)
-        TRM112=-COS(ALAT)*COS(DEC*DTOR)
-        TRM11=TRM111-TRM112
+        TRM111 = sin( alat ) * sin( DEC*DTOR )
+        TRM112 =-cos( alat ) * cos( DEC*DTOR )
+        TRM11  = TRM111 - TRM112
 
 ! --- solar noon altitude in degrees :
-        SOLALT=ASIN(TRM11)/DTOR
-        SUNBET = SOLALT
+        SolAlt = asin( TRM11 ) / DTOR
+        SunBet = SolAlt
 
 !
 ! --- cosine of the solar zenith angle :
 !
-        coszen =sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(thsun)
+        coszen =sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(ThSun)
 !
-        if (coszen .le. 0.0) then
+        if ( coszen <= 0.+1.d-4 ) then
           coszen = 0.0
           qatten = 0.0
         else
@@ -529,15 +599,15 @@
 !
         zen=raddeg*acos(coszen)
 !
-        if (zen.ge.74.) then
-          jab=int(.5*(90.-zen)+1.)
-        elseif (zen.ge.50.) then
-          jab=int(.23*(74.-zen)+9.)
+        if ( zen >= 74. ) then
+          jab = int( .5 *(90.-zen) +  1. )
+        elseif ( zen >= 50. ) then
+          jab = int( .23*(74.-zen) +  9. )
         else
-          jab=int(.10*(50.-zen)+15.)
+          jab = int( .10*(50.-zen) + 15. )
         end if
 !
-        dzen=(za(jab)-zen)/dza(jab)
+        dzen = ( za(jab) - zen ) / dza(jab)
 !
         albedo=alb1(jab)+dzen*(alb1(jab+1)-alb1(jab))
 !
