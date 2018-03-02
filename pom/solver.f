@@ -2644,7 +2644,7 @@ C  !The most south sudomains
          
          if ( my_task == master_task ) then
 
-!     mean u-velocoty at the eastern boundary.
+!     mean u-velocity at the eastern boundary.
 
             mean_uabe = sum_flow / max( sum_area, small )
 
@@ -3788,11 +3788,9 @@ C  !The most south sudomains
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              rad(i,j,k)=swrad(i,j)
-     &               *real(
-     &                (r(ntp)*exp(real(z(k)*dh(i,j)/ad1(ntp),16))
-     &                 +(1.-r(ntp))*exp(real(z(k)*dh(i,j)/ad2(ntp),16)))
-     &                ,rk)
+              rad(i,j,k)=swrad(i,j)*
+     &                (r(ntp)*exp(z(k)*dh(i,j)/ad1(ntp))
+     &                 +(1.-r(ntp))*exp(z(k)*dh(i,j)/ad2(ntp)))
             end do
           end do
         end do
