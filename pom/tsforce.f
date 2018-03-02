@@ -75,7 +75,8 @@
       nb = 0
       mb = 0
       db = 0
-      pres = 1013.
+      pres_a = 1013.
+      pres_b = 1013.
 
 !     Read backward and forward TS climatology in initial state
 
@@ -467,7 +468,7 @@
       rain  = (1.-bb)*rain_a + bb*rain_b
       cloud = (1.-bb)*cloud_a + bb*cloud_b
 
-! Simplified version of inverse barobeter:
+! Simplified version of inverse barometer:
 !   IB(mm) = -9.948 * ( ΔRdry(mbars) – 1013.3 )
 ! In POM it should be inversed in sign (it seems)
       e_atmos = 0.01 * ( pres - 1013. )
