@@ -610,8 +610,8 @@
       inquire(file=trim(netcdf_ic_file),exist=fexist)
       
       if (fexist) then
-        call read_clim_ts_pnetcdf(tb,sb,n)
-!      call read_clim_ts_pnetcdf_obs(tb,sb,rho,n)
+!        call read_clim_ts_pnetcdf(tb,sb,n)
+        call read_initial_ts_pnetcdf(tb,sb,elb,n)
 
 ! read annual-mean, xy-ave t,sclim if avail !lyo:20110202:
         write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean.nc"
@@ -717,6 +717,10 @@
 
       namelist/bry_nml/ rfn, rfe, rfs, rfw
 
+      if ( n_north == -1 ) eln = elb( :,jm)
+      if ( n_east  == -1 ) ele = elb(im,: )
+      if ( n_south == -1 ) els = elb( :, 1)
+      if ( n_west  == -1 ) elw = elb( 1,: )
 !     call read_uabe_pnetcdf(uabe)
 !eda:uvforce
 !      if (.not. calc_uvforce) then

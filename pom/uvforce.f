@@ -4,9 +4,12 @@
 
       private
 
-      public :: uvforce_init, uvforce_main 
+      public :: uvforce_init, uvforce_main
 
       include 'pom.h'
+
+      logical, parameter :: read_transport = .false.
+      integer, parameter :: n_bry = 3
 
 !     days in month
       integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,               
@@ -25,7 +28,11 @@
       real(kind=rk), dimension( jm_local, kb ) ::
      $     ube_a, ubw_a, ube_b, ubw_b
 
-    
+      real(kind=rk), dimension( 10 ) ::
+     &     trans_a, trans_b, transport
+      real(kind=rk), dimension( 2, 10 ) ::
+     &     x_a, x_b, y_a, y_b, x, y
+
       integer :: mon_a, mon_b, sec_in_month, mid_in_month
       integer :: k
       character(len=7) :: infile_a, infile_b
@@ -85,25 +92,29 @@
 
 
 !     data open.
-         write( infile_a, '( "bc",i2.2,".nc" )' ) mon_a
-         call read_bc_pnetcdf
-     $        ( ube_a, ubw_a, vbs_a, vbn_a, "bc.nc", mon_a )
+      if ( read_transport ) then
 
-!         write( infile_b, '( "bc",i2.2,".nc" )' ) mon_b
-         call read_bc_pnetcdf
-     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bc.nc", mon_b )
-     
-!         call read_bc_pnetcdf_obs
-!     $        ( ube_a, ubw_a, vbs_a, vbn_a, "bry_old.nc", mon_a )
-!
-!         call read_bc_pnetcdf_obs
-!     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bry_old.nc", mon_b )
+        call read_bc_transport_pnetcdf
+     &      ( trans_a, y_a, x_a, "bc.trans.nc", mon_a )
+
+        call read_bc_transport_pnetcdf
+     &      ( trans_b, y_b, x_b, "bc.trans.nc", mon_b )
+
+      else
+
+        call read_bc_pnetcdf
+     $      ( ube_a, ubw_a, vbs_a, vbn_a, "bc.nc", mon_a )
+        call read_bc_pnetcdf
+     $      ( ube_b, ubw_b, vbs_b, vbn_b, "bc.nc", mon_b )
 !     TODO: Treat water transport increase properly in case of baroclinic velocities input
 !           The below won't work for vertically non-homogeneous velocity field
-         ube_a = sf_bf*ube_a
-         ubw_a = sf_bf*ubw_a
-         vbs_a = sf_bf*vbs_a
-         vbn_a = sf_bf*vbn_a
+        ube_a = sf_bf*ube_a
+        ubw_a = sf_bf*ubw_a
+        vbs_a = sf_bf*vbs_a
+        vbn_a = sf_bf*vbn_a
+
+      end if
+
 
       if ( my_task == master_task ) 
      $        write(*,'(/a/)') "---------- uvforce_init."
@@ -189,45 +200,262 @@
          vbs_a = vbs_b
          vbn_a = vbn_b
 
+        if ( read_transport ) then
 
-         write( infile_b, '( "bc",i2.2,".nc" )' ) mon_b
-         call read_bc_pnetcdf
+          call read_bc_transport_pnetcdf
+     &      ( n_bry, trans_b, y_b, x_b, "bc.trans.nc", mon_b )
+
+        else
+
+          write( infile_b, '( "bc",i2.2,".nc" )' ) mon_b
+          call read_bc_pnetcdf
      $        ( ube_b, ubw_b, vbs_b, vbn_b, "bc.nc", mon_b )
      
-         ube_b = sf_bf*ube_b
-         ubw_b = sf_bf*ubw_b
-         vbs_b = sf_bf*vbs_b
-         vbn_b = sf_bf*vbn_b
+          ube_b = sf_bf*ube_b
+          ubw_b = sf_bf*ubw_b
+          vbs_b = sf_bf*vbs_b
+          vbn_b = sf_bf*vbn_b
 
-!         call read_bc_pnetcdf_obs
-!     $        ( ube_b, ubw_b, vbs_b, vbn_b, "bry_old.nc", mon_b )
-
+        end if
 
       endif
      
 
 !     time interpolation.
 
-      ube = ( 1.0 - aa ) * ube_a + aa * ube_b
-      ubw = ( 1.0 - aa ) * ubw_a + aa * ubw_b
-      vbs = ( 1.0 - aa ) * vbs_a + aa * vbs_b
-      vbn = ( 1.0 - aa ) * vbn_a + aa * vbn_b
-      
-!     integrate vertically
-      uabe = 0.
-      uabw = 0.
-      vabs = 0.
-      vabn = 0.
-      do k=1,kb
-        uabe = uabe + ube(:,k)*dz(k)
-        uabw = uabw + ubw(:,k)*dz(k)
-        vabs = vabs + vbs(:,k)*dz(k)
-        vabn = vabn + vbn(:,k)*dz(k)
-      end do
+      if ( read_transport ) then
+
+        transport = ( 1.0 - aa ) * trans_a + aa * trans_b
+        y = ( 1.0 - aa ) * y_a + aa * y_b
+        x = ( 1.0 - aa ) * x_a + aa * x_b
+
+        call transport_to_velocities
+
+!        print *, my_task, ": VOLTR [Sv]: ", transport(1:n_bry)
+        if ( my_task == 1 ) then
+          print *, my_task, ": TsuV [m/s]: "
+     &         , minval(vabs), ";", maxval(vabs)
+        end if
+        if ( my_task == 3 ) then
+          print *, my_task, ": TsgUSoy [m/s]: "
+     &         , minval(uabe), ";", maxval(uabe)
+        end if
+
+      else
+
+        ube = ( 1.0 - aa ) * ube_a + aa * ube_b
+        ubw = ( 1.0 - aa ) * ubw_a + aa * ubw_b
+        vbs = ( 1.0 - aa ) * vbs_a + aa * vbs_b
+        vbn = ( 1.0 - aa ) * vbn_a + aa * vbn_b
+
+  !     integrate vertically
+        uabe = 0.
+        uabw = 0.
+        vabs = 0.
+        vabn = 0.
+        do k=1,kb
+          uabe = uabe + ube(:,k)*dz(k)
+          uabw = uabw + ubw(:,k)*dz(k)
+          vabs = vabs + vbs(:,k)*dz(k)
+          vabn = vabn + vbn(:,k)*dz(k)
+        end do
+
+      end if
+
 
       return
 
       end subroutine uvforce_main
+!--------------------------------------------------------------
+
+      subroutine transport_to_velocities
+
+        implicit none
+
+        include 'pom.h'
+
+        integer i,j,n
+        real(kind=rk) area
+        integer x1,x2, y1,y2
+
+        x1 = 0
+        x2 = 0
+        y1 = 0
+        y2 = 0
+
+        do n = 1, n_bry
+
+! get boundary section area (the loop is convoluted; put only sections here, not volumes)
+
+! -- north
+          area = 0.
+
+          if ( n_north == -1 ) then
+            if ( y(1,n) == y(2,n)
+     &                    .and. int(y(1,n)) == jm_global ) then
+
+              x1 = minloc(i_global, 1, i_global >= x(1,n))
+!              print *, my_task, " @N x1: ", x1
+              x2 = maxloc(i_global, 1, i_global <= x(2,n))
+!              print *, my_task, " @N x2: ", x2
+
+              if ( x1 > 0 .and. x2 <= im ) then
+
+                do i = x1, x2
+                  area = area + 0.25
+     &           * ( h(i,jm) + elf(i,jm) + h(i,jmm1) + elf(i,jmm1) )
+     &           * ( dx(i,jm) + dx(i,jmm1) ) * dvm(i,jm)
+                end do
+
+              end if
+
+            end if
+          end if
+
+          call sum0d_mpi( area, 0 )
+          call bcast0d_mpi( area, 0 )
+
+          if ( area > 0. ) then
+            if ( n_north == -1 ) then
+              if ( y(1,n) == y(2,n)
+     &                    .and. int(y(1,n)) == jm_global ) then
+
+                if ( x1 > 0 .and. x2 <= im ) then
+                  vabn(x1:x2) = dvm(x1:x2,jm)*transport(n) / area
+                end if
+!              print *, my_task, " @N TR: ", transport(n)
+!              print *, my_task, " @N mV: ", vabn(x1)
+
+              end if
+            end if
+          end if
+
+! -- east
+          area = 0.
+
+          if ( n_east == -1 ) then
+            if ( x(1,n) == x(2,n)
+     &                    .and. int(x(1,n)) == im_global ) then
+
+              y1 = minloc(j_global, 1, j_global >= y(1,n))
+!              print *, my_task, " @E y1: ", y1
+              y2 = maxloc(j_global, 1, j_global <= y(2,n))
+!              print *, my_task, " @E y2: ", y2
+
+              if ( y1 > 0 .and. y2 <= jm ) then
+
+                do j = y1, y2
+                  area = area + 0.25
+     &           * ( h(im,j) + elf(im,j) + h(imm1,j) + elf(imm1,j) )
+     &           * ( dy(im,j) + dy(imm1,j) ) * dum(im,j)
+                end do
+
+              end if
+
+            end if
+          end if
+
+          call sum0d_mpi( area, 0 )
+          call bcast0d_mpi( area, 0 )
+
+          if ( area > 0. ) then
+            if ( n_east == -1 ) then
+              if ( x(1,n) == x(2,n)
+     &                    .and. int(x(1,n)) == im_global ) then
+
+                if ( y1 > 0 .and. y2 <= jm ) then
+                  uabe(y1:y2) = dum(im,y1:y2)*transport(n) / area
+                end if
+!              print *, my_task, " @E TR: ", transport(n)
+!              print *, my_task, " @E mV: ", uabe(y1)
+
+              end if
+            end if
+          end if
+
+! -- south
+          area = 0.
+
+          if ( n_south == -1 ) then
+            if ( y(1,n) == y(2,n) .and. int(y(1,n)) == 1 ) then
+
+              x1 = minloc(i_global, 1, i_global >= x(1,n))
+              x2 = maxloc(i_global, 1, i_global <= x(2,n))
+
+              if ( x1 > 0 .and. x2 <= im ) then
+
+                do i = x1, x2
+                  area = area + 0.25
+     &           * ( h(i,1) + elf(i,1) + h(i,2) + elf(i,2) )
+     &           * ( dx(i,1) + dx(i,2) ) * dum(i,1)
+                end do
+
+              end if
+
+            end if
+          end if
+
+          call sum0d_mpi( area, 0 )
+          call bcast0d_mpi( area, 0 )
+
+          if ( area > 0. ) then
+            if ( n_south == -1 ) then
+              if ( y(1,n) == y(2,n) .and. int(y(1,n)) == 1 ) then
+
+                if ( x1 > 0 .and. x2 <= im ) then
+                  vabs(x1:x2) = dvm(x1:x2,1)*transport(n) / area
+                end if
+
+              end if
+            end if
+          end if
+
+! -- west
+          area = 0.
+
+          if ( n_west == -1 ) then
+            if ( x(1,n) == x(2,n) .and. int(x(1,n)) == 1 ) then
+
+              y1 = minloc(j_global, 1, j_global >= y(1,n))
+!              print *, my_task, " @W y1: ", y1
+              y2 = maxloc(j_global, 1, j_global <= y(2,n))
+!              print *, my_task, " @W y2: ", y2
+
+              if ( y1 > 0 .and. y2 <= jm ) then
+
+                do j = y1, y2
+                  area = area + 0.25
+     &           * ( h(1,j) + elf(1,j) + h(2,j) + elf(2,j) )
+     &           * ( dy(1,j) + dy(2,j) ) * dum(1,j)
+                end do
+
+              end if
+
+            end if
+          end if
+
+          call sum0d_mpi( area, 0 )
+          call bcast0d_mpi( area, 0 )
+
+          if ( area > 0. ) then
+            if ( n_west == -1 ) then
+              if ( x(1,n) == x(2,n)
+     &                    .and. int(x(1,n)) == im_global ) then
+
+                if ( y1 > 0 .and. y2 <= jm ) then
+                  uabw(y1:y2) = dum(1,y1:y2)*transport(n) / area
+                end if
+!              print *, my_task, " @W TR: ", transport(n)
+!              print *, my_task, " @W mV: ", uabw(y1)
+
+              end if
+            end if
+          end if
+
+!        print *, my_task, "DONE!", n
+        end do
+
+      end subroutine transport_to_velocities
 !--------------------------------------------------------------
 
       end module uvforce

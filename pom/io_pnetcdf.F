@@ -944,8 +944,6 @@
       status = get_var_real_2d(ncid,fsm_varid,start,edge,fsm)
       call handle_error_pnetcdf('get_var_real: fsm',status,nf_noerr)
 
-      minh =  minval(h)
-      where (h==minh) h = 1.
       dvm = fsm
       dum = fsm
       do j=1,jm-1
@@ -1462,26 +1460,25 @@
       end
 
 !_______________________________________________________________________
-      subroutine read_initial_ts_pnetcdf(k,temp,salt)
+      subroutine read_initial_ts_pnetcdf(temp,salt,ssh,n)
 ! read initial temperature and salinity
       implicit none
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      integer get_var_real_3d
-      integer k
-!      real(kind=rk) temp(im,jm,k),salt(im,jm,k)
-      real(kind=rk) temp(im,jm,kb),salt(im,jm,kb)
+      integer get_var_real_2d, get_var_real_3d
+      integer k, n
+      real(kind=rk) temp(im,jm,kb),salt(im,jm,kb),ssh(im,jm)
       character(len=120) netcdf_ic_file
       integer ncid,status
-      integer tb_varid,sb_varid
+      integer tb_varid,sb_varid,el_varid
       integer(mpi_offset_kind) start(4),edge(4)
       
       start = 1
       edge  = 1
 
 ! open netcdf ic file
-      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_initial.nc"
+      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_clim.nc"
 
       if(my_task.eq.0) write(*,'(/''reading file '',a)')
      $  trim(netcdf_ic_file)
@@ -1497,22 +1494,32 @@
       status=nfmpi_inq_varid(ncid,'sclim',sb_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: s_init'
      $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'eclim',el_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: el_init'
+     $                          ,status,nf_noerr)
 
 ! get data
       start(1)=i_global(1)
       start(2)=j_global(1)
-      start(3)=1
-      start(4)=1
+      start(3)=n
       edge(1)=im
       edge(2)=jm
-      edge(3)=kb-1
-      edge(4)=1
-      status = get_var_real_3d(ncid,tb_varid,start,edge
-     $                                                ,temp(:,:,1:kb-1))
+      edge(3)=1
+      status = get_var_real_2d(ncid,el_varid,start,edge,ssh)
       call handle_error_pnetcdf('nfmpi_get_vara_real_all',
      $                          status,nf_noerr)
-      status = get_var_real_3d(ncid,sb_varid,start,edge
-     $                                                ,salt(:,:,1:kb-1))
+      start(1)=i_global(1)
+      start(2)=j_global(1)
+      start(3)=1
+      start(4)=n
+      edge(1)=im
+      edge(2)=jm
+      edge(3)=kb
+      edge(4)=1
+      status = get_var_real_3d(ncid,tb_varid,start,edge,temp)
+      call handle_error_pnetcdf('nfmpi_get_vara_real_all',
+     $                          status,nf_noerr)
+      status = get_var_real_3d(ncid,sb_varid,start,edge,salt)
       call handle_error_pnetcdf('nfmpi_get_vara_real_all',
      $                          status,nf_noerr)
       do k=1,kb-1
@@ -1523,6 +1530,7 @@
       end do
       temp(:,:,kb) = temp(:,:,kb-1)
       salt(:,:,kb) = salt(:,:,kb-1)
+      elb = elb*fsm
 
 ! close file
       status=nfmpi_close(ncid)
@@ -2341,24 +2349,23 @@
       return
       end
 !_______________________________________________________________________
-      subroutine read_bc_pnetcdf_obs(ube_out, ubw_out,
-     $                               vbs_out, vbn_out, in_file, n)
+      subroutine read_bc_transport_pnetcdf(trans,y,x, in_file, n)
 
       implicit none
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      integer get_var_real_2d
+      integer get_var_real_1d
       character(len=120) netcdf_bc_file
       integer ncid,status
-      integer ube_varid, ubw_varid, vbs_varid, vbn_varid
+      integer trans_varid, y_varid, x_varid, t_dimid
       integer(mpi_offset_kind) start(4),edge(4)
-      real(kind=rk) ube_out(jm,kb), ubw_out(jm,kb)
-     $   , vbs_out(im,kb), vbn_out(im,kb)
-      logical :: fexist !lyo:20110224:alu:stcc:
-      character(len=*), intent(in) :: in_file
+      logical :: fexist
       integer, intent(in) :: n
-      
+      integer n_bry
+      real(kind=rk), intent(out) :: trans(10), y(2,10), x(2,10)
+      character(len=*), intent(in) :: in_file
+
       start = 1
       edge  = 1
 !
@@ -2367,7 +2374,6 @@
      $     trim(in_file)
 
 !      write(netcdf_bc_file,'(a)') "./in/bc.nc"
-
       inquire(file=trim(netcdf_bc_file),exist=fexist)
 !
       if(fexist) then 
@@ -2378,37 +2384,45 @@
      $                  mpi_info_null,ncid)
       call handle_error_pnetcdf('nfmpi_open: '//netcdf_bc_file,
      $                          status,nf_noerr)
-! get variables
-      status=nfmpi_inq_varid(ncid,'east.u',ube_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: ube',status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'west.u',ubw_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: ubw',status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'south.v',vbs_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: vbs',status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'north.v',vbn_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: vbn',status,nf_noerr)
-! get data
-      start(1)=j_global(1)
-      start(2)=1
-      start(3)=n
-      edge(1)=jm
-      edge(2)=kb
-      edge(3)=1
-      status = get_var_real_2d(ncid,ube_varid,start,edge,ube_out)
-      call handle_error_pnetcdf('get_var_real_3d: ube',status,nf_noerr)
-      status = get_var_real_2d(ncid,ubw_varid,start,edge,ubw_out)
-      call handle_error_pnetcdf('get_var_real_3d: ubw',status,nf_noerr)
 
-      start(1)=i_global(1)
+      status = nfmpi_inq_dimid(ncid, 'num', t_dimid)
+      call handle_error_pnetcdf('nfmpi_inq_dimid: num',status,nf_noerr)
+      status = nfmpi_inq_dim(ncid, t_dimid, netcdf_bc_file, n_bry)
+      call handle_error_pnetcdf('nfmpi_inq_dim:num',status,nf_noerr)
+! get variables
+      status=nfmpi_inq_varid(ncid,'transport',trans_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid:trns',status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'y_bounds',y_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid:ybnd',status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'x_bounds',x_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid:xbnd',status,nf_noerr)
+! get data
+      start(1)=1
+      start(2)=n
+      edge(1)=n_bry
+      edge(2)=1
+      status = get_var_real_1d(ncid,trans_varid,start,edge
+     &                       ,trans(1:n_bry))
+      call handle_error_pnetcdf('get_var_real_1:trans',status,nf_noerr)
+      start(1)=1
       start(2)=1
-      start(3)=n
-      edge(1)=im
-      edge(2)=kb
-      edge(3)=1
-      status = get_var_real_2d(ncid,vbs_varid,start,edge,vbs_out)
-      call handle_error_pnetcdf('get_var_real_3d: vbs',status,nf_noerr)
-      status = get_var_real_2d(ncid,vbn_varid,start,edge,vbn_out)
-      call handle_error_pnetcdf('get_var_real_3d: vbn',status,nf_noerr)
+      edge(1)=n_bry
+      edge(2)=1
+      status = get_var_real_1d(ncid,y_varid,start,edge,y(1,1:n_bry))
+      call handle_error_pnetcdf('get_var_real_1d: y.1',status,nf_noerr)
+      status = get_var_real_1d(ncid,x_varid,start,edge,x(1,1:n_bry))
+      call handle_error_pnetcdf('get_var_real_1d: x.1',status,nf_noerr)
+      start(1)=1
+      start(2)=2
+      edge(1)=n_bry
+      edge(2)=1
+      status = get_var_real_1d(ncid,y_varid,start,edge,y(2,1:n_bry))
+      call handle_error_pnetcdf('get_var_real_1d: y.2',status,nf_noerr)
+      status = get_var_real_1d(ncid,x_varid,start,edge,x(2,1:n_bry))
+      call handle_error_pnetcdf('get_var_real_1d: x.2',status,nf_noerr)
+
+! convert Sv to m^3/s
+      trans = trans * 10.d6
 
 ! close file
       status=nfmpi_close(ncid)
@@ -2418,11 +2432,12 @@
 
       if(my_task.eq.master_task) then
 !----------------------------------------------------------------------!
-         write(6,'(/''****Warning from subr. read_bc_pnetcdf****'')')
+         write(6,'(/''****Warning from subr. read_bc_transport****'')')
          write(6,'(/''bc file '',a)')trim(netcdf_bc_file)
          write(6,'(/''does not exist, and bc set to zero'')')
-         ube_out(:,:)=0.0 ; ubw_out(:,:)=0.0
-         vbs_out(:,:)=0.0 ; vbn_out(:,:)=0.0
+         trans = 0.
+         y = 1.
+         x = 1.
       end if
 
       endif
