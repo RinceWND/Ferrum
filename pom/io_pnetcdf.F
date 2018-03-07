@@ -1495,19 +1495,30 @@
       call handle_error_pnetcdf('nfmpi_inq_varid: s_init'
      $                          ,status,nf_noerr)
       status=nfmpi_inq_varid(ncid,'eclim',el_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: el_init'
-     $                          ,status,nf_noerr)
 
+      if ( status == nf_noerr ) then
 ! get data
-      start(1)=i_global(1)
-      start(2)=j_global(1)
-      start(3)=n
-      edge(1)=im
-      edge(2)=jm
-      edge(3)=1
-      status = get_var_real_2d(ncid,el_varid,start,edge,ssh)
-      call handle_error_pnetcdf('nfmpi_get_vara_real_all',
+        start(1)=i_global(1)
+        start(2)=j_global(1)
+        start(3)=n
+        edge(1)=im
+        edge(2)=jm
+        edge(3)=1
+        status = get_var_real_2d(ncid,el_varid,start,edge,ssh)
+        call handle_error_pnetcdf('nfmpi_get_vara_real_all',
      $                          status,nf_noerr)
+      else
+        if ( status == -49 ) then
+          if ( my_task == master_task ) then
+            print *, "missing elevation data - falling back to 0"
+          end if
+          ssh = 0.
+        else
+          call handle_error_pnetcdf('nfmpi_inq_varid: el_init'
+     $                          ,status,nf_noerr)
+        end if
+      end if
+
       start(1)=i_global(1)
       start(2)=j_global(1)
       start(3)=1
@@ -2627,40 +2638,40 @@
       status = get_var_real_3d(ncid,vwnd_varid,start,edge,vwnd_out)
       call handle_error_pnetcdf('get_var_real: vwnd',status,nf_noerr)
 
-      do k=1,wind_npd
-        uwnd_out(2:imm1,2:jmm1,k) = uwnd_out(2:imm1,2:jmm1,k)*.25
-     &                        *(fsm(2:imm1,3:jm)+fsm(3:im,2:jmm1)
-     &                         +fsm(2:imm1,1:jmm2)+fsm(1:imm2,2:jmm1))
-        vwnd_out(2:imm1,2:jmm1,k) = vwnd_out(2:imm1,2:jmm1,k)*.25
-     &                        *(fsm(2:imm1,3:jm)+fsm(3:im,2:jmm1)
-     &                         +fsm(2:imm1,1:jmm2)+fsm(1:imm2,2:jmm1))
-        uwnd_out(1,2:jmm1,k) = uwnd_out(1,2:jmm1,k)/3.
-     &                        *(fsm(1,1:jmm2)+fsm(2,2:jmm1)+fsm(1,3:jm))
-        vwnd_out(1,2:jmm1,k) = vwnd_out(1,2:jmm1,k)/3.
-     &                        *(fsm(1,1:jmm2)+fsm(2,2:jmm1)+fsm(1,3:jm))
-        uwnd_out(im,2:jmm1,k) = uwnd_out(im,2:jmm1,k)/3.
-     &                   *(fsm(im,1:jmm2)+fsm(imm1,2:jmm1)+fsm(im,3:jm))
-        vwnd_out(im,2:jmm1,k) = vwnd_out(im,2:jmm1,k)/3.
-     &                   *(fsm(im,1:jmm2)+fsm(imm1,2:jmm1)+fsm(im,3:jm))
-        uwnd_out(2:imm1,1,k) = uwnd_out(2:imm1,1,k)/3.
-     &                        *(fsm(1:imm2,1)+fsm(2:imm1,2)+fsm(3:im,1))
-        vwnd_out(2:imm1,1,k) = vwnd_out(2:imm1,1,k)/3.
-     &                        *(fsm(1:imm2,1)+fsm(2:imm1,2)+fsm(3:im,1))
-        uwnd_out(2:imm1,jm,k) = uwnd_out(2:imm1,jm,k)/3.
-     &                   *(fsm(1:imm2,jm)+fsm(2:imm1,jmm1)+fsm(3:im,jm))
-        vwnd_out(2:imm1,jm,k) = vwnd_out(2:imm1,jm,k)/3.
-     &                   *(fsm(1:imm2,jm)+fsm(2:imm1,jmm1)+fsm(3:im,jm))
-        uwnd_out(1,1,k) = uwnd_out(1,1,k)*.5*(fsm(1,2)+fsm(2,1))
-        vwnd_out(1,1,k) = vwnd_out(1,1,k)*.5*(fsm(1,2)+fsm(2,1))
-        uwnd_out(im,1,k) = uwnd_out(im,1,k)*.5*(fsm(im,2)+fsm(imm1,1))
-        vwnd_out(im,1,k) = vwnd_out(im,1,k)*.5*(fsm(im,2)+fsm(imm1,1))
-        uwnd_out(1,jm,k) = uwnd_out(1,jm,k)*.5*(fsm(1,jmm1)+fsm(2,jm))
-        vwnd_out(1,jm,k) = vwnd_out(1,jm,k)*.5*(fsm(1,jmm1)+fsm(2,jm))
-        uwnd_out(im,jm,k) = uwnd_out(im,jm,k)*.5
-     &                     *(fsm(im,jmm1)+fsm(imm1,jm))
-        vwnd_out(im,jm,k) = vwnd_out(im,jm,k)*.5
-     &                     *(fsm(im,jmm1)+fsm(imm1,jm))
-      end do
+!      do k=1,wind_npd
+!        uwnd_out(2:imm1,2:jmm1,k) = uwnd_out(2:imm1,2:jmm1,k)*.25
+!     &                        *(fsm(2:imm1,3:jm)+fsm(3:im,2:jmm1)
+!     &                         +fsm(2:imm1,1:jmm2)+fsm(1:imm2,2:jmm1))
+!        vwnd_out(2:imm1,2:jmm1,k) = vwnd_out(2:imm1,2:jmm1,k)*.25
+!     &                        *(fsm(2:imm1,3:jm)+fsm(3:im,2:jmm1)
+!     &                         +fsm(2:imm1,1:jmm2)+fsm(1:imm2,2:jmm1))
+!        uwnd_out(1,2:jmm1,k) = uwnd_out(1,2:jmm1,k)/3.
+!     &                        *(fsm(1,1:jmm2)+fsm(2,2:jmm1)+fsm(1,3:jm))
+!        vwnd_out(1,2:jmm1,k) = vwnd_out(1,2:jmm1,k)/3.
+!     &                        *(fsm(1,1:jmm2)+fsm(2,2:jmm1)+fsm(1,3:jm))
+!        uwnd_out(im,2:jmm1,k) = uwnd_out(im,2:jmm1,k)/3.
+!     &                   *(fsm(im,1:jmm2)+fsm(imm1,2:jmm1)+fsm(im,3:jm))
+!        vwnd_out(im,2:jmm1,k) = vwnd_out(im,2:jmm1,k)/3.
+!     &                   *(fsm(im,1:jmm2)+fsm(imm1,2:jmm1)+fsm(im,3:jm))
+!        uwnd_out(2:imm1,1,k) = uwnd_out(2:imm1,1,k)/3.
+!     &                        *(fsm(1:imm2,1)+fsm(2:imm1,2)+fsm(3:im,1))
+!        vwnd_out(2:imm1,1,k) = vwnd_out(2:imm1,1,k)/3.
+!     &                        *(fsm(1:imm2,1)+fsm(2:imm1,2)+fsm(3:im,1))
+!        uwnd_out(2:imm1,jm,k) = uwnd_out(2:imm1,jm,k)/3.
+!     &                   *(fsm(1:imm2,jm)+fsm(2:imm1,jmm1)+fsm(3:im,jm))
+!        vwnd_out(2:imm1,jm,k) = vwnd_out(2:imm1,jm,k)/3.
+!     &                   *(fsm(1:imm2,jm)+fsm(2:imm1,jmm1)+fsm(3:im,jm))
+!        uwnd_out(1,1,k) = uwnd_out(1,1,k)*.5*(fsm(1,2)+fsm(2,1))
+!        vwnd_out(1,1,k) = vwnd_out(1,1,k)*.5*(fsm(1,2)+fsm(2,1))
+!        uwnd_out(im,1,k) = uwnd_out(im,1,k)*.5*(fsm(im,2)+fsm(imm1,1))
+!        vwnd_out(im,1,k) = vwnd_out(im,1,k)*.5*(fsm(im,2)+fsm(imm1,1))
+!        uwnd_out(1,jm,k) = uwnd_out(1,jm,k)*.5*(fsm(1,jmm1)+fsm(2,jm))
+!        vwnd_out(1,jm,k) = vwnd_out(1,jm,k)*.5*(fsm(1,jmm1)+fsm(2,jm))
+!        uwnd_out(im,jm,k) = uwnd_out(im,jm,k)*.5
+!     &                     *(fsm(im,jmm1)+fsm(imm1,jm))
+!        vwnd_out(im,jm,k) = vwnd_out(im,jm,k)*.5
+!     &                     *(fsm(im,jmm1)+fsm(imm1,jm))
+!      end do
 
 ! close file
       status=nfmpi_close(ncid)
@@ -2774,8 +2785,8 @@
      $                          status,nf_noerr)
 
 ! get variables
-      status=nfmpi_inq_varid(ncid,'shum',shm_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: shum'
+      status=nfmpi_inq_varid(ncid,'rhum',shm_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: rhum'
      $                          ,status,nf_noerr)
       status=nfmpi_inq_varid(ncid,'rain',prt_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: prate'
@@ -2793,7 +2804,7 @@
       edge(3)=1
 
       status = get_var_real_2d(ncid,shm_varid,start,edge,shm)
-      call handle_error_pnetcdf('get_var_real: shum',status,nf_noerr)
+      call handle_error_pnetcdf('get_var_real: rhum',status,nf_noerr)
       shm = shm*fsm
 
       status = get_var_real_2d(ncid,prt_varid,start,edge,prt)
@@ -2811,7 +2822,7 @@
       return
       end
 !_______________________________________________________________________
-      subroutine read_ncep_bulk_pnetcdf( pres, tair, shum, rain, cloud
+      subroutine read_ncep_bulk_pnetcdf( pres, tair, rhum, rain, cloud
      $                                  ,uwnd, vwnd, tskn, filename, n )
 ! read wind stress
       implicit none
@@ -2820,12 +2831,12 @@
       include 'pom.h'
       integer get_var_real_2d
       integer n
-      real(kind=rk), dimension(im,jm) :: pres, tair, shum, rain, cloud
+      real(kind=rk), dimension(im,jm) :: pres, tair, rhum, rain, cloud
      $                                  ,uwnd, vwnd, tskn
       character(len=14) filename
       character(len=24) netcdf_heat_aux_file
       integer ncid,status
-      integer pres_varid, tair_varid, shum_varid, rain_varid
+      integer pres_varid, tair_varid, rhum_varid, rain_varid
      $       ,cloud_varid, uwnd_varid, vwnd_varid, tskn_varid
       integer(mpi_offset_kind) start(4),edge(4)
 
@@ -2849,8 +2860,8 @@
       status=nfmpi_inq_varid(ncid,'tair',tair_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: tair'
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'shum',shum_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: shum'
+      status=nfmpi_inq_varid(ncid,'rhum',rhum_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: rhum'
      $                          ,status,nf_noerr)
       status=nfmpi_inq_varid(ncid,'prate',rain_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: rain'
@@ -2884,8 +2895,8 @@
       call handle_error_pnetcdf('get_var_real: tair',status,nf_noerr)
       tair = tair-273.15
 
-      status = get_var_real_2d(ncid,shum_varid,start,edge,shum)
-      call handle_error_pnetcdf('get_var_real: shum',status,nf_noerr)
+      status = get_var_real_2d(ncid,rhum_varid,start,edge,rhum)
+      call handle_error_pnetcdf('get_var_real: rhum',status,nf_noerr)
 
       status = get_var_real_2d(ncid,rain_varid,start,edge,rain)
       call handle_error_pnetcdf('get_var_real: rain',status,nf_noerr)
@@ -4844,7 +4855,7 @@
 !        character(len=*), intent(in) :: netcdf_out_file
 !        character(len=120) str_tmp
 !        integer time_dimid,x_dimid,y_dimid
-!        integer time_varid,tair_varid,shum_varid,rain_varid
+!        integer time_varid,tair_varid,rhum_varid,rain_varid
 !        integer tskn_varid,pres_varid,tcld_varid
 !        integer ncid,status,flags
 !        integer vdims(4)
@@ -4895,8 +4906,8 @@
 !      vdims(3)=time_dimid
 !      status=nf90mpi_def_var(ncid,'tair',nf90_double,vdims(1:3)
 !     &                      ,tair_varid)
-!      status=nf90mpi_def_var(ncid,'shum',nf90_double,vdims(1:3)
-!     &                      ,shum_varid)
+!      status=nf90mpi_def_var(ncid,'rhum',nf90_double,vdims(1:3)
+!     &                      ,rhum_varid)
 !      status=nf90mpi_def_var(ncid,'rain',nf90_double,vdims(1:3)
 !     &                      ,rain_varid)
 !      status=nf90mpi_def_var(ncid,'tskn',nf90_double,vdims(1:3)
@@ -4931,9 +4942,9 @@
 !      call handle_error_pnetcdf(
 !     $     'nf_put_vara_real: tair',status,nf_noerr)
 !      status=nfmpi_put_vara_double_all(
-!     $     ncid,shum_varid,start,edge,sh)
+!     $     ncid,rhum_varid,start,edge,sh)
 !      call handle_error_pnetcdf(
-!     $     'nf_put_vara_real: shum',status,nf_noerr)
+!     $     'nf_put_vara_real: rhum',status,nf_noerr)
 !      status=nfmpi_put_vara_double_all(
 !     $     ncid,rain_varid,start,edge,ra)
 !      call handle_error_pnetcdf(

@@ -1673,7 +1673,7 @@
             uaf(im,j)=uabe(j)
      $                     +rfe*sqrt(grav/h(imm1,j))*(el(imm1,j)-ele(j))
             uaf(im,j)=ramp*uaf(im,j)
-            vaf(im,j)=(vaf(imm1,j-1)+vaf(imm1,j)+vaf(imm1,j+1))/3. !0.
+            vaf(im,j)=0. !(vaf(imm1,j-1)+vaf(imm1,j)+vaf(imm1,j+1))/3. !0.
            enddo
           end if
 ! west
@@ -1682,7 +1682,7 @@
             uaf(2,j)=uabw(j)-rfw*sqrt(grav/h(2,j))*(el(2,j)-elw(j))
             uaf(2,j)=ramp*uaf(2,j)
             uaf(1,j)=uaf(2,j)
-            vaf(1,j)=(vaf(2,j-1)+vaf(2,j)+vaf(2,j+1))/3. !0.
+            vaf(1,j)=0. !(vaf(2,j-1)+vaf(2,j)+vaf(2,j+1))/3. !0.
            enddo
           end if
 
@@ -1692,7 +1692,7 @@
             vaf(i,jm)=vabn(i)
      $                     +rfn*sqrt(grav/h(i,jmm1))*(el(i,jmm1)-eln(i))
             vaf(i,jm)=ramp*vaf(i,jm)
-            uaf(i,jm)=(uaf(i-1,jmm1)+uaf(i,jmm1)+uaf(i+1,jmm1))/3. !0.
+            uaf(i,jm)=0. !(uaf(i-1,jmm1)+uaf(i,jmm1)+uaf(i+1,jmm1))/3. !0.
            enddo
           end if
 ! south
@@ -1701,7 +1701,7 @@
             vaf(i,2)=vabs(i)-rfs*sqrt(grav/h(i,2))*(el(i,2)-els(i))
             vaf(i,2)=ramp*vaf(i,2)
             vaf(i,1)=vaf(i,2)
-            uaf(i,1)=(uaf(i-1,2)+uaf(i,2)+uaf(i+1,2))/3. !0.
+            uaf(i,1)=0. !(uaf(i-1,2)+uaf(i,2)+uaf(i+1,2))/3. !0.
            enddo
           end if
 !

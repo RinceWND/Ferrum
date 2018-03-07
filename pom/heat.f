@@ -148,12 +148,13 @@
             vnow      = vair(i,j)
             tnow      = tair(i,j)+ckelv
             pnow      = pres(i,j)
-            e         = rhum(i,j)*pnow / ( 0.378*rhum(i,j) + 0.622 )
-            es        = 6.112 *
-     &           exp( (( 17.67*tair(i,j) )/( tair(i,j) + 243.25 )) )
-            rhnow     = 100.*e/es ! rwnd: specific to relative humidity
-            if (rhnow>100.) rhnow=100.
-            if (rhnow<0.) rhnow=0.
+!            e         = rhum(i,j)*pnow / ( 0.378*rhum(i,j) + 0.622 )
+!            es        = 6.112 *
+!     &           exp( (( 17.67*tair(i,j) )/( tair(i,j) + 243.25 )) )
+!            rhnow     = 100.*e/es ! rwnd: specific to relative humidity
+!            if (rhnow>100.) rhnow=100.
+!            if (rhnow<0.) rhnow=0.
+            rhnow     = rhum(i,j)
             precip    = rain(i,j)/1000. ! rwnd: precipitation rate from kg/(m2*s) to m/s
             cld       = cloud(i,j)/100. ! rwnd: total cloud cover from % to tenths
             sst_model = tsurf(i,j)+tbias
