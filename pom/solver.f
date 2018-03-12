@@ -1761,7 +1761,7 @@
      $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k) 
      $                 + 0.5 * u(im,j,k) + 0.25 * u(im,j+1,k) )
                   vf(im,j,k)
-     &             =(vf(imm1,j-1,k)+vf(imm1,j,k)+vf(imm1,j+1,k))/3. !0.0.
+     &             = 0. !(vf(imm1,j-1,k)+vf(imm1,j,k)+vf(imm1,j+1,k))/3. !0.0.
                enddo
             enddo
          endif
@@ -1780,7 +1780,7 @@
      $                 + 0.5 * u(2,j,k) + 0.25 * u(2,j+1,k) )
                   uf(1,j,k)=uf(2,j,k)
                   vf(1,j,k)
-     &             =(vf(2,j-1,k)+vf(2,j,k)+vf(2,j+1,k))/3. !0.0.
+     &             = 0. !(vf(2,j-1,k)+vf(2,j,k)+vf(2,j+1,k))/3. !0.0.
                enddo
             enddo
           endif
@@ -1799,7 +1799,7 @@
      $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,jm,k) 
      $                 + 0.5 * v(i,jm,k) + 0.25 * v(i+1,jm,k) )
                   uf(i,jm,k)
-     &             =(uf(i-1,jmm1,k)+uf(i,jmm1,k)+uf(i+1,jmm1,k))/3. !0.0.
+     &             = 0. !(uf(i-1,jmm1,k)+uf(i,jmm1,k)+uf(i+1,jmm1,k))/3. !0.0.
                enddo
             enddo
           endif
@@ -1820,7 +1820,7 @@
                   vf(i,1,k)=vf(i,2,k)
 !                 uf(i,jm,k)=0.e0 !lyo:debug:lyo:20110224:alu:stcc:
                   uf(i,1,k)
-     &             =(uf(i-1,2,k)+uf(i,2,k)+uf(i+1,2,k))/3. !0.0.
+     &             = 0. !(uf(i-1,2,k)+uf(i,2,k)+uf(i+1,2,k))/3. !0.0.
                enddo
             enddo
           endif
