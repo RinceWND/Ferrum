@@ -496,6 +496,7 @@
         wtsurf = wtsurf
      &           + c1 * ( tb(:,:,1) - tskin(:,:) )
      &                / max(h(:,:)*z(1), 1.)    !rwnd: (linear) prevention of overheating a thick layer
+        wtsurf = (1.-ice)*wtsurf - ice*2.13*(-4.-t(:,:,1))/hi/4.1876d6
         wssurf = wssurf
      $           + c1 * ( sb(:,:,1) - sskin(:,:) )
 !          write(*,*) my_task, "WT:", minval(wtsurf),maxval(wtsurf)

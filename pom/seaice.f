@@ -132,9 +132,22 @@
         real(kind=rk), dimension(im,jm) ::
      &                 fx, fy, divu, pice, delx, dely
      &                ,rhoi, duvi, uidx, vidy, fluxcx, fluxcy
-     &                ,tauiau, tauiav
-        real(kind=rk) eeta, tmp
+     &                ,tauiau, tauiav, ht
+        real(kind=rk) eeta, tmp, lhf
         integer i,j, cnum
+
+        ! FREEZ'T
+        lhf = 323500. ! Latent heat of fusion [J/kg]
+        ht  = (1.-ice)*( wtsurf - swrad )*4.1876d6 - ice*(-4.+1.82)*2.13/hi ! Net heat flux [W/m2]
+        do j = 1, jm
+          do i = 1, im
+            if ( ht(i,j) > 0. .and. t(i,j,1) < -1.82 ) then
+              ice(i,j) = ice(i,j) + (1.-ice(i,j))*.47
+              hi(i,j)  = (1.-ice(i,j))*(ht(i,j)*dte/lhf/930.)
+     &                   +   ice(i,j) * hi(i,j)
+            end if
+          end do
+        end do
 
         eeta = 1.e2 !1.01e-7 ! 1010 cm2/s? ! The source claims the coefficient equals to 10^10 cm2/s! This gives unreallistic Infinities.
 
