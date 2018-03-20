@@ -26,14 +26,16 @@
 
 !     buffers for tsurf, ssurf etc
       real(kind=rk), dimension( im_local, jm_local ) ::
-     &     tsurf_a, ssurf_a, tsurf_b, ssurf_b, uht, swr, emp
+     &     el_a, el_b
+     &    ,cloud_a, cloud_b, cloud
+     &    ,rain_a, rain_b, rain
      &    ,shum_a, shum_b, shum
      &    ,tair_a, tair_b, tair
-     &    ,rain_a, rain_b, rain
-     &    ,cloud_a, cloud_b, cloud
+!     &    ,tsurf_a, ssurf_a, tsurf_b, ssurf_b
      &    ,pres_a, pres_b, pres
      &    ,uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd, vwnd
      &    ,tskin_a, tskin_b, tskin, sskin
+     &    ,emp, swr, uht
   
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
@@ -120,10 +122,10 @@
 
 !     data open.
          call read_tsclim_monthly_pnetcdf
-     $        ( tm_a, sm_a, tc_a, sc_a, "ts_clim.nc", mon_a )
+     $        ( tm_a, sm_a, tc_a, sc_a, el_a, "ts_clim.nc", mon_a )
 
          call read_tsclim_monthly_pnetcdf
-     $        ( tm_b, sm_b, tc_b, sc_b, "ts_clim.nc", mon_b )
+     $        ( tm_b, sm_b, tc_b, sc_b, el_b, "ts_clim.nc", mon_b )
 
 !      call read_mean_ts_z_pnetcdf(tm_b, sm_b, 44, int(days_in_year))
 
@@ -275,6 +277,7 @@
          sm_a = sm_b
          tc_a = tc_b
          sc_a = sc_b
+         el_a = el_b
 !         uw_a = uw_b
 !         vw_a = vw_b
 
@@ -283,7 +286,7 @@
 
 !         write( infile_b, '( "tsclimib",i2.2,".nc" )' ) mon_b
          call read_tsclim_monthly_pnetcdf
-     $        ( tm_b, sm_b, tc_b, sc_b, "ts_clim.nc", mon_b )
+     $        ( tm_b, sm_b, tc_b, sc_b, el_b, "ts_clim.nc", mon_b )
 !         call read_tsclim_monthly_pnetcdf_obs
 !     $        ( rm_b, tc_b, sc_b, "ts_clim_old.nc", mon_b )
 !         call read_wind_monthly_pnetcdf
@@ -310,11 +313,14 @@
 
       tclim = ( 1.0 - aa ) * tc_a + aa * tc_b
       sclim = ( 1.0 - aa ) * sc_a + aa * sc_b
+      eln   = ( 1.0 - aa ) * el_a(:,jm) + aa * el_b(:,jm)
+      ele   = ( 1.0 - aa ) * el_a(im,:) + aa * el_b(im,:)
+      els   = ( 1.0 - aa ) * el_a(:, 1) + aa * el_b(:, 1)
+      elw   = ( 1.0 - aa ) * el_a( 1,:) + aa * el_b( 1,:)
       bb = aa
 !      bb = days_in_year - int( days_in_year )
       tmean = ( 1.0 - bb ) * tm_a + bb * tm_b
       smean = ( 1.0 - bb ) * sm_a + bb * sm_b
-!      rmean = ( 1.0 - aa ) * rm_a + aa * rm_b
       
 !      wusurf = ( 1.0 - aa ) * uw_a + aa * uw_b
 !      wvsurf = ( 1.0 - aa ) * vw_a + aa * vw_b
