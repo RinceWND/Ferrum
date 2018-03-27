@@ -13,12 +13,12 @@
       logical, parameter :: calc_bulk = .true.
      $                    , calc_bulk_ncep = .true.
 !     days in month
-      integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,               
+      integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,
      $                          31, 31, 30, 31, 30, 31/)
-                             
-!     coefficients for relaxation 
+
+!     coefficients for relaxation
 !     c1 = 1/30 [m/day]
-      real(kind=rk), parameter :: c1 = 3.858024691e-7 
+      real(kind=rk), parameter :: c1 = 3.858024691e-7
 !     c1 = 1 [m/day] !lyo:20110202:
 !      real(kind=rk), parameter :: c1 = 1.157407407e-5 !lyo:pac10:exp001->007;exp302:
       real(kind=rk) :: sstrelx, sssrelx
@@ -34,15 +34,15 @@
      &    ,pres_a, pres_b, pres
      &    ,uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd, vwnd
      &    ,tskin_a, tskin_b, tskin, sskin
-  
+
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
      $     tm_a, sm_a, tm_b, sm_b,
      $     tmean, smean
-     
+
 !      real(kind=rk), dimension( im_local, jm_local ) ::
 !     $     uw_a, vw_a, uw_b, vw_b
-    
+
       integer :: mon_a, mon_b, sec_in_month, mid_in_month
       integer :: i, j, k, nb, mb, db
       character(len=14) :: infile_b
@@ -66,7 +66,7 @@
       type(date) d_tmp
       logical lexist
       integer n
-  
+
 
 !     initialize
 
@@ -81,37 +81,37 @@
 !     Read backward and forward TS climatology in initial state
 
 !     check leap year
-      if( ( mod( d_in%year, 4 ) .eq. 0 
-     $     .and. mod( d_in%year, 100 ) .ne. 0 ) 
+      if( ( mod( d_in%year, 4 ) .eq. 0
+     $     .and. mod( d_in%year, 100 ) .ne. 0 )
      $     .or. mod( d_in%year, 400 ) .eq. 0 ) then
          mday(2) = 29
       else
          mday(2) = 28
       endif
-                      
+
 !     current time [sec] from the beginning of the month.
-      
-      sec_in_month = d_in%day * 24 * 3600  
+
+      sec_in_month = d_in%day * 24 * 3600
      $             + d_in%hour * 3600 + d_in%min * 60 + d_in%sec
 
       days_in_year = real( mday( d_in%month ) - 31 + d_in%day )
 
 !     mid-point [sec] in the month.
-      
-      mid_in_month = int( real( mday( d_in%month ) )/ 2.0  
+
+      mid_in_month = int( real( mday( d_in%month ) )/ 2.0
      $             * 24. * 3600. )
 
 
 !     decide between which two months.
- 
-!     former half in the month.    
+
+!     former half in the month.
       if ( sec_in_month .le. mid_in_month ) then
          mon_a = d_in%month - 1
 !     latter half in the month
       else
-         mon_a = d_in%month 
+         mon_a = d_in%month
       endif
-      
+
       mon_b = mon_a + 1
 
       if ( mon_a ==  0 ) mon_a = 12
@@ -132,7 +132,7 @@
 !
 !         call read_tsclim_monthly_pnetcdf_obs
 !     $        ( rm_b, tc_b, sc_b, "ts_clim_old.nc", mon_b )
-     
+
 !         call read_wind_monthly_pnetcdf
 !     $        ( uw_a, vw_a,       "sfrc_old.nc",    mon_a )
 !
@@ -193,7 +193,7 @@
 
       nb = n
 
-      if ( my_task == master_task ) 
+      if ( my_task == master_task )
      $        write(*,'(/a/)') "---------- tsforce_init."
 
 
@@ -210,59 +210,59 @@
       use module_time
 
       implicit none
-      
+
       integer :: ii, jj
-      
+
       ! intent(in)
       type(date), intent(in) :: d_in
-      
 
 
-!     check leap year. 
-      if( ( mod( d_in%year, 4 ) .eq. 0 
-     $     .and. mod( d_in%year, 100 ) .ne. 0 ) 
+
+!     check leap year.
+      if( ( mod( d_in%year, 4 ) .eq. 0
+     $     .and. mod( d_in%year, 100 ) .ne. 0 )
      $     .or. mod( d_in%year, 400 ) .eq. 0 ) then
          mday(2) = 29
       else
          mday(2) = 28
       endif
 
-                      
+
 !     current time [sec] from the beginning of the month.
-      
-      sec_in_month = d_in%day * 24 * 3600  
+
+      sec_in_month = d_in%day * 24 * 3600
      $             + d_in%hour * 3600 + d_in%min * 60 + d_in%sec
 
       days_in_year = real( mday( d_in%month ) - 31 + d_in%day )
 
 !     mid-point [sec] in the month.
-      
-      mid_in_month = int( real( mday( d_in%month ) )/ 2.0  
+
+      mid_in_month = int( real( mday( d_in%month ) )/ 2.0
      $             * 24. * 3600. )
 
 
 !     decide between which two months.
- 
-!     former half in the month.    
+
+!     former half in the month.
       if ( sec_in_month .le. mid_in_month ) then
          mon_a = d_in%month - 1
-         aa = real( sec_in_month ) 
+         aa = real( sec_in_month )
      $      + real( mday( mon_a ) )/ 2.0 * 24. * 3600.
 
 !     latter half in the month
       else
-         mon_a = d_in%month 
-         aa = real( sec_in_month ) 
+         mon_a = d_in%month
+         aa = real( sec_in_month )
      $      - real( mday( mon_a ) )/ 2.0 * 24. * 3600.
       endif
-      
+
       mon_b = mon_a + 1
 
       if ( mon_a ==  0 ) mon_a = 12
       if ( mon_b == 13 ) mon_b =  1
 
-      aa = aa / 
-     $     ( real( mday( mon_a ) + mday( mon_b ) ) / 2.0 * 24. * 3600. )            
+      aa = aa /
+     $     ( real( mday( mon_a ) + mday( mon_b ) ) / 2.0 * 24. * 3600. )
 
 
 
@@ -292,7 +292,7 @@
 !         write( infile_b, '( "ssts",i2.2,".nc" )' ) mon_b
 !         call read_ssts_monthly_pnetcdf
 !     $        ( tsurf_b, ssurf_b, "ts_clim.nc", mon_b )
-     
+
 !         tsurf_b = tc_b(:,:,1)
 !         ssurf_b = sc_b(:,:,1)
 
@@ -304,7 +304,7 @@
 !        sm_a = sm_b
 !        call read_mean_ts_z_pnetcdf( tm_b, sm_b, 44, db+1 )
 !      end if
-     
+
 
 !     time interpolation.
 
@@ -315,16 +315,16 @@
       tmean = ( 1.0 - bb ) * tm_a + bb * tm_b
       smean = ( 1.0 - bb ) * sm_a + bb * sm_b
 !      rmean = ( 1.0 - aa ) * rm_a + aa * rm_b
-      
+
 !      wusurf = ( 1.0 - aa ) * uw_a + aa * uw_b
 !      wvsurf = ( 1.0 - aa ) * vw_a + aa * vw_b
 
       tsurf = t(:,:,1) !( 1.0 - aa ) * tsurf_a + aa * tsurf_b
       ssurf = s(:,:,1) !( 1.0 - aa ) * ssurf_a + aa * ssurf_b
-      
+
 
 !     calculation of rmean.
-      
+
       call dens( smean, tmean, rmean )
 !      if (106 > i_global(1) .and. 106 < i_global(im)
 !     & .and. 214 > j_global(1) .and. 214 < j_global(jm) ) then
@@ -335,7 +335,7 @@
 
 !----------------------------------------------------------------------!
 !lyo:20110224:alu:stcc:
-!     Use tob* and sob* instead - see below commented lines 
+!     Use tob* and sob* instead - see below commented lines
 !     to be deleted in future - will get rid of tbe,sbe,tbw,sbw,tbn,sbn,
 !     tbs & sbs througout the code
 !     do k=1,kb
@@ -400,7 +400,7 @@
       implicit none
 
       integer n
-      
+
       ! intent(in)
       type(date), intent(in) :: d_in
       type(date) d_tmp
@@ -408,7 +408,7 @@
       integer sec_in_day
 !      character(len=120) datestr
 
-      logical :: lexist    
+      logical :: lexist
 
 
       sec_in_day = d_in%hour*3600 + d_in%min*60 + d_in%sec
@@ -452,7 +452,7 @@
           end if
         else
           if ( my_task == master_task ) then
-            write(*,'(/2a)') 
+            write(*,'(/2a)')
      $      "missing heat data at wind_main : "
      $              , trim(infile_b)
           endif
@@ -529,7 +529,7 @@
 ! TODO: interpolation
 
       return
-      
+
       end subroutine tsforce_tsflx
 !--------------------------------------------------------------
 

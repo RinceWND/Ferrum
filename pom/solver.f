@@ -606,7 +606,7 @@
       integer i,j,k,itera
 
       character(len=1), intent(in) :: var
-      
+
 !      if (var=='T') then
 !        eps = 0.01
 !      else if (var=='S') then
@@ -679,9 +679,9 @@
 !            if(itera.eq.1) zflux(i,j,1)=w(i,j,1)*f(i,j,1)*art(i,j)
 !     for rivers 2010/5/08 ayumi
             if (itera == 1 ) then
-               if ( var == 'T' ) 
+               if ( var == 'T' )
      $              zflux(i,j,1)=tsurf(i,j)*w(i,j,1)*art(i,j)
-               if ( var == 'S' ) 
+               if ( var == 'S' )
      $              zflux(i,j,1)=0.
             endif
             zflux(i,j,kb)=0.
@@ -718,9 +718,9 @@
 
 ! calculate antidiffusion velocity
         call smol_adif(xmassflux,ymassflux,zwflux,ff)
-        
+
 !        epsval = maxval(abs(ff(:,:,1:kbm1)-fbmem(:,:,1:kbm1))) ! rwnd: iteration check
-!        
+!
 !        call max0d_mpi(epsval,master_task) ! rwnd: iteration check
 !        call bcast0d_mpi(epsval,my_task) ! rwnd: iteration check
 
@@ -737,7 +737,7 @@
 
 ! end of Smolarkiewicz scheme
       end do
-      
+
 !      write(*,*) my_task, ": ", var, ": nitera = ", itera  ! rwnd: iteration check
 
 ! add horizontal diffusive fluxes
@@ -871,9 +871,9 @@
 
 ! calculate antidiffusion velocity
         call smol_adifC(xmassflux,ymassflux,cf)
-        
+
 !        epsval = maxval(abs(ff(:,:,1:kbm1)-fbmem(:,:,1:kbm1))) ! rwnd: iteration check
-!        
+!
 !        call max0d_mpi(epsval,master_task) ! rwnd: iteration check
 !        call bcast0d_mpi(epsval,my_task) ! rwnd: iteration check
 
@@ -888,7 +888,7 @@
 
 ! end of Smolarkiewicz scheme
       end do
-      
+
 !      write(*,*) my_task, ": ", var, ": nitera = ", itera  ! rwnd: iteration check
 
 ! add horizontal diffusive fluxes
@@ -1405,7 +1405,7 @@
       real(kind=rk) dh,cff,cff1
 
 !      rho = rho-rmean
-        
+
       p(:,:,1) = 0.
       do k = 1,kbm1
         p(:,:,k+1) = p(:,:,k)
@@ -1595,7 +1595,7 @@
 !lyo:pac10:beg:
 !lyo:20110224:alu:stcc:
 !     bcond_PeriodicFRZ.f:
-   
+
 !     (modified from /wrk/newshoni/hunglu/model/sbPOM/stcc_ideal/
 !     stcc_alu_30TSrelx_60aam_timescle1d/pom/bcond.f)
 !     See also /archive/lyo/gfdexwithpom/wmo09training/bcond_standrd.f
@@ -1603,7 +1603,7 @@
 !     bcond_standrd.f
 !
       subroutine bcond(idx)
-!     boundary conditions for idelaized STCC simulation with 
+!     boundary conditions for idelaized STCC simulation with
 !     x-periodic and y-FRZ; the y-periodic part not yet completed
 !     need also subroutines xperi2d_mpi & xperi3d_mpi
 !     included in this file also
@@ -1617,7 +1617,7 @@
       real(kind=rk) ga,u1,wm
       integer ii,jj
       real(kind=rk), parameter :: hmax = 8000.0 !lyo:20110224:alu:stcc:
-      
+
       if(idx.eq.1) then
 
 ! external (2-D) elevation boundary conditions
@@ -1629,7 +1629,7 @@
            end do
           endif
 !east
-          if(n_east.eq.-1) then 
+          if(n_east.eq.-1) then
            do j=1,jm
              elf(im,j)=elf(imm1,j)
            end do
@@ -1651,7 +1651,7 @@
          call xperi2d_mpi(elf,im,jm)
          endif
 !
-        if (ipery.ne.0) then 
+        if (ipery.ne.0) then
          call yperi2d_mpi(elf,im,jm) !lyo:scs1d:add yperi*:ipery:
          endif
 !
@@ -1666,7 +1666,7 @@
       else if(idx.eq.2) then
 
 ! external (2-D) velocity boundary conditions
-        
+
 ! east
           if(n_east.eq.-1) then
            do j=2,jmm1
@@ -1709,11 +1709,11 @@
           call xperi2d_mpi(uaf,im,jm)
           call xperi2d_mpi(vaf,im,jm)
         if (iperx.lt.0) then !free-slip north&south
-           if(n_north.eq.-1) then 
+           if(n_north.eq.-1) then
              uaf(:,jm)=uaf(:,jmm1)
              dum(:,jm)=1.0
            endif
-           if(n_south.eq.-1) then 
+           if(n_south.eq.-1) then
               uaf(:,1)=uaf(:,2)
               dum(:,1)=1.0
            endif
@@ -1724,11 +1724,11 @@
           call yperi2d_mpi(uaf,im,jm) !lyo:scs1d:add yperi*:ipery:
           call yperi2d_mpi(vaf,im,jm)
         if (ipery.lt.0) then !free-slip east&west
-           if(n_east.eq.-1) then 
+           if(n_east.eq.-1) then
              vaf(im,:)=vaf(imm1,:)
              dvm(im,:)=1.0
            endif
-           if(n_west.eq.-1) then 
+           if(n_west.eq.-1) then
               vaf(1,:)=vaf(2,:)
               dvm(1,:)=1.0
            endif
@@ -1751,14 +1751,14 @@
 !     EAST
 !     radiation boundary conditions.
 
-         if(n_east.eq.-1) then                  
+         if(n_east.eq.-1) then
             do k=1,kbm1
                do j=2,jmm1
-                  ga = sqrt( h(im,j) / hmax )    
-                  uf(im,j,k)  
-     $                 = ga * ( 0.25 * u(imm1,j-1,k) 
+                  ga = sqrt( h(im,j) / hmax )
+                  uf(im,j,k)
+     $                 = ga * ( 0.25 * u(imm1,j-1,k)
      $                 + 0.5 * u(imm1,j,k) + 0.25 * u(imm1,j+1,k) )
-     $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k) 
+     $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k)
      $                 + 0.5 * u(im,j,k) + 0.25 * u(im,j+1,k) )
                   vf(im,j,k)
      &             = 0. !(vf(imm1,j-1,k)+vf(imm1,j,k)+vf(imm1,j+1,k))/3. !0.0.
@@ -1769,14 +1769,14 @@
 !     WEST
 !     radiation boundary conditions.
 
-         if(n_west.eq.-1) then                  
+         if(n_west.eq.-1) then
             do k=1,kbm1
                do j=2,jmm1
                   ga = sqrt( h(1,j) / hmax )
-                  uf(2,j,k)  
-     $                 = ga * ( 0.25 * u(3,j-1,k) 
+                  uf(2,j,k)
+     $                 = ga * ( 0.25 * u(3,j-1,k)
      $                 + 0.5 * u(3,j,k) + 0.25 * u(3,j+1,k) )
-     $                 + ( 1.0 - ga ) * ( 0.25 * u(2,j-1,k) 
+     $                 + ( 1.0 - ga ) * ( 0.25 * u(2,j-1,k)
      $                 + 0.5 * u(2,j,k) + 0.25 * u(2,j+1,k) )
                   uf(1,j,k)=uf(2,j,k)
                   vf(1,j,k)
@@ -1788,15 +1788,15 @@
 !     NORTH
 !     radiation boundary conditions.
 
-         if(n_north.eq.-1) then                  
-            
+         if(n_north.eq.-1) then
+
             do k=1,kbm1
                do i=2,imm1
                   ga = sqrt( h(i,jm) / hmax )
-                  vf(i,jm,k)  
-     $                 = ga * ( 0.25 * v(i-1,jmm1,k) 
+                  vf(i,jm,k)
+     $                 = ga * ( 0.25 * v(i-1,jmm1,k)
      $                 + 0.5 * v(i,jmm1,k) + 0.25 * v(i+1,jmm1,k) )
-     $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,jm,k) 
+     $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,jm,k)
      $                 + 0.5 * v(i,jm,k) + 0.25 * v(i+1,jm,k) )
                   uf(i,jm,k)
      &             = 0. !(uf(i-1,jmm1,k)+uf(i,jmm1,k)+uf(i+1,jmm1,k))/3. !0.0.
@@ -1807,15 +1807,15 @@
 !     SOUTH
 !     radiation boundary conditions.
 
-         if(n_south.eq.-1) then                  
-            
+         if(n_south.eq.-1) then
+
             do k=1,kbm1
                do i=2,imm1
                   ga = sqrt( h(i,1) / hmax )
-                  vf(i,2,k)  
-     $                 = ga * ( 0.25 * v(i-1,3,k) 
+                  vf(i,2,k)
+     $                 = ga * ( 0.25 * v(i-1,3,k)
      $                 + 0.5 * v(i,3,k) + 0.25 * v(i+1,3,k) )
-     $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,2,k) 
+     $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,2,k)
      $                 + 0.5 * v(i,2,k) + 0.25 * v(i+1,2,k) )
                   vf(i,1,k)=vf(i,2,k)
 !                 uf(i,jm,k)=0.e0 !lyo:debug:lyo:20110224:alu:stcc:
@@ -1832,14 +1832,14 @@
         call xperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
 
         if (iperx.lt.0) then !free-slip north&south
-           if(n_north.eq.-1)           then 
+           if(n_north.eq.-1)           then
               wubot(:,jm)=wubot(:,jmm1)
               do k=1,kbm1
                uf(:,jm,k)=uf(:,jmm1,k)
               enddo
             endif
            if(n_south.eq.-1)           then
-              wubot(:,1)=wubot(:,2)        
+              wubot(:,1)=wubot(:,2)
               do k=1,kbm1
                uf(:,1,k)=uf(:,2,k)
               enddo
@@ -1854,14 +1854,14 @@
         call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
 
         if (ipery.lt.0) then !free-slip east&west
-           if(n_east.eq.-1)           then 
+           if(n_east.eq.-1)           then
               wvbot(im,:)=wvbot(imm1,:)
               do k=1,kbm1
                vf(im,:,k)=vf(imm1,:,k)
               enddo
             endif
            if(n_west.eq.-1)           then
-              wvbot(1,:)=wvbot(2,:)        
+              wvbot(1,:)=wvbot(2,:)
               do k=1,kbm1
                vf(1,:,k)=vf(2,:,k)
               enddo
@@ -1886,11 +1886,11 @@
 ! temperature and salinity boundary conditions (using uf and vf,
 ! respectively)
 
-!    west 
+!    west
       if(n_west.eq.-1) then
 
       do k=1,kbm1
-      do j=1,jm 
+      do j=1,jm
       u1=2.*u(2,j,k)*dti/(dx(1,j)+dx(2,j))
       if(u1.ge.0.) then
       uf(1,j,k)=t(1,j,k)-u1*(t(1,j,k)-tbw(j,k))
@@ -1906,7 +1906,7 @@
       end if
       end if !endif u1
       enddo  !enddo j
-      enddo  !enddo k 
+      enddo  !enddo k
 
       if(nfw.gt.3) then  !west FRZ needs at least 4 pts !lyo:20110224:alu:stcc:
       do k=1,kbm1; do j=1,jm; do i=1,nfw
@@ -1985,7 +1985,7 @@
       if(n_south.eq.-1) then
 
       do k=1,kbm1
-      do i=1,im 
+      do i=1,im
       u1=2.*v(i,2,k)*dti/(dy(i,1)+dy(i,2))
       if(u1.ge.0.) then
       uf(i,1,k)=t(i,1,k)-u1*(t(i,1,k)-tbs(i,k))
@@ -2021,7 +2021,7 @@
           call yperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
           call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
         endif
-!         
+!
          do k=1,kbm1
             do j=1,jm
                do i=1,im
@@ -2030,7 +2030,7 @@
                end do
             end do
          end do
-        
+
         return
 
       else if(idx.eq.5) then
@@ -2076,7 +2076,7 @@
          enddo
 
        end if
-                       
+
 ! west
        if(n_west.eq.-1) then
 
@@ -2091,7 +2091,7 @@
                 vf(1,j,k)=q2l(1,j,k)-u1*(q2l(2,j,k)-q2l(1,j,k))
               endif
            enddo
-         enddo 
+         enddo
 
        end if
 
@@ -2192,7 +2192,7 @@
         enddo
       else
 !
-! The most east sudomains    
+! The most east sudomains
       if(n_east.eq.-1) then
         dest_task=my_task-nproc_x+1
         sour_task=my_task-nproc_x+1
@@ -2221,7 +2221,7 @@
 
       endif !if(n_east.eq.-1)
 
-! The most west sudomains    
+! The most west sudomains
       if(n_west.eq.-1) then
         sour_task=my_task+nproc_x-1
         dest_task=my_task+nproc_x-1
@@ -2289,7 +2289,7 @@
         enddo; enddo
       else
 !
-C  !The most east sudomains    
+C  !The most east sudomains
       if(n_east.eq.-1) then
         dest_task=my_task-nproc_x+1
         sour_task=my_task-nproc_x+1
@@ -2326,7 +2326,7 @@ C  !The most east sudomains
 
       endif!if(n_east.eq.-1)
 
-C  !The most west sudomains    
+C  !The most west sudomains
       if(n_west.eq.-1) then
        sour_task=my_task+nproc_x-1
        dest_task=my_task+nproc_x-1
@@ -2397,7 +2397,7 @@ C  !The most west sudomains
         enddo
       else
 !
-C  !The most north sudomains    
+C  !The most north sudomains
       if(n_north.eq.-1) then
         dest_task=my_task-nproc_y+1
         sour_task=my_task-nproc_y+1
@@ -2426,7 +2426,7 @@ C  !The most north sudomains
 
       endif !if(n_north.eq.-1)
 
-C  !The most south sudomains    
+C  !The most south sudomains
       if(n_south.eq.-1) then
         sour_task=my_task+nproc_y-1
         dest_task=my_task+nproc_y-1
@@ -2493,7 +2493,7 @@ C  !The most south sudomains
         enddo; enddo
       else
 !
-C  !The most north sudomains    
+C  !The most north sudomains
       if(n_north.eq.-1) then
         dest_task=my_task-nproc_y+1
         sour_task=my_task-nproc_y+1
@@ -2530,7 +2530,7 @@ C  !The most north sudomains
 
       endif!if(n_north.eq.-1)
 
-C  !The most south sudomains    
+C  !The most south sudomains
       if(n_south.eq.-1) then
        sour_task=my_task+nproc_y-1
        dest_task=my_task+nproc_y-1
@@ -2593,17 +2593,17 @@ C  !The most south sudomains
       real(kind=rk) dum_area(jm), dum_flow(jm)
       real(kind=rk) sum_area, sum_flow, mean_uabe, uriv
       real(kind=rk) rdisp,rad_param,ome(6),ramt(6),phi0(6)   !fhx:tide
-      
+
       if(idx.eq.1) then
 
 ! external (2-D) elevation boundary conditions
-         
+
          if(n_east.eq.-1) then
             do j=1,jm
                elf(im,j)=elf(imm1,j)
             end do
          endif
-         
+
          do j=1,jm
             do i=1,im
                elf(i,j)=elf(i,j)*fsm(i,j)
@@ -2615,33 +2615,33 @@ C  !The most south sudomains
       else if(idx.eq.2) then
 
 ! external (2-D) velocity boundary conditions
-        
-                                
+
+
 !       east
 
 !     calculate net transport
-            
+
          dum_area = 0d0
          dum_flow = 0d0
 
 
-         if(n_east.eq.-1) then                  
+         if(n_east.eq.-1) then
          do j=2,jmm1
             dum_area(j) = 0.25
      $           * ( h(im,j) + elf (im,j) + h(im-1,j) + elf(im-1,j) )
      $           * ( dy(im,j) + dy(im-1,j) ) * dum(im,j)
-            
+
             dum_flow(j) = 0.25
      $           * ( h(im,j) + elf (im,j) + h(im-1,j) + elf(im-1,j) )
-     $           * ( dy(im,j) + dy(im-1,j) ) * uabe(j) * dum(im,j)                              
+     $           * ( dy(im,j) + dy(im-1,j) ) * uabe(j) * dum(im,j)
          end do
          endif
 
 
          call psum_mpi( dum_area, jm, sum_area )
          call psum_mpi( dum_flow, jm, sum_flow )
-         
-         
+
+
          if ( my_task == master_task ) then
 
 !     mean u-velocity at the eastern boundary.
@@ -2653,7 +2653,7 @@ C  !The most south sudomains
             uriv = totq / max( sum_area, small )
 
          endif
-         
+
 !     broadcasting to all the nodes.
 
          call bcast0d_mpi( mean_uabe, 0 )
@@ -2661,9 +2661,9 @@ C  !The most south sudomains
 
 
 !     adjust velocity at eastern boundary.
-         
-         if(n_east.eq.-1) then                  
-            
+
+         if(n_east.eq.-1) then
+
          do j=1,jm
             uaf(im,j) = ( uabe(j) - mean_uabe + uriv ) * dum(im,j)
             vaf(im,j) = 0.0
@@ -2674,10 +2674,10 @@ C  !The most south sudomains
           ramt = 0.
           ome  = 0.
           phi0 = 0.
-       if(calc_tide) then  
-            
-          rad_param=pi/180.0                
-          ome(1) = .08051140       !M2 in cycles per hour 
+       if(calc_tide) then
+
+          rad_param=pi/180.0
+          ome(1) = .08051140       !M2 in cycles per hour
           ome(2) = .08333333       !S2
           ome(5) = .04178075       !K1
           ome(6) = .03873066       !O1
@@ -2691,8 +2691,8 @@ C  !The most south sudomains
           phi0(2) = 106.*rad_param
           phi0(5) = 60.*rad_param
           phi0(6) = -40.*rad_param
-       do j=1,jm   
-       rdisp=sqrt(grav/h(imm1,j)) 
+       do j=1,jm
+       rdisp=sqrt(grav/h(imm1,j))
        do k=1,ntide
        uaf(im,j)=uaf(im,j)+ramt(k)*(
      $   ramp*amue(j,k)*cos(ome(k)*time-phue(j,k)*rad_param+phi0(k))-
@@ -2700,10 +2700,10 @@ C  !The most south sudomains
        enddo
 
 !      UAF(IM,J)=UAF(IM,J)+RAMT*( RAMP*AMUE(J,K)*COS(OME(K)*TIME-
-!     1    PHUE(J,K)) - COVRHE(J)*AMPE(J,K)*COS(OME(K)*TIME-PHAE(J,K)) )     
+!     1    PHUE(J,K)) - COVRHE(J)*AMPE(J,K)*COS(OME(K)*TIME-PHAE(J,K)) )
 
        enddo
-    
+
        end if ! if(calc_tide)
 !fhx:tide:end
 
@@ -2728,18 +2728,18 @@ C  !The most south sudomains
 !     east
 !     ratdiation boundary conditions.
 
-         if(n_east.eq.-1) then                  
-            
+         if(n_east.eq.-1) then
+
             hmax = 5300.
 
             do k=1,kbm1
                do j=2,jmm1
                   ga = sqrt( h(imm1,j) / hmax )
-!                  ga = sqrt( h(im,j) / hmax )  !fhx:tide 
-                  uf(im,j,k)  
-     $                 = ga * ( 0.25 * u(imm1,j-1,k) 
+!                  ga = sqrt( h(im,j) / hmax )  !fhx:tide
+                  uf(im,j,k)
+     $                 = ga * ( 0.25 * u(imm1,j-1,k)
      $                 + 0.5 * u(imm1,j,k) + 0.25 * u(imm1,j+1,k) )
-     $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k) 
+     $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k)
      $                 + 0.5 * u(im,j,k) + 0.25 * u(im,j+1,k) )
                enddo
             enddo
@@ -2764,7 +2764,7 @@ C  !The most south sudomains
 ! respectively)
 
 !     east
-         
+
          if(n_east.eq.-1) then
 
             do k=1,kbm1
@@ -2787,8 +2787,8 @@ C  !The most south sudomains
             enddo
 
          end if
-            
-         
+
+
          do k=1,kbm1
             do j=1,jm
                do i=1,im
@@ -2797,7 +2797,7 @@ C  !The most south sudomains
                end do
             end do
          end do
-        
+
         return
 
       else if(idx.eq.5) then
@@ -2816,16 +2816,16 @@ C  !The most south sudomains
       else if(idx.eq.6) then
 
 ! q2 and q2l boundary conditions
-                       
+
 !     east
-         
+
          if(n_east.eq.-1) then
             do k=1,kb
                do j=1,jm
-                  uf(im,j,k)=1.e-10 
-                  vf(im,j,k)=1.e-10 
-                  uf(1,j,k)=1.e-10 
-                  vf(1,j,k)=1.e-10 
+                  uf(im,j,k)=1.e-10
+                  vf(im,j,k)=1.e-10
+                  uf(1,j,k)=1.e-10
+                  vf(1,j,k)=1.e-10
                enddo
             end do
          end if
@@ -2905,7 +2905,7 @@ C  !The most south sudomains
           gae=dte*sqrt(grav*h(imm1,j))/dx(imm1,j)
           vaf(im,j)=(va(im,j)+gae*vaf(imm1,j))/(1.+gae)
 !          vaf(im,j)=0.e0
-          
+
 
 ! ayumi 2010/4/7 ---------------------------------
           uaf(im,j) = uabe(j)
@@ -3149,7 +3149,7 @@ C  !The most south sudomains
       integer i,j,k
 
       if(idx.eq.1) then
-      
+
 ! external (2-D) elevation boundary conditions
         do  j=1,jm
           if(n_west.eq.-1) elf(1,j)=elf(2,j)
@@ -3445,7 +3445,7 @@ C  !The most south sudomains
           end do
         end do
       end do
-      
+
 ! the following section solves the equation:
 !     dti2*(kq*q2')' - q2*(2.*dti2*dtef+1.) = -q2b
 
@@ -3479,7 +3479,7 @@ C  !The most south sudomains
           ! wave breaking energy- a variant of Craig & Banner (1994)
           ! see Mellor and Blumberg, 2003.
           ee(i,j,1)=0.
-          gg(i,j,1)=(15.8*cbcnst)**(2./3.)*utau2 
+          gg(i,j,1)=(15.8*cbcnst)**(2./3.)*utau2
           ! surface length scale following Stacey (1999).
           l0(i,j)=surfl*utau2/grav
           uf(i,j,kb)=sqrt((.5*(wubot(i,j)+wubot(i+1,j)))**2
@@ -3764,7 +3764,7 @@ C  !The most south sudomains
 
       do k=2,kbm1
         do j=1,jm
-          do i=1,im          
+          do i=1,im
             a(i,j,k-1)=-dti2*(kh(i,j,k)+umol)
      $                  /(dz(k-1)*dzz(k-1)*dh(i,j)*dh(i,j))
             c(i,j,k)=-dti2*(kh(i,j,k)+umol)
@@ -4302,18 +4302,18 @@ C  !The most south sudomains
 ! Nielson, P., 1992, Coastal bottom boundary layers and sediment
 ! transport. World Scientific.
 ! This aspect needs more basic research.
-! 
+!
 !  Input:
 !    fsm(I,j) = 1 for water cell, = 0 for land cell
 !    wusrf(i,j),wvsrf(i,j) = kinematic wind stress vector
-!    kp      = peak frequency wave number (m-1), assumed = 
+!    kp      = peak frequency wave number (m-1), assumed =
 !              the Significant wavenumber, a constant
 !    wubot(i,j),wvbot(i,j) = bottom stress vector as determned
 !      by bottom current (at zz(kb-1)) and cbc found here
 !    zzkbm1 = zz(kb-1) (non-d.)
 !    d(i,j) = water column depth (m)
 !    z0b = roughness parameter (m)
-!    cbcmin,cbcmax = limits on cbs (non-d.)    
+!    cbcmin,cbcmax = limits on cbs (non-d.)
 !
 !  Output:
 !    cbc(i,j) = bottom drag coefficient (non-d.)
@@ -4380,7 +4380,7 @@ C  !The most south sudomains
       data xd/0.,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7./
       data fdat/1.919,1.919,0.851,0.470,0.276,0.165,0.100,0.060,
      &         0.037,0.022,0.013,0.008,0.005,0.003,0.002/
-      fsinhinv=0.0 
+      fsinhinv=0.0
       if(x.lt.7.0) then
         ixd=int(2.0*x)+1
         fsinhinv=fdat(ixd)+(fdat(ixd+1)-fdat(ixd))*(x-xd(ixd))*2.0

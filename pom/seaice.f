@@ -12,7 +12,7 @@
       real(kind=rk), dimension( im_local, jm_local ) ::
      &     ice_a, ice_b
 
-    
+
       integer :: day_a, day_b
       character(len=16) :: infile_a, infile_b
       real(kind=rk) :: aa
@@ -21,7 +21,7 @@
       contains
 
 !==============================================================
-! Initialization variables for U & V boundary condition 
+! Initialization variables for U & V boundary condition
 !--------------------------------------------------------------
       subroutine ice_init( d_in )
 
@@ -29,7 +29,7 @@
 
         implicit none
 
-        type(date), intent(in) :: d_in 
+        type(date), intent(in) :: d_in
         type(date) d_2
         integer secs
 
@@ -48,16 +48,16 @@
 
 !     data open.
         write( infile_a, '( "ice.",i4,2(i2.2),".nc" )' )
-     &                                      d_2%year, d_2%month, d_2%day  
+     &                                      d_2%year, d_2%month, d_2%day
         call read_ice_pnetcdf( ice_a, infile_a )
 
         if (secs>0) d_2 = d_2 + 2*86400
 
         write( infile_b, '( "ice.",i4,2(i2.2),".nc" )' )
-     &                                      d_2%year, d_2%month, d_2%day  
+     &                                      d_2%year, d_2%month, d_2%day
         call read_ice_pnetcdf( ice_b, infile_b )
-     
-        if ( my_task == master_task ) 
+
+        if ( my_task == master_task )
      $        write(*,'(/a/)') "---------- ice_init."
 
         ice = ( 1.0 - aa ) * ice_a + aa * ice_b
@@ -102,11 +102,11 @@
           aa = 0.
 
           write( infile_b, '( "ice.",i4,2(i2.2),".nc" )' )
-     &                                      d_2%year, d_2%month, d_2%day  
+     &                                      d_2%year, d_2%month, d_2%day
           call read_ice_pnetcdf( ice_b, infile_b )
 
         endif
-     
+
 
 !     time interpolation.
 
@@ -121,7 +121,7 @@
 
       end subroutine ice_main
 !--------------------------------------------------------------
-      
+
 !==============================================================
 ! Advance ice in time
 !--------------------------------------------------------------
@@ -428,7 +428,7 @@
         vi  = vif
         icb = ice
         ice = icf
-        
+
       end subroutine ice_advance
 
       end module seaice

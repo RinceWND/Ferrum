@@ -3,7 +3,7 @@
 ! main program
 
       program pom
-      
+
       use module_time
       use river
       use tsforce
@@ -37,7 +37,7 @@
      &read_rst_file(15:16)//":"//read_rst_file(18:19) )
       mb = dtime%month
 
-      if ( calc_uvforce ) call uvforce_init(dtime) !eda:uvforce 
+      if ( calc_uvforce ) call uvforce_init(dtime) !eda:uvforce
       call tsforce_init( dtime )
       if ( calc_tsurf_mc ) call mcsst_init(dtime) !fhx:mcsst
       if ( calc_interp ) call interp_init !fhx:interp_flag
@@ -48,12 +48,12 @@
 
       if(my_task == master_task) then
         write(*,'(a)') 'End of initialization'
-        write(*,*) 
+        write(*,*)
         write(*,'("d = ",a)')  date2str( dtime )
       endif
 
       if(nread_rst.eq.0) !call write_output_init_pnetcdf !lyo:20110224:alu:stcc:!lyo:pac10:add this write_output_init*
-     &    call write_output_init_pnetcdf( 
+     &    call write_output_init_pnetcdf(
      &        "out/init."//trim(netcdf_file)//".nc")
 
 
@@ -75,7 +75,7 @@
 
 !     advance model
 !       call advance( dtime )    !lyo:???
-        call advance    
+        call advance
 !        call ice_advance
 
 !     drifter data assimilation  !eda:
@@ -85,10 +85,10 @@
 !     satellite SSHA data assimilation
         if ( calc_assim ) call assim_main( dtime )
 
-       
+
         dtime = dtime + int( dti )
 
-        if ( my_task.eq.master_task ) 
+        if ( my_task.eq.master_task )
      &       write(*,'("d = ",a)')  date2str( dtime )
 
 ! write output
@@ -188,7 +188,7 @@
 
 
 
-!         if ( my_task == 41 ) 
+!         if ( my_task == 41 )
 !     $        print*, im/2,jm/2,rot(im/2,jm/2),
 !     $        uab_mean(im/2,jm/2),vab_mean(im/2,jm/2)
 !
@@ -197,16 +197,16 @@
 !            do i = 1, im
 !               u_tmp = uab_mean(i,j)
 !               v_tmp = vab_mean(i,j)
-!               uab_mean(i,j) 
+!               uab_mean(i,j)
 !     $              = u_tmp * cos( rot(i,j) * deg2rad )
 !     $              - v_tmp * sin( rot(i,j) * deg2rad )
-!               vab_mean(i,j) 
+!               vab_mean(i,j)
 !     $              = u_tmp * sin( rot(i,j) * deg2rad )
 !     $              + v_tmp * cos( rot(i,j) * deg2rad )
 !            enddo
 !         enddo
 !
-!         if ( my_task == 41 ) 
+!         if ( my_task == 41 )
 !     $        print*, im/2,jm/2,
 !     $        cos(rot(im/2,jm/2)*deg2rad),
 !     $        uab_mean(im/2,jm/2),vab_mean(im/2,jm/2)
@@ -215,10 +215,10 @@
 !            do i = 1, im
 !               u_tmp = wusurf_mean(i,j)
 !               v_tmp = wvsurf_mean(i,j)
-!               wusurf_mean(i,j) 
+!               wusurf_mean(i,j)
 !     $              = u_tmp * cos( rot(i,j) * deg2rad )
 !     $              - v_tmp * sin( rot(i,j) * deg2rad )
-!               wvsurf_mean(i,j) 
+!               wvsurf_mean(i,j)
 !     $              = u_tmp * sin( rot(i,j) * deg2rad )
 !     $              + v_tmp * cos( rot(i,j) * deg2rad )
 !            enddo
@@ -229,16 +229,16 @@
 !               do i = 1, im
 !                  u_tmp = u_mean(i,j,k)
 !                  v_tmp = v_mean(i,j,k)
-!                  u_mean(i,j,k) 
+!                  u_mean(i,j,k)
 !     $                 = u_tmp * cos( rot(i,j) * deg2rad )
 !     $                 - v_tmp * sin( rot(i,j) * deg2rad )
-!                  v_mean(i,j,k) 
+!                  v_mean(i,j,k)
 !     $                 = u_tmp * sin( rot(i,j) * deg2rad )
 !     $                 + v_tmp * cos( rot(i,j) * deg2rad )
 !               enddo
 !            enddo
 !         enddo
-         
+
           if (output_flag == 1) then
 
             call write_output_pnetcdf(
@@ -267,7 +267,7 @@
           rho_mean    = 0.0
           kh_mean     = 0.0
           km_mean     = 0.0
-         
+
           num = 0
 
         end if
@@ -287,7 +287,7 @@
 
       if(netcdf_file.ne.'nonetcdf' .and. mod(iint,iprints).eq.0) then
 
-         
+
          usrf_mean    = usrf_mean    / real ( nums )
          vsrf_mean    = vsrf_mean    / real ( nums )
          elsrf_mean   = elsrf_mean   / real ( nums )
@@ -301,17 +301,17 @@
          call exchange2d_mpi( elsrf_mean, im, jm )
          call exchange2d_mpi( uwsrf_mean, im, jm )
          call exchange2d_mpi( vwsrf_mean, im, jm )
-       
+
        if (SURF_flag==1)
-     $    call write_SURF_pnetcdf( 
+     $    call write_SURF_pnetcdf(
      $        "out/SRF."//trim(netcdf_file)//".nc")
-       
+
          usrf_mean    = 0.0
          vsrf_mean    = 0.0
          elsrf_mean   = 0.0
          uwsrf_mean = 0.0
          vwsrf_mean = 0.0
-         
+
          nums = 0
 
       endif
@@ -330,10 +330,10 @@
 
       type(date), intent(in) :: d_in
 
-!lyo:exp302:The following changes will create a restart 1day after the 
+!lyo:exp302:The following changes will create a restart 1day after the
 !     initial date_start0 to be used for next-day's ncast&fcast
-      real(kind=rk), parameter :: write_rst1d = 1.0 !lyo:exp302:daily analysis restart 
-      integer irestart1d, ncount           !           each run for next-day 
+      real(kind=rk), parameter :: write_rst1d = 1.0 !lyo:exp302:daily analysis restart
+      integer irestart1d, ncount           !           each run for next-day
       data ncount/0/                       !           fcast
 
       irestart1d=nint(write_rst1d*86400./dti)                    !lyo:exp302:
@@ -343,7 +343,7 @@
          ncount=1                                                  !lyo:exp302:
 !     if( mod(iint,irestart) == 0 ) then                           !lyo:exp302:
 
-! fill up ghost cells 
+! fill up ghost cells
 ! They have to be filled in creating a restart file,
 ! which is independent of the number of nodes.
 
@@ -406,10 +406,10 @@
         call exchange3d_mpi(q2lb,im,jm,kb)
 
 
-         call write_restart_pnetcdf( 
+         call write_restart_pnetcdf(
      $        "out/"//date2str(d_in)//"."//
      $        trim(netcdf_file)//".rst" )
-         
+
       endif
 
 
