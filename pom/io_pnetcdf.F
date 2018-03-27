@@ -2004,18 +2004,19 @@
 ! followings are for MAB model
 ! ayumi since 2010/4/?
 !_______________________________________________________________________
-      subroutine read_tsclim_monthly_pnetcdf(tm,sm,tc,sc,in_file,n)
+      subroutine read_tsclim_monthly_pnetcdf(tm,sm,tc,sc,ht,in_file,n)
 ! read initial temperature and salinity
       implicit none
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
-      integer get_var_real_3d
+      integer get_var_real_3d, get_var_real_2d
       real(kind=rk) tm(im,jm,kb),sm(im,jm,kb),tc(im,jm,kb),sc(im,jm,kb)
+      real(kind=rk) ht(im,jm)
       character(len=120) netcdf_ic_file
       character(len=*) in_file
       integer ncid,status,n,k
-      integer tm_varid,sm_varid,tc_varid,sc_varid
+      integer tm_varid,sm_varid,tc_varid,sc_varid,ht_varid
       integer(mpi_offset_kind) start(4),edge(4)
 
 ! open netcdf ic file
@@ -2049,6 +2050,12 @@
       status=nfmpi_inq_varid(ncid,'sclim',sc_varid)
       call handle_error_pnetcdf('nfmpi_inq_varid: sc'
      $                          ,status,nf_noerr)
+      status=nfmpi_inq_varid(ncid,'eclim',ht_varid)
+      if ( status /= nf_noerr ) then
+        if ( my_task == master_task ) then
+          print *, "Failed reading elevation"
+        end if
+      end if
 
 ! get data
       start(1)=i_global(1)
@@ -2067,6 +2074,15 @@
       call handle_error_pnetcdf('get_var_real: tc',status,nf_noerr)
       status = get_var_real_3d(ncid,sc_varid,start,edge,sc)
       call handle_error_pnetcdf('get_var_real: sc',status,nf_noerr)
+      start(3)=n
+      edge(3)=1
+      status = get_var_real_2d(ncid,ht_varid,start,edge,ht)
+      if ( status /= nf_noerr ) then
+        if ( my_task == master_task ) then
+          print *, "Falling back to zero"
+        end if
+        el = 0.
+      end if
 
       do k=1,kbm1
         where (fsm(:,:)==0.)
@@ -2074,13 +2090,14 @@
           sm(:,:,k) = 0.
           tc(:,:,k) = 0.
           sc(:,:,k) = 0.
+          el        = 0.
         end where
       end do
 
-      tm(:,:,kb) = tm(:,:,kb-1)
-      sm(:,:,kb) = sm(:,:,kb-1)
-      tc(:,:,kb) = tc(:,:,kb-1)
-      sc(:,:,kb) = sc(:,:,kb-1)
+!      tm(:,:,kb) = tm(:,:,kb-1)
+!      sm(:,:,kb) = sm(:,:,kb-1)
+!      tc(:,:,kb) = tc(:,:,kb-1)
+!      sc(:,:,kb) = sc(:,:,kb-1)
 
 ! close file
       status=nfmpi_close(ncid)
