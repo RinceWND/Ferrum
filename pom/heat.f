@@ -11,8 +11,8 @@
 ! RADIATION FLUX AND THE DOWNWARD LONGWAVE RADIATION FLUX AS IT IS ASSUMED
 ! IN THE FIRST VERSION OF BULK CODE. THE NET SOLAR RADIATION IS CALCULATED
 ! ACCORDING TO THE REED FORMULA WHILE THE NET LONGWAVE RADIATION CAN BE
-! CALCULATED ACCORDING TO BIGNAMI OR MAY FORMULA (SEE LOGICAL VARIABLES
-! BIGNAMI_FORMULA & MAY_FORMULA BELOW)
+! CALCULATED ACCORDING TO BIGNAMI, MAY, HERZFELD OR BERLIAND FORMULA
+! (SEE `LWRAD_FORMULA` FLAG BELOW)
 !
 ! MOMENTUM, HEAT AND FRESHWATER FLUXES ARE CALCULATED FROM THE ATMOSPHERIC
 ! PARAMETERS (WIND VELOCITY, AIR TEMPERATURE, RELATIVE HUMIDITY, PRECIPITATION,
@@ -25,8 +25,8 @@
 !  ALL UNITS ARE S.I. (M.K.S.)
 !
 ! THE USER HAS THE OPTION TO CALCULATE THE NET LONGWAVE RADIATION FLUX
-! ACCORDING TO BIGNAMI OR MAY FORMULA. THIS IS DONE THROUGH THE LOGICAL
-! VARIABLES BIGNAMI_FORMULA & MAY_FORMULA
+! ACCORDING TO BIGNAMI, MAY, (pseudo)HERZFELD, and BERLIAND FORMULA.
+! THIS IS DONE THROUGH THE `LWRAD_FORMULA` PARAMETER (0 - 3)
 !
 ! SUBROUTINE BULK PROVIDES ITS OUTPUT INTO THE ARRAYS:
 !
@@ -78,9 +78,14 @@
 
       include 'realkind'
 
-      logical BIGNAMI_FORMULA, MAY_FORMULA, herzfeld_formula
-      parameter (BIGNAMI_FORMULA=.true., MAY_FORMULA=.false.,
-     $           herzfeld_formula=.false.)
+      integer*1 LWRAD_FORMULA,
+     &          lwBERLIAND, lwBIGNAMI, lwHERZFELD, lwMAY
+!-------------------------------------------------------------------------------
+! Longwave radiation formula (defaulted to lwBERLIAND)
+      parameter ( lwBIGNAMI  = 0,
+     &            lwMAY      = 1,
+     &            lwHERZFELD = 2,
+     &            lwBERLIAND = 3 )
 
       real(kind=rk), dimension(im, jm) ::
      $ fsm(im,jm),pme(im,jm),swrad(im,jm),wusurf(im,jm),
@@ -140,6 +145,7 @@
 !
       const = 0.622/1013.
 !
+      LWRAD_FORMULA = -1  ! Default to Berliand formula (same as 3)
 !
       do j = 1,jm
         do i = 1,im
@@ -205,22 +211,30 @@
 
             ea12 = 0.01*rhnow*esatair
 
-            if (bignami_formula) then
-              QBW=0.98*sigma*sstk**4-sigma*tnowk**4*(0.653+0.00535*ea12)
-     $                 *(1.+0.1762*cld*cld)
-            end if
+            select case ( LWRAD_FORMULA )
 
-            if (may_formula) then
-              QBW = (1.-0.75*(cld**3.4))
+              case ( lwBIGNAMI )
+                QBW = 0.98*sigma*sstk**4 - sigma*tnowk**4
+     $                 *(0.653+0.00535*ea12)
+     $                 *(1.+0.1762*cld*cld)
+
+              case ( lwMAY )
+                QBW = (1.-0.75*(cld**3.4))
      $             * (sigma*(tnowk**4.)*(0.4 -0.05*sqrt(ea12))
      $           + 4.*sigma*(tnowk**3.)*(sstk-tnowk))
-            end if
 
-            if (herzfeld_formula) then
-              QBW = (sigma*0.96*(1-(0.92e-5*tnowk*tnowk))*tnowk**4 +
+              case ( lwHERZFELD )
+                QBW = (sigma*0.96*(1-(0.92e-5*tnowk*tnowk))*tnowk**4 +
      $             4*sigma*0.96*(ckelv+tair(i,j)**3)*(sstk-tnowk)) *
-     $              (1-cos(alat(i,j))*cld) ! cos(phi) here is an improvised `beta` coefficient as a function of latitude from Herzfeld
-            end if
+     $              (1-.75*cos(alat(i,j)*3.14/180.)*cld) ! cos(phi) here is an improvised `beta` coefficient as a function of latitude from Herzfeld
+
+              case default  ! lwBERLIAND - Berliand (1952)
+                QBW = 0.97*sigma*
+     &               (     tnowk**4 * (.39-.05*sqrt(ea12))
+     &                *(1.-.6823*cld*cld)
+     &                + 4.*tnowk**3 * (sstk-tnowk))
+
+            end select
 
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
