@@ -138,7 +138,7 @@
 
         ! FREEZ'T
         lhf = 323500. ! Latent heat of fusion [J/kg]
-        ht  = (1.-ice)*( wtsurf - swrad )*4.1876d6 - ice*(-4.+1.82)*2.13/hi ! Net heat flux [W/m2]
+        ht  = (1.-ice)*(wtsurf-swrad)*4.1876d6-ice*(-4.+1.82)*2.13/hi ! Net heat flux [W/m2]
         do j = 1, jm
           do i = 1, im
             if ( ht(i,j) > 0. .and. t(i,j,1) < -1.82 ) then
