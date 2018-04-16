@@ -1404,17 +1404,16 @@
       real(kind=rk) p(im,jm,kb),fx(im,jm,kb),fc(im,jm,kb)
       real(kind=rk) dh,cff,cff1
 
-!      rho = rho-rmean
+      rho = rho-rmean
 
       p(:,:,1) = 0.
       do k = 1,kbm1
-        p(:,:,k+1) = p(:,:,k)
-     &            +dz(k)*dt(1:im,1:jm)*rho(1:im,1:jm,k)
-        fx(:,:,k) = .5*dz(k)*dt(1:im,1:jm)*(p(:,:,k)+p(:,:,k+1))
+        p(:,:,k+1) = p(:,:,k) + dt*dz(k)*rho(:,:,k)
+        fx(:,:,k) = .5*dt*dz(k)*(p(:,:,k)+p(:,:,k+1))
       end do
 
       cff = .5*grav
-      cff1= grav/rhoref
+      cff1= grav !/rhoref
 !
 !  Calculate pressure gradient in the XI-direction (m4/s2).
 !
@@ -1422,18 +1421,22 @@
       do k = 1,kbm1
         do j = 1,jm
           do i = 2,im
-!            if (dum(i,j)/=0.) then
-              dh = z(k+1)*(dt(i,j)-dt(i-1,j))!+et(i,j)-et(i-1,j)
+            if (dum(i,j)/=0.) then
+              dh = z(k+1)*(dt(i,j)-dt(i-1,j))+et(i,j)-et(i-1,j)
               fc(i,j,k+1) = .5*dh*(p(i,j,k+1)+p(i-1,j,k+1))
-              drhox(i,j,k) = .5*(cff*(dz(k)*dt(i-1,j)+
-     &                                dz(k)*dt(i  ,j))
-     &                             *( z(1)*(dt(i-1,j)-dt(i,j)))
-!     &                              *( et(i,j)-et(i-1,j) ) ! invert et?
-     &                         +cff1*(fx(i-1,j,k)-
+              if (k==1) then
+                drhox(i,j,k) = .5*(cff1*(fx(i-1,j,k)-
      &                                fx(i  ,j,k)+
      &                                fc(i,j,k  )-
      &                                fc(i,j,k+1)))*(dy(i,j)+dy(i-1,j))
-!            end if
+              else
+                drhox(i,j,k) = drhox(i,j,k-1) +
+     &                      .5*(cff1*(fx(i-1,j,k)-
+     &                                fx(i  ,j,k)+
+     &                                fc(i,j,k  )-
+     &                                fc(i,j,k+1)))*(dy(i,j)+dy(i-1,j))
+              end if
+            end if
           end do
         end do
       end do
@@ -1444,23 +1447,30 @@
       do k = 1,kbm1
         do j = 2,jm
           do i = 1,im
-!            if (dvm(i,j)/=0.) then
-              dh = z(k+1)*(dt(i,j)-dt(i,j-1))!+et(i,j)-et(i,j-1)
+            if (dvm(i,j)/=0.) then
+              dh = z(k+1)*(dt(i,j)-dt(i,j-1))+et(i,j)-et(i,j-1)
               fc(i,j,k+1) = .5*dh*(p(i,j,k+1)+p(i,j-1,k+1))
-              drhoy(i,j,k) = .5*(cff*(dz(k)*dt(i,j-1)+
-     &                                dz(k)*dt(i,j  ))
-     &                             *( z(1)*(dt(i,j-1)-dt(i,j)))
-!     &                              *( et(i,j)-et(i,j-1) )
-     &                         +cff1*(fx(i,j-1,k)-
+              if (k==1) then
+                drhoy(i,j,k) = .5*(cff1*(fx(i,j-1,k)-
      &                                fx(i,j  ,k)+
      &                                fc(i,j,k  )-
      &                                fc(i,j,k+1)))*(dx(i,j)+dx(i,j-1))
-!            end if
+              else
+                drhoy(i,j,k) = drhoy(i,j,k-1) +
+     &                      .5*(cff1*(fx(i,j-1,k)-
+     &                                fx(i,j  ,k)+
+     &                                fc(i,j,k  )-
+     &                                fc(i,j,k+1)))*(dx(i,j)+dx(i,j-1))
+              end if
+            end if
           end do
         end do
       end do
 
-!      rho = rho+rmean
+      drhox = -ramp*drhox
+      drhoy = -ramp*drhoy
+
+      rho = rho+rmean
 
       end subroutine
 
@@ -1473,11 +1483,11 @@
       real(kind=rk) phix(2:im),phie(im)
       real(kind=rk) fac1,fac2,fac3,cff1,cff2,cff3,cff4,gamma
 
-!      rho = rho-rmean
+      rho = rho-rmean
 
-      fac1 =     .5 *grav/rhoref
+      fac1 =     .5 *grav!/rhoref
       fac2 = 1000.  *grav/rhoref
-      fac3 =     .25*grav/rhoref
+      fac3 =     .25*grav!/rhoref
 
       do j = 1,jm
         do i = 2,im
@@ -1523,7 +1533,7 @@
 !     &           z_r(i,j,k  )-z_r(i-1,j,k  )
 !            phix(i)=phix(i)+                                            &
 !     &              fac3*(cff1*cff3-cff2*cff4)
-            drhox(i,j,k) = -.25*dz(k)*(dt(i,j)+dt(i-1,j))*
+            drhox(i,j,k) = drhox(i,j,k)-.25*dz(k)*(dt(i,j)+dt(i-1,j))*
      &                        phix(i)*(dy(i,j)+dy(i-1,j))
           end do
         end do
@@ -1578,7 +1588,7 @@
 !     &             z_r(i,j,k  )-z_r(i,j-1,k  )
 !              phie(i)=phie(i)+                                          &
 !     &                fac3*(cff1*cff3-cff2*cff4)
-              drhoy(i,j,k) = -.25*dz(k)*(dt(i,j)+dt(i,j-1))*
+              drhoy(i,j,k) = drhox(i,j,k)-.25*dz(k)*(dt(i,j)+dt(i,j-1))*
      &                          phie(i)*(dx(i,j)+dx(i,j-1))
 !              if (isnan(drhoy(i,j,k))) write(*,*) my_task,"::",i,j,k
             end do
@@ -1586,7 +1596,10 @@
         end if
       end do
 
-!      rho = rho+rmean
+      drhox = - ramp*drhox
+      drhoy = - ramp*drhoy
+
+      rho = rho+rmean
 
       end subroutine
 
