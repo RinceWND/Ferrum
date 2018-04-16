@@ -1533,7 +1533,8 @@
 !     &           z_r(i,j,k  )-z_r(i-1,j,k  )
 !            phix(i)=phix(i)+                                            &
 !     &              fac3*(cff1*cff3-cff2*cff4)
-            drhox(i,j,k) = drhox(i,j,k)-.25*dz(k)*(dt(i,j)+dt(i-1,j))*
+            drhox(i,j,k) = drhox(i,j,k-1)
+     &                     -.25*dz(k)*(dt(i,j)+dt(i-1,j))*
      &                        phix(i)*(dy(i,j)+dy(i-1,j))
           end do
         end do
@@ -1588,7 +1589,8 @@
 !     &             z_r(i,j,k  )-z_r(i,j-1,k  )
 !              phie(i)=phie(i)+                                          &
 !     &                fac3*(cff1*cff3-cff2*cff4)
-              drhoy(i,j,k) = drhox(i,j,k)-.25*dz(k)*(dt(i,j)+dt(i,j-1))*
+              drhoy(i,j,k) = drhoy(i,j,k-1)-
+     &                        .25*dz(k)*(dt(i,j)+dt(i,j-1))*
      &                          phie(i)*(dx(i,j)+dx(i,j-1))
 !              if (isnan(drhoy(i,j,k))) write(*,*) my_task,"::",i,j,k
             end do
