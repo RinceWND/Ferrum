@@ -1481,10 +1481,11 @@
       include 'pom.h'
       integer i,j,k
       real(kind=rk) phix(2:im),phie(im)
-      real(kind=rk) fac1,fac2,fac3,cff1,cff2,cff3,cff4,gamma
+      real(kind=rk) fac,fac1,fac2,fac3,cff1,cff2,cff3,cff4,gamma
 
-      rho = rho-rmean
+!      rho = rho-rmean
 
+      fac  = 10000.      /rhoref
       fac1 =     .5 *grav!/rhoref
       fac2 = 1000.  *grav/rhoref
       fac3 =     .25*grav!/rhoref
@@ -1493,9 +1494,10 @@
         do i = 2,im
           cff1 = (z(1)-zz(1))*(dt(i,j)+dt(i-1,j))
           phix(i) = fac1*(rho(i,j,1)-rho(i-1,j,1))*cff1
+          phix(i) = phix(i) + fac*(e_atmos(i,j)-e_atmos(i-1,j))
           phix(i) = phix(i)+                                              &
      &            (fac2+fac1*(rho(i,j,1)+rho(i-1,j,1)))*
-     &            (z(1)*(dt(i,j)-dt(i-1,j)))
+     &            (z(1)*(dt(i,j)-dt(i-1,j)) + et(i,j)-et(i-1,j))
           drhox(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i-1,j))*
      &                      phix(i)*(dy(i,j)+dy(i-1,j))
          end do
@@ -1508,6 +1510,7 @@
             cff1 = 1./(dt(i  ,j)*(zz(k-1)-zz(k))*
      &                 dt(i-1,j)*(zz(k-1)-zz(k)))
             cff2 = (dt(i,j)-dt(i-1,j))*(zz(k)+zz(k-1))
+     &         +2.*(et(i,j)-et(i-1,j))
             cff3 = (zz(k-1)-zz(k))*(dt(i,j)-dt(i-1,j))
             gamma = .125*cff1*cff2*cff3
 
@@ -1517,9 +1520,9 @@
      &             rho(i,j,k  )-rho(i-1,j,k  )
             cff3 = (dt(i,j)+dt(i-1,j))*(zz(k-1)-zz(k))
             cff4 = (1.+gamma)*
-     &               (zz(k-1)*(dt(i,j)-dt(i-1,j)))+
+     &               (zz(k-1)*(dt(i,j)-dt(i-1,j))+et(i,j)-et(i-1,j))+
      &             (1.-gamma)*
-     &               (zz(k  )*(dt(i,j)-dt(i-1,j)))
+     &               (zz(k  )*(dt(i,j)-dt(i-1,j))+et(i,j)-et(i-1,j))
             phix(i) = phix(i)+                                            &
      &                fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1549,9 +1552,10 @@
           do i = 1,im
             cff1 = (z(1)-zz(1))*(dt(i,j)+dt(i,j-1))
             phie(i) = fac1*(rho(i,j,1)-rho(i,j-1,1))*cff1
+            phie(i) = phie(i) + fac*(e_atmos(i,j)-e_atmos(i,j-1))
             phie(i) = phie(i)+                                            &
      &              (fac2+fac1*(rho(i,j,1)+rho(i,j-1,1)))*
-     &              (z(1)*(dt(i,j)-dt(i,j-1)))
+     &              (z(1)*(dt(i,j)-dt(i,j-1)) + et(i,j)-et(i,j-1))
             drhoy(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i,j-1))*
      &                        phie(i)*(dy(i,j)+dy(i,j-1))
           end do
@@ -1564,6 +1568,7 @@
               cff1 = 1./(dt(i,j  )*(z(k-1)-z(k))*
      &                   dt(i,j-1)*(z(k-1)-z(k)))
               cff2 = (dt(i,j)-dt(i,j-1))*(zz(k)+zz(k-1))
+     &           +2.*(et(i,j)-et(i,j-1))
               cff3 = (zz(k-1)-zz(k))*(dt(i,j)-dt(i,j-1))
               gamma = .125*cff1*cff2*cff3
 
@@ -1573,9 +1578,9 @@
      &               rho(i,j,k  )-rho(i,j-1,k  )
               cff3 = (dt(i,j)+dt(i,j-1))*(zz(k-1)-zz(k))
               cff4 = (1.+gamma)*
-     &                 (zz(k-1)*(dt(i,j)-dt(i,j-1)))+
+     &                (zz(k-1)*(dt(i,j)-dt(i,j-1))+et(i,j)-et(i,j-1))+
      &               (1.-gamma)*
-     &                 (zz(k  )*(dt(i,j)-dt(i,j-1)))
+     &                (zz(k  )*(dt(i,j)-dt(i,j-1))+et(i,j)-et(i,j-1))
               phie(i) = phie(i)+                                          &
      &                  fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1601,7 +1606,7 @@
       drhox = - ramp*drhox
       drhoy = - ramp*drhoy
 
-      rho = rho+rmean
+!      rho = rho+rmean
 
       end subroutine
 
