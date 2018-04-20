@@ -149,18 +149,7 @@
       if(mode.ne.2) then
         call advct(a,c,ee)
 
-        if (npg==1) then   !fhx:Toni:npg
-          call baropg
-        else if (npg==2) then
-          call baropg_mcc
-        else if (npg==3) then
-          call baropg_lin
-        else if (npg==4) then
-          call baropg_song_std
-        else
-          error_status=1
-          write(6,'(/''Error: invalid value for npg'')')
-        end if
+        call pgscheme(npg)
 
 !lyo:scs1d:
         if (n1d.ne.0) then
@@ -1107,3 +1096,26 @@
       return
       end
 !_______________________________________________________________________
+
+      subroutine pgscheme(npg)
+
+        implicit none
+
+        integer, intent(in) :: npg
+
+        select case (npg)
+          case (1)
+            call baropg
+          case (2)
+            call baropg_mcc
+          case (3)
+            call baropg_lin
+          case (4)
+            call baropg_song_std
+          case (5)
+            call baropg_shch
+          case default
+            call baropg_mcc
+        end select
+
+      end subroutine

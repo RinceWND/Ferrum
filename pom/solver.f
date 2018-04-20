@@ -1384,6 +1384,12 @@
         end do
       end do
 
+      if (ramp > 0) then
+        write(40+my_task,*) iint, drhox(50,50,:)
+        write(50+my_task,*) iint, et(50,50), rho(50,50,:)
+      end if
+      if (iint > 10) call finalize_mpi
+
       do k=1,kb
         do j=1,jm
           do i=1,im
@@ -1470,6 +1476,12 @@
       drhox = -ramp*drhox
       drhoy = -ramp*drhoy
 
+      if (ramp > 0) then
+        write(40+my_task,*) iint, drhox(50,50,:)
+        write(50+my_task,*) iint, et(50,50), rho(50,50,:)
+      end if
+      if (iint > 10) call finalize_mpi
+
       rho = rho+rmean
 
       end subroutine
@@ -1492,12 +1504,12 @@
 
       do j = 1,jm
         do i = 2,im
-          cff1 = (z(1)-zz(1))*(dt(i,j)+dt(i-1,j))
+          cff1 = (z(1)-zz(1))*(d(i,j)+d(i-1,j))
           phix(i) = fac1*(rho(i,j,1)-rho(i-1,j,1))*cff1
-          phix(i) = phix(i) + fac*(e_atmos(i,j)-e_atmos(i-1,j))
+!          phix(i) = phix(i) + fac*(e_atmos(i,j)-e_atmos(i-1,j))
           phix(i) = phix(i)+                                              &
      &            (fac2+fac1*(rho(i,j,1)+rho(i-1,j,1)))*
-     &            (z(1)*(dt(i,j)-dt(i-1,j)) + et(i,j)-et(i-1,j))
+     &            (z(1)*(d(i,j)-d(i-1,j)))! + el(i,j)-el(i-1,j))
           drhox(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i-1,j))*
      &                      phix(i)*(dy(i,j)+dy(i-1,j))
          end do
@@ -1507,22 +1519,22 @@
 !
         do k = 2,kbm1
           do i = 2,im
-            cff1 = 1./(dt(i  ,j)*(zz(k-1)-zz(k))*
-     &                 dt(i-1,j)*(zz(k-1)-zz(k)))
-            cff2 = (dt(i,j)-dt(i-1,j))*(zz(k)+zz(k-1))
-     &         +2.*(et(i,j)-et(i-1,j))
-            cff3 = (zz(k-1)-zz(k))*(dt(i,j)-dt(i-1,j))
+            cff1 = 1./(d(i  ,j)*(zz(k-1)-zz(k))*
+     &                 d(i-1,j)*(zz(k-1)-zz(k)))
+            cff2 = (d(i,j)-d(i-1,j))*(zz(k)+zz(k-1))
+!     &         +2.*(el(i,j)-el(i-1,j))
+            cff3 = (zz(k-1)-zz(k))*(d(i,j)-d(i-1,j))
             gamma = .125*cff1*cff2*cff3
 
             cff1 = (1.+gamma)*(rho(i,j,k-1)-rho(i-1,j,k-1))+
      &             (1.-gamma)*(rho(i,j,k  )-rho(i-1,j,k  ))
             cff2 = rho(i,j,k-1)+rho(i-1,j,k-1)-                           &
      &             rho(i,j,k  )-rho(i-1,j,k  )
-            cff3 = (dt(i,j)+dt(i-1,j))*(zz(k-1)-zz(k))
+            cff3 = (d(i,j)+d(i-1,j))*(zz(k-1)-zz(k))
             cff4 = (1.+gamma)*
-     &               (zz(k-1)*(dt(i,j)-dt(i-1,j))+et(i,j)-et(i-1,j))+
+     &               (zz(k-1)*(d(i,j)-d(i-1,j)))+!el(i,j)-el(i-1,j))+
      &             (1.-gamma)*
-     &               (zz(k  )*(dt(i,j)-dt(i-1,j))+et(i,j)-et(i-1,j))
+     &               (zz(k  )*(d(i,j)-d(i-1,j)))!+el(i,j)-el(i-1,j))
             phix(i) = phix(i)+                                            &
      &                fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1537,7 +1549,7 @@
 !            phix(i)=phix(i)+                                            &
 !     &              fac3*(cff1*cff3-cff2*cff4)
             drhox(i,j,k) = drhox(i,j,k-1)
-     &                     -.25*dz(k)*(dt(i,j)+dt(i-1,j))*
+     &                     -.25*dz(k)*(d(i,j)+d(i-1,j))*
      &                        phix(i)*(dy(i,j)+dy(i-1,j))
           end do
         end do
@@ -1550,13 +1562,13 @@
 !
         if (j>=2) then
           do i = 1,im
-            cff1 = (z(1)-zz(1))*(dt(i,j)+dt(i,j-1))
+            cff1 = (z(1)-zz(1))*(d(i,j)+d(i,j-1))
             phie(i) = fac1*(rho(i,j,1)-rho(i,j-1,1))*cff1
-            phie(i) = phie(i) + fac*(e_atmos(i,j)-e_atmos(i,j-1))
+!            phie(i) = phie(i) + fac*(e_atmos(i,j)-e_atmos(i,j-1))
             phie(i) = phie(i)+                                            &
      &              (fac2+fac1*(rho(i,j,1)+rho(i,j-1,1)))*
-     &              (z(1)*(dt(i,j)-dt(i,j-1)) + et(i,j)-et(i,j-1))
-            drhoy(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i,j-1))*
+     &              (z(1)*(d(i,j)-d(i,j-1)))! + el(i,j)-el(i,j-1))
+            drhoy(i,j,1) = -.25*dz(1)*(d(i,j)+d(i,j-1))*
      &                        phie(i)*(dy(i,j)+dy(i,j-1))
           end do
 !
@@ -1565,22 +1577,22 @@
 !
           do k = 2,kbm1
             do i = 1,im
-              cff1 = 1./(dt(i,j  )*(z(k-1)-z(k))*
-     &                   dt(i,j-1)*(z(k-1)-z(k)))
-              cff2 = (dt(i,j)-dt(i,j-1))*(zz(k)+zz(k-1))
-     &           +2.*(et(i,j)-et(i,j-1))
-              cff3 = (zz(k-1)-zz(k))*(dt(i,j)-dt(i,j-1))
+              cff1 = 1./(d(i,j  )*(z(k-1)-z(k))*
+     &                   d(i,j-1)*(z(k-1)-z(k)))
+              cff2 = (d(i,j)-d(i,j-1))*(zz(k)+zz(k-1))
+!     &           +2.*(el(i,j)-el(i,j-1))
+              cff3 = (zz(k-1)-zz(k))*(d(i,j)-d(i,j-1))
               gamma = .125*cff1*cff2*cff3
 
               cff1 = (1.+gamma)*(rho(i,j,k-1)-rho(i,j-1,k-1))+
      &               (1.-gamma)*(rho(i,j,k  )-rho(i,j-1,k  ))
               cff2 = rho(i,j,k-1)+rho(i,j-1,k-1)-                         &
      &               rho(i,j,k  )-rho(i,j-1,k  )
-              cff3 = (dt(i,j)+dt(i,j-1))*(zz(k-1)-zz(k))
+              cff3 = (d(i,j)+d(i,j-1))*(zz(k-1)-zz(k))
               cff4 = (1.+gamma)*
-     &                (zz(k-1)*(dt(i,j)-dt(i,j-1))+et(i,j)-et(i,j-1))+
+     &                (zz(k-1)*(d(i,j)-d(i,j-1)))+!el(i,j)-el(i,j-1))+
      &               (1.-gamma)*
-     &                (zz(k  )*(dt(i,j)-dt(i,j-1))+et(i,j)-et(i,j-1))
+     &                (zz(k  )*(d(i,j)-d(i,j-1)))!+el(i,j)-el(i,j-1))
               phie(i) = phie(i)+                                          &
      &                  fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1595,13 +1607,218 @@
 !              phie(i)=phie(i)+                                          &
 !     &                fac3*(cff1*cff3-cff2*cff4)
               drhoy(i,j,k) = drhoy(i,j,k-1)-
-     &                        .25*dz(k)*(dt(i,j)+dt(i,j-1))*
+     &                        .25*dz(k)*(d(i,j)+d(i,j-1))*
      &                          phie(i)*(dx(i,j)+dx(i,j-1))
 !              if (isnan(drhoy(i,j,k))) write(*,*) my_task,"::",i,j,k
             end do
           end do
         end if
       end do
+
+      drhox = - ramp*drhox
+      drhoy = - ramp*drhoy
+
+!      if (ramp > 0) then
+!        write(40+my_task,*) iint, drhox(50,50,:)
+!        write(50+my_task,*) iint, el(50,50), rho(50,50,:)
+!      end if
+!      if (iint > 10) call finalize_mpi
+
+!      rho = rho+rmean
+
+      end subroutine
+
+!_______________________________________________________________________
+      subroutine baropg_shch
+
+      implicit none
+      include 'pom.h'
+      integer i,j,k
+      real(kind=rk), parameter :: OneFifth   = .2
+     &                           ,OneTwelfth = 1./12.
+     &                           ,eps        = 1.e-10
+      real(kind=rk) GRho, GRho0, HalfGRho
+      real(kind=rk) fac,cff,cff1,cff2
+      real(kind=rk), dimension(im,jm,kb):: p
+      real(kind=rk), dimension(im,kb+1) :: idR, idZ
+      real(kind=rk), dimension(im,jm)   :: fc, aux, idRx, idZx
+
+!      rho = rho-rmean
+
+!
+!-----------------------------------------------------------------------
+!  Preliminary step (same for XI- and ETA-components:
+!-----------------------------------------------------------------------
+!
+      GRho  = grav!/rhoref
+      GRho0 = 1000./GRho
+      HalfGRho = .5*GRho
+      fac = 100./rhoref
+
+      do j = 1,jm
+        do k = 2,kb
+          do i = 1,im
+            idR(i,k) = rho(i,j,k-1) - rho(i,j,k)
+            idZ(i,k) = (zz(k-1)-zz(k))*d(i,j)
+          end do
+        end do
+        do i = 1,im
+          idR(i,1) = idR(i,2)
+          idZ(i,1) = idZ(i,2)
+          idR(i,kb+1) = idR(i,kb)
+          idZ(i,kb+1) = idZ(i,kb)
+        end do
+        do k=1,kb
+          do i=1,im
+            cff = 2.*idR(i,k)*idR(i,k+1)
+            if (cff > eps) then
+              idR(i,k) = cff/(idR(i,k)+idR(i,k+1))
+            else
+              idR(i,k) = 0.
+            end if
+            idZ(i,k) = 2.*idZ(i,k)*idZ(i,k+1)/(idZ(i,k)+idZ(i,k+1))
+          end do
+        end do
+        do i=1,im
+          cff1 = 1./(d(i,j)*(zz(1)-zz(2)))
+          cff2 = .5*(rho(i,j,1)-rho(i,j,2))*d(i,j)*(z(1)-zz(1))*cff1
+          p(i,j,1) = Grho*(rho(i,j,1)+cff2)*d(i,j)*(z(1)-zz(1))
+        end do
+        do k = 2,kb
+          do i = 1,im
+            p(i,j,k) = p(i,j,k-1) +
+     &                HalfGRho*((rho(i,j,k-1)+rho(i,j,k))*
+     &                          (d(i,j)*(zz(k-1)-zz(k)))-
+     &                          OneFifth*
+     &                          ((idR(i,k-1)-idR(i,k))*
+     &                           (d(i,j)*(zz(k-1)-zz(k))-
+     &                            OneTwelfth*
+     &                            (idZ(i,k-1)+idZ(i,k)))-
+     &                           (idZ(i,k-1)-idZ(i,k))*
+     &                           (rho(i,j,k-1)-rho(i,j,k)-
+     &                            OneTwelfth*
+     &                            (idR(i,k-1)+idR(i,k)))))
+          end do
+        end do
+      end do
+!
+!-----------------------------------------------------------------------
+!  Compute XI-component pressure gradient term.
+!-----------------------------------------------------------------------
+!
+      do k = 1,kb
+        do j = 1,jm
+          do i = 2,im
+            aux(i,j) = zz(k)*(d(i,j)-d(i-1,j))
+            fc(i,j) = rho(i,j,k)-rho(i-1,j,k)
+          end do
+        end do
+        do j = 1,jm
+          do i = 1,imm1
+            cff = 2.*aux(i,j)*aux(i+1,j)
+            if (cff > eps) then
+              cff1 = 1./(aux(i,j)+aux(i+1,j))
+              idZx(i,j) = cff*cff1
+            else
+              idZx(i,j) = 0.
+            end if
+            cff1 = 2.*fc(i,j)*fc(i+1,j)
+            if (cff1 > eps) then
+              cff2 = 1./(fc(i,j)+fc(i+1,j))
+              idRx(i,j) = cff1*cff2
+            else
+              idRx(i,j) = 0.
+            end if
+          end do
+        end do
+
+        do j = 1,jm
+          do i = 2,im
+            if (k==1) then
+              drhox(i,j,k) = 0.
+            else
+              drhox(i,j,k) = drhox(i,j,k-1)
+            end if
+            drhox(i,j,k) =drhox(i,j,k)+.25*(dy(i,j)+dy(i-1,j))*
+     &                    (dz(k)*(d(i,j)+d(i-1,j)))*
+     &                    (p(i-1,j,k)-p(i,j,k)-
+     &                     HalfGRho*
+     &                     ((rho(i,j,k)+rho(i-1,j,k))*
+     &                      (zz(k)*(dt(i,j)-d(i-1,j)))
+!     &                             +et(i,j)-et(i-1,j))-
+     &                      -OneFifth*
+     &                       ((idRx(i,j)-idRx(i-1,j))*
+     &                        (zz(k)*(dt(i,j)-d(i-1,j))
+!     &                               +et(i,j)-et(i-1,j)-
+     &                        -OneTwelfth*
+     &                         (idZx(i,j)+idZx(i-1,j)))-
+     &                        (idZx(i,j)-idZx(i-1,j))*
+     &                        (rho(i,j,k)-rho(i-1,j,k)-
+     &                         OneTwelfth*
+     &                         (idRx(i,j)+idRx(i-1,j))))))
+          end do
+        end do
+      end do
+!
+!-----------------------------------------------------------------------
+!  ETA-component pressure gradient term.
+!-----------------------------------------------------------------------
+!
+      do k = 1,kb
+        do j = 2,jm
+          do i = 1,im
+            aux(i,j) = zz(k)*(d(i,j)-d(i,j-1))
+            fc(i,j) = rho(i,j,k)-rho(i,j-1,k)
+          end do
+        end do
+        do j = 1,jmm1
+          do i = 1,im
+            cff = 2.*aux(i,j)*aux(i,j+1)
+            if (cff > eps) then
+              cff1 = 1./(aux(i,j)+aux(i,j+1))
+              idZx(i,j) = cff*cff1
+            else
+              idZx(i,j) = 0.
+            end if
+            cff1 = 2.*fc(i,j)*fc(i,j+1)
+            if (cff1 > eps) then
+              cff2 = 1./(fc(i,j)+fc(i,j+1))
+              idRx(i,j) = cff1*cff2
+            else
+              idRx(i,j) = 0.
+            end if
+          end do
+        end do
+
+        do j = 2,jm
+          do i = 1,im
+            if (k==1) then
+              drhoy(i,j,k) = 0.
+            else
+              drhoy(i,j,k) = drhoy(i,j,k-1)
+            end if
+            drhoy(i,j,k) =drhoy(i,j,k)+.25*(dx(i,j)+dy(i,j-1))*
+     &                    (dz(k)*(d(i,j)+d(i,j-1)))*
+     &                    (p(i,j-1,k)-p(i,j,k)-
+     &                     HalfGRho*
+     &                     ((rho(i,j,k)+rho(i,j-1,k))*
+     &                      (zz(k)*(d(i,j)-d(i,j-1)))
+!     &                             +et(i,j)-et(i,j-1))-
+     &                      -OneFifth*
+     &                       ((idRx(i,j)-idRx(i,j-1))*
+     &                        (zz(k)*(d(i,j)-d(i,j-1))
+!     &                               +et(i,j)-et(i,j-1)-
+     &                        -OneTwelfth*
+     &                         (idZx(i,j)+idZx(i,j-1)))-
+     &                        (idZx(i,j)-idZx(i,j-1))*
+     &                        (rho(i,j,k)-rho(i,j-1,k)-
+     &                         OneTwelfth*
+     &                         (idRx(i,j)+idRx(i,j-1))))))
+          end do
+        end do
+      end do
+!
+
 
       drhox = - ramp*drhox
       drhoy = - ramp*drhoy

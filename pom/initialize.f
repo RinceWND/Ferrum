@@ -944,18 +944,14 @@
         end do
       end do
 
-      if (npg==1) then   !fhx:Toni:npg
-         call baropg
-      else if (npg==2) then
-        call baropg_mcc
-      else if (npg==3) then
-        call baropg_lin
-      else if (npg==4) then
-        call baropg_song_std
-      else
-        error_status=1
-        write(6,'(/''Error: invalid value for npg'')')
+      if (my_task == master_task) then
+        if (npg>5 .and. npg<0) then
+          write(*,'(/"[!] Invalid value for Pressure Gradient Scheme")')
+          write(*,'("   Defaulting to McCalpin 4th order (npg=3)")')
+        end if
       end if
+
+      call pgscheme(npg)
 
       do k=1,kbm1
         do j=1,jm
