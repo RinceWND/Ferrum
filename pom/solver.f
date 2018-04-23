@@ -1384,11 +1384,11 @@
         end do
       end do
 
-      if (ramp > 0) then
-        write(40+my_task,*) iint, drhox(50,50,:)
-        write(50+my_task,*) iint, et(50,50), rho(50,50,:)
-      end if
-      if (iint > 10) call finalize_mpi
+!      if (ramp > 0) then
+!        write(40+my_task,*) iint, drhox(50,50,:)
+!        write(50+my_task,*) iint, et(50,50), rho(50,50,:)
+!      end if
+!      if (iint > 10) call finalize_mpi
 
       do k=1,kb
         do j=1,jm
@@ -1476,11 +1476,11 @@
       drhox = -ramp*drhox
       drhoy = -ramp*drhoy
 
-      if (ramp > 0) then
-        write(40+my_task,*) iint, drhox(50,50,:)
-        write(50+my_task,*) iint, et(50,50), rho(50,50,:)
-      end if
-      if (iint > 10) call finalize_mpi
+!      if (ramp > 0) then
+!        write(40+my_task,*) iint, drhox(50,50,:)
+!        write(50+my_task,*) iint, et(50,50), rho(50,50,:)
+!      end if
+!      if (iint > 10) call finalize_mpi
 
       rho = rho+rmean
 
