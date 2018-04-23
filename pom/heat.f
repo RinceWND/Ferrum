@@ -258,7 +258,7 @@
 
             call coare35vn( (SP-sqrt(usurf(i,j)**2+vsurf(i,j)**2)),
      &                      10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
-     &                      pnow, tsurf(i,j),sol_net,370._rk,alat(i,j),
+     &                      pnow,sst_model,sol_net,370._rk,alat(i,j),
      &                      600._rk, (3.6e6*precip), 0._rk, 0._rk,
      &                      QH, QE, Evap)
 
