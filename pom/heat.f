@@ -86,7 +86,7 @@
      &            lwMAY      = 1,
      &            lwHERZFELD = 2,
      &            lwBERLIAND = 3 )
-      logical, parameter :: use_coare = .false.
+      logical, parameter :: use_coare = .true.
 
       real(kind=rk), dimension(im, jm) ::
      $ fsm(im,jm),pme(im,jm),swrad(im,jm),wusurf(im,jm),
@@ -97,7 +97,7 @@
      $  uair(im,jm),vair(im,jm),tair(im,jm),rhum(im,jm),
      $  rain(im,jm),cloud(im,jm),pres(im,jm)
 
-      real(kind=rk) unow, vnow, tnow, pnow, e, es, precip, cld
+      real(kind=rk) unow, vnow, tnow, pnow, precip, cld
      &   , sst_model, QBW
 
       real(kind=rk), external :: cd, heatlat, esk
@@ -108,7 +108,7 @@
      &            , ea12, emiss, esatair, esatoce, evap
      &            , fe, fh
      &            , Qe, Qh, Qu
-     &            , rhnow, rhom
+     &            , rhnow, rho, rhom
      &            , sigma, sol_net, sp, ss, sstk, stp
      &            , taux, tauy, tnowk
      &            , wair, wflux, wsatair, wsatoce
@@ -256,13 +256,16 @@
 
           if ( use_coare ) then
 
-            call coare35vn( (SP-sqrt(usurf(i,j)**2+vsurf(i,j)**2)),
+!            call coare35vn( (SP-sqrt(usurf(i,j)**2+vsurf(i,j)**2)),
+!     &                      10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
+!     &                      pnow,sst_model,sol_net,370._rk,alat(i,j),
+!     &                      600._rk, (3.6e6*precip), 0._rk, 0._rk,
+!     &                      QH, QE, Evap )
+!            Evap = Evap*rho/3.6e6
+            call coare30( (unow-usurf(i,j)),(vnow-vsurf(i,j)),
      &                      10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
-     &                      pnow,sst_model,sol_net,370._rk,alat(i,j),
-     &                      600._rk, (3.6e6*precip), 0._rk, 0._rk,
-     &                      QH, QE, Evap)
-
-            Evap = Evap*rho/3.6e6
+     &                      pnow,sst_model,rho,cld,precip*1000.,sol_net,
+     &                      QH, QE, Evap )
 
           else
 ! Calculate turbulent exchange coefficients according to Kondo scheme
@@ -344,6 +347,9 @@
 ! --- calculates : Qu = Qb + QH + QE
 !
             QU = qbw + qh + qe
+            if (isnan(QU)) then
+            print *, ":", i,j,qbw, qh, qe
+            end if
 !
 ! --- 1. Devide upward heat flux by rho*Cpw
 !
@@ -653,6 +659,423 @@
         return
       end
 
+      subroutine coare30( uw, vw, blk_ZW, Tair, blk_ZT, Hair, blk_ZQ
+     &   , Pair, Tsea, Rsea, cloud, rain, srflx, shflx, lhflx, evap )
+
+        implicit none
+
+        include 'realkind'
+
+        real(kind=rk), intent(in) :: uw, vw, Pair, Tair, Hair, Tsea
+     &                             , Rsea, cloud, rain
+        real(kind=rk) srflx, lrflx, evap
+
+        real(kind=rk) Bf, blk_beta, blk_Cpa, blk_Cpw, blk_dter
+     &              , blk_Rgas, blk_tcw, blk_visw, blk_Zabl, blk_ZQ
+     &              , blk_ZT, blk_ZW, CC, Cd, Cd10, cff, cff1, cff2
+     &              , Ch, Ch10, charn, Clam, Cp, Ct, Ct10, Cwet, delQ
+     &              , delQc, delT, delTc, delW, diffh, diffw, e_sat
+     &              , EminusP, emmiss, eps, Fc, g, Hcool, Hl, Hlb, Hlv
+     &              , Hlw, Hs, Hsb, Hscale, Hscale2, Hsr, L, L10, lambd
+     &              , LHeat, lhflx, LRad, PairM, pi, Q, Qair, Qbouy
+     &              , Qcool, Qpsi, Qsea, Qstar, r3, RH, rhoAir
+     &              , rhoref, rhoSea, rhow, Ri, Ribcu, Rr, scff, SHeat
+     &              , shflx, SRad, StefBo, stflx, TairC, TairK, Taur
+     &              , Taux, Tauy, Tcff, Tpsi, TseaC, TseaK, Tstar
+     &              , twopi_inv, u10, upvel, Uwind, vap_p, VisAir
+     &              , vonKar, Vwind, wet_bulb, Wgus, Wmag, Wpsi, Wspeed
+     &              , Wstar, Zetu, Zo10, ZoL, ZoQ, ZoT, ZoT10, ZoW
+        real(kind=rk), external :: bulk_psiu, bulk_psit
+        integer Iter
+
+        integer, parameter :: IterMax = 3
+        logical, parameter :: COOLSKIN = .true.
+
+        blk_Beta =   1.2
+        blk_cpa  =1004.67
+        blk_cpw  =   4.082793e6
+        blk_dter =    .3
+        blk_Rgas = 287.1
+        blk_tcw  =    .6
+        blk_visw =   1.e-6
+        blk_Zabl = 600.
+        Cp = 3983.212682927
+        emmiss = .97
+        eps = 1.e-20
+        g  = 9.81
+        pi = 4.*atan(1.)
+        r3 = 1./3.
+        rhoref = 1025.
+        stefbo = 5.67e-8
+        vonKar = .4
+!
+!  Compute Atmosphere-ocean fluxes using a bulk flux parameterization.
+!
+        Hscale    = rhoref*Cp
+        Hscale2   = 1./(rhoref*Cp)
+        twopi_inv = .5/pi
+!
+!  Input bulk parameterization fields.
+!
+        Wmag  = sqrt( uw*uw + vw*vw )
+        PairM = Pair
+        TairC = Tair
+        TairK = TairC + 273.16
+        TseaC = Tsea
+        TseaK = TseaC + 273.16
+        rhoSea= Rsea*rhoref + 1000.
+        RH    = Hair/100. ! Convert to fraction
+        SRad  = srflx*Hscale
+        Tcff  = 2.1e-5*( TseaC+3.2 )**0.79
+        Scff  =  .026
+!
+!  Initialize.
+!
+        delTc = 0.
+        delQc = 0.
+!        LHeat = lhflx*Hscale
+!        SHeat = shflx*Hscale
+        Taur  = 0.
+        Taux  = 0.
+        Tauy  = 0.
+
+!-----------------------------------------------------------------------
+!  Compute net longwave radiation (W/m2), LRad.
+!-----------------------------------------------------------------------
+!
+!  Use Berliand (1952) formula to calculate net longwave radiation.
+!  The equation for saturation vapor pressure is from Gill (Atmosphere-
+!  Ocean Dynamics, pp 606). Here the coefficient in the cloud term
+!  is assumed constant, but it is a function of latitude varying from
+!  1.0 at poles to 0.5 at the Equator).
+!
+        cff   = ( .7859 + .03477*TairC )/(1. + .00412*TairC )
+        e_sat = 10.0**cff   ! saturation vapor pressure (hPa or mbar)
+        vap_p = e_sat * RH       ! water vapor pressure (hPa or mbar)
+
+        cff2  = TairK*TairK*TairK
+        cff1  = cff2*TairK
+        LRad  =-emmiss*StefBo*
+     &              (cff1*( .39 - .05*sqrt(vap_p))*
+     &                    (1.   - .6823*cloud*cloud)+
+     &               cff2*4.*(TseaK-TairK))
+!-----------------------------------------------------------------------
+!  Compute specific humidities (kg/kg).
+!
+!    note that Qair(i) is the saturation specific humidity at Tair
+!                 Q(i) is the actual specific humidity
+!              Qsea(i) is the saturation specific humidity at Tsea
+!
+!          Saturation vapor pressure in mb is first computed and then
+!          converted to specific humidity in kg/kg
+!
+!          The saturation vapor pressure is computed from Teten formula
+!          using the approach of Buck (1981):
+!
+!          Esat(mb) = (1.0007_r8+3.46E-6_r8*PairM(mb))*6.1121_r8*
+!                  EXP(17.502_r8*TairC(C)/(240.97_r8+TairC(C)))
+!
+!          The ambient vapor is found from the definition of the
+!          Relative humidity:
+!
+!          RH = W/Ws*100 ~ E/Esat*100   E = RH/100*Esat if RH is in %
+!                                       E = RH*Esat     if RH fractional
+!
+!          The specific humidity is then found using the relationship:
+!
+!          Q = 0.622 E/(P + (0.622-1)e)
+!
+!          Q(kg/kg) = 0.62197_r8*(E(mb)/(PairM(mb)-0.378_r8*E(mb)))
+!
+!-----------------------------------------------------------------------
+!
+!  Compute air saturation vapor pressure (mb), using Teten formula.
+!
+        cff = (1.0007 + 3.46e-6*PairM)*6.1121*
+     &        exp( 17.502*TairC / (240.97+TairC) )
+!
+!  Compute specific humidity at Saturation, Qair (kg/kg).
+!
+        Qair = .62197*( cff / (PairM-.378*cff) )
+!
+!  Compute specific humidity, Q (kg/kg).
+!
+        cff = cff*RH                                 !Vapor pres (mb)
+        Q   = .62197*( cff / (PairM-.378*cff) ) !Spec hum (kg/kg)
+!
+!  Compute water saturation vapor pressure (mb), using Teten formula.
+!
+        cff = ( 1.0007 + 3.46e-6*PairM )*6.1121*
+     &        exp( 17.502*TseaC / (240.97+TseaC) )
+!
+!  Vapor Pressure reduced for salinity (Kraus & Businger, 1994, pp 42).
+!
+        cff = cff*0.98
+!
+!  Compute Qsea (kg/kg) from vapor pressure.
+!
+        Qsea = 0.62197*( cff / (PairM-0.378*cff) )
+
+!-----------------------------------------------------------------------
+!  Compute Monin-Obukhov similarity parameters for wind (Wstar),
+!  heat (Tstar), and moisture (Qstar), Liu et al. (1979).
+!-----------------------------------------------------------------------
+!
+!  Moist air density (kg/m3).
+!
+        rhoAir = PairM*100.0 / ( blk_Rgas*TairK*(1.+.61*Q) )
+!
+!  Kinematic viscosity of dry air (m2/s), Andreas (1989).
+!
+        VisAir = 1.326e-5*
+     &              (1.+TairC*(6.542e-3+TairC*
+     &               (8.301e-6 - 4.84e-9*TairC)))
+!
+!  Compute latent heat of vaporization (J/kg) at sea surface, Hlv.
+!
+        Hlv = ( 2.501 - .00237*TseaC )*1.0e+6
+!
+!  Assume that wind is measured relative to sea surface and include
+!  gustiness.
+!
+        Wgus = .5
+        delW = sqrt( Wmag*Wmag + Wgus*Wgus )
+        delQ = Qsea-Q
+        delT = TseaC-TairC
+!
+!  Neutral coefficients.
+!
+        ZoW = 0.0001
+        u10 = delW * log( 10./ZoW )/log( blk_ZW/ZoW )
+        Wstar = .035*u10
+        Zo10  = .011*Wstar*Wstar/g + .11*VisAir/Wstar
+        Cd10  = ( vonKar / log( 10./Zo10 ) )**2
+        Ch10  = .00115
+        Ct10  = Ch10/sqrt(Cd10)
+        ZoT10 = 10. / exp( vonKar/Ct10 )
+        Cd    = ( vonKar / log( blk_ZW/Zo10) )**2
+!
+!  Compute Richardson number.
+!
+        Ct = vonKar / log( blk_ZT/ZoT10 )  ! T transfer coefficient
+        CC = vonKar*Ct/Cd
+        delTc = 0.
+        delTc = blk_dter
+        Ribcu = -blk_ZW/(blk_Zabl*0.004*blk_beta**3)
+        Ri = -g*blk_ZW*((delT-delTc)+
+     &                          .61*TairK*delQ)/
+     &          (TairK*delW*delW)
+        if ( Ri < 0. ) then
+          Zetu = CC*Ri / ( 1. + Ri/Ribcu )       ! Unstable
+        else
+          Zetu = CC*Ri / ( 1. + 3.*Ri/CC )   ! Stable
+        end if
+        L10 = blk_ZW/Zetu
+!
+!  First guesses for Monon-Obukhov similarity scales.
+!
+        Wstar = delW*vonKar / ( log(blk_ZW/Zo10) -
+     &                          bulk_psiu( blk_ZW/L10, pi ) )
+        Tstar = -(delT-delTc)*vonKar/
+     &           ( log( blk_ZT/ZoT10 )-
+     &             bulk_psit( blk_ZT/L10, pi ) )
+        Qstar = -(delQ-delQc)*vonKar/
+     &           ( log(blk_ZQ/ZoT10 )-
+     &             bulk_psit( blk_ZQ/L10, pi ) )
+!
+!  Modify Charnock for high wind speeds. The 0.125 factor below is for
+!  1.0/(18.0-10.0).
+!
+        if ( delW > 18. ) then
+          charn = .018
+        elseif ( (10. < delW ).and.(delW >= 18. ) ) then
+          charn = .011 + .125*(.018-.011)*(delW-10.)
+        else
+          charn = .011
+        end if
+!
+!  Iterate until convergence. It usually converges within 3 iterations.
+!
+        do Iter = 1,IterMax
+
+          ZoW = charn*Wstar*Wstar/g + .11*VisAir/(Wstar+eps)
+          Rr  = ZoW*Wstar/VisAir
+!
+!  Compute Monin-Obukhov stability parameter, Z/L.
+!
+          ZoQ = min( 1.15e-4, 5.5e-5/Rr**.6 )
+          ZoT = ZoQ
+          ZoL = vonKar*g*blk_ZW*
+     &             (Tstar*(1.+.61*Q)+
+     &                        .61*TairK*Qstar)/
+     &             (TairK*Wstar*Wstar*
+     &             (1.+.61*Q)+eps)
+          L = blk_ZW/(ZoL+eps)
+!
+!  Evaluate stability functions at Z/L.
+!
+          Wpsi = bulk_psiu( ZoL, pi )
+          Tpsi = bulk_psit( blk_ZT/L, pi )
+          Qpsi = bulk_psit( blk_ZQ/L, pi )
+          if ( COOLSKIN ) then
+            Cwet = .622*Hlv*Qsea/
+     &              ( blk_Rgas*TseaK*TseaK )
+            delQc = Cwet*delTc
+          end if
+!
+!  Compute wind scaling parameters, Wstar.
+!
+          Wstar = max( eps, delW*vonKar/
+     &                ( log( blk_ZW/ZoW ) - Wpsi ) )
+          Tstar = -(delT-delTc)*vonKar/
+     &                ( log( blk_ZT/ZoT ) - Tpsi )
+          Qstar = -(delQ-delQc)*vonKar/
+     &                ( log( blk_ZQ/ZoQ ) - Qpsi )
+!
+!  Compute gustiness in wind speed.
+!
+          Bf = -g/TairK*
+     &         Wstar*( Tstar + .61*TairK*Qstar )
+          if ( Bf > 0. ) then
+            Wgus = blk_beta*( Bf*blk_Zabl )**r3
+          else
+            Wgus = .2
+          end if
+          delW = sqrt( Wmag*Wmag + Wgus*Wgus )
+
+          if ( COOLSKIN ) then
+!
+!-----------------------------------------------------------------------
+!  Cool Skin correction.
+!-----------------------------------------------------------------------
+!
+!  Cool skin correction constants. Clam: part of Saunders constant
+!  lambda; Cwet: slope of saturation vapor.
+!
+            Clam = 16.*g*blk_Cpw*( rhoSea*blk_visw )**3/
+     &           ( blk_tcw*blk_tcw*rhoAir*rhoAir )
+!
+!  Set initial guesses for cool-skin layer thickness (Hcool).
+!
+            Hcool = 0.001
+!
+!  Backgound sensible and latent heat.
+!
+            Hsb = -rhoAir*blk_Cpa*Wstar*Tstar
+            Hlb = -rhoAir*Hlv*Wstar*Qstar
+!
+!  Mean absoption in cool-skin layer.
+!
+            Fc = .065 + 11.*Hcool-
+     &         (1.-exp(-Hcool*1250.))*6.6e-5/Hcool
+!
+!  Total cooling at the interface.
+!
+            Qcool = LRad+Hsb+Hlb-SRad*Fc
+            Qbouy = Tcff*Qcool+Scff*Hlb*blk_Cpw/Hlv
+!
+!  Compute temperature and moisture change.
+!
+            if ( ( Qcool > 0. ).and.( Qbouy > 0. ) ) then
+              lambd = 6./(1.+
+     &               (Clam*Qbouy/(Wstar+eps)**4)**.75)**r3
+              Hcool = lambd*blk_visw/(sqrt(rhoAir/rhoSea)*
+     &                              Wstar+eps)
+              delTc = Qcool*Hcool/blk_tcw
+            else
+              delTc = 0.
+            end if
+            delQc = Cwet*delTc
+          end if
+
+        end do
+!-----------------------------------------------------------------------
+!  Compute Atmosphere/Ocean fluxes.
+!-----------------------------------------------------------------------
+!
+!
+!  Compute transfer coefficients for momentum (Cd).
+!
+        Wspeed = sqrt( Wmag*Wmag + Wgus*Wgus )
+        Cd = Wstar*Wstar / ( Wspeed*Wspeed+eps)
+        Ch = Wstar*Tstar / (-Wspeed*delT+.0098*blk_ZT)
+!
+!  Compute turbulent sensible heat flux (W/m2), Hs.
+!
+        Hs = -blk_Cpa*rhoAir*Wstar*Tstar
+!
+!  Compute sensible heat flux (W/m2) due to rainfall (kg/m2/s), Hsr.
+!
+        diffw = 2.11e-5*(TairK/273.16)**1.94
+        diffh =  .02411*(1.+TairC*
+     &                    (3.309e-3 - 1.44e-6*TairC))/
+     &          (rhoAir*blk_Cpa)
+        cff = Qair*Hlv / (blk_Rgas*TairK*TairK)
+        wet_bulb = 1. / (1.+.622*(cff*Hlv*diffw)/
+     &                           (blk_Cpa*diffh))
+        Hsr = rain*wet_bulb*blk_Cpw*
+     &        ((TseaC-TairC)+(Qsea-Q)*Hlv/blk_Cpa)
+        SHeat = Hs+Hsr
+!
+!  Compute turbulent latent heat flux (W/m2), Hl.
+!
+        Hl = -Hlv*rhoAir*Wstar*Qstar
+!
+!  Compute Webb correction (Webb effect) to latent heat flux, Hlw.
+!
+        upvel = -1.61*Wstar*Qstar-
+     &          (1.+1.61*Q)*Wstar*Tstar/TairK
+        Hlw = rhoAir*Hlv*upvel*Q
+        LHeat = Hl+Hlw
+!
+!  Compute momentum flux (N/m2) due to rainfall (kg/m2/s).
+!
+        Taur = .85*rain*Wmag
+!
+!  Compute wind stress components (N/m2), Tau.
+!
+        cff  = rhoAir*Cd*Wspeed
+        Taux = (cff*Uwind + Taur*sign(1._rk,Uwind))
+        Tauy = (cff*Vwind + Taur*sign(1._rk,Vwind))
+
+!=======================================================================
+!  Compute surface net heat flux and surface wind stress.
+!=======================================================================
+!
+!  Compute kinematic, surface, net heat flux (degC m/s).  Notice that
+!  the signs of latent and sensible fluxes are reversed because fluxes
+!  calculated from the bulk formulations above are positive out of the
+!  ocean.
+!
+!  For EMINUSP option,  EVAP = LHeat (W/m2) / Hlv (J/kg) = kg/m2/s
+!                       PREC = rain = kg/m2/s
+!
+!  To convert these rates to m/s divide by freshwater density, rhow.
+!
+!  Note that when the air is undersaturated in water vapor (Q < Qsea)
+!  the model will evaporate and LHeat > 0:
+!
+!                   LHeat positive out of the ocean
+!                    evap positive out of the ocean
+!
+!  Note that if evaporating, the salt flux is positive
+!        and if     raining, the salt flux is negative
+!
+!  Note that fresh water flux is positive out of the ocean and the
+!  salt flux (stflx(isalt)) is positive into the ocean. It is converted
+!  to (psu m/s) for stflx(isalt) in "set_vbc.F" or "ice_mk.h". The E-P
+!  value is saved in variable EminusP for I/O purposes.
+!
+        cff = 1./rhow
+        lrflx = LRad*Hscale2
+        lhflx = LHeat*Hscale2 ! do not invert latent...
+        shflx = SHeat*Hscale2 ! ...and sensible heat fluxes
+        stflx =(srflx+lrflx+lhflx+shflx)
+        evap  = LHeat/Hlv
+        stflx = cff*(evap-rain)
+        EminusP = stflx
+
+      end subroutine
 !----------------------------------------------------------------------
       subroutine coare35vn( u, zu, t, zt, rh, zq, P, ts, Rs, Rl, lat
      &                     ,zi, rain, cp, sigH, hsb, hlb, Evap )
@@ -738,6 +1161,7 @@
         cpv    = cpa*( 1. + 0.84*Q )
         rhoa   =  P    *100./( Rgas*(t+tdk) * (1.+0.61*Q) ) !***
         rhodry = (P-Pv)*100./( Rgas*(t+tdk)              )
+!  Kinematic viscosity of dry air (m2/s), Andreas (1989).
         visa   = 1.326e-5*( 1.+t*(6.542e-3+t*(8.301e-6-4.84e-9*t)) ) !*** VisAir
 
 !-----------  cool skin constants  ---------------------------------------
@@ -765,6 +1189,7 @@
         dter  = 0.3
         ut    = sqrt( u**2 + ug**2 )
         u10   = ut * log(10./1.e-4) / log(zu/1.e-4)
+!        print *, u10, zu, ut
         usr   = 0.035 * u10
         zo10  = 0.011*usr**2/grav + 0.11*visa/usr
         Cd10  = ( von / log(10./zo10) )**2
@@ -776,9 +1201,10 @@
         CC    =   von * Ct/Cd
         Ribcu = -zu/(zi*.004*Beta**3)
         Ribu  = -grav*zu/ta*( (dt-dter*jcool)+.61*ta*dq )/ut**2
-        zetu  = CC*Ribu*( 1. + 3.*Ribu/CC )
         if ( Ribu < 0. ) then
-          zetu = CC*Ribu/(1+Ribu/Ribcu)
+          zetu = CC*Ribu/( 1. + Ribu/Ribcu )
+        else
+          zetu = CC*Ribu*( 1. + 3.*Ribu/CC )
         end if
         L10 = zu/zetu
         gf  = ut/u
@@ -794,14 +1220,14 @@
 !  Charnock variable
 !----------------------------------------------------------
 
-        charnC = 0.011
-        umax   = 19.
-        a1     =   .0017
-        a2     =-  .0050
-
-        charnC = a1*u10 + a2
-        if ( u10 > umax ) charnC = a1*umax+a2
-        if ( charnC < 0.011 ) charnC = 0.011
+!        charnC = 0.011
+!        umax   = 19.
+!        a1     =   .0017
+!        a2     =-  .0050
+!
+!        charnC = a1*u10 + a2
+!        if ( u10 > umax ) charnC = a1*umax+a2
+!        if ( charnC < 0.011 ) charnC = 0.011
 
         A = 0.114   ! wave-age dependent coefficients
         B = 0.622
@@ -819,6 +1245,7 @@
         elseif ( ut > 10. ) then
           charn = 0.011 + (ut-10.)/(18.-10.)*(0.018-0.011)
         end if
+        charnC = charn ! Fix?
 
         nits = 10   ! number of iterations
 
@@ -827,7 +1254,8 @@
 
         do i = 1, nits
 
-          zet = von*grav*zu/ta*(tsr+.61*ta*qsr/(1+.61*Q))/(usr**2)
+!          zet = von*grav*zu/ta*(tsr+.61*ta*qsr/(1+.61*Q))/(usr**2)
+          zet = von*grav*zu*(tsr*(1.+.61*Q))
           if (waveage) then
             if (seastate) then
               charn = charnS
@@ -839,12 +1267,18 @@
           end if
           L  = zu/zet
           zo = charn*usr**2/grav + .11*visa/usr  ! surface roughness
+!          if (zo<1.d-10) zo = 1.d-10
           rr = zo*usr/visa
           zoq= min(1.6e-4, 5.8e-5/rr**.72)       ! These thermal roughness lengths give Stanton and
           zot= zoq                               ! Dalton numbers that closely approximate COARE 3.0
           cdhf = von    /(log(zu/zo) - psiu_26(zu/L))
           cqhf = von*fdg/(log(zq/zoq)- psit_26(zq/L))
           cthf = von*fdg/(log(zt/zot)- psit_26(zt/L))
+          if (isnan(cdhf)) then
+            print *, "zo:   ", charn, usr, grav, visa
+            print *, "cdhf: ", von, zu, zo, L
+            print *, "logs: ", log(zu/zo), psiu_26(zu/L), ut
+          end if
           usr  = ut*cdhf
           qsr  =-(dq-wetc*dter*jcool)*cqhf
           tsr  =-(dt-dter*jcool)*cthf
@@ -861,11 +1295,12 @@
           dels = Rns*(0.065+11.*tkt-6.6e-5/tkt*(1.-exp(-tkt/8.0e-4)))
           qcol = qout-dels
           alq  = Al*qcol + be*hlb*cpw/Le
-          xlamx= 6.
-          tkt = min(0.01, xlamx*visw/(sqrt(rhoa/rhow)*usr))
           if ( alq > 0. ) then
             xlamx = 6./(1.+(bigc*alq/usr**4)**0.75)**0.333
             tkt   = xlamx*visw/(sqrt(rhoa/rhow)*usr)
+          else
+            xlamx= 6.
+            tkt = min(0.01, xlamx*visw/(sqrt(rhoa/rhow)*usr))
           end if
           dter = qcol*tkt/tcw
           dqer = wetc*dter
@@ -1114,8 +1549,6 @@
         real(kind=rk) dzet, f, psik, psic, x
 
         dzet = min(50., 0.35*zet)               ! stable
-        psit_26 = -( (1+0.6667*zet)**1.5
-     &          + 0.6667*(zet-14.28)*exp(-dzet) + 8.525 )
         if ( zet < 0. ) then                  ! unstable
           x = (1.-15.  *zet)**0.5
           psik = 2. *log((1+x     )/2.)
@@ -1125,6 +1558,9 @@
      &                                  + 4.*atan(1.)/sqrt(3.)
           f = zet**2/(1.+zet**2)
           psit_26 = (1-f)*psik + f*psic
+        else
+          psit_26 = -( (1+0.6667*zet)**1.5
+     &          + 0.6667*(zet-14.28)*exp(-dzet) + 8.525 )
         end if
 
       end
@@ -1150,7 +1586,6 @@
         real(kind=rk) dzet, f, psik, psic, x
 
         dzet = min(50., 0.35*zet)               ! stable
-        psiu_26 =-(a*zet+b*(zet-c/d)*exp(-dzet)+b*c/d)
         if ( zet < 0. ) then                   ! unstable
           x = (1.-15.  *zet)**0.25
           psik = 2. *log((1.+x     )/2.) + log((1.+x*x)/2.)
@@ -1161,6 +1596,8 @@
      &                                   + 4.*atan(1.)/sqrt(3.)
           f = zet**2 / ( 1+zet**2 )
           psiu_26 = (1.-f)*psik + f*psic
+        else
+          psiu_26 =-(a*zet+b*(zet-c/d)*exp(-dzet)+b*c/d)
         end if
 
       end !function psiu_26
@@ -1185,3 +1622,129 @@
         RHcalc = 100.*em/es
 
       end
+
+      function bulk_psiu(ZoL, pi)
+!
+!=======================================================================
+!                                                                      !
+!  This function evaluates the stability function for  wind speed      !
+!  by matching Kansas  and free convection forms.  The convective      !
+!  form follows Fairall et al. (1996) with profile constants from      !
+!  Grachev et al. (2000) BLM.  The  stable  form is from Beljaars      !
+!  and Holtslag (1991).                                                !
+!                                                                      !
+!=======================================================================
+!
+        implicit none
+
+        include 'realkind'
+
+        real(rk) bulk_psiu
+!
+!  Imported variable declarations.
+!
+        real(rk), intent(in) :: ZoL, pi
+!
+!  Local variable declarations.
+!
+        real(rk), parameter :: r3 = 1./3.
+
+        real(rk) :: Fw, cff, psic, psik, x, y
+!
+!-----------------------------------------------------------------------
+!  Compute stability function, PSI.
+!-----------------------------------------------------------------------
+!
+!  Unstable conditions.
+!
+        if ( ZoL < 0. ) then
+          x = (1.-15.*ZoL)**.25
+          psik = 2.*log(.5*(1.+x))+
+     &              log(.5*(1.+x*x))-
+     &           2.*atan(x)+.5*pi
+!
+!  For very unstable conditions, use free-convection (Fairall).
+!
+          cff = sqrt(3.)
+          y = (1.-10.15*ZoL)**r3
+          psic = 1.5*log(r3*(1.+y+y*y))-
+     &       cff*atan((1.+2.*y)/cff)+pi/cff
+!
+!  Match Kansas and free-convection forms with weighting Fw.
+!
+          cff = ZoL*ZoL
+          Fw  = cff/(1.+cff)
+          bulk_psiu=(1.-Fw)*psik+Fw*psic
+!
+!  Stable conditions.
+!
+        else
+          cff = min( 50., .35*ZoL )
+          bulk_psiu = -((1.+ZoL)+.6667*(ZoL-14.28)/
+     &            exp(cff)+8.525)
+        end if
+        return
+      end !function bulk_psiu
+
+      function bulk_psit (ZoL, pi)
+!
+!=======================================================================
+!                                                                      !
+!  This function evaluates the  stability function  for moisture and   !
+!  heat by matching Kansas and free convection forms. The convective   !
+!  form follows Fairall et al. (1996) with  profile  constants  from   !
+!  Grachev et al. (2000) BLM.  The stable form is from  Beljaars and   !
+!  and Holtslag (1991).                                                !
+!
+!=======================================================================
+!                                                                      !
+!
+        implicit none
+
+        include 'realkind'
+
+        real(rk) bulk_psit
+!
+!  Imported variable declarations.
+!
+        real(rk), intent(in) :: ZoL, pi
+!
+!  Local variable declarations.
+!
+        real(rk), parameter :: r3 = 1./3.
+
+        real(rk) :: Fw, cff, psic, psik, x, y
+!
+!-----------------------------------------------------------------------
+!  Compute stability function, PSI.
+!-----------------------------------------------------------------------
+!
+!  Unstable conditions.
+!
+        if ( ZoL < 0. ) then
+          x = (1.-15.*ZoL)**.5
+          psik = 2.*log(.5*(1.+x))
+!
+!  For very unstable conditions, use free-convection (Fairall).
+!
+          cff = sqrt(3.)
+          y = (1.-34.15*ZoL)**r3
+          psic = 1.5*log(r3*(1.+y+y*y))-
+     &       cff*atan((1.+2.*y)/cff)+pi/cff
+!
+!  Match Kansas and free-convection forms with weighting Fw.
+!
+          cff = ZoL*ZoL
+          Fw  = cff/(1.+cff)
+          bulk_psit = (1.-Fw)*psik+Fw*psic
+!
+!  Stable conditions.
+!
+        else
+          cff = min( 50., .35*ZoL )
+          bulk_psit = -((1.+2.*ZoL)**1.5+
+     &            0.6667*(ZoL-14.28)/EXP(cff)+8.525)
+        end if
+
+        return
+      end !function bulk_psit
