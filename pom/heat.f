@@ -705,6 +705,7 @@
         g  = 9.81
         pi = 4.*atan(1.)
         r3 = 1./3.
+        rhow   = 1000.
         rhoref = 1025.
         stefbo = 5.67e-8
         vonKar = .4
