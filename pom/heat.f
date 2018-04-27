@@ -265,7 +265,7 @@
             call coare30( (unow-usurf(i,j)),(vnow-vsurf(i,j)),
      &                      10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
      &                      pnow,sst_model,rho,cld,precip*1000.,sol_net,
-     &                      QH, QE, Evap )
+     &                     -QBW, QH, QE, Evap )
 
           else
 ! Calculate turbulent exchange coefficients according to Kondo scheme
@@ -660,14 +660,15 @@
       end
 
       subroutine coare30( uw, vw, blk_ZW, Tair, blk_ZT, Hair, blk_ZQ
-     &   , Pair, Tsea, Rsea, cloud, rain, srflx, shflx, lhflx, evap )
+     &                  , Pair, Tsea, Rsea, cloud, rain, srflx, LRad
+     &                  , shflx, lhflx, evap )
 
         implicit none
 
         include 'realkind'
 
         real(kind=rk), intent(in) :: uw, vw, Pair, Tair, Hair, Tsea
-     &                             , Rsea, cloud, rain
+     &                             , LRad, Rsea, cloud, rain
         real(kind=rk) srflx, lrflx, evap
 
         real(kind=rk) Bf, blk_beta, blk_Cpa, blk_Cpw, blk_dter
@@ -677,14 +678,14 @@
      &              , delQc, delT, delTc, delW, diffh, diffw, e_sat
      &              , EminusP, emmiss, eps, Fc, g, Hcool, Hl, Hlb, Hlv
      &              , Hlw, Hs, Hsb, Hscale, Hscale2, Hsr, L, L10, lambd
-     &              , LHeat, lhflx, LRad, PairM, pi, Q, Qair, Qbouy
-     &              , Qcool, Qpsi, Qsea, Qstar, r3, RH, rhoAir
-     &              , rhoref, rhoSea, rhow, Ri, Ribcu, Rr, scff, SHeat
-     &              , shflx, SRad, StefBo, stflx, TairC, TairK, Taur
-     &              , Taux, Tauy, Tcff, Tpsi, TseaC, TseaK, Tstar
-     &              , twopi_inv, u10, upvel, Uwind, vap_p, VisAir
-     &              , vonKar, Vwind, wet_bulb, Wgus, Wmag, Wpsi, Wspeed
-     &              , Wstar, Zetu, Zo10, ZoL, ZoQ, ZoT, ZoT10, ZoW
+     &              , LHeat, lhflx, PairM, pi, Q, Qair, Qbouy, Qcool
+     &              , Qpsi, Qsea, Qstar, r3, RH, rhoAir, rhoref, rhoSea
+     &              , rhow, Ri, Ribcu, Rr, scff, SHeat, shflx, SRad
+     &              , StefBo, stflx, TairC, TairK, Taur, Taux, Tauy
+     &              , Tcff, Tpsi, TseaC, TseaK, Tstar, twopi_inv, u10
+     &              , upvel, Uwind, vap_p, VisAir, vonKar, Vwind
+     &              , wet_bulb, Wgus, Wmag, Wpsi, Wspeed, Wstar
+     &              , Zetu, Zo10, ZoL, ZoQ, ZoT, ZoT10, ZoW
         real(kind=rk), external :: bulk_psiu, bulk_psit
         integer Iter
 
@@ -724,7 +725,7 @@
         TairK = TairC + 273.16
         TseaC = Tsea
         TseaK = TseaC + 273.16
-        rhoSea= Rsea*rhoref + 1000.
+        rhoSea= Rsea !*rhoref + 1000.
         RH    = Hair/100. ! Convert to fraction
         SRad  = srflx*Hscale
         Tcff  = 2.1e-5*( TseaC+3.2 )**0.79
@@ -756,10 +757,10 @@
 
         cff2  = TairK*TairK*TairK
         cff1  = cff2*TairK
-        LRad  =-emmiss*StefBo*
-     &              (cff1*( .39 - .05*sqrt(vap_p))*
-     &                    (1.   - .6823*cloud*cloud)+
-     &               cff2*4.*(TseaK-TairK))
+!        LRad  =-emmiss*StefBo*
+!     &              (cff1*( .39 - .05*sqrt(vap_p))*
+!     &                    (1.   - .6823*cloud*cloud)+
+!     &               cff2*4.*(TseaK-TairK))
 !-----------------------------------------------------------------------
 !  Compute specific humidities (kg/kg).
 !
@@ -1069,14 +1070,14 @@
 !
         cff = 1./rhow
         lrflx = LRad*Hscale2
-        lhflx = LHeat*Hscale2 ! do not invert latent...
-        shflx = SHeat*Hscale2 ! ...and sensible heat fluxes
+        lhflx = LHeat !*Hscale2 ! do not invert latent...
+        shflx = SHeat !*Hscale2 ! ...and sensible heat fluxes and convert them to [var*m/s] as well
         stflx =(srflx+lrflx+lhflx+shflx)
         evap  = LHeat/Hlv
         stflx = cff*(evap-rain)
         EminusP = stflx
 
-      end subroutine
+      end ! subroutine
 !----------------------------------------------------------------------
       subroutine coare35vn( u, zu, t, zt, rh, zq, P, ts, Rs, Rl, lat
      &                     ,zi, rain, cp, sigH, hsb, hlb, Evap )
