@@ -281,22 +281,22 @@
 
           if ( use_coare ) then
 
-!            call coare35vn( (SP-sqrt(usrf**2+vsrf**2)),
-!     &                      10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
-!     &                      pnow,sst_model,sol_net,QBWd,alat(i,j),
-!     &                      600._rk, (3.6e6*precip), 0._rk, 0._rk,
-!     &                      QH, QE, Evap )
-!            Evap = Evap*rho/3.6e6
+            call coare35vn( (SP-sqrt(usrf**2+vsrf**2)),
+     &                      10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
+     &                      pnow,sst_model,sol_net,QBWd,alat(i,j),
+     &                      600._rk, (3.6e6*precip), 0._rk, 0._rk,
+     &                      QH, QE, Evap )
+            Evap = Evap*rho/3.6e6
 !            if (i==50.and.j==50) then
 !            print *, "3.5 EVAP: ", Evap
 !            print *, "3.5 QE:   ", QE
 !            print *, "3.5 QH:   ", QH
 !            print *, "3.5 QBWd: ", QBWd
 !            end if
-            call coare30((unow-usurf(i,j)),(vnow-vsurf(i,j)),
-     &                    10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
-     &                    pnow,sst_model,rnow,cld,precip*1000.,sol_net,
-     &                   -QBW, QH, QE, Evap )
+!            call coare30((unow-usurf(i,j)),(vnow-vsurf(i,j)),
+!     &                    10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
+!     &                    pnow,sst_model,rnow,cld,precip*1000.,sol_net,
+!     &                   -QBW, QH, QE, Evap )
 !            if (i==50.and.j==50) then
 !            print *, "3.0 EVAP: ", Evap
 !            print *, "3.0 QE:   ", QE
@@ -1180,38 +1180,37 @@
         waveage = .false.
         seastate = .false.
 
-! convert rh to specific humidity
-        Qs = qsat26sea(ts,P)/1000.          ! surface water specific humidity (g/kg)
-        call qsat26air(t,P,rh, Q, Pv)       ! specific humidity of air (g/kg)
+! convert rh to specific humidity (the functions below return g/kg)
+        Qs = qsat26sea(ts,P)/1000.          ! surface water specific humidity [g/kg]
+        call qsat26air(t,P,rh, Q, Pv)       ! specific humidity of air [kg/kg]
         Q = Q/1000.
 
 !-----------  set constants ----------------------------------------------
         zref = 10.
-        Beta =  1.2
-        von  =   .4
+        Beta =  1.2                         ! Given as 1.25 in Fairall et al.(1996)
+        von  =   .4                         ! Von Karman's "number"
         fdg  = 1.                           ! Turbulent Prandtl number
         tdk  = 273.16
         grav = grv(lat)
 
 !-----------  air constants ----------------------------------------------
-        Rgas   = 287.1
-        Le     = ( 2.501 - .00237*ts )*1.e6 ! Latent Heat of vaporization (J/kg) !***
-        cpa    = 1004.67
-        cpv    = cpa*( 1. + 0.84*Q )
-        rhoa   =  P    *100./( Rgas*(t+tdk) * (1.+0.61*Q) ) !***
+        Rgas   = 287.1                      ! Gas const. dry air [J/kg/K]
+        Le     = ( 2.501 - .00237*ts )*1.e6 ! Latent Heat of vaporization [J/kg]
+        cpa    = 1004.67                    ! Specific heat of dry air [J/kg/K] (Businger 1982)
+        cpv    = cpa*( 1. + 0.84*Q )        ! Moist air - currently not used (Businger 1982)
+        rhoa   =  P    *100./( Rgas*(t+tdk) * (1.+0.61*Q) ) ! Moist air density [kg/m^3]
         rhodry = (P-Pv)*100./( Rgas*(t+tdk)              )
-!  Kinematic viscosity of dry air (m2/s), Andreas (1989).
-        visa   = 1.326e-5*( 1.+t*(6.542e-3+t*(8.301e-6-4.84e-9*t)) ) !*** VisAir
+        visa   = 1.326e-5*( 1.+t*(6.542e-3+t*(8.301e-6-4.84e-9*t)) ) !  Kinematic viscosity of dry air [m2/s], Andreas (1989).
 
 !-----------  cool skin constants  ---------------------------------------
-        Al   = 2.1e-5*( ts+3.2 )**0.79
-        be   =  .026
-        cpw  = 4000.
-        rhow = 1022.
-        visw = 1.e-6
-        tcw  =  .6
+        Al   = 2.1e-5*( ts+3.2 )**0.79      ! Water thermal expansion coef.
+        be   =  .026                        ! Salinity expansion coef.
+        cpw  = 4000.                        ! Specific heat of water [J/kg/K]
+        rhow = 1025.                        ! Seawater density
+        visw = 1.e-6                        ! Kinematic viscosity of water [m^2/s]
+        tcw  =  .6                          ! Thermal conductivity of water [W/m/K]
         bigc = 16.*grav*cpw*(rhow*visw)**3 / (tcw**2 * rhoa**2)
-        wetc =  .622*Le*Qs / ( Rgas*(ts+tdk)**2 )
+        wetc =  .622*Le*Qs / ( Rgas*(ts+tdk)**2 ) !correction for dq;slope of sat. vap.
 
 !-----------  net radiation fluxes ---------------------------------------
         Rns =  .945 * Rs                    ! albedo correction
@@ -1228,7 +1227,6 @@
         dter  = 0.3
         ut    = sqrt( u**2 + ug**2 )
         u10   = ut * log(10./1.e-4) / log(zu/1.e-4)
-!        print *, u10, zu, ut
         usr   = 0.035 * u10
         zo10  = 0.011*usr**2/grav + 0.11*visa/usr
         Cd10  = ( von / log(10./zo10) )**2
@@ -1245,7 +1243,7 @@
         else
           zetu = CC*Ribu*( 1. + 3.*Ribu/CC )
         end if
-        L10 = zu/zetu
+        L10 = zu/zetu                         ! Monin-Obukhov length
         gf  = ut/u
         usr = ut*von / ( log(zu/zo10) - psiu_40(zu/L10) )
         tsr = -(dt-     dter*jcool)*von*fdg
@@ -1284,7 +1282,7 @@
         elseif ( ut > 10. ) then
           charn = 0.011 + (ut-10.)/(18.-10.)*(0.018-0.011)
         end if
-        charnC = charn ! Fix?
+!        charnC = charn ! Fix?
 
         nits = 10   ! number of iterations
 
@@ -1355,15 +1353,15 @@
         end do
 
 !----------------  compute fluxes  --------------------------------------------
-        tau = rhoa*usr*usr/gf       ! wind stress
-        hsb =-rhoa*cpa*usr*tsr      ! sensible heat flux
-        hlb =-rhoa*Le*usr*qsr       ! latent heat flux
+        tau = rhoa*usr*usr/gf       ! wind stress [N/m^2]
+        hsb =-rhoa*cpa*usr*tsr      ! sensible heat flux [W/m^2]
+        hlb =-rhoa*Le*usr*qsr       ! latent heat flux [W/m^2]
         hbb =-rhoa*cpa*usr*tvsr     ! buoyancy flux
         hsbb=-rhoa*cpa*usr*tssr     ! sonic heat flux
         wbar=1.61*hlb/Le/(1.+1.61*Q)/rhoa + hsb/rhoa/cpa/ta
         hlwebb = rhoa*wbar*Q*Le
         Evap   = 1000.*hlwebb/Le/1000.*3600.    !mm/hour
-        hlb = hlb + hlwebb
+        hlb = hlb + hlwebb ! ?????? Webb correction to latent heat flux already in ef via zoq/rr function so return hlwebb
 
 !-----  compute transfer coeffs relative to ut @ meas. ht  --------------------
         Cd = tau/rhoa/ut/max(.1,u)
@@ -1415,7 +1413,7 @@
         dqs_dt = Q*Le/(Rgas*(t+tdk)**2)  ! Clausius-Clapeyron
         alfac= 1./(1.+0.622*(dqs_dt*Le*dwat)/(cpa*dtmp))  ! wet bulb factor
         RF = rain*alfac*cpw*
-     &      ((ts-t-dter*jcool)+(Qs-Q-dqer*jcool)*Le/cpa) !/3600.
+     &      ((ts-t-dter*jcool)+(Qs-Q-dqer*jcool)*Le/cpa)/3600.
         hsb = hsb+RF
 
         lapse = grav/cpa
