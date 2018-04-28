@@ -1,9 +1,10 @@
 !
 !
-      subroutine bulk(im,jm,tbias,fsm,tsurf,alon,alat,iyr,imo,iday,
-     $    ihour,imin,wusurf,wvsurf,wtsurf,swrad,pme,
-     $                                    uair,vair,usurf,vsurf,
-     $                                    tair,rhum,rain,cloud,pres)
+      subroutine bulk(im,jm,tbias, fsm, tsurf, alon,alat
+     &               ,iyr,imo,iday,ihour,imin
+     &               ,wusurf,wvsurf,wtsurf,swrad,pme
+     &               ,uair,vair,usurf,vsurf,rsea
+     &               ,tair,rhum,rain,cloud,pres)
 !*******************************************************************************
 ! THIS SUBROUTINE PROVIDES SURFACE BOUNDARY CONDITIONS FOR MOMENTUM,
 ! HEAT AND SALT EQUATIONS SOLVED BY THE HYDRODYNAMIC MODEL IN CASES WHEN
@@ -91,14 +92,14 @@
       real(kind=rk), dimension(im, jm) ::
      $ fsm(im,jm),pme(im,jm),swrad(im,jm),wusurf(im,jm),
      $ wvsurf(im,jm),wtsurf(im,jm),tsurf(im,jm),alon(im,jm),
-     $ alat(im,jm),usurf(im,jm),vsurf(im,jm)
+     $ alat(im,jm),usurf(im,jm),vsurf(im,jm),rsea(im,jm)
 
       real(kind=rk), dimension(im, jm) ::
      $  uair(im,jm),vair(im,jm),tair(im,jm),rhum(im,jm),
      $  rain(im,jm),cloud(im,jm),pres(im,jm)
 
       real(kind=rk) unow, vnow, tnow, pnow, precip, cld
-     &   , sst_model, QBW
+     &   , sst_model, QBW, QBWd
 
       real(kind=rk), external :: cd, heatlat, esk
 
@@ -108,9 +109,10 @@
      &            , ea12, emiss, esatair, esatoce, evap
      &            , fe, fh
      &            , Qe, Qh, Qu
-     &            , rhnow, rho, rhom
+     &            , rhnow, rho, rhom, rnow
      &            , sigma, sol_net, sp, ss, sstk, stp
      &            , taux, tauy, tnowk
+     &            , usrf, vsrf
      &            , wair, wflux, wsatair, wsatoce
 !
 !--------------------------------------------------------------------
@@ -119,7 +121,7 @@
 !
 ! --- Sea water density
 
-      data rho/1023./
+      data rho/1025./
 
 ! --- Sea water density times the specific heat of seawater
 
@@ -155,6 +157,7 @@
             vnow      = vair(i,j)
             tnow      = tair(i,j)+ckelv
             pnow      = pres(i,j)
+            rnow      = rsea(i,j)*rho + 1000.
 !            e         = rhum(i,j)*pnow / ( 0.378*rhum(i,j) + 0.622 )
 !            es        = 6.112 *
 !     &           exp( (( 17.67*tair(i,j) )/( tair(i,j) + 243.25 )) )
@@ -165,6 +168,18 @@
             precip    = rain(i,j)/1000. ! rwnd: precipitation rate from kg/(m2*s) to m/s
             cld       = cloud(i,j)/100. ! rwnd: total cloud cover from % to tenths
             sst_model = tsurf(i,j)+tbias
+
+            if (i<im) then
+              usrf = .5*(usurf(i+1,j)+usurf(i,j))
+            else
+              usrf = .5*(usurf(i-1,j)+usurf(i,j))
+            end if
+
+            if (j<jm) then
+              vsrf = .5*(vsurf(i,j+1)+vsurf(i,j))
+            else
+              vsrf = .5*(vsurf(i,j-1)+vsurf(i,j))
+            end if
 
 ! SST_MODEL IS THE MODEL'S TEMPERATURE (in deg Celsius) AT THE TOP LEVEL
 !
@@ -218,24 +233,34 @@
                 QBW = 0.98*sigma*sstk**4 - sigma*tnowk**4
      $                 *(0.653+0.00535*ea12)
      $                 *(1.+0.1762*cld*cld)
+                QBWd= 0.98*sigma*sstk**4 - sigma*tnowk**4
+     $                 *(0.653+0.00535*ea12)
 
               case ( lwMAY )
                 QBW = (1.-0.75*(cld**3.4))
      $             * (sigma*(tnowk**4.)*(0.4 -0.05*sqrt(ea12))
+     $           + 4.*sigma*(tnowk**3.)*(sstk-tnowk))
+                QBWd=(sigma*(tnowk**4.)*(0.4 -0.05*sqrt(ea12))
      $           + 4.*sigma*(tnowk**3.)*(sstk-tnowk))
 
               case ( lwHERZFELD )
                 QBW = (sigma*0.96*(1-(0.92e-5*tnowk*tnowk))*tnowk**4 +
      $             4*sigma*0.96*(ckelv+tair(i,j)**3)*(sstk-tnowk)) *
      $              (1-.75*cos(alat(i,j)*3.14/180.)*cld) ! cos(phi) here is an improvised `beta` coefficient as a function of latitude from Herzfeld
+                QBWd= (sigma*0.96*(1-(0.92e-5*tnowk*tnowk))*tnowk**4 +
+     $             4*sigma*0.96*(ckelv+tair(i,j)**3)*(sstk-tnowk))
 
               case default  ! lwBERLIAND - Berliand (1952)
                 QBW = 0.97*sigma*
      &               (     tnowk**4 * (.39-.05*sqrt(ea12))
      &                *(1.-.6823*cld*cld)
      &                + 4.*tnowk**3 * (sstk-tnowk))
+                QBWd= 0.97*sigma*
+     &               (     tnowk**4 * (.39-.05*sqrt(ea12))
+     &                + 4.*tnowk**3 * (sstk-tnowk))
 
             end select
+            QBWd = QBWd - QBW
 
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -256,16 +281,28 @@
 
           if ( use_coare ) then
 
-!            call coare35vn( (SP-sqrt(usurf(i,j)**2+vsurf(i,j)**2)),
+!            call coare35vn( (SP-sqrt(usrf**2+vsrf**2)),
 !     &                      10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
-!     &                      pnow,sst_model,sol_net,370._rk,alat(i,j),
+!     &                      pnow,sst_model,sol_net,QBWd,alat(i,j),
 !     &                      600._rk, (3.6e6*precip), 0._rk, 0._rk,
 !     &                      QH, QE, Evap )
 !            Evap = Evap*rho/3.6e6
-            call coare30( (unow-usurf(i,j)),(vnow-vsurf(i,j)),
-     &                      10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
-     &                      pnow,sst_model,rho,cld,precip*1000.,sol_net,
-     &                     -QBW, QH, QE, Evap )
+!            if (i==50.and.j==50) then
+!            print *, "3.5 EVAP: ", Evap
+!            print *, "3.5 QE:   ", QE
+!            print *, "3.5 QH:   ", QH
+!            print *, "3.5 QBWd: ", QBWd
+!            end if
+            call coare30((unow-usurf(i,j)),(vnow-vsurf(i,j)),
+     &                    10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
+     &                    pnow,sst_model,rnow,cld,precip*1000.,sol_net,
+     &                   -QBW, QH, QE, Evap )
+!            if (i==50.and.j==50) then
+!            print *, "3.0 EVAP: ", Evap
+!            print *, "3.0 QE:   ", QE
+!            print *, "3.0 QH:   ", QH
+!            print *, "RAIN===   ", precip
+!            end if
 
           else
 ! Calculate turbulent exchange coefficients according to Kondo scheme
@@ -690,7 +727,7 @@
         integer Iter
 
         integer, parameter :: IterMax = 3
-        logical, parameter :: COOLSKIN = .true.
+        logical, parameter :: COOLSKIN = .false.
 
         blk_Beta =   1.2
         blk_cpa  =1004.67
@@ -700,16 +737,16 @@
         blk_tcw  =    .6
         blk_visw =   1.e-6
         blk_Zabl = 600.
-        Cp = 3983.212682927
-        emmiss = .97
+        Cp       =3983.212682927
+        emmiss   =    .97
+        g        =   9.81
+        rhow     =1000.
+        rhoref   =1025.
+        stefbo   =   5.67e-8
+        vonKar   =    .4
         eps = 1.e-20
-        g  = 9.81
-        pi = 4.*atan(1.)
-        r3 = 1./3.
-        rhow   = 1000.
-        rhoref = 1025.
-        stefbo = 5.67e-8
-        vonKar = .4
+        pi  = 4.*atan(1.)
+        r3  = 1./3.
 !
 !  Compute Atmosphere-ocean fluxes using a bulk flux parameterization.
 !
@@ -855,7 +892,7 @@
         Ch10  = .00115
         Ct10  = Ch10/sqrt(Cd10)
         ZoT10 = 10. / exp( vonKar/Ct10 )
-        Cd    = ( vonKar / log( blk_ZW/Zo10) )**2
+        Cd    = ( vonKar / log( blk_ZW/Zo10 ) )**2
 !
 !  Compute Richardson number.
 !
@@ -1108,7 +1145,7 @@
 
         include 'realkind'
 
-        integer*1, parameter :: jcool = 1
+        integer*1, parameter :: jcool = 0
 
         real(kind=rk), external :: grv, psit_26, psiu_26
      &                           , psiu_40, qsat26sea, RHcalc
@@ -1326,6 +1363,7 @@
         wbar=1.61*hlb/Le/(1.+1.61*Q)/rhoa + hsb/rhoa/cpa/ta
         hlwebb = rhoa*wbar*Q*Le
         Evap   = 1000.*hlwebb/Le/1000.*3600.    !mm/hour
+        hlb = hlb + hlwebb
 
 !-----  compute transfer coeffs relative to ut @ meas. ht  --------------------
         Cd = tau/rhoa/ut/max(.1,u)
@@ -1377,7 +1415,8 @@
         dqs_dt = Q*Le/(Rgas*(t+tdk)**2)  ! Clausius-Clapeyron
         alfac= 1./(1.+0.622*(dqs_dt*Le*dwat)/(cpa*dtmp))  ! wet bulb factor
         RF = rain*alfac*cpw*
-     &      ((ts-t-dter*jcool)+(Qs-Q-dqer*jcool)*Le/cpa)/3600.
+     &      ((ts-t-dter*jcool)+(Qs-Q-dqer*jcool)*Le/cpa) !/3600.
+        hsb = hsb+RF
 
         lapse = grav/cpa
         SST   = ts-dter*jcool

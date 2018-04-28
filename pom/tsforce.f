@@ -495,7 +495,7 @@
      $              d_in%year,d_in%month,d_in%day,
      $              d_in%hour,d_in%min,
      $              wusurf,wvsurf,wtsurf,swrad,emp,
-     $              uwnd,vwnd,u(:,:,1),v(:,:,1),
+     $              uwnd,vwnd,u(:,:,1),v(:,:,1),rho(:,:,1),
      $              tair,shum,rain,cloud,pres)
         wssurf = emp*(sb(:,:,1)+sbias)
 ! Relax to skin TS... Skin salinity is just climatology
