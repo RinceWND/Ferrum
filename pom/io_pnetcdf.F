@@ -2699,78 +2699,89 @@
 !_______________________________________________________________________
 
 !_______________________________________________________________________
-      subroutine read_heat_pnetcdf( hfl, swr, air, emp, filename, n )
-! read wind stress
-      implicit none
-# include "mpif.h"
-# include "pnetcdf.inc"
-      include 'pom.h'
-      integer get_var_real_2d
-      integer n
-      real(kind=rk), dimension(im,jm) :: hfl, swr, air, emp
-!      character :: filename*15, netcdf_wind_file*23
-      character(len=11) filename
-      character(len=24) netcdf_heat_file
-      integer ncid,status
-      integer hfl_varid, swr_varid, air_varid, emp_varid
-      integer(mpi_offset_kind) start(4),edge(4)
+      subroutine read_heat_pnetcdf( sh, lh, sr, lr, dlr, filename, n )
+! read heat fluxes
+        use mpi
+        use pnetcdf
 
-      start = 1
-      edge  = 1
+        implicit none
 
+        include 'pom.h'
+        include 'io.h'
 
-! open netcdf wind file
-      netcdf_heat_file="in/heat/"//trim(filename)
-!*    write(netcdf_wind_file,'("in/"//windf//"/",a )')
-!     write(netcdf_wind_file,'("in/"//trim(windf)//"/",a )')
-!!    write(netcdf_wind_file,'("in/"trim(windf)"/",a )')
-!*   $                         trim(filename)
-!!    write(netcdf_wind_file,'(''in/gfsw/'',a )') trim(filename)
-      if(my_task.eq.0) write(*,'(/''reading heat '',a,'' @ '',i4)')
+        integer get_var_real_2d
+        real(rk), dimension(im,jm), intent(out) :: sh, lh, sr, lr, dlr
+        character(len=*), intent(in) :: filename
+        integer, intent (in) :: n
+
+        character(len=64) netcdf_heat_file
+        integer ncid,status
+        integer sh_varid, lh_varid, sr_varid, lr_varid, dlr_varid
+        integer(mpi_offset_kind) start(4),edge(4)
+
+        start = 1
+        edge  = 1
+
+! open netcdf file
+        netcdf_heat_file = trim(flux_path)//trim(filename)//".nc"
+
+        if(my_task.eq.0) write(*,'(/''reading heat '',a,'' @ '',i4)')
      $                                    trim(netcdf_heat_file),n
-      status=nfmpi_open(pom_comm,netcdf_heat_file,nf_nowrite,
+        status=nfmpi_open(pom_comm,netcdf_heat_file,nf_nowrite,
      $                  mpi_info_null,ncid)
-      call handle_error_pnetcdf('nfmpi_open: '//netcdf_heat_file,
+        call handle_error_pnetcdf('nfmpi_open: '//netcdf_heat_file,
      $                          status,nf_noerr)
 
 ! get variables
-      status=nfmpi_inq_varid(ncid,'swrad',swr_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: swrad'
-     $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'uhtfl',hfl_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: uhtfl'
-     $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'tempa',air_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: tempa'
-     $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'evmpr',emp_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: evmpr'
-     $                          ,status,nf_noerr)
+        status=nfmpi_inq_varid(ncid,sht_name,sh_varid)
+        call handle_error_pnetcdf(
+     &         'nfmpi_inq_varid: '//trim(sht_name),status,nf_noerr)
+        status=nfmpi_inq_varid(ncid,lht_name,lh_varid)
+        call handle_error_pnetcdf(
+     &         'nfmpi_inq_varid: '//trim(lht_name),status,nf_noerr)
+        status=nfmpi_inq_varid(ncid,swr_name,sr_varid)
+        call handle_error_pnetcdf(
+     &         'nfmpi_inq_varid: '//trim(swr_name),status,nf_noerr)
+        status=nfmpi_inq_varid(ncid,lwr_name,lr_varid)
+        call handle_error_pnetcdf(
+     &         'nfmpi_inq_varid: '//trim(lwr_name),status,nf_noerr)
+        status=nfmpi_inq_varid(ncid,dlwr_name,dlr_varid)
+        call handle_error_pnetcdf(
+     &        'nfmpi_inq_varid: '//trim(dlwr_name),status,nf_noerr)
 ! get data
-      start(1)=i_global(1)
-      start(2)=j_global(1)
-      start(3)=n
-      edge(1)=im
-      edge(2)=jm
-      edge(3)=1
+        start(1) = i_global(1)
+        start(2) = j_global(1)
+        start(3) = n
+        edge(1) = im
+        edge(2) = jm
+        edge(3) = 1
 
-      status = get_var_real_2d(ncid,swr_varid,start,edge,swr)
-      call handle_error_pnetcdf('get_var_real: swrad',status,nf_noerr)
+        status = get_var_real_2d(ncid,sh_varid,start,edge,sh)
+        call handle_error_pnetcdf(
+     &               'get_var_real: '//trim(sht_name),status,nf_noerr)
 
-      status = get_var_real_2d(ncid,hfl_varid,start,edge,hfl)
-      call handle_error_pnetcdf('get_var_real: uhtfl',status,nf_noerr)
+        status = get_var_real_2d(ncid,lh_varid,start,edge,lh)
+        call handle_error_pnetcdf(
+     &               'get_var_real: '//trim(lht_name),status,nf_noerr)
 
-      status = get_var_real_2d(ncid,air_varid,start,edge,air)
-      call handle_error_pnetcdf('get_var_real: tempa',status,nf_noerr)
+        status = get_var_real_2d(ncid,sr_varid,start,edge,sr)
+        call handle_error_pnetcdf(
+     &               'get_var_real: '//trim(swr_name),status,nf_noerr)
 
-      status = get_var_real_2d(ncid,emp_varid,start,edge,emp)
-      call handle_error_pnetcdf('get_var_real: evmpr',status,nf_noerr)
+        status = get_var_real_2d(ncid,lr_varid,start,edge,lr)
+        call handle_error_pnetcdf(
+     &               'get_var_real: '//trim(lwr_name),status,nf_noerr)
+
+        status = get_var_real_2d(ncid,dlr_varid,start,edge,dlr)
+        call handle_error_pnetcdf(
+     &              'get_var_real: '//trim(dlwr_name),status,nf_noerr)
 
 ! close file
-      status=nfmpi_close(ncid)
-      call handle_error_pnetcdf('nf_close',status,nf_noerr)
+        status=nfmpi_close(ncid)
+        call handle_error_pnetcdf('nf_close',status,nf_noerr)
 
-      return
+        return
+
       end
 !_______________________________________________________________________
       subroutine read_heat_aux_pnetcdf( shm, prt, cld, filename, n )
@@ -5305,6 +5316,8 @@
           where (var==mv) var = 0.
         end if
 
-        var = var*fk+ok
+        if (fk/=1. .and. ok/=0.) then
+          var = var*fk+ok
+        end if
 
       end function
