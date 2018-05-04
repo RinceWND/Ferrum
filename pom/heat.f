@@ -4,7 +4,7 @@
      &               ,iyr,imo,iday,ihour,imin
      &               ,wusurf,wvsurf,wtsurf,swrad,pme
      &               ,uair,vair,usurf,vsurf,rsea
-     &               ,tair,rhum,rain,cloud,pres)
+     &               ,tair,rhum,rain,cloud,pres,my_task)
 !*******************************************************************************
 ! THIS SUBROUTINE PROVIDES SURFACE BOUNDARY CONDITIONS FOR MOMENTUM,
 ! HEAT AND SALT EQUATIONS SOLVED BY THE HYDRODYNAMIC MODEL IN CASES WHEN
@@ -88,6 +88,8 @@
      &            lwHERZFELD = 2,
      &            lwBERLIAND = 3 )
       logical, parameter :: use_coare = .true.
+
+      integer, intent(in) :: my_task
 
       real(kind=rk), dimension(im, jm) ::
      $ fsm(im,jm),pme(im,jm),swrad(im,jm),wusurf(im,jm),
@@ -287,16 +289,15 @@
      &                      600._rk, (3.6e6*precip), 0._rk, 0._rk,
      &                      QH, QE, Evap )
             Evap = Evap*rho/3.6e6
-!            if (i==50.and.j==50) then
-!            print *, "3.5 EVAP: ", Evap
-!            print *, "3.5 QE:   ", QE
-!            print *, "3.5 QH:   ", QH
-!            print *, "3.5 QBWd: ", QBWd
-!            end if
 !            call coare30((unow-usurf(i,j)),(vnow-vsurf(i,j)),
 !     &                    10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
 !     &                    pnow,sst_model,rnow,cld,precip*1000.,sol_net,
 !     &                   -QBW, QH, QE, Evap )
+            if (my_task==1.and.i==50.and.j==50) then
+!            print *, "3.5 EVAP: ", Evap
+            write(61, '(5(f12.7,x),f12.7)') QE,QH,QBW,sol_net,
+     &                                   (qbw+qh+qe-sol_net),QBWd
+            end if
 !            if (i==50.and.j==50) then
 !            print *, "3.0 EVAP: ", Evap
 !            print *, "3.0 QE:   ", QE
@@ -432,7 +433,7 @@
 
       end
 !
-      function HEATLAT(t)
+      pure function HEATLAT(t)
 !
 ! --- calculates the Latent Heat of Vaporization ( J/kg ) as function of
 ! --- the temperature ( Celsius degrees )
@@ -448,7 +449,7 @@
         real(kind=rk) heatlat
         real(kind=rk), intent(in)  :: t
 
-        heatlat = 2.5008d+6 -2.3d+3*t
+        heatlat = 2.5008e+6_rk - 2.3e+3_rk * t
 
         return
       end
@@ -1329,7 +1330,7 @@
           hsb=-rhoa*cpa*usr*tsr
           hlb=-rhoa*Le*usr*qsr
           qout = Rnl+hsb+hlb
-          dels = Rns*(0.065+11.*tkt-6.6e-5/tkt*(1.-exp(-tkt/8.0e-4)))
+          dels = Rns*(0.065+11.*tkt-6.6e-5/tkt*(1.-exp(-tkt/8.0e-4))) ! 1./0.0008 = 1250.
           qcol = qout-dels
           alq  = Al*qcol + be*hlb*cpw/Le
           if ( alq > 0. ) then
@@ -1361,12 +1362,12 @@
         wbar=1.61*hlb/Le/(1.+1.61*Q)/rhoa + hsb/rhoa/cpa/ta
         hlwebb = rhoa*wbar*Q*Le
         Evap   = 1000.*hlwebb/Le/1000.*3600.    !mm/hour
-        hlb = hlb + hlwebb ! ?????? Webb correction to latent heat flux already in ef via zoq/rr function so return hlwebb
+        hlb = hlb - hlwebb ! ?????? Webb correction to latent heat flux already in ef via zoq/rr function so return hlwebb
 
 !-----  compute transfer coeffs relative to ut @ meas. ht  --------------------
         Cd = tau/rhoa/ut/max(.1,u)
         Ch =-usr*tsr/ut/(dt-dter*jcool)
-        Ce =-usr*qsr/(dq-dqer*jcool)/ut
+        Ce =-usr*qsr/ut/(dq-dqer*jcool)
 
 !---  compute 10-m neutral coeff relative to ut (output if needed) ------------
         Cdn_10 = 1000.*von**2     / log(10./zo)**2

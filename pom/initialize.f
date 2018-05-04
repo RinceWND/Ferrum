@@ -161,6 +161,7 @@
 
       implicit none
       include 'pom.h'
+      include 'io.h'
       namelist/pom_nml/ title,netcdf_file,mode,nadv,nitera,sw,npg,dte, !fhx:Toni:npg
      $                  isplit,time_start,nread_rst,read_rst_file
      $                 ,write_rst,write_rst_file,days,prtd1,prtd2
@@ -181,6 +182,14 @@
       logical spinup
       namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
       namelist/misc_nml/ spinup, t_lo, t_hi
+      namelist/input_files_nml/
+     &  grid_path, bc_path, clim_path, mean_path
+     &, bulk_path, flux_path
+      namelist/input_vars_nml/
+     &  dlwr_name, lht_name, lwr_name, prat_name, pres_name
+     &, rhum_name, sht_name, sst_name, swr_name, tair_name
+     &, tcld_name, umf_name, uwnd_name, vmf_name, vwnd_name
+     &, wgst_name
 
 ! Input of filenames and constants
 
@@ -293,6 +302,12 @@
       read(73,nml=switch_nml)
       read(73,nml=misc_nml)
       read(73,nml=sensitivity_nml)
+      close(73)
+
+! read main switches
+      open(73,file='io.nml',status='old')
+      read(73,nml=input_files_nml)
+      read(73,nml=input_vars_nml)
       close(73)
 
 ! End of input of constants

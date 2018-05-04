@@ -10,7 +10,7 @@
 
       include 'pom.h'
 
-      logical, parameter :: calc_bulk = .true.
+      logical, parameter :: calc_bulk = .false.
      $                    , calc_bulk_ncep = .true.
 !     days in month
       integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,
@@ -36,6 +36,8 @@
      &    ,uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd, vwnd
      &    ,tskin_a, tskin_b, tskin, sskin
      &    ,emp, swr, uht
+     &    ,sh_a,sh_b, lh_a,lh_b, sr_a,sr_b, lr_a,lr_b
+     &    ,dlr_a,dlr_b
 
       real(kind=rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
@@ -161,17 +163,33 @@
       d_tmp%year = d_in%year
       n = int((d_in-d_tmp)/86400.*4.)+1
 
-      write( infile_b, '( a3,".",i4.4,".nc" )' )
+      if ( calc_bulk ) then
+
+        write( infile_b, '( a3,".",i4.4,".nc" )' )
      $        "hfl", d_in%year
 
-      inquire(file='in/heat/'//trim(infile_b),
+        inquire(file='in/heat/'//trim(infile_b),
      $           exist=lexist)
 
-      if(lexist) then
-        if (calc_bulk_ncep) then
+        if(lexist) then
           call read_ncep_bulk_pnetcdf(pres_a,tair_a,shum_a,rain_a
      $                   ,cloud_a,uwnd_a,vwnd_a,tskin_a,infile_b,n)
+        else
+          if ( my_task == master_task ) then
+            print *, "[!] Missing surface bulk data file `"
+     &             , trim(infile_b), "`"
+          end if
         end if
+
+      else
+
+        write( infile_b, '( i4.4 )' ) d_in%year
+
+        call read_heat_pnetcdf(sh_a,lh_a,sr_a,lr_a,dlr_a,infile_b,n)
+
+        print *, my_task, maxval(sh_a),maxval(lh_a)
+     &          ,maxval(sr_a),maxval(lr_a),maxval(dlr_a)
+
       end if
 
       n = n+1
@@ -482,26 +500,21 @@
 !      call write_sflx(datestr, tair,shum,rain,tskin,pres,cloud )
       if (calc_bulk) then
 
-        if (.not.calc_bulk_ncep) then
-          if (d_in%month /= mb) then
-            mb = (d_in%year-1979)*12+d_in%month
-            infile_b = "hfl.aux.mon.nc"
-            call read_heat_aux_pnetcdf(shum,rain,cloud,infile_b,mb)
-          end if
-        end if
         uwnd = ( 1.0 - bb ) * uwnd_a + bb * uwnd_b
         vwnd = ( 1.0 - bb ) * vwnd_a + bb * vwnd_b
+
         call bulk(im,jm,tbias,fsm,t(:,:,1),east_e,north_e,
      $              d_in%year,d_in%month,d_in%day,
      $              d_in%hour,d_in%min,
      $              wusurf,wvsurf,wtsurf,swrad,emp,
      $              uwnd,vwnd,u(:,:,1),v(:,:,1),rho(:,:,1),
-     $              tair,shum,rain,cloud,pres)
+     $              tair,shum,rain,cloud,pres,my_task)
+
         wssurf = emp*(sb(:,:,1)+sbias)
 ! Relax to skin TS... Skin salinity is just climatology
         wtsurf = wtsurf
      &           + c1 * ( tb(:,:,1) - tskin(:,:) )
-     &                / max(h(:,:)*z(1), 1.)    !rwnd: (linear) prevention of overheating a thick layer
+     &                / min(-h(:,:)*zz(1), 1.)    !rwnd: (linear) prevention of overheating a thick layer
         wtsurf = (1.-ice)*wtsurf - ice*2.13*(-4.-t(:,:,1))/hi/4.1876d6
         wssurf = wssurf
      $           + c1 * ( sb(:,:,1) - sskin(:,:) )
@@ -509,8 +522,8 @@
 !          write(*,*) my_task, "SW:", minval(swrad),maxval(swrad)
 !          write(*,*) my_task, "MP:", minval(emp),maxval(emp)
       else
-          do j=1,jm
-             do i=1,im
+        do j=1,jm
+          do i=1,im
 
                 sstrelx = 1.
                 sssrelx = 1.
