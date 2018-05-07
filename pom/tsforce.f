@@ -10,22 +10,25 @@
 
       include 'pom.h'
 
-      logical, parameter :: calc_bulk = .false.
-     $                    , calc_bulk_ncep = .true.
+      real(rk), external :: heatlat
+
+      logical, parameter :: calc_bulk     = .false.
+     &                    , read_bulk     = .true.
+     &                    , relax_surface = .true.
 !     days in month
       integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,
      $                          31, 31, 30, 31, 30, 31/)
 
 !     coefficients for relaxation
 !     c1 = 1/30 [m/day]
-      real(kind=rk), parameter :: c1 = 3.858024691e-7
+      real(rk), parameter :: c1 = 3.858024691e-7
 !     c1 = 1 [m/day] !lyo:20110202:
 !      real(kind=rk), parameter :: c1 = 1.157407407e-5 !lyo:pac10:exp001->007;exp302:
-      real(kind=rk) :: sstrelx, sssrelx
+      real(rk) :: sstrelx, sssrelx
 
 
 !     buffers for tsurf, ssurf etc
-      real(kind=rk), dimension( im_local, jm_local ) ::
+      real(rk), dimension( im_local, jm_local ) ::
      &     el_a, el_b
      &    ,cloud_a, cloud_b, cloud
      &    ,rain_a, rain_b, rain
@@ -36,10 +39,11 @@
      &    ,uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd, vwnd
      &    ,tskin_a, tskin_b, tskin, sskin
      &    ,emp, swr, uht
-     &    ,sh_a,sh_b, lh_a,lh_b, sr_a,sr_b, lr_a,lr_b
-     &    ,dlr_a,dlr_b
+     &    ,sh,sh_a,sh_b, lh,lh_a,lh_b
+     &    ,sr,sr_a,sr_b, lr,lr_a,lr_b
+     &    ,dlr,dlr_a,dlr_b
 
-      real(kind=rk), dimension( im_local, jm_local, kb ) ::
+      real(rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
      $     tm_a, sm_a, tm_b, sm_b,
      $     tmean, smean
@@ -50,9 +54,10 @@
       integer :: mon_a, mon_b, sec_in_month, mid_in_month
       integer :: i, j, k, nb, mb, db
       character(len=14) :: infile_b
-      real(kind=rk) :: aa, bb
-      real(kind=rk) days_in_year
+      real(rk) aa, bb
+      real(rk) days_in_year
 
+      real(rk), parameter :: rho_fw = 1000.
 
       contains
 
@@ -163,7 +168,7 @@
       d_tmp%year = d_in%year
       n = int((d_in-d_tmp)/86400.*4.)+1
 
-      if ( calc_bulk ) then
+      if ( read_bulk ) then
 
         write( infile_b, '( a3,".",i4.4,".nc" )' )
      $        "hfl", d_in%year
@@ -181,14 +186,13 @@
           end if
         end if
 
-      else
+      end if
+
+      if ( .not.calc_bulk ) then
 
         write( infile_b, '( i4.4 )' ) d_in%year
 
         call read_heat_pnetcdf(sh_a,lh_a,sr_a,lr_a,dlr_a,infile_b,n)
-
-        print *, my_task, maxval(sh_a),maxval(lh_a)
-     &          ,maxval(sr_a),maxval(lr_a),maxval(dlr_a)
 
       end if
 
@@ -198,17 +202,26 @@
         d_tmp%year = d_tmp%year+1
       end if
 
-      write( infile_b, '( a3,".",i4.4,".nc" )' )
+      if ( read_bulk ) then
+        write( infile_b, '( a3,".",i4.4,".nc" )' )
      $        "hfl", d_tmp%year
 
-      inquire(file='in/heat/'//trim(infile_b),
+        inquire(file='in/heat/'//trim(infile_b),
      $           exist=lexist)
 
-      if(lexist) then
-        if (calc_bulk_ncep) then
+        if (lexist) then
           call read_ncep_bulk_pnetcdf(pres_b,tair_b,shum_b,rain_b
      $                   ,cloud_b,uwnd_b,vwnd_b,tskin_b,infile_b,n)
         end if
+
+      end if
+
+      if ( .not.calc_bulk ) then
+
+        write( infile_b, '( i4.4 )' ) d_in%year
+
+        call read_heat_pnetcdf(sh_b,lh_b,sr_b,lr_b,dlr_b,infile_b,n)
+
       end if
 
       nb = n
@@ -446,59 +459,74 @@
         d_tmp%year = d_tmp%year+1
       end if
 
-      if (n/=nb) then
+      if ( n/=nb ) then
+
         nb = n
-        tair_a = tair_b
-        pres_a = pres_b
-        shum_a = shum_b
-        rain_a = rain_b
-        cloud_a= cloud_b
-        tskin_a= tskin_b
-        uwnd_a = uwnd_b
-        vwnd_a = vwnd_b
-        write( infile_b, '( a3,".",i4.4,".nc" )' )
+
+        if ( read_bulk ) then
+
+          tair_a = tair_b
+          pres_a = pres_b
+          shum_a = shum_b
+          rain_a = rain_b
+          cloud_a= cloud_b
+          tskin_a= tskin_b
+          uwnd_a = uwnd_b
+          vwnd_a = vwnd_b
+
+          write( infile_b, '( a3,".",i4.4,".nc" )' )
      $        "hfl", d_tmp%year
 
-        inquire(file='in/heat/'//trim(infile_b),
+          inquire(file='in/heat/'//trim(infile_b),
      $           exist=lexist)
 
-        swrad  = 0.
-        if(lexist) then
-          if (calc_bulk_ncep) then
+          swrad  = 0.
+          if(lexist) then
             call read_ncep_bulk_pnetcdf(pres_b,tair_b,shum_b,rain_b
      $                     ,cloud_b,uwnd_b,vwnd_b,tskin_b,infile_b,n)
           else
-            call read_heat_pnetcdf(
-     $                  uht,swr,tair,emp,infile_b,n)
-!     $                 wtsurf(1:im,1:jm),swrad(1:im,1:jm),infile_b,n)
-!          swrad(1:im,1:jm)  = swr
-!          swrad  = -swrad/(rhoref*3986.)
-          end if
-        else
-          if ( my_task == master_task ) then
-            write(*,'(/2a)')
+            if ( my_task == master_task ) then
+              write(*,'(/2a)')
      $      "missing heat data at wind_main : "
      $              , trim(infile_b)
+            endif
           endif
-        endif
+
+        end if
+
+        if ( .not.calc_bulk ) then
+
+          sh_a = sh_b
+          lh_a = lh_b
+          sr_a = sr_b
+          lr_a = lr_b
+          dlr_a= dlr_b
+
+          write( infile_b, '( i4.4 )' ) d_in%year
+
+          call read_heat_pnetcdf(sh_b,lh_b,sr_b,lr_b,dlr_b,infile_b,n)
+
+        end if
 
       end if
-
-      tair  = (1.-bb)*tair_a + bb*tair_b
-      tskin = (1.-bb)*tskin_a + bb*tskin_b
-      sskin = (1.-bb)*sc_a(:,:,1) + bb*sc_b(:,:,1)
-      pres  = (1.-bb)*pres_a + bb*pres_b
-      shum  = (1.-bb)*shum_a + bb*shum_b
-      rain  = (1.-bb)*rain_a + bb*rain_b
-      cloud = (1.-bb)*cloud_a + bb*cloud_b
 
 ! Simplified version of inverse barometer:
 !   IB(mm) = -9.948 * ( ΔRdry(mbars) – 1013.3 )
 ! In POM it should be inversed in sign (it seems)
       e_atmos = 0.01 * ( pres - 1013. )
+
+      tskin = (1.-bb)*tskin_a + bb*tskin_b
+      sskin = (1.-bb)*sc_a(:,:,1) + bb*sc_b(:,:,1)
+
 !      datestr = "dbg."//date2str(d_in)
 !      call write_sflx(datestr, tair,shum,rain,tskin,pres,cloud )
-      if (calc_bulk) then
+      if ( calc_bulk ) then
+
+        tair  = (1.-bb)*tair_a + bb*tair_b
+        pres  = (1.-bb)*pres_a + bb*pres_b
+        shum  = (1.-bb)*shum_a + bb*shum_b
+        rain  = (1.-bb)*rain_a + bb*rain_b
+        cloud = (1.-bb)*cloud_a + bb*cloud_b
 
         uwnd = ( 1.0 - bb ) * uwnd_a + bb * uwnd_b
         vwnd = ( 1.0 - bb ) * vwnd_a + bb * vwnd_b
@@ -512,36 +540,54 @@
 
         wssurf = emp*(sb(:,:,1)+sbias)
 ! Relax to skin TS... Skin salinity is just climatology
-        wtsurf = wtsurf
+        if ( relax_surface ) then
+          wtsurf = wtsurf
      &           + c1 * ( tb(:,:,1) - tskin(:,:) )
-     &                / min(-h(:,:)*zz(1), 1.)    !rwnd: (linear) prevention of overheating a thick layer
-        wtsurf = (1.-ice)*wtsurf - ice*2.13*(-4.-t(:,:,1))/hi/4.1876d6
-        wssurf = wssurf
+     &                / max(-h(:,:)*zz(1), 1.)    !rwnd: (linear) prevention of overheating a thick layer
+          wssurf = wssurf
      $           + c1 * ( sb(:,:,1) - sskin(:,:) )
+        end if
+        wtsurf = (1.-ice)*wtsurf - ice*2.13*(-4.-t(:,:,1))/hi/4.1876d6
 !          write(*,*) my_task, "WT:", minval(wtsurf),maxval(wtsurf)
 !          write(*,*) my_task, "SW:", minval(swrad),maxval(swrad)
 !          write(*,*) my_task, "MP:", minval(emp),maxval(emp)
       else
+
+        sh = (1.-bb)*sh_a + bb*sh_b
+        lh = (1.-bb)*lh_a + bb*lh_b
+        sr = (1.-bb)*sr_a + bb*sr_b
+        lr = (1.-bb)*lr_a + bb*lr_b
+        dlr= (1.-bb)*dlr_a+ bb*dlr_b
+
         do j=1,jm
           do i=1,im
 
-                sstrelx = 1.
-                sssrelx = 1.
+            sstrelx = 1.
+            sssrelx = 1.
 !lyo:20110202:
 !           sssrelx = ( 1.0d0 + tanh( 0.002d0 * (h(i,j)-1000.d0)))*0.5d0
 !           sssrelx = ( 1.0d0 + tanh(0.0005d0 * (h(i,j)-2500.d0)))*0.5d0
 
-                wtsurf( i, j ) = sf_hf *
-     $           ( uht(i,j)/3986.+emp(i,j)*(tair(i,j)-t(i,j,1)) )
-     $           /rhoref
-                wssurf( i, j ) = -emp(i,j)*(s(i,j,1)+sbias)
-                wtsurf( i, j ) = wtsurf(i,j)
-     $           + c1 * sstrelx * ( tb( i, j, 1 ) - tsurf( i, j ) )
-                wssurf( i, j ) = wssurf(i,j)
-     $           + c1 * sssrelx * ( sb( i, j, 1 ) - ssurf( i, j ) )
+            swrad( i, j ) = sr( i, j )/3986./rhoref
+            if ( read_bulk ) then
+              emp( i , j ) = lh(i,j)/heatlat(t(i,j,1))/rhoref
+     &                      -rain(i,j)/rho_fw
+            end if
+            wtsurf( i, j ) = ( lr(i,j)+sh(i,j)+lh(i,j) )
+     &                       /3986./rhoref
+     &             + emp(i,j)*(tair(i,j)-t(i,j,1))   ! Not needed, since it already is included in latent heat flux, right?
+            wtsurf( i, j ) = sf_hf*wtsurf( i, j )
+            wssurf( i, j ) = -emp( i, j ) * ( s( i, j, 1 )+sbias )
 
-             enddo
-          enddo
+            if ( relax_surface ) then
+              wtsurf(i,j) = wtsurf(i,j)
+     &           + c1 * sstrelx * ( tb( i, j, 1 ) - tsurf( i, j ) )
+              wssurf(i,j) = wssurf(i,j)
+     &           + c1 * sssrelx * ( sb( i, j, 1 ) - ssurf( i, j ) )
+            end if
+
+          end do
+        end do
 
       end if
 
