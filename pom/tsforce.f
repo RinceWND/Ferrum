@@ -510,22 +510,24 @@
 
       end if
 
+      tskin = (1.-bb)*tskin_a + bb*tskin_b
+      sskin = (1.-bb)*sc_a(:,:,1) + bb*sc_b(:,:,1)
+
+      if ( read_bulk ) then
+        pres  = (1.-bb)*pres_a + bb*pres_b
+        rain  = (1.-bb)*rain_a + bb*rain_b
+      end if
 ! Simplified version of inverse barometer:
 !   IB(mm) = -9.948 * ( ΔRdry(mbars) – 1013.3 )
 ! In POM it should be inversed in sign (it seems)
       e_atmos = 0.01 * ( pres - 1013. )
-
-      tskin = (1.-bb)*tskin_a + bb*tskin_b
-      sskin = (1.-bb)*sc_a(:,:,1) + bb*sc_b(:,:,1)
 
 !      datestr = "dbg."//date2str(d_in)
 !      call write_sflx(datestr, tair,shum,rain,tskin,pres,cloud )
       if ( calc_bulk ) then
 
         tair  = (1.-bb)*tair_a + bb*tair_b
-        pres  = (1.-bb)*pres_a + bb*pres_b
         shum  = (1.-bb)*shum_a + bb*shum_b
-        rain  = (1.-bb)*rain_a + bb*rain_b
         cloud = (1.-bb)*cloud_a + bb*cloud_b
 
         uwnd = ( 1.0 - bb ) * uwnd_a + bb * uwnd_b
@@ -581,9 +583,9 @@
 
             if ( relax_surface ) then
               wtsurf(i,j) = wtsurf(i,j)
-     &           + c1 * sstrelx * ( tb( i, j, 1 ) - tsurf( i, j ) )
+     &           + c1 * sstrelx * ( tb( i, j, 1 ) - tskin( i, j ) )
               wssurf(i,j) = wssurf(i,j)
-     &           + c1 * sssrelx * ( sb( i, j, 1 ) - ssurf( i, j ) )
+     &           + c1 * sssrelx * ( sb( i, j, 1 ) - sskin( i, j ) )
             end if
 
           end do
