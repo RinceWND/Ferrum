@@ -2784,6 +2784,70 @@
 
       end
 !_______________________________________________________________________
+      subroutine read_surf_corr_pnetcdf( dtemp, dsalt, filename, n )
+! read heat fluxes
+        use mpi
+        use pnetcdf
+
+        implicit none
+
+        include 'pom.h'
+        include 'io.h'
+
+        integer get_var_real_2d
+        real(rk), dimension(im,jm), intent(out) :: dtemp, dsalt
+        character(len=*), intent(in) :: filename
+        integer, intent (in) :: n
+
+        character(len=64) netcdf_tmp_file
+        integer ncid,status
+        integer dtemp_varid, dsalt_varid
+        integer(mpi_offset_kind) start(4),edge(4)
+
+        start = 1
+        edge  = 1
+
+! open netcdf file
+        netcdf_tmp_file = 'in/'//trim(filename)
+
+        if(my_task.eq.0) write(*,'(/''reading heat '',a,'' @ '',i4)')
+     $                                    trim(netcdf_tmp_file),n
+        status=nfmpi_open(pom_comm,netcdf_tmp_file,nf_nowrite,
+     $                  mpi_info_null,ncid)
+        call handle_error_pnetcdf('nfmpi_open: '//netcdf_tmp_file,
+     $                          status,nf_noerr)
+
+! get variables
+        status=nfmpi_inq_varid(ncid,"dt",dtemp_varid)
+        call handle_error_pnetcdf(
+     &         'nfmpi_inq_varid: dtemp',status,nf_noerr)
+        status=nfmpi_inq_varid(ncid,"ds",dsalt_varid)
+        call handle_error_pnetcdf(
+     &         'nfmpi_inq_varid: dsalt',status,nf_noerr)
+! get data
+        start(1) = i_global(1)
+        start(2) = j_global(1)
+        start(3) = n
+        edge(1) = im
+        edge(2) = jm
+        edge(3) = 1
+
+        status = get_var_real_2d(ncid,dtemp_varid,start,edge,dtemp)
+        call handle_error_pnetcdf(
+     &               'get_var_real: dtemp',status,nf_noerr)
+
+        status = get_var_real_2d(ncid,dsalt_varid,start,edge,dsalt)
+        call handle_error_pnetcdf(
+     &               'get_var_real: dsalt',status,nf_noerr)
+
+! close file
+        status=nfmpi_close(ncid)
+        call handle_error_pnetcdf('nf_close',status,nf_noerr)
+
+        return
+
+      end
+!_______________________________________________________________________
       subroutine read_heat_aux_pnetcdf( shm, prt, cld, filename, n )
 ! read wind stress
       implicit none

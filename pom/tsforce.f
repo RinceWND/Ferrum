@@ -12,9 +12,10 @@
 
       real(rk), external :: heatlat
 
-      logical, parameter :: calc_bulk     = .false.
+      logical, parameter :: calc_bulk     = .true.
      &                    , read_bulk     = .true.
      &                    , relax_surface = .true.
+     &                    , corr_surface  = .true.
 !     days in month
       integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,
      $                          31, 31, 30, 31, 30, 31/)
@@ -42,6 +43,7 @@
      &    ,sh,sh_a,sh_b, lh,lh_a,lh_b
      &    ,sr,sr_a,sr_b, lr,lr_a,lr_b
      &    ,dlr,dlr_a,dlr_b
+     &    ,dtemp,dt_a,dt_b, dsalt,ds_a,ds_b
 
       real(rk), dimension( im_local, jm_local, kb ) ::
      $     tc_a, sc_a, tc_b, sc_b,
@@ -86,6 +88,8 @@
       db = 0
       pres_a = 1013.
       pres_b = 1013.
+      dtemp = 0.
+      dsalt = 0.
 
 !     Read backward and forward TS climatology in initial state
 
@@ -134,6 +138,10 @@
          call read_tsclim_monthly_pnetcdf
      $        ( tm_b, sm_b, tc_b, sc_b, el_b, "ts_clim.nc", mon_b )
 
+      if ( corr_surface ) then
+        call read_surf_corr_pnetcdf( dt_a, ds_a, "dt.nc", mon_a )
+        call read_surf_corr_pnetcdf( dt_b, ds_b, "dt.nc", mon_b )
+      end if
 !      call read_mean_ts_z_pnetcdf(tm_b, sm_b, 44, int(days_in_year))
 
 !         call read_tsclim_monthly_pnetcdf_obs
@@ -309,6 +317,10 @@
          tc_a = tc_b
          sc_a = sc_b
          el_a = el_b
+         if ( corr_surface ) then
+           dt_a = dt_b
+           ds_a = ds_b
+         end if
 !         uw_a = uw_b
 !         vw_a = vw_b
 
@@ -318,6 +330,9 @@
 !         write( infile_b, '( "tsclimib",i2.2,".nc" )' ) mon_b
          call read_tsclim_monthly_pnetcdf
      $        ( tm_b, sm_b, tc_b, sc_b, el_b, "ts_clim.nc", mon_b )
+         if ( corr_surface ) then
+           call read_surf_corr_pnetcdf( dt_b, ds_b, "dt.nc", mon_b)
+         end if
 !         call read_tsclim_monthly_pnetcdf_obs
 !     $        ( rm_b, tc_b, sc_b, "ts_clim_old.nc", mon_b )
 !         call read_wind_monthly_pnetcdf
@@ -342,12 +357,16 @@
 
 !     time interpolation.
 
-      tclim = ( 1.0 - aa ) * tc_a + aa * tc_b
-      sclim = ( 1.0 - aa ) * sc_a + aa * sc_b
-      eln   = ( 1.0 - aa ) * el_a(:,jm) + aa * el_b(:,jm)
-      ele   = ( 1.0 - aa ) * el_a(im,:) + aa * el_b(im,:)
-      els   = ( 1.0 - aa ) * el_a(:, 1) + aa * el_b(:, 1)
-      elw   = ( 1.0 - aa ) * el_a( 1,:) + aa * el_b( 1,:)
+      tclim = ( 1. - aa ) * tc_a       + aa * tc_b
+      sclim = ( 1. - aa ) * sc_a       + aa * sc_b
+      eln   = ( 1. - aa ) * el_a(:,jm) + aa * el_b(:,jm)
+      ele   = ( 1. - aa ) * el_a(im,:) + aa * el_b(im,:)
+      els   = ( 1. - aa ) * el_a(:, 1) + aa * el_b(:, 1)
+      elw   = ( 1. - aa ) * el_a( 1,:) + aa * el_b( 1,:)
+      if ( corr_surface ) then
+        dtemp=( 1. - aa ) * dt_a       + aa * dt_b
+        dsalt=( 1. - aa ) * ds_a       + aa * ds_b
+      end if
       bb = aa
 !      bb = days_in_year - int( days_in_year )
       tmean = ( 1.0 - bb ) * tm_a + bb * tm_b
@@ -356,8 +375,8 @@
 !      wusurf = ( 1.0 - aa ) * uw_a + aa * uw_b
 !      wvsurf = ( 1.0 - aa ) * vw_a + aa * vw_b
 
-      tsurf = t(:,:,1) !( 1.0 - aa ) * tsurf_a + aa * tsurf_b
-      ssurf = s(:,:,1) !( 1.0 - aa ) * ssurf_a + aa * ssurf_b
+      tsurf = t(:,:,1)+dtemp !( 1.0 - aa ) * tsurf_a + aa * tsurf_b
+      ssurf = s(:,:,1)+dsalt !( 1.0 - aa ) * ssurf_a + aa * ssurf_b
 
 
 !     calculation of rmean.
@@ -533,7 +552,7 @@
         uwnd = ( 1.0 - bb ) * uwnd_a + bb * uwnd_b
         vwnd = ( 1.0 - bb ) * vwnd_a + bb * vwnd_b
 
-        call bulk(im,jm,tbias,fsm,t(:,:,1),east_e,north_e,
+        call bulk(im,jm,tbias,fsm,tsurf,east_e,north_e,
      $              d_in%year,d_in%month,d_in%day,
      $              d_in%hour,d_in%min,
      $              wusurf,wvsurf,wtsurf,swrad,emp,
@@ -544,8 +563,8 @@
 ! Relax to skin TS... Skin salinity is just climatology
         if ( relax_surface ) then
           wtsurf = wtsurf
-     &           + c1 * ( tb(:,:,1) - tskin(:,:) )
-     &                / max(-h(:,:)*zz(1), 1.)    !rwnd: (linear) prevention of overheating a thick layer
+     &           + c1 * ( tb(:,:,1) - tskin(:,:) - dtemp )
+!     &                / max(-h(:,:)*zz(1), 1.)    !rwnd: (linear) prevention of overheating a thick layer
           wssurf = wssurf
      $           + c1 * ( sb(:,:,1) - sskin(:,:) )
         end if

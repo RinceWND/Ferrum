@@ -840,7 +840,7 @@
 !
 !  Compute specific humidity, Q (kg/kg).
 !
-        cff = cff*RH                                 !Vapor pres (mb)
+        cff = cff*RH                            !Vapor pres (mb)
         Q   = .62197*( cff / (PairM-.378*cff) ) !Spec hum (kg/kg)
 !
 !  Compute water saturation vapor pressure (mb), using Teten formula.
@@ -906,7 +906,7 @@
      &                          .61*TairK*delQ)/
      &          (TairK*delW*delW)
         if ( Ri < 0. ) then
-          Zetu = CC*Ri / ( 1. + Ri/Ribcu )       ! Unstable
+          Zetu = CC*Ri / ( 1. + Ri/Ribcu )   ! Unstable
         else
           Zetu = CC*Ri / ( 1. + 3.*Ri/CC )   ! Stable
         end if
