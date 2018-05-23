@@ -498,6 +498,8 @@
         call advq(q2lb,q2l,vf,a,c)
         call profq(a,c,tps,dtef)
 
+        where(q2l.lt..5*small) q2l = .5*small
+        where(q2lb.lt..5*small) q2lb = .5*small
         call bcond(6)
 
 
@@ -523,7 +525,7 @@
 
 
 ! calculate tf and sf using uf, vf, a and c as temporary variables
-        if(mode.ne.4) then
+        if( mode /= 4 .and. iint > 2 ) then
           if(nadv.eq.1) then
 !            call advt1(tb,t,tclim,uf,a,c)
 !            call advt1(sb,s,sclim,vf,a,c)
