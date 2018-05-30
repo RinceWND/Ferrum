@@ -66,53 +66,28 @@
 
       if ( calc_wind ) then
 
-         sec_in_day = d_in%hour*3600 + d_in%min*60 + d_in%sec
+        sec_in_day = d_in%hour*3600 + d_in%min*60 + d_in%sec
 
-!!*      write( infile, '( //trim(windf)//"_",i4.4,2i2.2,".nc" )' )
-!!*  $        d_in%year, d_in%month, d_in%day
-!         write( infile, '( a4,"_",i4.4,2i2.2,".nc" )' )
-!     $        windf, d_in%year, d_in%month, d_in%day
-         if (calc_mflx) then
-           write( infile, '( a3,".",i4.4,".nc" )' )
-     $        "hfl", d_in%year
-         else
-           write( infile, '( a3,".",i4.4,".nc" )' )
-     $        "mfl", d_in%year
-         end if
-!!       write( infile, '( "gfsw_",i4.4,2i2.2,".nc" )' )   ! fhx:read gfsw wind
-!!    $        d_in%year, d_in%month, d_in%day
+        write( infile, '( i4.4,".nc" )' ) d_in%year
 
-! fhx: check wind data exists,is ~exist, set wind to be 0.10/26/2010  
-         inquire(file='in/'//trim(windf)//'/'//trim(infile),
-     $           exist=lexist)   
-!!       inquire(file='in/gfsw/'//trim(infile),exist=lexist)   
+        d_off      = str2date("1979-01-01 00:00:00")
+        d_off%year = d_in%year
+        n = int((d_in-d_off)/86400.)*4 + 1
 
-         if(lexist) then
-           d_off = str2date("1979-01-01 00:00:00")
-           d_off%year = d_in%year
-           n = int((d_in-d_off)/86400.)*4+1
+        if ( calc_mflx ) then
 
-           if (calc_mflx) then
-             call read_wind_pnetcdfc
+          call read_wind_pnetcdfc
      &         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
-           else
-             call read_mflx_pnetcdf
+
+        else
+
+          call read_mflx_pnetcdf
      $         ( uwnd_buf_coarse, vwnd_buf_coarse, trim(infile), n )
-           end if
 
-           uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
-           vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
+        end if
 
-         else
-             if ( my_task == master_task ) then
-                  write(*,'(/2a)') 
-     $              "missing wind data at wind_init : "
-     $              , trim(infile)
-             endif
-             uwnd_buf_coarse = 0.
-             vwnd_buf_coarse = 0.         
-            
-         endif
+        uwnd_buf_coarse = sf_wi*uwnd_buf_coarse
+        vwnd_buf_coarse = sf_wi*vwnd_buf_coarse
 
 ! interpolation
       if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.  

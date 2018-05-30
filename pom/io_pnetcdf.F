@@ -2610,34 +2610,52 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
+      include 'io.h'
+
       integer get_var_real_3d,k
       integer, parameter :: wind_npd = 4
       real(kind=rk) uwnd_out(im_coarse,jm_coarse,wind_npd)
       real(kind=rk) vwnd_out(im_coarse,jm_coarse,wind_npd)
 !      character :: filename*15, netcdf_wind_file*23
-      character(len=11) filename
-      character(len=24) netcdf_wind_file
+      character(len=*)   filename
+      character(len=256) netcdf_read_file
       integer ncid,status,n
       integer uwnd_varid,vwnd_varid
       integer(mpi_offset_kind) start(4),edge(4)
+      logical lexist
 
       start = 1
       edge  = 1
 
 ! open netcdf wind file
-      netcdf_wind_file="in/"//windf//"/"//trim(filename)
-      if(my_task.eq.0) write(*,'(/''reading wind '',a,'' @ '',i4)')
-     $                                    trim(netcdf_wind_file),n
-      status=nfmpi_open(pom_comm_coarse,netcdf_wind_file,nf_nowrite,
-     $                  mpi_info_null,ncid)
-      call handle_error_pnetcdf('nfmpi_open: '//netcdf_wind_file,
+      netcdf_read_file = trim(bulk_path)//trim(filename)
+
+      inquire( file=netcdf_read_file, exist=lexist )
+
+      if ( .not.lexist ) then
+
+        if ( my_task == master_task ) then
+          print *, "[!] Missing wind data file at `"
+     &             , trim(netcdf_read_file), "`"
+        end if
+        return
+
+      end if
+
+      if ( my_task == master_task ) then
+        write( *,'(/''reading wind '',a,'' @ '',i4)' )
+     &                                    trim(netcdf_read_file), n
+      end if
+      status = nfmpi_open( pom_comm_coarse, netcdf_read_file
+     &                   , nf_nowrite, mpi_info_null, ncid )
+      call handle_error_pnetcdf('nfmpi_open: '//netcdf_read_file,
      $                          status,nf_noerr)
 
 ! get variables
-      status=nfmpi_inq_varid(ncid,'uwnd',uwnd_varid)
+      status = nfmpi_inq_varid( ncid, trim(uwnd_name), uwnd_varid )
       call handle_error_pnetcdf('nfmpi_inq_varid: uwnd'
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'vwnd',vwnd_varid)
+      status = nfmpi_inq_varid( ncid, trim(vwnd_name), vwnd_varid )
       call handle_error_pnetcdf('nfmpi_inq_varid: vwnd'
      $                          ,status,nf_noerr)
 
@@ -2650,10 +2668,12 @@
       edge(3)=wind_npd
 
       status = get_var_real_3d(ncid,uwnd_varid,start,edge,uwnd_out)
-      call handle_error_pnetcdf('get_var_real: uwnd',status,nf_noerr)
+      call handle_error_pnetcdf('get_var_real: '//trim(uwnd_name)
+     &                         ,status,nf_noerr)
 
       status = get_var_real_3d(ncid,vwnd_varid,start,edge,vwnd_out)
-      call handle_error_pnetcdf('get_var_real: vwnd',status,nf_noerr)
+      call handle_error_pnetcdf('get_var_real: '//trim(vwnd_name)
+     &                         ,status,nf_noerr)
 
 !      do k=1,wind_npd
 !        uwnd_out(2:imm1,2:jmm1,k) = uwnd_out(2:imm1,2:jmm1,k)*.25
@@ -2921,28 +2941,46 @@
 # include "mpif.h"
 # include "pnetcdf.inc"
       include 'pom.h'
+      include 'io.h'
+
       integer get_var_real_2d
       integer n
       real(kind=rk), dimension(im,jm) :: pres, tair, rhum, rain, cloud
      $                                  ,uwnd, vwnd, tskn
-      character(len=14) filename
-      character(len=24) netcdf_heat_aux_file
+      character(len=*)  filename
+      character(len=256) netcdf_read_file
       integer ncid,status
       integer pres_varid, tair_varid, rhum_varid, rain_varid
      $       ,cloud_varid, uwnd_varid, vwnd_varid, tskn_varid
       integer(mpi_offset_kind) start(4),edge(4)
+      logical lexist
 
       start = 1
       edge  = 1
 
 
 ! open netcdf wind file
-      netcdf_heat_aux_file="in/heat/"//trim(filename)
-      if(my_task.eq.0) write(*,'(/''reading bulk data '',a,'' @ '',i4)')
-     $                                    trim(netcdf_heat_aux_file),n
-      status=nfmpi_open(pom_comm,netcdf_heat_aux_file,nf_nowrite,
-     $                  mpi_info_null,ncid)
-      call handle_error_pnetcdf('nfmpi_open: '//netcdf_heat_aux_file,
+      netcdf_read_file = trim(bulk_path)//trim(filename)
+      inquire( file=netcdf_read_file, exist=lexist )
+
+      if ( .not.lexist ) then
+
+        if ( my_task == master_task ) then
+          print *, "[!] Missing surface bulk data file at `"
+     &             , trim(netcdf_read_file), "`"
+        end if
+        return
+
+      end if
+
+      if ( my_task == master_task ) then
+        write(*,'(/''reading bulk data '',a,'' @ '',i4)')
+     $                                    trim(netcdf_read_file),n
+      end if
+
+      status = nfmpi_open( pom_comm, netcdf_read_file, nf_nowrite,
+     $                     mpi_info_null, ncid )
+      call handle_error_pnetcdf('nfmpi_open: '//netcdf_read_file,
      $                          status,nf_noerr)
 
 ! get variables

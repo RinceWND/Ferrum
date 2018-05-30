@@ -14,8 +14,9 @@
 
       logical, parameter :: calc_bulk     = .true.
      &                    , read_bulk     = .true.
+     &                    , read_flux     = .true.
      &                    , relax_surface = .true.
-     &                    , corr_surface  = .true.
+     &                    , corr_surface  = .false.
 !     days in month
       integer :: mday(0:12) = (/31, 31, 28, 31, 30, 31, 30,
      $                          31, 31, 30, 31, 30, 31/)
@@ -38,8 +39,7 @@
 !     &    ,tsurf_a, ssurf_a, tsurf_b, ssurf_b
      &    ,pres_a, pres_b, pres
      &    ,uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd, vwnd
-     &    ,tskin_a, tskin_b, tskin, sskin
-     &    ,emp, swr, uht
+     &    ,tskin_a, tskin_b, tskin, sskin, emp
      &    ,sh,sh_a,sh_b, lh,lh_a,lh_b
      &    ,sr,sr_a,sr_b, lr,lr_a,lr_b
      &    ,dlr,dlr_a,dlr_b
@@ -75,7 +75,6 @@
 !     intent(in)
       type(date), intent(in) :: d_in
       type(date) d_tmp
-      logical lexist
       integer n
 
 
@@ -178,32 +177,24 @@
 
       if ( read_bulk ) then
 
-        write( infile_b, '( a3,".",i4.4,".nc" )' )
-     $        "hfl", d_in%year
+        write( infile_b, '( i4.4,".nc" )' ) d_in%year
 
-        inquire(file='in/heat/'//trim(infile_b),
-     $           exist=lexist)
-
-        if(lexist) then
-          call read_ncep_bulk_pnetcdf(pres_a,tair_a,shum_a,rain_a
-     $                   ,cloud_a,uwnd_a,vwnd_a,tskin_a,infile_b,n)
-        else
-          if ( my_task == master_task ) then
-            print *, "[!] Missing surface bulk data file `"
-     &             , trim(infile_b), "`"
-          end if
-        end if
+        call read_ncep_bulk_pnetcdf( pres_a,  tair_a, shum_a
+     &                             , rain_a, cloud_a, uwnd_a
+     &                             , vwnd_a, tskin_a, infile_b, n)
 
       end if
 
-      if ( .not.calc_bulk ) then
+      if ( read_flux ) then
 
         write( infile_b, '( i4.4 )' ) d_in%year
 
-        call read_heat_pnetcdf(sh_a,lh_a,sr_a,lr_a,dlr_a,infile_b,n)
+        call read_heat_pnetcdf( sh_a,  lh_a, sr_a
+     &                        , lr_a, dlr_a, infile_b, n )
 
       end if
 
+! Read next record
       n = n+1
       if (n > 4*(365+inc_leap(d_in%year))) then
         n = mod(n,4*(365+inc_leap(d_in%year)))
@@ -211,20 +202,16 @@
       end if
 
       if ( read_bulk ) then
-        write( infile_b, '( a3,".",i4.4,".nc" )' )
-     $        "hfl", d_tmp%year
 
-        inquire(file='in/heat/'//trim(infile_b),
-     $           exist=lexist)
+        write( infile_b, '( i4.4,".nc" )' ) d_in%year
 
-        if (lexist) then
-          call read_ncep_bulk_pnetcdf(pres_b,tair_b,shum_b,rain_b
-     $                   ,cloud_b,uwnd_b,vwnd_b,tskin_b,infile_b,n)
-        end if
+        call read_ncep_bulk_pnetcdf( pres_b,  tair_b, shum_b
+     &                             , rain_b, cloud_b, uwnd_b
+     &                             , vwnd_b, tskin_b, infile_b, n)
 
       end if
 
-      if ( .not.calc_bulk ) then
+      if ( read_flux ) then
 
         write( infile_b, '( i4.4 )' ) d_in%year
 
@@ -513,7 +500,7 @@
 
         end if
 
-        if ( .not.calc_bulk ) then
+        if ( read_flux ) then
 
           sh_a = sh_b
           lh_a = lh_b
@@ -543,6 +530,18 @@
 
 !      datestr = "dbg."//date2str(d_in)
 !      call write_sflx(datestr, tair,shum,rain,tskin,pres,cloud )
+      if ( read_flux ) then
+
+        sh = (1.-bb)*sh_a + bb*sh_b
+        lh = (1.-bb)*lh_a + bb*lh_b
+        sr = (1.-bb)*sr_a + bb*sr_b
+        lr = (1.-bb)*lr_a + bb*lr_b
+        dlr= (1.-bb)*dlr_a+ bb*dlr_b
+
+      else
+        dlr= -370.
+      end if
+
       if ( calc_bulk ) then
 
         tair  = (1.-bb)*tair_a + bb*tair_b
@@ -552,12 +551,14 @@
         uwnd = ( 1.0 - bb ) * uwnd_a + bb * uwnd_b
         vwnd = ( 1.0 - bb ) * vwnd_a + bb * vwnd_b
 
-        call bulk(im,jm,tbias,fsm,tsurf,east_e,north_e,
+        swrad = -sr*fsm
+
+        call bulk(im,jm,tbias,fsm,t(:,:,1),east_e,north_e,
      $              d_in%year,d_in%month,d_in%day,
      $              d_in%hour,d_in%min,
      $              wusurf,wvsurf,wtsurf,swrad,emp,
      $              uwnd,vwnd,u(:,:,1),v(:,:,1),rho(:,:,1),
-     $              tair,shum,rain,cloud,pres,my_task)
+     $              tair,shum,rain,cloud,pres,-dlr,my_task)
 
         wssurf = emp*(sb(:,:,1)+sbias)
 ! Relax to skin TS... Skin salinity is just climatology
@@ -574,11 +575,6 @@
 !          write(*,*) my_task, "MP:", minval(emp),maxval(emp)
       else
 
-        sh = (1.-bb)*sh_a + bb*sh_b
-        lh = (1.-bb)*lh_a + bb*lh_b
-        sr = (1.-bb)*sr_a + bb*sr_b
-        lr = (1.-bb)*lr_a + bb*lr_b
-        dlr= (1.-bb)*dlr_a+ bb*dlr_b
 
         do j=1,jm
           do i=1,im
@@ -611,8 +607,6 @@
         end do
 
       end if
-
-! TODO: interpolation
 
       return
 

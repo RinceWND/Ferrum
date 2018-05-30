@@ -515,6 +515,9 @@
 !lyomoving:call idealized setup subr instead of reading grid:
 !
       call read_grid_pnetcdf !_obs
+! modify zero distances to 1 meter (should check for |df|<epsilon, though)
+      where( dx == 0. ) dx = 1.
+      where( dy == 0. ) dy = 1.
 !     The followings are read in read_grid_pnetcdf:
 !     z,zz,dx,dy
 !     east_u,east_v,east_e,east_c
