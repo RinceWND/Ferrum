@@ -480,23 +480,14 @@
           uwnd_a = uwnd_b
           vwnd_a = vwnd_b
 
-          write( infile_b, '( a3,".",i4.4,".nc" )' )
-     $        "hfl", d_tmp%year
+          write( infile_b, '( i4.4,".nc" )' ) d_tmp%year
 
           inquire(file='in/heat/'//trim(infile_b),
      $           exist=lexist)
 
           swrad  = 0.
-          if(lexist) then
-            call read_ncep_bulk_pnetcdf(pres_b,tair_b,shum_b,rain_b
+          call read_ncep_bulk_pnetcdf(pres_b,tair_b,shum_b,rain_b
      $                     ,cloud_b,uwnd_b,vwnd_b,tskin_b,infile_b,n)
-          else
-            if ( my_task == master_task ) then
-              write(*,'(/2a)')
-     $      "missing heat data at wind_main : "
-     $              , trim(infile_b)
-            endif
-          endif
 
         end if
 
