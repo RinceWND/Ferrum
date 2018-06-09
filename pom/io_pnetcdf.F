@@ -2450,7 +2450,7 @@
       call handle_error_pnetcdf('get_var_real_1d: x.2',status,nf_noerr)
 
 ! convert Sv to m^3/s
-      trans = trans * 10.d6
+      trans = trans * 1.d6
 
 ! close file
       status=nfmpi_close(ncid)
