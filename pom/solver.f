@@ -602,18 +602,19 @@
       real(kind=rk), dimension(im,jm,kb) :: fb,fclim,ff,xflux,yflux
      &                                 ,fbmem,xmassflux,ymassflux,zwflux
       real(kind=rk), dimension(im,jm)    :: eta
-!      real(kind=rk) eps, epsval  ! rwnd: iteration check
+      real(kind=rk) eps, epsval  ! rwnd: iteration check
       integer i,j,k,itera
 
       character(len=1), intent(in) :: var
 
-!      if (var=='T') then
-!        eps = 0.01
-!      else if (var=='S') then
-!        eps = 0.001
-!      else
-!        eps = 0.0001
-!      end if ! rwnd: iteration check
+      select case ( var )
+        case ('T')
+          eps = 0.001
+        case ('S')
+          eps = 0.0001
+        case default
+          eps = 0.00001
+      end select ! rwnd: iteration check
 
 ! calculate horizontal mass fluxes
       xmassflux = 0.
@@ -719,10 +720,10 @@
 ! calculate antidiffusion velocity
         call smol_adif(xmassflux,ymassflux,zwflux,ff)
 
-!        epsval = maxval(abs(ff(:,:,1:kbm1)-fbmem(:,:,1:kbm1))) ! rwnd: iteration check
-!
-!        call max0d_mpi(epsval,master_task) ! rwnd: iteration check
-!        call bcast0d_mpi(epsval,my_task) ! rwnd: iteration check
+        epsval = maxval(abs(ff(:,:,1:kbm1)-fbmem(:,:,1:kbm1))) ! rwnd: iteration check
+
+        call max0d_mpi(epsval,master_task) ! rwnd: iteration check
+        call bcast0d_mpi(epsval,master_task) ! rwnd: iteration check
 
         do j=1,jm
           do i=1,im
@@ -733,7 +734,7 @@
           end do
         end do
 
-!        if (epsval < eps) exit ! rwnd: iteration check
+        if (epsval < eps) exit ! rwnd: iteration check
 
 ! end of Smolarkiewicz scheme
       end do
@@ -1410,7 +1411,7 @@
       real(kind=rk) p(im,jm,kb),fx(im,jm,kb),fc(im,jm,kb)
       real(kind=rk) dh,cff,cff1
 
-      rho = rho-rmean
+!      rho = rho-rmean
 
       p(:,:,1) = 0.
       do k = 1,kbm1
@@ -1428,7 +1429,7 @@
         do j = 1,jm
           do i = 2,im
             if (dum(i,j)/=0.) then
-              dh = z(k+1)*(dt(i,j)-dt(i-1,j))+et(i,j)-et(i-1,j)
+              dh = z(k+1)*(dt(i,j)-dt(i-1,j))
               fc(i,j,k+1) = .5*dh*(p(i,j,k+1)+p(i-1,j,k+1))
               if (k==1) then
                 drhox(i,j,k) = .5*(cff1*(fx(i-1,j,k)-
@@ -1454,7 +1455,7 @@
         do j = 2,jm
           do i = 1,im
             if (dvm(i,j)/=0.) then
-              dh = z(k+1)*(dt(i,j)-dt(i,j-1))+et(i,j)-et(i,j-1)
+              dh = z(k+1)*(dt(i,j)-dt(i,j-1))
               fc(i,j,k+1) = .5*dh*(p(i,j,k+1)+p(i,j-1,k+1))
               if (k==1) then
                 drhoy(i,j,k) = .5*(cff1*(fx(i,j-1,k)-
@@ -1477,12 +1478,38 @@
       drhoy = -ramp*drhoy
 
 !      if (ramp > 0) then
-!        write(40+my_task,*) iint, drhox(50,50,:)
-!        write(50+my_task,*) iint, et(50,50), rho(50,50,:)
+!        write(40+my_task,*) iint, drhox(50,50,:),drhoy(50,50,:)
+!        write(50+my_task,*) iint, et(50,50), et(49,50), et(50,49),
+!     &                   h(50,50), h(49,50), h(50,49), dz,
+!     &                   dx(50,50), dx(49,50), dx(50,49),
+!     &                   dy(50,50), dy(49,50), dy(50,49),
+!     &               rho(50,50,:), "|", rho(49,50,:), "|", rho(50,49,:)
+!      end if
+!      if (iint >= 1) then
+!        if (my_task==0) then
+!          print *, iint, "z:     ", z(2)
+!          print *, iint, "dz:    ", dz(2)
+!          print *, iint, "hi-1:  ", h(49,50)
+!          print *, iint, "h:     ", h(50,50)
+!          print *, iint, "dy-1:  ", dy(49,50)
+!          print *, iint, "dy:    ", dy(50,50)
+!          print *, iint, "hzi-1: ", dz(2)*h(49,50)
+!          print *, iint, "hzi:   ", dz(2)*h(50,50)
+!          print *, iint, "rhoi-1:", rho(49,50,2)
+!          print *, iint, "rho:   ", rho(50,50,2)
+!          print *, iint, "pi-1:  ", p(49,50,2)
+!          print *, iint, "p:     ", p(50,50,2)
+!          print *, iint, "fxi-1: ", fx(49,50,2)
+!          print *, iint, "fx:    ", fx(50,50,2)
+!          print *, iint, "fc:    ", fc(50,50,2)
+!          print *, z(3)*(dt(50,50)-dt(49,50))+et(50,50)-et(49,50)
+!          print *, iint, "drhox: ", drhox(50,50,2)
+!        end if
+!        call finalize_mpi
 !      end if
 !      if (iint > 10) call finalize_mpi
 
-      rho = rho+rmean
+!      rho = rho+rmean
 
       end subroutine
 
@@ -1998,7 +2025,7 @@
      $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k)
      $                 + 0.5 * u(im,j,k) + 0.25 * u(im,j+1,k) )
                   vf(im,j,k)
-     &             = 0. !(vf(imm1,j-1,k)+vf(imm1,j,k)+vf(imm1,j+1,k))/3. !0.0.
+     &             = (v(imm1,j-1,k)+v(imm1,j,k)+v(imm1,j+1,k))/3. !0.0.
                enddo
             enddo
          endif
@@ -2017,7 +2044,7 @@
      $                 + 0.5 * u(2,j,k) + 0.25 * u(2,j+1,k) )
                   uf(1,j,k)=uf(2,j,k)
                   vf(1,j,k)
-     &             = 0. !(vf(2,j-1,k)+vf(2,j,k)+vf(2,j+1,k))/3. !0.0.
+     &             = (v(2,j-1,k)+v(2,j,k)+v(2,j+1,k))/3. !0.0.
                enddo
             enddo
           endif
@@ -2036,7 +2063,7 @@
      $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,jm,k)
      $                 + 0.5 * v(i,jm,k) + 0.25 * v(i+1,jm,k) )
                   uf(i,jm,k)
-     &             = 0. !(uf(i-1,jmm1,k)+uf(i,jmm1,k)+uf(i+1,jmm1,k))/3. !0.0.
+     &             = (u(i-1,jmm1,k)+u(i,jmm1,k)+u(i+1,jmm1,k))/3. !0.0.
                enddo
             enddo
           endif
@@ -2057,7 +2084,7 @@
                   vf(i,1,k)=vf(i,2,k)
 !                 uf(i,jm,k)=0.e0 !lyo:debug:lyo:20110224:alu:stcc:
                   uf(i,1,k)
-     &             = 0. !(uf(i-1,2,k)+uf(i,2,k)+uf(i+1,2,k))/3. !0.0.
+     &             = (u(i-1,2,k)+u(i,2,k)+u(i+1,2,k))/3. !0.0.
                enddo
             enddo
           endif
@@ -4026,7 +4053,7 @@ C  !The most south sudomains
           do j=1,jm
             do i=1,im
               rad(i,j,k)=swrad(i,j)*
-     &                (r(ntp)*exp(z(k)*dh(i,j)/ad1(ntp))
+     &                (     r(ntp) *exp(z(k)*dh(i,j)/ad1(ntp))
      &                 +(1.-r(ntp))*exp(z(k)*dh(i,j)/ad2(ntp)))
             end do
           end do
