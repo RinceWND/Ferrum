@@ -525,7 +525,7 @@
 
 
 ! calculate tf and sf using uf, vf, a and c as temporary variables
-        if( mode /= 4 .and. iint > 2 .and. nread_rst == 0 ) then
+        if( mode /= 4 .and. ( iint > 2 .or. nread_rst == 1 ) ) then
           if(nadv.eq.1) then
 !            call advt1(tb,t,tclim,uf,a,c)
 !            call advt1(sb,s,sclim,vf,a,c)
