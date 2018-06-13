@@ -14,7 +14,7 @@
 
       logical, parameter :: calc_bulk     = .true.
      &                    , read_bulk     = .true.
-     &                    , read_flux     = .true.
+     &                    , read_flux     = .false.
      &                    , relax_surface = .true.
      &                    , corr_surface  = .false.
 !     days in month

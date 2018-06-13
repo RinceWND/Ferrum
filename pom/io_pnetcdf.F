@@ -8,37 +8,48 @@
 ! parallel NetCDF I/O
 
 !_______________________________________________________________________
-      subroutine def_var_pnetcdf(ncid,name,nvdims,vdims,varid,vartype,
-     $                           long_name,units,coords,lcoords)
-# include "mpif.h"
-# include "pnetcdf.inc"
-      integer vdims(nvdims)
-      integer ncid,nvdims,varid,vartype
-      logical lcoords
-      character*(*) name,long_name,units,coords
-      integer status
-      integer(mpi_offset_kind) length
-! define variable
-      status=nfmpi_def_var(ncid,name,vartype,nvdims,vdims,varid)
-      call handle_error_pnetcdf('nf_put_att_text',status,nf_noerr)
-! define attributes
-      length=len(trim(long_name))
-      status=nfmpi_put_att_text(ncid,varid,'long_name',
-     $                          length,trim(long_name))
-      call handle_error_pnetcdf('nf_put_att_text',status,nf_noerr)
+      subroutine def_var_pnetcdf(ncid,name,nvdims,vdims,varid,vartype
+     &                          ,long_name,units,nofill,fillval
+     &                          ,coords,lcoords)
+        use mpi
+        use pnetcdf
 
-      length=len(trim(units))
-      status=nfmpi_put_att_text(ncid,varid,'units',
-     $                          length,trim(units))
-      call handle_error_pnetcdf('nf_put_att_text',status,nf_noerr)
+        integer         , intent(in) :: vdims(nvdims)
+        integer         , intent(in) :: ncid,nvdims,vartype,nofill
+        logical         , intent(in) :: lcoords
+        character(len=*), intent(in) :: name,long_name,units,coords
+        real            , intent(in) :: fillval
+        integer         , intent(out):: varid
+        integer status
+
+! define variable
+        status = nf90mpi_def_var( ncid, name, vartype, vdims, varid )
+        call handle_error_pnetcdf('nf_def_var',status,nf_noerr)
+! define fill value
+        if ( nofill > -1 ) then
+          status = nf90mpi_def_var_fill( ncid, varid, nofill, fillval )
+          call handle_error_pnetcdf('nf_def_var_fill',status,nf_noerr)
+        end if
+! define attributes
+        status = nf90mpi_put_att( ncid, varid, 'long_name'
+     &                           ,trim(long_name) )
+        call handle_error_pnetcdf('nf_put_att : long_name'
+     &                           ,status,nf_noerr)
+
+        status = nf90mpi_put_att( ncid, varid, 'units'
+     &                           ,trim(units) )
+        call handle_error_pnetcdf('nf_put_att : units'
+     &                           ,status,nf_noerr)
 ! add coordinates attribute, if necessary
-      if(lcoords) then
-        length=len(trim(coords))
-        status=nfmpi_put_att_text(ncid,varid,'coordinates',
-     $                            length,trim(coords))
-        call handle_error_pnetcdf('nf_put_att_text',status,nf_noerr)
-      endif
-      return
+        if ( lcoords ) then
+          status = nf90mpi_put_att( ncid, varid, 'coordinates'
+     &                             ,trim(coords) )
+          call handle_error_pnetcdf('nf_put_att : coordinates'
+     &                             ,status,nf_noerr)
+        end if
+
+        return
+
       end
 
 !_______________________________________________________________________
@@ -126,12 +137,12 @@
       str_tmp='days since '//time_start
       call def_var_pnetcdf(ncid,'time',1,vdims,time_varid,nf_float,
      $                     'time',str_tmp,
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
 
       vdims(1)=z_dimid
       call def_var_pnetcdf(ncid,'z',1,vdims,z_varid,nf_float,
      $                     'sigma of cell face','sigma_level',
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
       length=22
       status=nfmpi_put_att_text(ncid,z_varid,'standard_name',
      $                          length,'ocean_sigma_coordinate')
@@ -142,7 +153,7 @@
 
       call def_var_pnetcdf(ncid,'zz',1,vdims,zz_varid,nf_float,
      $                     'sigma of cell centre','sigma_level',
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
       length=22
       status=nfmpi_put_att_text(ncid,zz_varid,'standard_name',
      $                          length,'ocean_sigma_coordinate')
@@ -155,102 +166,102 @@
       vdims(2)=y_dimid
       call def_var_pnetcdf(ncid,'dx',2,vdims,dx_varid,nf_float,
      $                     'grid increment in x','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'dy',2,vdims,dy_varid,nf_float,
      $                     'grid increment in y','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'east_u',2,vdims,east_u_varid,nf_float,
      $                     'easting of u-points','degree',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'east_v',2,vdims,east_v_varid,nf_float,
      $                     'easting of v-points','degree',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'east_e',2,vdims,east_e_varid,nf_float,
      $                     'easting of elevation points','degree',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'east_c',2,vdims,east_c_varid,nf_float,
      $                     'easting of cell corners','degree',
-     $                     'east_c north_c',.true.)
+     $                     -1,0.,'east_c north_c',.true.)
       call def_var_pnetcdf(ncid,'north_u',2,vdims,north_u_varid,nf_float
      $                    ,'northing of u-points','degree',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'north_v',2,vdims,north_v_varid,nf_float
      $                    ,'northing of v-points','degree',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'north_e',2,vdims,north_e_varid,nf_float
      $                    ,'northing of elevation points','degree',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'north_c',2,vdims,north_c_varid,nf_float
      $                    ,'northing of cell corners','degree',
-     $                     'east_c north_c',.true.)
+     $                     -1,0.,'east_c north_c',.true.)
       call def_var_pnetcdf(ncid,'rot',2,vdims,rot_varid,nf_float,
      $                    'Rotation angle of x-axis wrt. east','degree',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'h',2,vdims,h_varid,nf_float,
      $                     'undisturbed water depth','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'fsm',2,vdims,fsm_varid,nf_float,
      $                     'free surface mask','dimensionless',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'dum',2,vdims,dum_varid,nf_float,
      $                     'u-velocity mask','dimensionless',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'dvm',2,vdims,dvm_varid,nf_float,
      $                     'v-velocity mask','dimensionless',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
 
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=time_dimid
       call def_var_pnetcdf(ncid,'uab',3,vdims,uab_varid,nf_float,
      $                     'depth-averaged u','metre/sec',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'vab',3,vdims,vab_varid,nf_float,
      $                     'depth-averaged v','metre/sec',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'elb',3,vdims,elb_varid,nf_float,
      $                     'surface elevation','metre',
-     $                     'east_e north_e',.true.)
+     $                     0,-999.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'wusurf',3,vdims,wusurf_varid,nf_float,
      $                     'x-momentum flux','metre^2/sec^2',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'wvsurf',3,vdims,wvsurf_varid,nf_float,
      $                     'y-momentum flux','metre^2/sec^2',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'wtsurf',3,vdims,wtsurf_varid,nf_float,
      $                     'temperature flux','deg m/s',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'wssurf',3,vdims,wssurf_varid,nf_float,
      $                     'salinity flux','psu m/s',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=z_dimid
       vdims(4)=time_dimid
       call def_var_pnetcdf(ncid,'u',4,vdims,u_varid,nf_float,
      $                     'x-velocity','metre/sec',
-     $                     'east_u north_u zz',.true.)
+     $                     -1,0.,'east_u north_u zz',.true.)
       call def_var_pnetcdf(ncid,'v',4,vdims,v_varid,nf_float,
      $                     'y-velocity','metre/sec',
-     $                     'east_v north_v zz',.true.)
+     $                     -1,0.,'east_v north_v zz',.true.)
       call def_var_pnetcdf(ncid,'w',4,vdims,w_varid,nf_float,
      $                     'z-velocity','metre/sec',
-     $                     'east_e north_e z',.true.)
+     $                     -1,0.,'east_e north_e z',.true.)
       call def_var_pnetcdf(ncid,'t',4,vdims,t_varid,nf_float,
      $                     'potential temperature','K',
-     $                     'east_e north_e zz',.true.)
+     $                     0,-999.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'s',4,vdims,s_varid,nf_float,
      $                     'salinity x rho / rhoref','PSS',
-     $                     'east_e north_e zz',.true.)
+     $                     0,0.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'rho',4,vdims,rho_varid,nf_float,
      $                     '(density-1000)/rhoref','dimensionless',
-     $                     'east_e north_e zz',.true.)
+     $                     -1,0.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'kh',4,vdims,kh_varid,nf_float,
      $                     'vertical diffusivity','metre2/sec',
-     $                     'east_e north_e zz',.true.)
+     $                     -1,0.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'km',4,vdims,km_varid,nf_float,
      $                     'vertical viscosity','metre2/sec',
-     $                     'east_e north_e zz',.true.)
+     $                     -1,0.,'east_e north_e zz',.true.)
 
 ! end definitions
       status=nfmpi_enddef(ncid)
@@ -484,89 +495,89 @@
       vdims(1)=time_dimid
       str_tmp='days since '//time_start
       call def_var_pnetcdf(ncid,'time',1,vdims,time_varid,nf_double,
-     $                     'time',str_tmp,' ',.false.)
+     $                     'time',str_tmp,-1,0.,' ',.false.)
 
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       call def_var_pnetcdf(ncid,'wusurf',2,vdims,wusurf_varid,nf_double,
      $                     'x-momentum flux at the surface',
-     $                     'metre^2/sec^2',
+     $                     'metre^2/sec^2',-1,0.,
      $                     'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'wvsurf',2,vdims,wvsurf_varid,nf_double,
      $                     'y-momentum flux at the surface',
-     $                     'metre^2/sec^2',
+     $                     'metre^2/sec^2',-1,0.,
      $                     'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'wubot',2,vdims,wubot_varid,nf_double,
      $                     'x-momentum flux at the bottom',
-     $                     'metre^2/sec^2',
+     $                     'metre^2/sec^2',-1,0.,
      $                     'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'wvbot',2,vdims,wvbot_varid,nf_double,
      $                     'y-momentum flux at the bottom',
-     $                     'metre^2/sec^2',
+     $                     'metre^2/sec^2',-1,0.,
      $                     'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'aam2d',2,vdims,aam2d_varid,nf_double,
      $                     'vertical average of aam',
-     $                     'metre^2/sec',
+     $                     'metre^2/sec',-1,0.,
      $                     'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'ua',2,vdims,ua_varid,nf_double,
      $                     'vertical mean of u',
-     $                     'metre/sec',
+     $                     'metre/sec',-1,0.,
      $                     'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'uab',2,vdims,uab_varid,nf_double,
      $                     'vertical mean of u at time -dt',
-     $                     'metre/sec',
+     $                     'metre/sec',-1,0.,
      $                     'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'va',2,vdims,va_varid,nf_double,
      $                     'vertical mean of v',
-     $                     'metre/sec',
+     $                     'metre/sec',-1,0.,
      $                     'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'vab',2,vdims,vab_varid,nf_double,
      $                     'vertical mean of v at time -dt',
-     $                     'metre/sec',
+     $                     'metre/sec',-1,0.,
      $                     'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'el',2,vdims,el_varid,nf_double,
      $                     'surface elevation in external mode',
-     $                     'metre',
+     $                     'metre',-1,0.,
      $                     'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'elb',2,vdims,elb_varid,nf_double,
      $                     'surface elevation in external mode at -dt',
-     $                     'metre',
+     $                     'metre',-1,0.,
      $                     'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'et',2,vdims,et_varid,nf_double,
      $                     'surface elevation in internal mode',
-     $                     'metre',
+     $                     'metre',-1,0.,
      $                     'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'etb',2,vdims,etb_varid,nf_double,
      $                     'surface elevation in internal mode at -dt',
-     $                     'metre',
+     $                     'metre',-1,0.,
      $                     'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'egb',2,vdims,egb_varid,nf_double,
      $                     'surface elevation for pres. grad. at -dt',
-     $                     'metre',
+     $                     'metre',-1,0.,
      $                     'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'utb',2,vdims,utb_varid,nf_double,
      $                     'ua time averaged over dti',
-     $                     'metre/sec',
+     $                     'metre/sec',-1,0.,
      $                     'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'vtb',2,vdims,vtb_varid,nf_double,
      $                     'va time averaged over dti',
-     $                     'metre/sec',
+     $                     'metre/sec',-1,0.,
      $                     'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'adx2d',2,vdims,adx2d_varid,nf_double,
      $                     'vertical integral of advx',
-     $                     '-',
+     $                     '-',-1,0.,
      $                     'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'ady2d',2,vdims,ady2d_varid,nf_double,
      $                     'vertical integral of advy',
-     $                     '-',
+     $                     '-',-1,0.,
      $                     'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'advua',2,vdims,advua_varid,nf_double,
      $                     'sum of 2nd, 3rd and 4th terms in eq (18)',
-     $                     '-',
+     $                     '-',-1,0.,
      $                     'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'advva',2,vdims,advva_varid,nf_double,
      $                     'sum of 2nd, 3rd and 4th terms in eq (19)',
-     $                     '-',
+     $                     '-',-1,0.,
      $                     'east_v north_v',.true.)
 
       vdims(1)=x_dimid
@@ -574,79 +585,79 @@
       vdims(3)=z_dimid
       call def_var_pnetcdf(ncid,'u',3,vdims,u_varid,nf_double,
      $                     'x-velocity',
-     $                     'metre/sec',
+     $                     'metre/sec',-1,0.,
      $                     'east_u north_u zz',.true.)
       call def_var_pnetcdf(ncid,'ub',3,vdims,ub_varid,nf_double,
      $                     'x-velocity at time -dt',
-     $                     'metre/sec',
+     $                     'metre/sec',-1,0.,
      $                     'east_u north_u zz',.true.)
       call def_var_pnetcdf(ncid,'v',3,vdims,v_varid,nf_double,
      $                     'y-velocity',
-     $                     'metre/sec',
+     $                     'metre/sec',-1,0.,
      $                     'east_v north_v zz',.true.)
       call def_var_pnetcdf(ncid,'vb',3,vdims,vb_varid,nf_double,
      $                     'y-velocity at time -dt',
-     $                     'metre/sec',
+     $                     'metre/sec',-1,0.,
      $                     'east_v north_v zz',.true.)
       call def_var_pnetcdf(ncid,'w',3,vdims,w_varid,nf_double,
      $                     'sigma-velocity',
-     $                     'metre/sec',
+     $                     'metre/sec',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'t',3,vdims,t_varid,nf_double,
      $                     'potential temperature',
-     $                     'K',
+     $                     'K',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'tb',3,vdims,tb_varid,nf_double,
      $                     'potential temperature at time -dt',
-     $                     'K',
+     $                     'K',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'s',3,vdims,s_varid,nf_double,
      $                     'salinity x rho / rhoref',
-     $                     'PSS',
+     $                     'PSS',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'sb',3,vdims,sb_varid,nf_double,
      $                     'salinity x rho / rhoref at time -dt',
-     $                     'PSS',
+     $                     'PSS',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'rho',3,vdims,rho_varid,nf_double,
      $                     '(density-1000)/rhoref',
-     $                     'dimensionless',
+     $                     'dimensionless',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'km',3,vdims,km_varid,nf_double,
      $                     'vertical kinematic viscosity',
-     $                     'metre^2/sec',
+     $                     'metre^2/sec',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'kh',3,vdims,kh_varid,nf_double,
      $                     'vertical diffusivity',
-     $                     'metre^2/sec',
+     $                     'metre^2/sec',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'kq',3,vdims,kq_varid,nf_double,
      $                     'kq',
-     $                     'metre^2/sec',
+     $                     'metre^2/sec',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'l',3,vdims,l_varid,nf_double,
      $                     'turbulence length scale',
-     $                     '-',
+     $                     '-',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'q2',3,vdims,q2_varid,nf_double,
      $                     'twice the turbulent kinetic energy',
-     $                     'metre^2/sec^2',
+     $                     'metre^2/sec^2',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'q2b',3,vdims,q2b_varid,nf_double,
      $                     'twice the turbulent kinetic energy at -dt',
-     $                     'metre^2/sec^2',
+     $                     'metre^2/sec^2',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'aam',3,vdims,aam_varid,nf_double,
      $                     'horizontal kinematic viscosity',
-     $                     'metre^2/sec',
+     $                     'metre^2/sec',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'q2l',3,vdims,q2l_varid,nf_double,
      $                     'q2 x l',
-     $                     'metre^3/sec^2',
+     $                     'metre^3/sec^2',-1,0.,
      $                     'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'q2lb',3,vdims,q2lb_varid,nf_double,
      $                     'q2 x l at time -dt',
-     $                     'metre^3/sec^2',
+     $                     'metre^3/sec^2',-1,0.,
      $                     'east_e north_e zz',.true.)
 
 ! end definitions
@@ -3503,13 +3514,13 @@
       vdims(1)=time_dimid
       str_tmp='days since '//time_start
       call def_var_pnetcdf(ncid,'time',1,vdims,time_varid,nf_float,
-     $                     'time',str_tmp,
+     $                     'time',str_tmp,-1,0.,
      $                     ' ',.false.)
 
       vdims(1)=z_dimid
       call def_var_pnetcdf(ncid,'z',1,vdims,z_varid,nf_float,
      $                     'sigma of cell face','sigma_level',
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
       length=22
       status=nfmpi_put_att_text(ncid,z_varid,'standard_name',
      $                          length,'ocean_sigma_coordinate')
@@ -3520,7 +3531,7 @@
 
       call def_var_pnetcdf(ncid,'zz',1,vdims,zz_varid,nf_float,
      $                     'sigma of cell centre','sigma_level',
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
       length=22
       status=nfmpi_put_att_text(ncid,zz_varid,'standard_name',
      $                          length,'ocean_sigma_coordinate')
@@ -3533,114 +3544,114 @@
       vdims(2)=y_dimid
       call def_var_pnetcdf(ncid,'dx',2,vdims,dx_varid,nf_float,
      $                     'grid increment in x','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'dy',2,vdims,dy_varid,nf_float,
      $                     'grid increment in y','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'east_u',2,vdims,east_u_varid,nf_float,
      $                     'easting of u-points','degree',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'east_v',2,vdims,east_v_varid,nf_float,
      $                     'easting of v-points','degree',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'east_e',2,vdims,east_e_varid,nf_float,
      $                     'easting of elevation points','degree',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'east_c',2,vdims,east_c_varid,nf_float,
      $                     'easting of cell corners','degree',
-     $                     'east_c north_c',.true.)
+     $                     -1,0.,'east_c north_c',.true.)
       call def_var_pnetcdf(ncid,'north_u',2,vdims,north_u_varid,nf_float
      $                    ,'northing of u-points','degree',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'north_v',2,vdims,north_v_varid,nf_float
      $                    ,'northing of v-points','degree',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'north_e',2,vdims,north_e_varid,nf_float
      $                    ,'northing of elevation points','degree',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'north_c',2,vdims,north_c_varid,nf_float
      $                    ,'northing of cell corners','degree',
-     $                     'east_c north_c',.true.)
+     $                     -1,0.,'east_c north_c',.true.)
       call def_var_pnetcdf(ncid,'rot',2,vdims,rot_varid,nf_float,
      $                    'Rotation angle of x-axis wrt. east','degree',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'h',2,vdims,h_varid,nf_float,
      $                     'undisturbed water depth','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'fsm',2,vdims,fsm_varid,nf_float,
      $                     'free surface mask','dimensionless',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'dum',2,vdims,dum_varid,nf_float,
      $                     'u-velocity mask','dimensionless',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'dvm',2,vdims,dvm_varid,nf_float,
      $                     'v-velocity mask','dimensionless',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
 
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=time_dimid
       call def_var_pnetcdf(ncid,'uab',3,vdims,uab_varid,nf_float,
      $                     'depth-averaged u','metre/sec',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'vab',3,vdims,vab_varid,nf_float,
      $                     'depth-averaged v','metre/sec',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'elb',3,vdims,elb_varid,nf_float,
      $                     'surface elevation','metre',
-     $                     'east_e north_e',.true.)
+     $                     0,-999.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'wusurf',3,vdims,wusurf_varid,nf_float,
      $                     'x-momentum flux','metre^2/sec^2',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'wvsurf',3,vdims,wvsurf_varid,nf_float,
      $                     'y-momentum flux','metre^2/sec^2',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'wtsurf',3,vdims,wtsurf_varid,nf_float,
      $                     'temperature flux','deg m/s',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'swrad',3,vdims,uhtfl_varid,nf_float,
      $                     'upward net heat flux','K m/s',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'wssurf',3,vdims,wssurf_varid,nf_float,
      $                     'salinity flux','psu m/s',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'icec',3,vdims,icec_varid,nf_float,
      $                     'sea ice concentration','fraction',
-     $                     'east_e north_e',.true.)
+     $                     0,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'ui',3,vdims,ui_varid,nf_float,
      $                     'sea ice x-velocity','m/s',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'vi',3,vdims,vi_varid,nf_float,
      $                     'sea ice y-velocity','m/s',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=z_dimid
       vdims(4)=time_dimid
       call def_var_pnetcdf(ncid,'u',4,vdims,u_varid,nf_float,
      $                     'x-velocity','metre/sec',
-     $                     'east_u north_u zz',.true.)
+     $                     -1,0.,'east_u north_u zz',.true.)
       call def_var_pnetcdf(ncid,'v',4,vdims,v_varid,nf_float,
      $                     'y-velocity','metre/sec',
-     $                     'east_v north_v zz',.true.)
+     $                     -1,0.,'east_v north_v zz',.true.)
       call def_var_pnetcdf(ncid,'w',4,vdims,w_varid,nf_float,
      $                     'z-velocity','metre/sec',
-     $                     'east_e north_e z',.true.)
+     $                     -1,0.,'east_e north_e z',.true.)
       call def_var_pnetcdf(ncid,'t',4,vdims,t_varid,nf_float,
      $                     'potential temperature','K',
-     $                     'east_e north_e zz',.true.)
+     $                     0,-999.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'s',4,vdims,s_varid,nf_float,
      $                     'salinity x rho / rhoref','PSS',
-     $                     'east_e north_e zz',.true.)
+     $                     0,0.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'rho',4,vdims,rho_varid,nf_float,
      $                     '(density-1000)/rhoref','dimensionless',
-     $                     'east_e north_e zz',.true.)
+     $                     -1,0.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'kh',4,vdims,kh_varid,nf_float,
      $                     'vertical diffusivity','metre2/sec',
-     $                     'east_e north_e zz',.true.)
+     $                     -1,0.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'km',4,vdims,km_varid,nf_float,
      $                     'vertical viscosity','metre2/sec',
-     $                     'east_e north_e zz',.true.)
+     $                     -1,0.,'east_e north_e zz',.true.)
 
 ! end definitions
       status=nfmpi_enddef(ncid)
@@ -4060,12 +4071,12 @@
       str_tmp='days since '//time_start
       call def_var_pnetcdf(ncid,'time',1,vdims,time_varid,nf_float,
      $                     'time',str_tmp,
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
 
       vdims(1)=z_dimid
       call def_var_pnetcdf(ncid,'z',1,vdims,z_varid,nf_float,
      $                     'sigma of cell face','sigma_level',
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
       length=22
       status=nfmpi_put_att_text(ncid,z_varid,'standard_name',
      $                          length,'ocean_sigma_coordinate')
@@ -4076,7 +4087,7 @@
 
       call def_var_pnetcdf(ncid,'zz',1,vdims,zz_varid,nf_float,
      $                     'sigma of cell centre','sigma_level',
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
       length=22
       status=nfmpi_put_att_text(ncid,zz_varid,'standard_name',
      $                          length,'ocean_sigma_coordinate')
@@ -4090,17 +4101,17 @@
 
       call def_var_pnetcdf(ncid,'alon',2,vdims,east_e_varid,nf_float,
      $                     'easting of elevation points','degree',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'alat',2,vdims,north_e_varid,nf_float,
      $                     'northing of elevation points','degree',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
 
       call def_var_pnetcdf(ncid,'h',2,vdims,h_varid,nf_float,
      $                     'undisturbed water depth','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'fsm',2,vdims,fsm_varid,nf_float,
      $                     'free surface mask','dimensionless',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
 
 
       vdims(1)=x_dimid
@@ -4108,19 +4119,19 @@
       vdims(3)=time_dimid
       call def_var_pnetcdf(ncid,'usrf',3,vdims,usrf_varid,nf_float,
      $                     'surface u','metre/sec',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'vsrf',3,vdims,vsrf_varid,nf_float,
      $                     'surface v','metre/sec',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'elsrf',3,vdims,elsrf_varid,nf_float,
      $                     'surface elevation','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'uwsrf',3,vdims,uwsrf_varid,nf_float,
      $                     'wind u','metre/sec',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'vwsrf',3,vdims,vwsrf_varid,nf_float,
      $                     'wind v','metre/sec',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
 
 
 ! end definitions
@@ -4319,12 +4330,12 @@
       str_tmp='days since '//time_start
       call def_var_pnetcdf(ncid,'time',1,vdims,time_varid,nf_float,
      $                     'time',str_tmp,
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
 
       vdims(1)=z_dimid
       call def_var_pnetcdf(ncid,'sigma',1,vdims,z_varid,nf_float,
      $                     'sigma of cell face','sigma_level',
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
       str_tmp='ocean_sigma_coordinate'
       length=len(trim(str_tmp))
       status=nfmpi_put_att_text(ncid,z_varid,'standard_name',
@@ -4337,7 +4348,7 @@
 
       call def_var_pnetcdf(ncid,'zz',1,vdims,zz_varid,nf_float,
      $                     'sigma of cell centre','sigma_level',
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
       str_tmp='ocean_sigma_coordinate'
       length=len(trim(str_tmp))
       status=nfmpi_put_att_text(ncid,zz_varid,'standard_name',
@@ -4352,88 +4363,88 @@
       vdims(1)=x_dimid
       call def_var_pnetcdf(ncid,'els',1,vdims,els_varid,nf_float, !South
      $                      'South elebc','metre',
-     $                      'east_e',.true.)
+     $                      -1,0.,'east_e',.true.)
       call def_var_pnetcdf(ncid,'eln',1,vdims,eln_varid,nf_float, !North
      $                      'Nouth elebc','metre',
-     $                      'east_e',.true.)
+     $                      -1,0.,'east_e',.true.)
       vdims(1)=y_dimid
       call def_var_pnetcdf(ncid,'ele',1,vdims,ele_varid,nf_float, !East
      $                      'East elebc','metre',
-     $                      'north_e',.true.)
+     $                      -1,0.,'north_e',.true.)
       call def_var_pnetcdf(ncid,'elw',1,vdims,elw_varid,nf_float, !West
      $                      'West elebc','metre',
-     $                      'north_e',.true.)
+     $                      -1,0.,'north_e',.true.)
 
 
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       call def_var_pnetcdf(ncid,'dx',2,vdims,dx_varid,nf_float,
      $                     'grid increment in x','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'dy',2,vdims,dy_varid,nf_float,
      $                     'grid increment in y','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'east_u',2,vdims,east_u_varid,nf_float,
      $                     'easting of u-points','degree',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'east_v',2,vdims,east_v_varid,nf_float,
      $                     'easting of v-points','degree',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'east_e',2,vdims,east_e_varid,nf_float,
      $                     'easting of elevation points','degree',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'east_c',2,vdims,east_c_varid,nf_float,
      $                     'easting of cell corners','degree',
-     $                     'east_c north_c',.true.)
+     $                     -1,0.,'east_c north_c',.true.)
       call def_var_pnetcdf(ncid,'north_u',2,vdims,north_u_varid,nf_float
      $                    ,'northing of u-points','degree',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'north_v',2,vdims,north_v_varid,nf_float
      $                    ,'northing of v-points','degree',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'north_e',2,vdims,north_e_varid,nf_float
      $                    ,'northing of elevation points','degree',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'north_c',2,vdims,north_c_varid,nf_float
      $                    ,'northing of cell corners','degree',
-     $                     'east_c north_c',.true.)
+     $                     -1,0.,'east_c north_c',.true.)
       call def_var_pnetcdf(ncid,'rot',2,vdims,rot_varid,nf_float,
      $                    'Rotation angle of x-axis wrt. east','degree',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'h',2,vdims,h_varid,nf_float,
      $                     'undisturbed water depth','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'fsm',2,vdims,fsm_varid,nf_float,
      $                     'free surface mask','dimensionless',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'dum',2,vdims,dum_varid,nf_float,
      $                     'u-velocity mask','dimensionless',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'dvm',2,vdims,dvm_varid,nf_float,
      $                     'v-velocity mask','dimensionless',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'frz',2,vdims,frz_varid,nf_float,
      $                     'frz coeffi','dimensionless',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'aamfrz',2,vdims,aamfrz_varid,nf_float,
      $                     'aamfrz coeffi','dimensionless',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
 
       vdims(1)=x_dimid
       vdims(2)=y_dimid
       vdims(3)=time_dimid
       call def_var_pnetcdf(ncid,'wusurf',3,vdims,wusurf_varid,nf_float,
      $                     'x-momentum flux','metre^2/sec^2',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'wvsurf',3,vdims,wvsurf_varid,nf_float,
      $                     'y-momentum flux','metre^2/sec^2',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'wtsurf',3,vdims,wtsurf_varid,nf_float,
      $                     'temperature flux','deg m/s',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'wssurf',3,vdims,wssurf_varid,nf_float,
      $                     'salinity flux','psu m/s',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
 
       vdims(1)=x_dimid
       vdims(2)=y_dimid
@@ -4441,19 +4452,19 @@
       vdims(4)=time_dimid
       call def_var_pnetcdf(ncid,'t',4,vdims,t_varid,nf_float,
      $                     'potential temperature','K',
-     $                     'east_e north_e zz',.true.)
+     $                     -1,0.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'s',4,vdims,s_varid,nf_float,
      $                     'salinity x rho / rhoref','PSS',
-     $                     'east_e north_e zz',.true.)
+     $                     -1,0.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'rho',4,vdims,rho_varid,nf_float,
      $                     '(density-1000)/rhoref','dimensionless',
-     $                     'east_e north_e zz',.true.)
+     $                     -1,0.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'kh',4,vdims,kh_varid,nf_float,
      $                     'vertical diffusivity','metre2/sec',
-     $                     'east_e north_e zz',.true.)
+     $                     -1,0.,'east_e north_e zz',.true.)
       call def_var_pnetcdf(ncid,'km',4,vdims,km_varid,nf_float,
      $                     'vertical viscosity','metre2/sec',
-     $                     'east_e north_e zz',.true.)
+     $                     -1,0.,'east_e north_e zz',.true.)
 
 ! end definitions
       status=nfmpi_enddef(ncid)
@@ -4683,7 +4694,7 @@
         str_tmp='days since '//time_start
         call def_var_pnetcdf(ncid,'time',1,vdims,time_varid,nf_float,
      $                     'time',str_tmp,
-     $                     ' ',.false.)
+     $                     -1,0.,' ',.false.)
 
         vdims(1)=z_dimid
 
@@ -4691,46 +4702,46 @@
         vdims(1)=x_dimid
         call def_var_pnetcdf(ncid,'vabs',1,vdims,vabs_varid,nf_float, !South
      $                      'South barotropic boundary velocity','m/s',
-     $                      'east_e',.true.)
+     $                      -1,0.,'east_e',.true.)
         call def_var_pnetcdf(ncid,'vabn',1,vdims,vabn_varid,nf_float, !North
      $                      'Nouth barotropic boundary velocity','m/s',
-     $                      'east_e',.true.)
+     $                      -1,0.,'east_e',.true.)
         vdims(1)=y_dimid
         call def_var_pnetcdf(ncid,'uabe',1,vdims,uabe_varid,nf_float, !East
      $                      'East barotropic boundary velocity','m/s',
-     $                      'north_e',.true.)
+     $                      -1,0.,'north_e',.true.)
         call def_var_pnetcdf(ncid,'uabw',1,vdims,uabw_varid,nf_float, !West
      $                      'West barotropic boundary velocity','m/s',
-     $                      'north_e',.true.)
+     $                      -1,0.,'north_e',.true.)
 
 
       vdims(1)=y_dimid
       vdims(2)=z_dimid
       call def_var_pnetcdf(ncid,'tbe',2,vdims,tbe_varid,nf_float,
      $                     'east boundary temp','degree',
-     $                     'north_e sigma',.true.)
+     $                     -1,0.,'north_e sigma',.true.)
       call def_var_pnetcdf(ncid,'sbe',2,vdims,sbe_varid,nf_float,
      $                     'east boundary salt','pps',
-     $                     'north_e sigma',.true.)
+     $                     -1,0.,'north_e sigma',.true.)
       call def_var_pnetcdf(ncid,'tbw',2,vdims,tbw_varid,nf_float,
      $                     'west boundary temp','degree',
-     $                     'north_e sigma',.true.)
+     $                     -1,0.,'north_e sigma',.true.)
       call def_var_pnetcdf(ncid,'sbw',2,vdims,sbw_varid,nf_float,
      $                     'west boundary salt','pps',
-     $                     'north_e sigma',.true.)
+     $                     -1,0.,'north_e sigma',.true.)
       vdims(1)=x_dimid
       call def_var_pnetcdf(ncid,'tbs',2,vdims,tbs_varid,nf_float,
      $                     'south boundary temp','degree',
-     $                     'east_e sigma',.true.)
+     $                     -1,0.,'east_e sigma',.true.)
       call def_var_pnetcdf(ncid,'sbs',2,vdims,sbs_varid,nf_float,
      $                     'south boundary salt','pps',
-     $                     'east_e sigma',.true.)
+     $                     -1,0.,'east_e sigma',.true.)
       call def_var_pnetcdf(ncid,'tbn',2,vdims,tbn_varid,nf_float
      $                    ,'north boundary temp','degree',
-     $                     'east_e sigma',.true.)
+     $                     -1,0.,'east_e sigma',.true.)
       call def_var_pnetcdf(ncid,'sbn',2,vdims,sbn_varid,nf_float
      $                    ,'north boundary salt','pps',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
 !      call def_var_pnetcdf(ncid,'north_e',2,vdims,north_e_varid,nf_float
 !     $                    ,'northing of elevation points','degree',
 !     $                     'east_e north_e',.true.)
@@ -4764,22 +4775,22 @@
       vdims(3)=time_dimid
       call def_var_pnetcdf(ncid,'ice_c',3,vdims,icec_varid,nf_float,
      $                     'Sea ice concentration','',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'ice_u',3,vdims,ui_varid,nf_float,
      $                     'Sea ice u-velocity','metre/sec',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'ice_v',3,vdims,vi_varid,nf_float,
      $                     'Sea ice v-velocity','metre/sec',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
       call def_var_pnetcdf(ncid,'hi',3,vdims,hi_varid,nf_float,
      $                     'sea ice thickness','metre',
-     $                     'east_e north_e',.true.)
+     $                     -1,0.,'east_e north_e',.true.)
       call def_var_pnetcdf(ncid,'flx_u',3,vdims,uf_varid,nf_float,
      $                     'Sea ice u-flux','conc/sec',
-     $                     'east_u north_u',.true.)
+     $                     -1,0.,'east_u north_u',.true.)
       call def_var_pnetcdf(ncid,'flx_v',3,vdims,vf_varid,nf_float,
      $                     'Sea ice v-flux','conc/sec',
-     $                     'east_v north_v',.true.)
+     $                     -1,0.,'east_v north_v',.true.)
 !
 !      vdims(1)=x_dimid
 !      vdims(2)=y_dimid
