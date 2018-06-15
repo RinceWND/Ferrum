@@ -4,7 +4,7 @@
      &               ,iyr,imo,iday,ihour,imin
      &               ,wusurf,wvsurf,wtsurf,swrad,pme
      &               ,uair,vair,usurf,vsurf,rsea
-     &               ,tair,rhum,rain,cloud,pres,my_task)
+     &               ,tair,rhum,rain,cloud,pres,lwrd,my_task)
 !*******************************************************************************
 ! THIS SUBROUTINE PROVIDES SURFACE BOUNDARY CONDITIONS FOR MOMENTUM,
 ! HEAT AND SALT EQUATIONS SOLVED BY THE HYDRODYNAMIC MODEL IN CASES WHEN
@@ -87,7 +87,7 @@
      &            lwMAY      = 1,
      &            lwHERZFELD = 2,
      &            lwBERLIAND = 3 )
-      logical, parameter :: use_coare = .true.
+      logical, parameter :: use_coare = .true., calc_swr = .false.
 
       integer, intent(in) :: my_task
 
@@ -101,7 +101,7 @@
      $  rain(im,jm),cloud(im,jm),pres(im,jm)
 
       real(kind=rk) unow, vnow, tnow, pnow, precip, cld
-     &   , sst_model, QBW, QBWd
+     &   , sst_model, QBW, lwrd
 
       real(kind=rk), external :: cd, heatlat, esk
 
@@ -235,69 +235,70 @@
                 QBW = 0.98*sigma*sstk**4 - sigma*tnowk**4
      $                 *(0.653+0.00535*ea12)
      $                 *(1.+0.1762*cld*cld)
-                QBWd= 0.98*sigma*sstk**4 - sigma*tnowk**4
-     $                 *(0.653+0.00535*ea12)
 
               case ( lwMAY )
                 QBW = (1.-0.75*(cld**3.4))
      $             * (sigma*(tnowk**4.)*(0.4 -0.05*sqrt(ea12))
-     $           + 4.*sigma*(tnowk**3.)*(sstk-tnowk))
-                QBWd=(sigma*(tnowk**4.)*(0.4 -0.05*sqrt(ea12))
      $           + 4.*sigma*(tnowk**3.)*(sstk-tnowk))
 
               case ( lwHERZFELD )
                 QBW = (sigma*0.96*(1-(0.92e-5*tnowk*tnowk))*tnowk**4 +
      $             4*sigma*0.96*(ckelv+tair(i,j)**3)*(sstk-tnowk)) *
      $              (1-.75*cos(alat(i,j)*3.14/180.)*cld) ! cos(phi) here is an improvised `beta` coefficient as a function of latitude from Herzfeld
-                QBWd= (sigma*0.96*(1-(0.92e-5*tnowk*tnowk))*tnowk**4 +
-     $             4*sigma*0.96*(ckelv+tair(i,j)**3)*(sstk-tnowk))
 
               case default  ! lwBERLIAND - Berliand (1952)
                 QBW = 0.97*sigma*
      &               (     tnowk**4 * (.39-.05*sqrt(ea12))
      &                *(1.-.6823*cld*cld)
      &                + 4.*tnowk**3 * (sstk-tnowk))
-                QBWd= 0.97*sigma*
-     &               (     tnowk**4 * (.39-.05*sqrt(ea12))
-     &                + 4.*tnowk**3 * (sstk-tnowk))
 
             end select
-            QBWd = QBWd - QBW
 
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
 ! --- calculate the term : ( Ts - Ta )
             deltemp = sstk - tnowk
 
+            if ( calc_swr ) then
 ! --- Calculate net solar radiation flux according to Reed (Reed,1977) formula
 !
 ! Reed, R.K.,1977: On estimating insolation over the ocean, J.Phys.
 ! Oceanogr. 17, 854-871.
 
-            call sol_rad(sol_net,cld,alon(i,j),alat(i,j)
+              call sol_rad(sol_net,cld,alon(i,j),alat(i,j)
      $                  ,iyr,imo,iday,ihour,imin)
 
+            else
+              sol_net = swrad(i,j)
+            end if
 ! --- 1. Divide net solar radiation flux by rho*Cpw and reverse sign
             swrad(i,j) = -sol_net/rho_cpw
 !
 
           if ( use_coare ) then
 
-            call coare35vn( (SP-sqrt(usrf**2+vsrf**2)),
+            call coare35vn( (sqrt((unow-usrf)**2+(vnow-vsrf)**2)),
      &                      10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
-     &                      pnow,sst_model,sol_net,QBWd,alat(i,j),
+     &                      pnow,sst_model,sol_net,lwrd,alat(i,j),
      &                      600._rk, (3.6e6*precip), 0._rk, 0._rk,
      &                      QH, QE, Evap )
-            Evap = Evap*rho/3.6e6
+!            Evap = Evap*rho/3.6e6
+!            if (my_task==1.and.i==50.and.j==50) then
+!!            print *, "3.5 EVAP: ", Evap
+!            write(61, '(6(f12.7,x),f12.7)') QE,QH,QBW,sol_net,
+!     &                           (qbw+qh+qe-sol_net),lwrd,3.6e6*precip
+!            end if
+
 !            call coare30((unow-usurf(i,j)),(vnow-vsurf(i,j)),
 !     &                    10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
 !     &                    pnow,sst_model,rnow,cld,precip*1000.,sol_net,
 !     &                   -QBW, QH, QE, Evap )
-            if (my_task==1.and.i==50.and.j==50) then
-!            print *, "3.5 EVAP: ", Evap
-            write(61, '(5(f12.7,x),f12.7)') QE,QH,QBW,sol_net,
-     &                                   (qbw+qh+qe-sol_net),QBWd
-            end if
+
+!            if (my_task==1.and.i==50.and.j==50) then
+!!            print *, "3.5 EVAP: ", Evap
+!            write(62, '(6(f12.7,x),f12.7)') QE,QH,QBW,sol_net,
+!     &                           (qbw+qh+qe-sol_net),lwrd,precip*1000.
+!            end if
 !            if (i==50.and.j==50) then
 !            print *, "3.0 EVAP: ", Evap
 !            print *, "3.0 QE:   ", QE
@@ -509,7 +510,7 @@
         integer      , intent(in)  :: iyr, imt, idy, ihr, ime
         real(kind=rk) qsw, blat, blon, acl
 
-        real(kind=rk), external :: qshort
+        real(kind=rk), external :: qshort, qshort_simple
 
         data PI/3.141593/,RAD/.01745329/
 !
@@ -647,17 +648,17 @@
 !
 ! --- cosine of the solar zenith angle :
 !
-        coszen =sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(ThSun)
+        coszen = sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(ThSun)
 !
-        if ( coszen <= 0.+1.d-4 ) then
-          coszen = 0.0
-          qatten = 0.0
+        if ( coszen <= 1.d-4 ) then
+          coszen = 0.
+          qatten = 0.
         else
           qatten = tau**(1./coszen)
         end if
         qzer  = coszen * solar
         qdir  = qzer * qatten
-        qdiff = ((1.-aozone)*qzer - qdir) * 0.5
+        qdiff = ((1.-aozone)*qzer - qdir) * .5
         qtot  =  qdir + qdiff
 !
 ! --- ( radiation as from Reed(1977), Simpson and Paulson(1979) )
@@ -697,6 +698,115 @@
         return
       end
 
+      function qshort_simple(iyr,imt,idy,ihr,ime,alat,alon,acl)
+
+        implicit none
+!
+        include 'realkind'
+
+        real(kind=rk), intent(in)  :: alat, alon, acl
+        integer      , intent(in)  :: iyr, imt, idy, ihr, ime
+
+        real(kind=rk) degrad, eclips, raddeg, pi
+
+        parameter(pi=3.1415927,degrad=pi/180.,raddeg=180./pi,
+     $            eclips=23.439*degrad)
+!
+        dimension alpham(12)
+
+        real(kind=rk) qshort_simple
+
+        integer imt1, iyr1, intT1, intT2
+        real(kind=rk)
+     &   albedo, alpha, alpham
+     & , capC, capG, capL, coseca, DEC, DTOR, delta
+     & , epsiln, g360, gha, gha360, phi
+     & , SC, sinalt
+     & , theta, UT, SHA, SMLT
+     & , xl360, XLCT
+!
+! ---   alat,alon - (lat, lon)  in radians !!
+!
+        data SC/1370./ ! Solar constant [W/m2]
+        data delta/0.85/ ! Atmospheric transmission coefficient
+        data albedo/0.06/
+!
+! --- albedo monthly values from Payne (1972) as means of the values
+! --- at 40N and 30N for the Atlantic Ocean ( hence the same latitudinal
+! --- band of the Mediterranean Sea ) :
+!
+        data alpham /0.09,0.08,0.06,0.06,0.06,0.06,0.06,0.06,
+     $               0.06,0.07,0.09,0.10/
+!
+! --- sun hour angle :
+!
+        DTOR = DEGRAD
+        XLCT = ( 1.*ihr ) + ( 1.*ime / 60. )
+        UT   = XLCT
+
+        if ( imt > 2 ) then
+          iyr1 = iyr
+          imt1 = imt-3
+        else
+          iyr1 = iyr-1
+          imt1 = imt+9
+        end if
+
+        intT1 = int(  30.6 * imt1      + 0.5 )
+        intT2 = int( 365.25*(iyr1-1976)      )
+        SMLT  = ( (UT/24.) + idy + intT1 + intT2 - 8707.5) / 36525.
+        epsiln=  23.4393 -     0.013*SMLT
+        capG  = 357.528  + 35999.050*SMLT
+
+        if ( capG > 360. ) then
+          g360 = capG - int( capG/360. )*360.
+        else
+          g360 = capG
+        end if
+
+        capC = 1.915*sin( g360*DTOR ) + .020*sin( 2.*g360*DTOR )
+        capL = 280.46 + 36000.770*SMLT + capC
+
+        if ( capL > 360. ) then
+          xl360 = capL - int( capL/360. ) *360.
+        else
+          xl360 = capL
+        end if
+
+        alpha = xl360 -
+     &     2.466*sin( 2.*xl360*DTOR ) + .053*sin( 4.*xl360*DTOR )
+        gha = 15.*UT - 180.- capC + xl360 - alpha
+
+        if ( gha > 360. ) then
+          gha360 = gha - int( gha/360. )*360.
+        else
+          gha360 = gha
+        end if
+
+        DEC = atan( tan( epsiln*DTOR ) * sin( alpha*DTOR ) )/DTOR
+
+!     Calculate Solar Hour Angle
+        phi = ( GHA360 + alon*RADDEG )*degrad
+        SHA = GHA360 + ( alon*RADDEG )
+
+! --- sun declination :
+        theta = DEC * DEGRAD
+
+        sinalt = cos(theta)*cos(alat)*cos(phi)+sin(theta)*sin(alat)
+        coseca = 1. / sinalt
+!
+        if ( coseca < -40. ) coseca = -40.
+
+        rewind( 40 )
+        write( 40, * ) delta, coseca, sinalt
+        qshort_simple = SC*( delta**coseca * (sinalt-1.) + .91 )
+     &                    *( 1 - .71*acl )*( 1. - albedo )
+        if ( qshort_simple > SC ) qshort_simple = SC
+!
+        return
+      end
+
+
       subroutine coare30( uw, vw, blk_ZW, Tair, blk_ZT, Hair, blk_ZQ
      &                  , Pair, Tsea, Rsea, cloud, rain, srflx, LRad
      &                  , shflx, lhflx, evap )
@@ -732,7 +842,7 @@
 
         blk_Beta =   1.2
         blk_cpa  =1004.67
-        blk_cpw  =   4.082793e6
+        blk_cpw  =   4.082793e3
         blk_dter =    .3
         blk_Rgas = 287.1
         blk_tcw  =    .6
@@ -1182,7 +1292,7 @@
         seastate = .false.
 
 ! convert rh to specific humidity (the functions below return g/kg)
-        Qs = qsat26sea(ts,P)/1000.          ! surface water specific humidity [g/kg]
+        Qs = qsat26sea(ts,P)/1000.          ! surface water specific humidity [kg/kg]
         call qsat26air(t,P,rh, Q, Pv)       ! specific humidity of air [kg/kg]
         Q = Q/1000.
 
@@ -1258,14 +1368,14 @@
 !  Charnock variable
 !----------------------------------------------------------
 
-!        charnC = 0.011
-!        umax   = 19.
-!        a1     =   .0017
-!        a2     =-  .0050
-!
-!        charnC = a1*u10 + a2
-!        if ( u10 > umax ) charnC = a1*umax+a2
-!        if ( charnC < 0.011 ) charnC = 0.011
+        charnC = 0.011
+        umax   = 19.
+        a1     =   .0017
+        a2     =-  .0050
+
+        charnC = a1*u10 + a2
+        if ( u10 > umax ) charnC = a1*umax+a2
+        if ( charnC < 0.011 ) charnC = 0.011
 
         A = 0.114   ! wave-age dependent coefficients
         B = 0.622
@@ -1360,9 +1470,9 @@
         hbb =-rhoa*cpa*usr*tvsr     ! buoyancy flux
         hsbb=-rhoa*cpa*usr*tssr     ! sonic heat flux
         wbar=1.61*hlb/Le/(1.+1.61*Q)/rhoa + hsb/rhoa/cpa/ta
-        hlwebb = rhoa*wbar*Q*Le
-        Evap   = 1000.*hlwebb/Le/1000.*3600.    !mm/hour
-        hlb = hlb - hlwebb ! ?????? Webb correction to latent heat flux already in ef via zoq/rr function so return hlwebb
+        hlwebb = hlb + rhoa*wbar*Q*Le
+        Evap   = hlwebb/Le
+!        hlb = hlb + hlwebb ! ?????? Webb correction to latent heat flux already in ef via zoq/rr function so return hlwebb
 
 !-----  compute transfer coeffs relative to ut @ meas. ht  --------------------
         Cd = tau/rhoa/ut/max(.1,u)
@@ -1411,10 +1521,10 @@
 !******** rain heat flux (save to use if desired) *****************************
         dwat = 2.11e-5*((t+tdk)/tdk)**1.94  ! water vapour diffusivity
         dtmp =(1. + 3.309e-3*t - 1.44e-6*t*t)*0.02411/(rhoa*cpa) ! heat diffusivity
-        dqs_dt = Q*Le/(Rgas*(t+tdk)**2)  ! Clausius-Clapeyron
+        dqs_dt = Q*Le/(Rgas*(t+tdk)**2.)  ! Clausius-Clapeyron
         alfac= 1./(1.+0.622*(dqs_dt*Le*dwat)/(cpa*dtmp))  ! wet bulb factor
         RF = rain*alfac*cpw*
-     &      ((ts-t-dter*jcool)+(Qs-Q-dqer*jcool)*Le/cpa)/3600.
+     &      ((ts-t-dter*jcool)+(Qs-Q-dqer*jcool)*Le/cpa)/3600. ! [W/m2]??? 1/3600 here is to convert rain in mm/h to kg/m2/s.
         hsb = hsb+RF
 
         lapse = grav/cpa
