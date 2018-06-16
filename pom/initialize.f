@@ -162,6 +162,8 @@
       implicit none
       include 'pom.h'
       include 'io.h'
+      include 'bulk.h'
+
       namelist/pom_nml/ title,netcdf_file,mode,nadv,nitera,sw,npg,dte, !fhx:Toni:npg
      $                  isplit,time_start,nread_rst,read_rst_file
      $                 ,write_rst,write_rst_file,days,prtd1,prtd2
@@ -171,7 +173,7 @@
      $                 ,nbct,nbcs,tprni,umol,z0b,ntp
 
       namelist/switch_nml/
-     $     calc_wind, calc_tsforce, calc_river, calc_assim,
+     $     calc_bulk, calc_wind, calc_tsforce, calc_river, calc_assim,
      $     calc_assimdrf,         !eda
      $     calc_tsurf_mc, calc_tide,!fhx:mcsst; fhx:tide
      $     calc_uvforce,         !eda:uvforce
@@ -190,6 +192,7 @@
      &, rhum_name, sht_name, sst_name, swr_name, tair_name
      &, tcld_name, umf_name, uwnd_name, vmf_name, vwnd_name
      &, wgst_name
+      namelist/bulk_nml/ calc_swr, use_coare, lwrad_formula
 
 ! Input of filenames and constants
 
@@ -285,6 +288,15 @@
 ! Initial value of aam:
       aam_init=500.
 
+! Bulk default parameters
+!
+! Calculate shortwave radiation according to Reed
+      calc_swr  = .true.
+
+! Do not use COARE algorithm for heat fluxes estimation by default
+      use_coare = .false.
+
+
 ! Other parameters and flags
       sf_bf = 1.
       sf_hf = 1.
@@ -310,6 +322,11 @@
       read(73,nml=input_vars_nml)
       close(73)
 
+! read bulk configuration
+      open(73,file='bulk.nml',status='old')
+      read(73,nml=bulk_nml)
+      close(73)
+
 ! End of input of constants
 
 ! calculate some constants
@@ -328,13 +345,21 @@
       ispi=1./float(isplit)
       isp2i=1./(2.*float(isplit))
 
-! initialise time
-! Calulate the Julian days from 1992-01-01 !fhx:20110113
-      dtime0 = str2date( time_start(1:19) )
-      dtime = str2date(read_rst_file(1:13)//":"//
+! Initialise time
+! Do not offset time if not restarting
+      if ( nread_rst /= 0 ) then
+
+        dtime0 = str2date( time_start(1:19) )
+        dtime = str2date( read_rst_file(1:13)//":"//
      &  read_rst_file(15:16)//":"//read_rst_file(18:19) )
 
-      time0 = real( (dtime-dtime0)/86400, rk )
+        time0 = real( (dtime-dtime0)/86400, rk )
+
+      else
+
+        time0 = 0.
+
+      end if
 
 !      if (my_task == master_task) then
 !         print*, 'dtime',dtime
@@ -403,6 +428,14 @@
         write(6,'(''   heat flux     = '',f10.4)') sf_hf
         write(6,'(''   wind speed    = '',f10.4)') sf_wi
         write(6,'(''   lat.velocities= '',f10.4)') sf_bf
+        if ( calc_bulk ) then
+          write(6,'(/'' Air-Sea Bulk: [ ENABLED ]'')')
+          write(6,'(''   calc swrad    = '',l2)') calc_swr
+          write(6,'(''   use COARE     = '',l2)') use_coare
+          write(6,'(''   longwave form.= '',i2)') lwrad_formula
+        else
+          write(6,'(/'' Air-Sea Bulk: [ DISABLED ]'')')
+        end if
       end if
 
       return

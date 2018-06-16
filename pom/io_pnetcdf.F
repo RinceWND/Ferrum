@@ -2947,10 +2947,12 @@
 !_______________________________________________________________________
       subroutine read_ncep_bulk_pnetcdf( pres, tair, rhum, rain, cloud
      $                                  ,uwnd, vwnd, tskn, filename, n )
-! read wind stress
+! read bulk data
+      use mpi
+      use pnetcdf
+
       implicit none
-# include "mpif.h"
-# include "pnetcdf.inc"
+
       include 'pom.h'
       include 'io.h'
 
@@ -2959,7 +2961,7 @@
       real(kind=rk), dimension(im,jm) :: pres, tair, rhum, rain, cloud
      $                                  ,uwnd, vwnd, tskn
       character(len=*)  filename
-      character(len=256) netcdf_read_file
+      character(len=256) netcdf_read_file, att_val
       integer ncid,status
       integer pres_varid, tair_varid, rhum_varid, rain_varid
      $       ,cloud_varid, uwnd_varid, vwnd_varid, tskn_varid
@@ -2989,35 +2991,35 @@
      $                                    trim(netcdf_read_file),n
       end if
 
-      status = nfmpi_open( pom_comm, netcdf_read_file, nf_nowrite,
-     $                     mpi_info_null, ncid )
+      status = nf90mpi_open( pom_comm, netcdf_read_file, nf_nowrite,
+     &                       mpi_info_null, ncid )
       call handle_error_pnetcdf('nfmpi_open: '//netcdf_read_file,
-     $                          status,nf_noerr)
+     &                          status,nf_noerr)
 
 ! get variables
-      status=nfmpi_inq_varid(ncid,'pres',pres_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: pres'
+      status = nf90mpi_inq_varid( ncid, trim(pres_name), pres_varid )
+      call handle_error_pnetcdf('nfmpi_inq_varid: '//trim(pres_name)
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'tair',tair_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: tair'
+      status = nf90mpi_inq_varid( ncid, trim(tair_name), tair_varid )
+      call handle_error_pnetcdf('nfmpi_inq_varid: '//trim(tair_name)
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'rhum',rhum_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: rhum'
+      status = nf90mpi_inq_varid( ncid, trim(rhum_name), rhum_varid )
+      call handle_error_pnetcdf('nfmpi_inq_varid: '//trim(rhum_name)
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'prate',rain_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: rain'
+      status = nf90mpi_inq_varid( ncid, trim(prat_name), rain_varid )
+      call handle_error_pnetcdf('nfmpi_inq_varid: '//trim(prat_name)
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'cloud',cloud_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: cloud'
+      status = nf90mpi_inq_varid( ncid, trim(tcld_name), cloud_varid)
+      call handle_error_pnetcdf('nfmpi_inq_varid: '//trim(tcld_name)
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'uwnd',uwnd_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: uwnd'
+      status = nf90mpi_inq_varid( ncid, trim(uwnd_name), uwnd_varid )
+      call handle_error_pnetcdf('nfmpi_inq_varid: '//trim(uwnd_name)
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'vwnd',vwnd_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: vwnd'
+      status = nf90mpi_inq_varid( ncid, trim(vwnd_name), vwnd_varid )
+      call handle_error_pnetcdf('nfmpi_inq_varid: '//trim(vwnd_name)
      $                          ,status,nf_noerr)
-      status=nfmpi_inq_varid(ncid,'skt',tskn_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: skt'
+      status = nf90mpi_inq_varid( ncid, trim(sst_name), tskn_varid )
+      call handle_error_pnetcdf('nfmpi_inq_varid: '//trim(sst_name)
      $                          ,status,nf_noerr)
 
 ! get data
@@ -3028,32 +3030,50 @@
       edge(2)=jm
       edge(3)=1
 
-      status = get_var_real_2d(ncid,pres_varid,start,edge,pres)
-      call handle_error_pnetcdf('get_var_real: pres',status,nf_noerr)
-      pres = pres/100.
+      status = get_var_real_2d( ncid, pres_varid, start,edge, pres )
+      call handle_error_pnetcdf('get_var_real: '//trim(pres_name)
+     &                          ,status,nf_noerr)
+      status = nf90mpi_get_att( ncid, pres_varid, 'units', att_val )
+      if ( status == nf_noerr ) then
+        if ( trim(att_val) == 'Pa' ) pres = pres/100.
+      end if
 
-      status = get_var_real_2d(ncid,tair_varid,start,edge,tair)
-      call handle_error_pnetcdf('get_var_real: tair',status,nf_noerr)
-      tair = tair-273.15
+      status = get_var_real_2d( ncid, tair_varid, start,edge, tair )
+      call handle_error_pnetcdf('get_var_real: '//trim(tair_name)
+     &                          ,status,nf_noerr)
+      status = nf90mpi_get_att( ncid, tair_varid, 'units', att_val )
+      if ( status == nf_noerr ) then
+        if ( index(trim(att_val), 'K') /= 0 ) tair = tair - 273.15
+      end if
 
-      status = get_var_real_2d(ncid,rhum_varid,start,edge,rhum)
-      call handle_error_pnetcdf('get_var_real: rhum',status,nf_noerr)
+      status = get_var_real_2d( ncid, rhum_varid, start,edge, rhum )
+      call handle_error_pnetcdf('get_var_real: '//trim(rhum_name)
+     &                          ,status,nf_noerr)
 
-      status = get_var_real_2d(ncid,rain_varid,start,edge,rain)
-      call handle_error_pnetcdf('get_var_real: rain',status,nf_noerr)
+      status = get_var_real_2d( ncid, rain_varid, start,edge, rain )
+      call handle_error_pnetcdf('get_var_real: '//trim(prat_name)
+     &                          ,status,nf_noerr)
 
-      status = get_var_real_2d(ncid,cloud_varid,start,edge,cloud)
-      call handle_error_pnetcdf('get_var_real: cloud',status,nf_noerr)
+      status = get_var_real_2d( ncid, cloud_varid, start,edge, cloud )
+      call handle_error_pnetcdf('get_var_real: '//trim(tcld_name)
+     &                          ,status,nf_noerr)
+      where( cloud < 0. ) cloud = 0.
 
-      status = get_var_real_2d(ncid,uwnd_varid,start,edge,uwnd)
-      call handle_error_pnetcdf('get_var_real: uwnd',status,nf_noerr)
+      status = get_var_real_2d( ncid, uwnd_varid, start,edge, uwnd )
+      call handle_error_pnetcdf('get_var_real: '//trim(uwnd_name)
+     &                          ,status,nf_noerr)
 
-      status = get_var_real_2d(ncid,vwnd_varid,start,edge,vwnd)
-      call handle_error_pnetcdf('get_var_real: vwnd',status,nf_noerr)
+      status = get_var_real_2d( ncid, vwnd_varid, start,edge, vwnd )
+      call handle_error_pnetcdf('get_var_real: '//trim(vwnd_name)
+     &                          ,status,nf_noerr)
 
-      status = get_var_real_2d(ncid,tskn_varid,start,edge,tskn)
-      call handle_error_pnetcdf('get_var_real: skt',status,nf_noerr)
-      tskn = tskn-273.15
+      status = get_var_real_2d( ncid, tskn_varid, start,edge, tskn )
+      call handle_error_pnetcdf('get_var_real: '//trim(pres_name)
+     &                          ,status,nf_noerr)
+      status = nf90mpi_get_att( ncid, tskn_varid, 'units', att_val )
+      if ( status == nf_noerr ) then
+        if ( index(trim(att_val), 'K') /= 0 ) tskn = tskn - 273.15
+      end if
 
 ! close file
       status=nfmpi_close(ncid)
