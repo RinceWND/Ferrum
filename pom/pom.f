@@ -32,9 +32,13 @@
 
 ! starting date and time
 ! read date from restart file name !fhx:
-!     dtime = str2date( time_start(1:19) )
-      dtime = str2date( read_rst_file(1:13)//":"//
-     &read_rst_file(15:16)//":"//read_rst_file(18:19) )
+! ...only if restart is enabled
+      if ( nread_rst /= 0 ) then
+        dtime = str2date( read_rst_file(1:13)//":"//
+     &  read_rst_file(15:16)//":"//read_rst_file(18:19) )
+      else
+        dtime = str2date( time_start )
+      end if
       mb = dtime%month
 
       if ( calc_uvforce ) call uvforce_init(dtime) !eda:uvforce

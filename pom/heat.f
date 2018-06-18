@@ -75,21 +75,14 @@
 ! and interpolate them to the current time step)
 !
 !*******************************************************************************
-!      implicit none
+      implicit none
 
       include 'realkind'
+      include 'bulk.h'
 
-      integer*1 LWRAD_FORMULA,
-     &          lwBERLIAND, lwBIGNAMI, lwHERZFELD, lwMAY
-!-------------------------------------------------------------------------------
-! Longwave radiation formula (defaulted to lwBERLIAND)
-      parameter ( lwBIGNAMI  = 0,
-     &            lwMAY      = 1,
-     &            lwHERZFELD = 2,
-     &            lwBERLIAND = 3 )
-      logical, parameter :: use_coare = .true., calc_swr = .false.
-
-      integer, intent(in) :: my_task
+      integer      , intent(in) :: im,jm, my_task
+      real(kind=rk), intent(in) :: tbias
+      integer      , intent(in) :: iyr,imo,iday,ihour,imin
 
       real(kind=rk), dimension(im, jm) ::
      $ fsm(im,jm),pme(im,jm),swrad(im,jm),wusurf(im,jm),
@@ -105,14 +98,15 @@
 
       real(kind=rk), external :: cd, heatlat, esk
 
+      integer       i, j
       real(kind=rk) arho
-     &            , cd1, ce2, ch2
+     &            , cd1, ce2, ch2, ckelv, const, cp
      &            , deltemp
-     &            , ea12, emiss, esatair, esatoce, evap
-     &            , fe, fh
+     &            , ea12, emiss, esatair, esatoce, evap, expsi
+     &            , fe, fh, ps
      &            , Qe, Qh, Qu
-     &            , rhnow, rho, rhom, rnow
-     &            , sigma, sol_net, sp, ss, sstk, stp
+     &            , rd, rhnow, rho, rhom, rnow, rho_cpw
+     &            , sigma, solar, sol_net, sp, ss, sstk, stp
      &            , taux, tauy, tnowk
      &            , usrf, vsrf
      &            , wair, wflux, wsatair, wsatoce
@@ -149,8 +143,6 @@
       data ckelv /273.16/
 !
       const = 0.622/1013.
-!
-      LWRAD_FORMULA = -1  ! Default to Berliand formula (same as 3)
 !
       do j = 1,jm
         do i = 1,im
@@ -1402,8 +1394,8 @@
 
         do i = 1, nits
 
-!          zet = von*grav*zu/ta*(tsr+.61*ta*qsr/(1+.61*Q))/(usr**2)
-          zet = von*grav*zu*(tsr*(1.+.61*Q))
+          zet = von*grav*zu/ta*(tsr+.61*ta*qsr)/(usr**2)
+!          zet = von*grav*zu*(tsr*(1.+.61*Q))
           if (waveage) then
             if (seastate) then
               charn = charnS
@@ -1422,11 +1414,6 @@
           cdhf = von    /(log(zu/zo) - psiu_26(zu/L))
           cqhf = von*fdg/(log(zq/zoq)- psit_26(zq/L))
           cthf = von*fdg/(log(zt/zot)- psit_26(zt/L))
-          if (isnan(cdhf)) then
-            print *, "zo:   ", charn, usr, grav, visa
-            print *, "cdhf: ", von, zu, zo, L
-            print *, "logs: ", log(zu/zo), psiu_26(zu/L), ut
-          end if
           usr  = ut*cdhf
           qsr  =-(dq-wetc*dter*jcool)*cqhf
           tsr  =-(dt-dter*jcool)*cthf
@@ -1471,7 +1458,7 @@
         hsbb=-rhoa*cpa*usr*tssr     ! sonic heat flux
         wbar=1.61*hlb/Le/(1.+1.61*Q)/rhoa + hsb/rhoa/cpa/ta
         hlwebb = hlb + rhoa*wbar*Q*Le
-        Evap   = hlwebb/Le
+        Evap   = hlwebb/Le          ! evaporation rate [kg/m^2/s]
 !        hlb = hlb + hlwebb ! ?????? Webb correction to latent heat flux already in ef via zoq/rr function so return hlwebb
 
 !-----  compute transfer coeffs relative to ut @ meas. ht  --------------------

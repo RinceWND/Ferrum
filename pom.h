@@ -499,7 +499,7 @@
 ! ayumi 2010/4/15
 
       logical
-     $  calc_wind, calc_tsforce,
+     $  calc_bulk, calc_wind, calc_tsforce,
      $  calc_river, calc_assim,
      $  calc_assimdrf, !eda
      $  calc_interp,    !fhx:interp_flag
@@ -524,6 +524,7 @@
 
 
       common/blklog/
+     &  calc_bulk,
      $  calc_wind,
      $  calc_tsforce,
      $  calc_river,

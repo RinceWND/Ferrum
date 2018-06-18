@@ -12,8 +12,7 @@
 
       real(rk), external :: heatlat
 
-      logical, parameter :: calc_bulk     = .true.
-     &                    , read_bulk     = .true.
+      logical, parameter :: read_bulk     = .true.
      &                    , read_flux     = .false.
      &                    , relax_surface = .true.
      &                    , corr_surface  = .false.
