@@ -232,14 +232,14 @@
         call transport_to_velocities
 
 !        print *, my_task, ": VOLTR [Sv]: ", transport(1:n_bry)
-        if ( my_task == 1 ) then
-          print *, my_task, ": TsuV [m/s]: "
-     &         , minval(vabs), ";", maxval(vabs)
-        end if
-        if ( my_task == 3 ) then
-          print *, my_task, ": TsgUSoy [m/s]: "
-     &         , minval(uabe), ";", maxval(uabe)
-        end if
+!        if ( my_task == 1 ) then
+!          print *, my_task, ": TsuV [m/s]: "
+!     &         , minval(vabs), ";", maxval(vabs)
+!        end if
+!        if ( my_task == 3 ) then
+!          print *, my_task, ": TsgUSoy [m/s]: "
+!     &         , minval(uabe), ";", maxval(uabe)
+!        end if
 
       else
 
@@ -382,29 +382,30 @@
               x1 = minloc(i_global, 1, i_global >= x(1,n))
               x2 = maxloc(i_global, 1, i_global <= x(2,n))
 
-              if ( x1 > 0 .and. x2 <= im ) then
+              x1 = max( 1,x1)
+              x2 = min(im,x2)
 
-                do i = x1, x2
-                  area = area + 0.25
-     &           * ( h(i,1) + elf(i,1) + h(i,2) + elf(i,2) )
-     &           * ( dx(i,1) + dx(i,2) ) * dum(i,1)
-                end do
-
-              end if
+              do i = x1, x2
+                area = area + 0.25
+     &         * ( h(i,1) + elf(i,1) + h(i,2) + elf(i,2) )
+     &         * ( dx(i,1) + dx(i,2) ) * dum(i,1)
+              end do
 
             end if
           end if
 
           call sum0d_mpi( area, 0 )
           call bcast0d_mpi( area, 0 )
+!          if ( my_task == master_task ) then
+!            print *, "TSU AREA [m2]:", area
+!            print *, "Transport [Sv]:", transport(n)
+!          end if
 
           if ( area > 0. ) then
             if ( n_south == -1 ) then
               if ( y(1,n) == y(2,n) .and. int(y(1,n)) == 1 ) then
 
-                if ( x1 > 0 .and. x2 <= im ) then
-                  vabs(x1:x2) = dvm(x1:x2,1)*transport(n) / area
-                end if
+                vabs(x1:x2) = dvm(x1:x2,1)*transport(n) / area
 
               end if
             end if
