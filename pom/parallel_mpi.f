@@ -45,8 +45,9 @@
 ! check number of processors
       if(nproc.ne.n_proc) then
         error_status=1
-        if(my_task.eq.master_task) write(*,'(a//a)')
-     $   'Incompatible number of processors','POM terminated with error'
+        if(my_task.eq.master_task) write(*,'(a,i3''/=''i3//a)')
+     $   'Incompatible number of processors',nproc,n_proc
+     $  ,'POM terminated with error'
         call finalize_mpi
         stop
       end if

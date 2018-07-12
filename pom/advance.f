@@ -4,6 +4,7 @@
 
 !_______________________________________________________________________
       subroutine advance
+        use seaice
 ! advance POM 1 step in time
       implicit none
       include 'pom.h'
@@ -24,6 +25,7 @@
       do iext=1,isplit
         call mode_external
         call check_nan_2d  !fhx:tide:debug
+        if (calc_ice) call ice_advance
       end do
 
 ! internal (3-D) mode calculation
@@ -86,12 +88,12 @@
 ! oscilations near the boundary (Jamart and Ozer, JGR, 91, 10621-10631)
 !          wusurf(i,j)=0.e0
 !     test ayumi 2010/5/8
-!          wusurf(i,j) = 2.e-4 
-!     $     * cos( pi *( north_e(i,j) - 10.e0 ) / 40.e0 ) 
-     
+!          wusurf(i,j) = 2.e-4
+!     $     * cos( pi *( north_e(i,j) - 10.e0 ) / 40.e0 )
+
 !          wvsurf(i,j)=0.e0
 
-          e_atmos(i,j)=0.
+!          e_atmos(i,j)=0.
 !          vfluxf(i,j)=0.e0
 
 ! set w(i,j,1)=vflux(i,j).ne.0 if one wishes non-zero flow across
@@ -106,7 +108,7 @@
 ! only the evaporative component of vflux) and the long wave
 ! radiation
 
-! ayumi 2010/4/19 
+! ayumi 2010/4/19
 ! wtsurf & wssurf are calculated in tsclim_monthly
 !          wtsurf(i,j)=0.e0
 
@@ -147,18 +149,7 @@
       if(mode.ne.2) then
         call advct(a,c,ee)
 
-        if (npg==1) then   !fhx:Toni:npg
-          call baropg
-        else if (npg==2) then
-          call baropg_mcc
-        else if (npg==3) then
-          call baropg_lin
-        else if (npg==4) then
-          call baropg_song_std
-        else
-          error_status=1
-          write(6,'(/''Error: invalid value for npg'')')
-        end if
+        call pgscheme(npg)
 
 !lyo:scs1d:
         if (n1d.ne.0) then
@@ -308,7 +299,7 @@
      $                         +elf(i,j)-elf(i-1,j))
      $                  +e_atmos(i,j)-e_atmos(i-1,j))
      $              +drx2d(i,j)+aru(i,j)*(wusurf(i,j)-wubot(i,j))
-           
+
         end do
       end do
 
@@ -479,7 +470,7 @@
 !     IF(MOD(IINT,16).EQ.0) THEN   ! 16 = 3.*3600./dti, every 3 hours
 !--      IF(iint.eq.1 .or. MOD(IINT,16).EQ.0) THEN
 !--      IF(MOD(IINT,IASSIM).EQ.0) THEN
-!        call assimdrf_OIpsLag(time, itime1, mins, sec, 
+!        call assimdrf_OIpsLag(time, itime1, mins, sec,
 !    1     IM, JM, KB, u, v, Nx, Ny, beta, alon, alat, zz, D,
 !    2     igs, ige, jgs, jge, ndrfmax,
 !    3     ub, vb, dz, DrfDir)
@@ -507,6 +498,8 @@
         call advq(q2lb,q2l,vf,a,c)
         call profq(a,c,tps,dtef)
 
+        where(q2l.lt..5*small) q2l = .5*small
+        where(q2lb.lt..5*small) q2lb = .5*small
         call bcond(6)
 
 
@@ -532,17 +525,17 @@
 
 
 ! calculate tf and sf using uf, vf, a and c as temporary variables
-        if(mode.ne.4) then
+        if( mode /= 4 .and. ( iint > 2 .or. nread_rst == 1 ) ) then
           if(nadv.eq.1) then
 !            call advt1(tb,t,tclim,uf,a,c)
 !            call advt1(sb,s,sclim,vf,a,c)
             call advt1(tb,t,tclim,uf,a,c,'T')
             call advt1(sb,s,sclim,vf,a,c,'S')
           else if(nadv.eq.2) then
-!            call advt2(tb,t,tclim,uf,a,c)
-!            call advt2(sb,s,sclim,vf,a,c)
-            call advt2(tb,t,tclim,uf,a,c,'T')
-            call advt2(sb,s,sclim,vf,a,c,'S')
+!            call advt2(tb,tclim,uf,a,c)
+!            call advt2(sb,sclim,vf,a,c)
+            call advt2(tb,tclim,uf,a,c,'T')
+            call advt2(sb,sclim,vf,a,c,'S')
           else
             error_status=1
             write(6,'(/''Error: invalid value for nadv'')')
@@ -554,6 +547,12 @@
 
 
           call bcond(4)
+          if (t_lo > -999.) then
+            where (uf<t_lo) uf = t_lo
+          end if
+          if (t_hi <  999.) then
+            where (uf>t_hi) uf = t_hi
+          end if
 
 
           call exchange3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
@@ -784,17 +783,18 @@
         call sum0d_mpi(  vol_tot, master_task )
         call sum0d_mpi( area_tot, master_task )
 
-        temp_ave = temp_ave / vol_tot
-        salt_ave = salt_ave / vol_tot
-        elev_ave = elev_ave / area_tot
-
-
 ! print averages
-        if(my_task.eq.master_task) 
-     $       write(*,'(a,e15.8,2(a,f11.8),a)') 
+        if(my_task.eq.master_task) then
+
+          temp_ave = temp_ave / vol_tot
+          salt_ave = salt_ave / vol_tot
+          elev_ave = elev_ave / area_tot
+          write(*,'(a,e15.8,2(a,f11.8),a)')
      $       "mean ; et = ",elev_ave," m, tb = ",
      $       temp_ave + tbias," deg, sb = ",
-     $       salt_ave + sbias ," psu"
+     $       salt_ave + sbias," psu"
+
+        end if
 
       end if
 
@@ -874,8 +874,8 @@
       vsrf_mean    = vsrf_mean    + v(:,:,1)
       elsrf_mean    = elsrf_mean    + elb
       uwsrf_mean = uwsrf_mean + uwsrf
-      vwsrf_mean = vwsrf_mean + vwsrf      
-      
+      vwsrf_mean = vwsrf_mean + vwsrf
+
       nums = nums + 1
 
       return
@@ -895,7 +895,7 @@
 !
 !      if(netcdf_file.ne.'nonetcdf' .and. mod(iint,iprint).eq.0) then
 !
-!         
+!
 !         uab_mean    = uab_mean    / real ( num )
 !         vab_mean    = vab_mean    / real ( num )
 !         elb_mean    = elb_mean    / real ( num )
@@ -913,23 +913,23 @@
 !         km_mean     = km_mean     / real ( num )
 !
 !
-!         
-!!         if ( my_task == 41 ) 
+!
+!!         if ( my_task == 41 )
 !!     $        print*, im/2,jm/2,rot(im/2,jm/2),
 !!     $        uab_mean(im/2,jm/2),vab_mean(im/2,jm/2)
 !!         do j = 1, jm
 !!            do i = 1, im
 !!               u_tmp = uab_mean(i,j)
 !!               v_tmp = vab_mean(i,j)
-!!               uab_mean(i,j) 
+!!               uab_mean(i,j)
 !!     $              = u_tmp * cos( rot(i,j) * deg2rad )
 !!     $              - v_tmp * sin( rot(i,j) * deg2rad )
-!!               vab_mean(i,j) 
+!!               vab_mean(i,j)
 !!     $              = u_tmp * sin( rot(i,j) * deg2rad )
 !!     $              + v_tmp * cos( rot(i,j) * deg2rad )
 !!            enddo
 !!         enddo
-!!         if ( my_task == 41 ) 
+!!         if ( my_task == 41 )
 !!     $        print*, im/2,jm/2,
 !!     $        cos(rot(im/2,jm/2)*deg2rad),
 !!     $        uab_mean(im/2,jm/2),vab_mean(im/2,jm/2)
@@ -939,10 +939,10 @@
 !!            do i = 1, im
 !!               u_tmp = wusurf_mean(i,j)
 !!               v_tmp = wvsurf_mean(i,j)
-!!               wusurf_mean(i,j) 
+!!               wusurf_mean(i,j)
 !!     $              = u_tmp * cos( rot(i,j) * deg2rad )
 !!     $              - v_tmp * sin( rot(i,j) * deg2rad )
-!!               wvsurf_mean(i,j) 
+!!               wvsurf_mean(i,j)
 !!     $              = u_tmp * sin( rot(i,j) * deg2rad )
 !!     $              + v_tmp * cos( rot(i,j) * deg2rad )
 !!            enddo
@@ -952,16 +952,16 @@
 !!               do i = 1, im
 !!                  u_tmp = u_mean(i,j,k)
 !!                  v_tmp = v_mean(i,j,k)
-!!                  u_mean(i,j,k) 
+!!                  u_mean(i,j,k)
 !!     $                 = u_tmp * cos( rot(i,j) * deg2rad )
 !!     $                 - v_tmp * sin( rot(i,j) * deg2rad )
-!!                  v_mean(i,j,k) 
+!!                  v_mean(i,j,k)
 !!     $                 = u_tmp * sin( rot(i,j) * deg2rad )
 !!     $                 + v_tmp * cos( rot(i,j) * deg2rad )
 !!               enddo
 !!            enddo
 !!         enddo
-!         
+!
 !
 !         write( filename, '("out/",2a,".nc")' )
 !     $        trim( netcdf_file ), date2str( d_in )
@@ -983,7 +983,7 @@
 !         rho_mean    = 0.0
 !         kh_mean     = 0.0
 !         km_mean     = 0.0
-!         
+!
 !         num = 0
 !
 !      endif
@@ -993,11 +993,11 @@
 !
 !_______________________________________________________________________
       subroutine check_nan
-      
+
       implicit none
 
       include 'pom.h'
-      
+
       call detect_nan( u, "u" )
       call detect_nan( v, "v" )
       call detect_nan( t, "t" )
@@ -1008,12 +1008,12 @@
 
 !_______________________________________________________________________
       subroutine detect_nan( var, varname )
-      
+
       implicit none
       include 'pom.h'
 
       integer i, j, k, num_nan
-      real(kind=rk), intent(in) :: var(im,jm,kb) 
+      real(kind=rk), intent(in) :: var(im,jm,kb)
       character(len=*),intent(in)  :: varname
 !      logical isnanf
 
@@ -1047,27 +1047,27 @@
 !_______________________________________________________________________
 !fhx:tide:debug
       subroutine check_nan_2d
-      
+
       implicit none
 
       include 'pom.h'
-      
+
       call detect_nan_2d( uaf, "uaf" )
       call detect_nan_2d( vaf, "vaf" )
       call detect_nan_2d( elf, "elf" )
-      
+
 
       return
       end
 !_______________________________________________________________________
 !fhx:tide;debug
       subroutine detect_nan_2d( var, varname )
-      
+
       implicit none
       include 'pom.h'
 
       integer i, j, num_nan
-      real(kind=rk), intent(in) :: var(im,jm) 
+      real(kind=rk), intent(in) :: var(im,jm)
       character(len=*),intent(in)  :: varname
 !      logical isnanf
 
@@ -1082,7 +1082,7 @@
      $                 var(i,j),h(i,j),time
                        num_nan = num_nan + 1
                endif
- 
+
          enddo
       enddo
 
@@ -1098,3 +1098,26 @@
       return
       end
 !_______________________________________________________________________
+
+      subroutine pgscheme(npg)
+
+        implicit none
+
+        integer, intent(in) :: npg
+
+        select case (npg)
+          case (1)
+            call baropg
+          case (2)
+            call baropg_mcc
+          case (3)
+            call baropg_lin
+          case (4)
+            call baropg_song_std
+          case (5)
+            call baropg_shch
+          case default
+            call baropg_mcc
+        end select
+
+      end subroutine

@@ -92,10 +92,10 @@
 ! fhx: interpolation to fine grid. 12/13/2010
       if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.
 
-        call interp_mask_2d(frs_coarse,0,east_e,north_e,fsm,frs)
-        call interp_mask_3d(tav_coarse,0,east_e,north_e,fsm,tav)
-        call interp_mask_3d(fac_coarse,0,east_e,north_e,fsm,fac)
-        call interp_mask_3d(cof_coarse,0,east_e,north_e,fsm,cof)
+        call interp_mask_2d(frs_coarse,0,east_e,north_e,frs)
+        call interp_mask_3d(tav_coarse,0,east_e,north_e,tav)
+        call interp_mask_3d(fac_coarse,0,east_e,north_e,fac)
+        call interp_mask_3d(cof_coarse,0,east_e,north_e,cof)
 
       if (n_west.eq.-1) then
 

@@ -39,7 +39,7 @@
 
           if(my_task.eq.master_task) write(*,'(a//a)')
      $   'Incompatible number of *_global and *_global_coarse',
-     $   'POM terminated with error' 
+     $   'POM terminated with error'
           stop
 
       end if
@@ -74,7 +74,7 @@
       end do
       end do
       dvm(:,1)=dvm(:,2)
-      
+
       call exchange2d_mpi(h,im,jm)
       call exchange2d_mpi(fsm,im,jm)
       call exchange2d_mpi(dum,im,jm)
@@ -84,7 +84,7 @@
 ! read initial and lateral boundary conditions
       call initial_conditions
 
-! read laterel boundary conditions 
+! read laterel boundary conditions
       call lateral_boundary_conditions !ayumi:20100407
 
 !lyo:pac10:beg:
@@ -95,7 +95,7 @@
 !     For FRZ in bcond: T[n+1]={ (1-frz)*T[n] + frz*Tobs },
 !     the inverse-relax-time = frz/dti,
 !     so that since "bfrz" gives frz=1 @boundaries,
-!     frz=1 (=dti/dti) -> inverse-relax-time = 1/dti @boundaries, and 
+!     frz=1 (=dti/dti) -> inverse-relax-time = 1/dti @boundaries, and
 !     frz=dti/86400.   -> inverse-relax-time = 1/86400 @boundaries etc.
       rdisp=dti/86400.; frz(:,:)=frz(:,:)*rdisp !lyo:stcc:mar_:dec_:
 !     rdisp=1.;         frz(:,:)=frz(:,:)*rdisp !lyo:stcc:
@@ -122,20 +122,20 @@
      $    call incmix(aamfac,im,jm,1,lono,lato,east_e,north_e,xs,ys,fak)
 
 ! read restart data from a previous run
-      if(nread_rst.ne.0) call read_restart_pnetcdf 
+      if(nread_rst.ne.0) call read_restart_pnetcdf
 
 ! write grid and initial conditions
       if (output_flag == 1) then
-       if(netcdf_file.ne.'nonetcdf') 
+       if(netcdf_file.ne.'nonetcdf')
      $     call write_output_pnetcdf(
      $     "out/"//trim(netcdf_file)//".nc")
       end if
 
       if (SURF_flag == 2) then  !fhx:20110131: flag=2 for initial SURF output
-      if(netcdf_file.ne.'nonetcdf') 
+      if(netcdf_file.ne.'nonetcdf')
      $     call write_SURF_pnetcdf(
-     $     "out/SRF."//trim(netcdf_file)//".nc")      
-      end if    
+     $     "out/SRF."//trim(netcdf_file)//".nc")
+      end if
 
 ! check for errors
       call   sum0i_mpi(error_status,master_task)
@@ -148,7 +148,7 @@
       end if
 !      if(my_task.eq.master_task) then !lyo:???why comment out?
 !   write(*,'(/a)') 'End of initialization'
-!   write(*,*) 
+!   write(*,*)
 !      endif
 
       return
@@ -161,21 +161,38 @@
 
       implicit none
       include 'pom.h'
-      namelist/pom_nml/ title,netcdf_file,mode,nadv,nitera,sw,npg,dte, !fhx:Toni:npg 
+      include 'io.h'
+      include 'bulk.h'
+
+      namelist/pom_nml/ title,netcdf_file,mode,nadv,nitera,sw,npg,dte, !fhx:Toni:npg
      $                  isplit,time_start,nread_rst,read_rst_file
      $                 ,write_rst,write_rst_file,days,prtd1,prtd2
      $                 ,iperx,ipery,n1d !lyo:scs1d:add iper* & n1d in pom.nml
                                         !n1d .ne. 0 for 1d simulation
      $                 ,windf           !lyo: windf = ccmp, ecmw, or gfsw etc
-     $                 ,nbct,nbcs,tprni,umol
-     
-      namelist/switch_nml/ 
-     $     calc_wind, calc_tsforce, calc_river, calc_assim,
+     $                 ,nbct,nbcs,tprni,umol,z0b,ntp
+
+      namelist/switch_nml/
+     $     calc_bulk, calc_wind, calc_tsforce, calc_river, calc_assim,
      $     calc_assimdrf,         !eda
-     $     calc_tsurf_mc, calc_tide,!fhx:mcsst; fhx:tide     
+     $     calc_tsurf_mc, calc_tide,!fhx:mcsst; fhx:tide
      $     calc_uvforce,         !eda:uvforce
-     $     output_flag, SURF_flag !fhx:20110131:
+     $     calc_ice,
+     $     output_flag, SURF_flag, monthly_flag !fhx:20110131:
       type(date) ::  dtime, dtime0
+
+      logical spinup
+      namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
+      namelist/misc_nml/ spinup, t_lo, t_hi
+      namelist/input_files_nml/
+     &  grid_path, bc_path, clim_path, mean_path
+     &, bulk_path, flux_path
+      namelist/input_vars_nml/
+     &  dlwr_name, lht_name, lwr_name, prat_name, pres_name
+     &, rhum_name, sht_name, sst_name, swr_name, tair_name
+     &, tcld_name, umf_name, uwnd_name, vmf_name, vwnd_name
+     &, wgst_name
+      namelist/bulk_nml/ calc_swr, use_coare, lwrad_formula
 
 ! Input of filenames and constants
 
@@ -214,7 +231,6 @@
 ! Inverse horizontal turbulent Prandtl number (ah/am; dimensionless):
 ! NOTE that tprni=0.e0 yields zero horizontal diffusivity!
       tprni=.2
-       
 
 ! Background viscosity used in subroutines profq, proft, profu and
 ! profv (S.I. units):
@@ -246,7 +262,7 @@
 !     2        no           yes           yes
 !     3        yes          no            no
 !     4        yes          no            yes
-!      nbct=1
+      nbct=1
 
 ! Surface salinity boundary condition, used in subroutine proft:
 !    nbcs   prescribed    prescribed
@@ -254,7 +270,7 @@
 !     1        no           yes
 !     3        yes          no
 ! NOTE that only 1 and 3 are allowed for salinity.
-!      nbcs=1
+      nbcs=1
 
 ! Step interval during which external (2-D) mode advective terms are
 ! not updated (dimensionless):
@@ -272,15 +288,43 @@
 ! Initial value of aam:
       aam_init=500.
 
+! Bulk default parameters
+!
+! Calculate shortwave radiation according to Reed
+      calc_swr  = .true.
+
+! Do not use COARE algorithm for heat fluxes estimation by default
+      use_coare = .false.
+
+
+! Other parameters and flags
+      sf_bf = 1.
+      sf_hf = 1.
+      sf_wi = 1.
+      t_lo = -999.
+      t_hi =  999.
 
 ! read input namelist
       open(73,file='pom.nml',status='old')
       read(73,nml=pom_nml)
       close(73)
-  
+
 ! read main switches
       open(73,file='switch.nml',status='old')
       read(73,nml=switch_nml)
+      read(73,nml=misc_nml)
+      read(73,nml=sensitivity_nml)
+      close(73)
+
+! read main switches
+      open(73,file='io.nml',status='old')
+      read(73,nml=input_files_nml)
+      read(73,nml=input_vars_nml)
+      close(73)
+
+! read bulk configuration
+      open(73,file='bulk.nml',status='old')
+      read(73,nml=bulk_nml)
       close(73)
 
 ! End of input of constants
@@ -294,21 +338,29 @@
       dti2=dti*2
 
       iend=max0(nint(days*24.*3600./dti),2)
-      iprint=nint(prtd1*24.*3600./dti)
+      iprint=max(nint(prtd1*24.*3600./dti),1)
       irestart=nint(write_rst*24.*3600./dti)
       iprints=nint(prtd2*24.*3600./dti) !fhx:20110131:add 3hrly output
 
       ispi=1./float(isplit)
       isp2i=1./(2.*float(isplit))
 
-! initialise time
-! Calulate the Julian days from 1992-01-01 !fhx:20110113
-      dtime0 = str2date( time_start(1:19) )
-      dtime = str2date(read_rst_file(9:21)//":"//
-     &  read_rst_file(23:24)//":"//read_rst_file(26:27) )
+! Initialise time
+! Do not offset time if not restarting
+      if ( nread_rst /= 0 ) then
 
-       time0=( dtime - dtime0 ) / 86400
-       
+        dtime0 = str2date( time_start(1:19) )
+        dtime = str2date( read_rst_file(1:13)//":"//
+     &  read_rst_file(15:16)//":"//read_rst_file(18:19) )
+
+        time0 = real( (dtime-dtime0)/86400, rk )
+
+      else
+
+        time0 = 0.
+
+      end if
+
 !      if (my_task == master_task) then
 !         print*, 'dtime',dtime
 !         print*, 'dtime0',dtime0
@@ -316,7 +368,7 @@
 !      endif
 
 !      time0=0.e0
-       time=time0 !lyo:20110224:alu:stcc:!lyo:pac10:
+      time=time0 !lyo:20110224:alu:stcc:!lyo:pac10:
 
 ! print initial summary
       if(my_task.eq.master_task) then
@@ -325,7 +377,7 @@
         write(6,'('' nadv       = '',i10)') nadv
         write(6,'('' nitera     = '',i10)') nitera
         write(6,'('' sw         = '',f10.4)') sw
-        write(6,'('' npg         = '',i10)') npg    !fhx:Toni:npg
+        write(6,'('' npg        = '',i10)') npg    !fhx:Toni:npg
         write(6,'('' nread_rst  = '',i10)') nread_rst
         write(6,'('' write_rst  = '',f10.4)') write_rst
         write(6,'('' irestart   = '',i10)') irestart
@@ -361,17 +413,29 @@
         write(6,'('' smoth      = '',f10.4)') smoth
         write(6,'('' alpha      = '',f10.4)') alpha
 !        write(6,'('' lramp      = '',l10)') lramp
-        write(6,'('' calc_wind      = '',l)') calc_wind
-        write(6,'('' calc_tsforce   = '',l)') calc_tsforce
-        write(6,'('' calc_river     = '',l)') calc_river
-        write(6,'('' calc_assim     = '',l)') calc_assim
-        write(6,'('' calc_assimdrf  = '',l)') calc_assimdrf !eda
-        write(6,'('' calc_uvforce  = '',l)') calc_uvforce !eda:uvforce
-        write(6,'('' calc_tsurf_mc  = '',l)') calc_tsurf_mc !fhx:mcsst
-        write(6,'('' calc_tide      = '',l)') calc_tide     !fhx:tide
-        write(6,'('' calc_interp    = '',l)') calc_interp   !fhx:interp_flag
+        write(6,'('' calc_wind      = '',l2)') calc_wind
+        write(6,'('' calc_tsforce   = '',l2)') calc_tsforce
+        write(6,'('' calc_river     = '',l2)') calc_river
+        write(6,'('' calc_assim     = '',l2)') calc_assim
+        write(6,'('' calc_assimdrf  = '',l2)') calc_assimdrf !eda
+        write(6,'('' calc_uvforce   = '',l2)') calc_uvforce !eda:uvforce
+        write(6,'('' calc_tsurf_mc  = '',l2)') calc_tsurf_mc !fhx:mcsst
+        write(6,'('' calc_tide      = '',l2)') calc_tide     !fhx:tide
+        write(6,'('' calc_interp    = '',l2)') calc_interp   !fhx:interp_flag
         write(6,'('' output_flag    = '',i2)') output_flag  !fhx:20110131:
         write(6,'('' SURF_flag      = '',i2)') SURF_flag    !fhx:20110131:
+        write(6,'(/'' Sensitivity:'')')
+        write(6,'(''   heat flux     = '',f10.4)') sf_hf
+        write(6,'(''   wind speed    = '',f10.4)') sf_wi
+        write(6,'(''   lat.velocities= '',f10.4)') sf_bf
+        if ( calc_bulk ) then
+          write(6,'(/'' Air-Sea Bulk: [ ENABLED ]'')')
+          write(6,'(''   calc swrad    = '',l2)') calc_swr
+          write(6,'(''   use COARE     = '',l2)') use_coare
+          write(6,'(''   longwave form.= '',i2)') lwrad_formula
+        else
+          write(6,'(/'' Air-Sea Bulk: [ DISABLED ]'')')
+        end if
       end if
 
       return
@@ -381,14 +445,14 @@
       subroutine initialize_arrays
 ! initialize arrays for safety
 
-!     ayumi 2010/5/14 
+!     ayumi 2010/5/14
 !      use river, only : totq
 
       implicit none
       include 'pom.h'
       integer i,j,k
 
-!     ayumi 2010/5/14 
+!     ayumi 2010/5/14
 !      totq = 0.e0
 
 !     ayumi 2010/6/13
@@ -439,6 +503,8 @@
           vfluxf(i,j) =0.
           wusurf(i,j) =0.
           wvsurf(i,j) =0.
+          tauiwu(i,j) =0.
+          tauiwv(i,j) =0.
           wtsurf(i,j) =0.
           wssurf(i,j) =0.
           swrad(i,j)  =0.
@@ -449,6 +515,7 @@
           wubot(i,j)  =0.     !lyo:20110315:botwavedrag:
           wvbot(i,j)  =0.     !lyo:20110315:botwavedrag:
           aamfac(i,j) =1.     !fhx:incmix
+          hi(i,j)=.35
         end do
       end do
 
@@ -461,8 +528,8 @@
         end do
       end do
 
-      
-      
+
+
       return
       end
 
@@ -477,10 +544,13 @@
 ! degrees to radians
       deg2rad=pi/180.
 
-! read grid 
+! read grid
 !lyomoving:call idealized setup subr instead of reading grid:
 !
       call read_grid_pnetcdf !_obs
+! modify zero distances to 1 meter (should check for |df|<epsilon, though)
+      where( dx == 0. ) dx = 1.
+      where( dy == 0. ) dy = 1.
 !     The followings are read in read_grid_pnetcdf:
 !     z,zz,dx,dy
 !     east_u,east_v,east_e,east_c
@@ -502,6 +572,11 @@
 !lyo:scs1d:end:
 !
 ! derived vertical grid variables
+!      z(kb) = -1. ! :DIRTY HACK!!! (for stupid grid)
+!      zz(kb-1) = .5*(z(kb-1)+z(kb)) ! :
+!      zz(kb) = 2.*zz(kb-1)-zz(kb-2) ! :
+!!      if (my_task==1) fsm(:,jm-8:jm) = 0.
+!      h = 1500.
       do k=1,kb-1
         dz(k) = z(k)- z(k+1)
         dzz(k)=zz(k)-zz(k+1)
@@ -575,26 +650,37 @@
       include 'pom.h'
       integer i,j,k, n
       integer :: ii, jj                !lyo:pac10:
-      character*120 netcdf_ic_file     !lyo:20110202:
+      character(len=120) netcdf_ic_file     !lyo:20110202:
       logical :: fexist                !lyo:20110202:
 
-      read(read_rst_file, '(13x,i2)') n
+      read(read_rst_file, '(5x,i2)') n
 
 ! read initial temperature and salinity from ic file
 !      call read_initial_ts_pnetcdf(kb,tb,sb)
-      call read_clim_ts_pnetcdf(tb,sb,n)
-!      call read_clim_ts_pnetcdf_obs(tb,sb,rho,n)
+      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_clim.nc"
+      inquire(file=trim(netcdf_ic_file),exist=fexist)
+
+      if (fexist) then
+!        call read_clim_ts_pnetcdf(tb,sb,n)
+        call read_initial_ts_pnetcdf(tb,sb,elb,n)
 
 ! read annual-mean, xy-ave t,sclim if avail !lyo:20110202:
-      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean.nc"
-      inquire(file=trim(netcdf_ic_file),exist=fexist)
-      if(fexist) then  !annual-mean xy-ave t,sclim
-        call read_mean_ts_pnetcdf(tclim,sclim,n)
-      else             !annual-mean *clim* - dangerous for rmean
+        write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean.nc"
+        inquire(file=trim(netcdf_ic_file),exist=fexist)
+        if(fexist) then  !annual-mean xy-ave t,sclim
+          call read_mean_ts_pnetcdf(tclim,sclim,n)
+        else             !annual-mean *clim* - dangerous for rmean
 !      call read_clim_ts_pnetcdf_obs(tclim,sclim,rmean,n)
-        call read_clim_ts_pnetcdf(tclim,sclim,n)
-      endif
-      
+          call read_clim_ts_pnetcdf(tclim,sclim,n)
+        endif
+
+      else
+        if (my_task==0) write(*,*) "Failed reading clim..."
+        tb = 15.
+        sb = 33.
+        tclim = 15.
+        sclim = 33.
+      end if
 ! calc. initial density
       call dens(sb,tb,rho)
 
@@ -616,9 +702,9 @@
 ! thereafter - users may create variable boundary conditions)
 !lyo:pac10:Comment out - replace by tobe etc below:
 !     do k=1,kbm1
-!       do j=1,jm                           
-!         tbe(j,k) = tb(im,j,k) * fsm(im,j) !lyo:20110202:use initial 
-!         sbe(j,k) = sb(im,j,k) * fsm(im,j) ! t,sb instead of t,sclim 
+!       do j=1,jm
+!         tbe(j,k) = tb(im,j,k) * fsm(im,j) !lyo:20110202:use initial
+!         sbe(j,k) = sb(im,j,k) * fsm(im,j) ! t,sb instead of t,sclim
 !         tbw(j,k) = tb( 1,j,k) * fsm( 1,j) !lyo:20110202:add west
 !         sbw(j,k) = sb( 1,j,k) * fsm( 1,j)
 !       end do
@@ -661,6 +747,8 @@
       enddo
 !lyo:pac10:end:
 
+!      call read_ice_pnetcdf( "ice.19790102.nc", icb )
+
       return
       end
 
@@ -669,24 +757,34 @@
 !lyo:pac10:beg:Here thro *end: replaced subr.lateral_boundary_conditions
       subroutine lateral_boundary_conditions
 ! read lateral boundary conditions
-! transport at eastern boundary for PROFS in GOM 
+! transport at eastern boundary for PROFS in GOM
 ! ayumi 2010/4/7
 
       include 'pom.h'
       logical :: here, judge_inout !lyo:scs1d:
       integer :: i,j,ic,jc         !lyo:scs1d:
       real(kind=rk)    :: corcon            !lyo:scs1d:
-      character*120 in_file        !eda:uvforce
+      character(len=120) in_file        !eda:uvforce
 
+      namelist/bry_nml/ rfn, rfe, rfs, rfw
+
+      if ( n_north == -1 ) eln = elb( :,jm)
+      if ( n_east  == -1 ) ele = elb(im,: )
+      if ( n_south == -1 ) els = elb( :, 1)
+      if ( n_west  == -1 ) elw = elb( 1,: )
 !     call read_uabe_pnetcdf(uabe)
 !eda:uvforce
-      if (.not. calc_uvforce) then
-        write(in_file,'(a)') "bc.nc"
-        call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file, 1) 
-      endif
+!      if (.not. calc_uvforce) then
+!        write(in_file,'(a)') "bc.nc"
+!        call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file, 1)
+!      endif
 
-!     Radiation factors for use in subroutine bcond !alu:20101216 
+!     Radiation factors for use in subroutine bcond !alu:20101216
+!      rfe=0.; rfw=0.; rfn=0.; rfs=0. !=1 Flather; =0 clamped
       rfe=1.; rfw=1.; rfn=1.; rfs=1. !=1 Flather; =0 clamped
+      open(73,file='bry.nml',status='old')
+      read(73,nml=bry_nml)
+      close(73)
 
 ! Periodic in "x" and/or "y"?  !lyo:20110224:alu:stcc:
 !     iperx.ne.0 if x-periodic; ipery.ne.0 if y-periodic               !
@@ -694,11 +792,11 @@
 !     iperx=-1; ipery= 0 !--> x-periodic & free-slip S/N boundaries
 !     iperx= 0; ipery= 0 !--> x-periodic & free-slip S/N boundaries
 !lyo:scs1d:moved to namelist: pom.nml
-!lyo:scs1d:cannot be beta-plane if double-periodic (note cor(*,*) 
+!lyo:scs1d:cannot be beta-plane if double-periodic (note cor(*,*)
 !     was previously defined in "call read_grid")
       if (iperx.eq.1 .and. ipery.eq.1) then
       ic = (im_global+1)/2; jc = (jm_global+1)/2
-         here = judge_inout( ic, jc, 
+         here = judge_inout( ic, jc,
      $                       i_global(1), i_global(im),
      $                       j_global(1), j_global(jm) )
          if ( here ) then
@@ -710,7 +808,7 @@
             enddo; enddo
          endif !if (iperx.eq.1 .and. ipery.eq.1) then
 
-      return 
+      return
       end
 
 !_______________________________________________________________________
@@ -770,7 +868,7 @@
         write(nu,'(''Stopped in subr.bfrz, mw ='',i4)') mw
         write( *,'(''Stopped in bfrz. proc# ,mw ='',2i4)') my_task,mw
         stop
-       endif 
+       endif
       endif
 !
 !     East:
@@ -831,7 +929,7 @@
        endif
       endif
 !
-      return 
+      return
       end
 !lyo:pac10:end:
 
@@ -841,15 +939,15 @@
 !fhx:tide:read tidal amplitude & phase at the eastern boundary for PROFS
 
       include 'pom.h'
-      
+
 !      call read_tide_east_pnetcdf(ampe,phae)
        call read_tide_east_pnetcdf(ampe,phae,amue,phue)
 
 !      if(my_task.eq.0)print*,ampe(10,1),phae(10,1),amue(10,1),phue(10,1)
 !      if(my_task.eq.0)print*,ampe(10,2),phae(10,2),amue(10,2),phue(10,2)
-      return 
+      return
       end
-!fhx:tide:read_tide end 
+!fhx:tide:read_tide end
 !_______________________________________________________________________
       subroutine update_initial
 ! update the initial conditions and set the remaining initial conditions
@@ -897,18 +995,14 @@
         end do
       end do
 
-      if (npg==1) then   !fhx:Toni:npg
-         call baropg
-      else if (npg==2) then
-        call baropg_mcc
-      else if (npg==3) then
-        call baropg_lin
-      else if (npg==4) then
-        call baropg_song_std
-      else
-        error_status=1
-        write(6,'(/''Error: invalid value for npg'')')
+      if (my_task == master_task) then
+        if (npg>5 .and. npg<0) then
+          write(*,'(/"[!] Invalid value for Pressure Gradient Scheme")')
+          write(*,'("   Defaulting to McCalpin 4th order (npg=3)")')
+        end if
       end if
+
+      call pgscheme(npg)
 
       do k=1,kbm1
         do j=1,jm
@@ -962,8 +1056,8 @@
           do k=1,ks
             tin(k)=tb(i,j,k)
             if (zs(k).le.h(i,j) .and. tin(k).lt.0.01) then
-              tmax=amax1(tb(i-1,j,k),tb(i+1,j,k),
-     $                   tb(i,j-1,k),tb(i,j+1,k))
+              tmax = max(tb(i-1,j,k),tb(i+1,j,k),
+     $                   tb(i,j-1,k),tb(i,j+1,k)) !rwnd: is amax1 necessary?
               tin(k)=tmax
             endif
             if (tin(k).lt.0.01 .and. k.ne.1) tin(k)=tin(k-1)
@@ -1050,7 +1144,7 @@
 !_______________________________________________________________________
       subroutine splint(xa,ya,y2a,n,x,y)
       include 'realkind'
-      
+
       real(kind=rk), dimension(n) :: xa,ya,y2a
       real(kind=rk) h,a,b,x,y
 
@@ -1067,7 +1161,7 @@
       endif
       h=xa(khi)-xa(klo)
       if (h.eq.0.)  then
-        error_staus=1
+        error_status=1
         write(6,'(/a)') 'Error: bad xa input in splint'
       end if
       a=(xa(khi)-x)/h
@@ -1091,7 +1185,7 @@
       integer :: im,jm,kb,i,j,k
       real(kind=rk) :: aam(im,jm,kb),x(im,jm),y(im,jm)
       real(kind=rk) :: lono,lato,xs,ys,fac,factor,expon
-      
+
 !      print*,'incmix:', lono,lato
       do k=1,kb
       do j=1,jm
@@ -1113,11 +1207,11 @@
 !=============================================================
 ! If the processor has ( i_in, j_in ) in its local domain.
 !-------------------------------------------------------------
-      logical function judge_inout( i_in, j_in, 
-     $                              imin_in, imax_in, 
-     $                              jmin_in, jmax_in ) 
+      logical function judge_inout( i_in, j_in,
+     $                              imin_in, imax_in,
+     $                              jmin_in, jmax_in )
       integer :: i_in, j_in, imin_in, imax_in, jmin_in, jmax_in
-      
+
       if ( ( i_in >= imin_in .and. i_in <= imax_in )
      $     .and.( j_in >= jmin_in .and. j_in <= jmax_in ) ) then
 
