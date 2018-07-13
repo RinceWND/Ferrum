@@ -764,7 +764,7 @@
       logical :: here, judge_inout !lyo:scs1d:
       integer :: i,j,ic,jc         !lyo:scs1d:
       real(kind=rk)    :: corcon            !lyo:scs1d:
-      character(len=120) in_file        !eda:uvforce
+!      character(len=120) in_file        !eda:uvforce
 
       namelist/bry_nml/ rfn, rfe, rfs, rfw
 

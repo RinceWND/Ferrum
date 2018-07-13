@@ -54,7 +54,7 @@
       ! local     
       type(date) :: d_off, d_fwd
 
-      logical :: lexist
+!      logical :: lexist
 
       integer n
 
@@ -240,7 +240,7 @@
       type(date) :: d_off, d_fwd
       integer n
 
-      logical :: lexist     
+!      logical :: lexist     
 
       sec_in_day = d_in%hour*3600 + d_in%min*60 + d_in%sec
 

@@ -66,7 +66,8 @@
 
 
 !     external forcings
-        if (iint==1 .or. .not.spinup) then
+        if ( iint==1 .or. .not.spinup ) then  ! when spinup, do only once
+
           if ( calc_uvforce ) call uvforce_main(dtime)  !eda:uvforce
           call tsforce_main( dtime )
           if ( calc_tsurf_mc )call mcsst_main(dtime)  !fhx:mcsst
@@ -74,6 +75,7 @@
           if ( calc_wind )    call wind_main( dtime )
           if ( calc_river )   call river_main( dtime, .false. )
           if ( calc_ice )     call ice_main( dtime )
+
         end if
 
 

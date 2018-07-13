@@ -8,7 +8,7 @@
 
       include 'pom.h'
 
-      logical, parameter :: read_transport = .false.
+      logical, parameter :: read_transport = .true.
       integer, parameter :: n_bry = 3
 
 !     days in month
@@ -203,7 +203,7 @@
         if ( read_transport ) then
 
           call read_bc_transport_pnetcdf
-     &      ( n_bry, trans_b, y_b, x_b, "bc.trans.nc", mon_b )
+     &      ( trans_b, y_b, x_b, "bc.trans.nc", mon_b )
 
         else
 
