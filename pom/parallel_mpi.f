@@ -313,6 +313,27 @@
       return
       end
 !_______________________________________________________________________
+      subroutine min0d_mpi(work,to)
+! send min of WORK to node TO
+      implicit none
+      include 'mpif.h'
+      include 'pom.h'
+      integer to
+      real(kind=rk) work,tmp
+      integer ierr
+      integer mpi_rk
+      
+      if (rk==8) then
+        mpi_rk = mpi_double_precision
+      else
+        mpi_rk = mpi_real
+      end if
+! get max
+      call mpi_reduce(work,tmp,1,mpi_rk,mpi_min,to,pom_comm,ierr)
+      work=tmp
+      return
+      end
+!_______________________________________________________________________
       subroutine bcast0i_mpi(work,from)
 ! send WORK to all nodes from node FROM
       implicit none

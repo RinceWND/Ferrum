@@ -1883,14 +1883,254 @@
       real(kind=rk), parameter :: hmax = 8000.0 !lyo:20110224:alu:stcc:
 
       real(kind=rk) m2t,s2t,k1t,o1t ! period in days
-      integer t_est,t_nth,t_i,t_j
+      real(kind=rk) t_lat, t_lon, t_amp, t_phs, dist, min_dist, dtr, pi2
+      integer t_i,t_j,n
 
+      real(rk), dimension(38,4) :: tides_s2t
+      real(rk), dimension(88,4) :: tides_m2t
+      real(rk), dimension(55,4) :: tides_o1t
+      real(rk), dimension(46,4) :: tides_k1t
+
+      tides_s2t( 1,:) = (/141.02, 48.3 , 0.01,   0./)
+      tides_s2t( 2,:) = (/140.66, 48.47, 0.01,  30./)
+      tides_s2t( 3,:) = (/140.48, 48.46, 0.01,  60./)
+      tides_s2t( 4,:) = (/140.22, 46.77, 0.01, 240./)
+      tides_s2t( 5,:) = (/140.67, 47.06, 0.01, 270./)
+      tides_s2t( 6,:) = (/140.95, 47.47, 0.01, 300./)
+      tides_s2t( 7,:) = (/141.1 , 47.93, 0.01, 330./)
+      tides_s2t( 8,:) = (/141.59, 48.78, 0.04,   0./)
+      tides_s2t( 9,:) = (/140.9 , 48.93, 0.04,  30./)
+      tides_s2t(10,:) = (/140.63, 48.88, 0.04,  60./)
+      tides_s2t(11,:) = (/141.84, 48.98, 0.07,   0./)
+      tides_s2t(12,:) = (/141.14, 49.49, 0.07,  30./)
+      tides_s2t(13,:) = (/140.85, 49.43, 0.07,  60./)
+      tides_s2t(14,:) = (/141.29, 50.01, 0.1 ,  30./)
+      tides_s2t(15,:) = (/140.79, 50.23, 0.1 ,  60./)
+      tides_s2t(16,:) = (/141.49, 51.15, 0.2 ,  30./)
+      tides_s2t(17,:) = (/141.89, 45.84, 0.04, 240./)
+      tides_s2t(18,:) = (/130.01, 35.92, 0.01,   0./)
+      tides_s2t(19,:) = (/130.15, 35.89, 0.01,  30./)
+      tides_s2t(20,:) = (/130.5 , 35.92, 0.01,  60./)
+      tides_s2t(21,:) = (/130.69, 36.04, 0.01,  90./)
+      tides_s2t(22,:) = (/130.97, 36.32, 0.01, 120./)
+      tides_s2t(23,:) = (/131.1 , 36.58, 0.01, 150./)
+      tides_s2t(24,:) = (/131.02, 37.14, 0.01, 180./)
+      tides_s2t(25,:) = (/129.64, 36.99, 0.01, 210./)
+      tides_s2t(26,:) = (/129.63, 36.12, 0.01, 300./)
+      tides_s2t(27,:) = (/129.91, 35.74, 0.04,   0./)
+      tides_s2t(28,:) = (/130.83, 35.48, 0.04,  60./)
+      tides_s2t(29,:) = (/131.69, 35.18, 0.04,  90./)
+      tides_s2t(30,:) = (/129.65, 35.86, 0.04, 330./)
+      tides_s2t(31,:) = (/129.76, 35.52, 0.07,   0./)
+      tides_s2t(32,:) = (/130.16, 35.37, 0.07,  30./)
+      tides_s2t(33,:) = (/130.95, 35.21, 0.07,  60./)
+      tides_s2t(34,:) = (/129.52, 35.28, 0.1 ,   0./)
+      tides_s2t(35,:) = (/130.15, 35.15, 0.1 ,  30./)
+      tides_s2t(36,:) = (/131.05, 34.82, 0.1 ,  60./)
+      tides_s2t(37,:) = (/129.9 , 34.39, 0.2 ,  30./)
+      tides_s2t(38,:) = (/128.26, 34.54, 0.3 ,  30./)
+
+      tides_m2t( 1,:) = (/141.21, 51.45, 0.7 ,   0./)
+      tides_m2t( 2,:) = (/141.08, 51.27, 0.6 ,   0./)
+      tides_m2t( 3,:) = (/141.04, 51.07, 0.5 ,   0./)
+      tides_m2t( 4,:) = (/141.22, 50.36, 0.4 ,   0./)
+      tides_m2t( 5,:) = (/141.35, 49.75, 0.3 ,   0./)
+      tides_m2t( 6,:) = (/141.33, 49.1 , 0.2 ,   0./)
+      tides_m2t( 7,:) = (/141.15, 48.61, 0.1 ,   0./)
+      tides_m2t( 8,:) = (/140.77, 48.01, 0.07,   0./)
+      tides_m2t( 9,:) = (/140.42, 47.62, 0.04,   0./)
+      tides_m2t(10,:) = (/140.18, 47.37, 0.01,   0./)
+      tides_m2t(11,:) = (/141.8 , 48.91, 0.2 , 330./)
+      tides_m2t(12,:) = (/141.78, 48.39, 0.1 , 330./)
+      tides_m2t(13,:) = (/141.  , 47.89, 0.07, 330./)
+      tides_m2t(14,:) = (/140.59, 47.51, 0.04, 330./)
+      tides_m2t(15,:) = (/140.28, 47.31, 0.01, 330./)
+      tides_m2t(16,:) = (/141.9 , 48.11, 0.1 , 300./)
+      tides_m2t(17,:) = (/141.38, 47.69, 0.07, 300./)
+      tides_m2t(18,:) = (/140.8 , 47.38, 0.04, 300./)
+      tides_m2t(19,:) = (/140.37, 47.24, 0.01, 300./)
+      tides_m2t(20,:) = (/141.46, 46.88, 0.04, 270./)
+      tides_m2t(21,:) = (/140.47, 46.99, 0.01, 270./)
+      tides_m2t(22,:) = (/141.85, 46.44, 0.04, 240./)
+      tides_m2t(23,:) = (/140.45, 46.73, 0.01, 240./)
+      tides_m2t(24,:) = (/142.13, 45.96, 0.1 , 210./)
+      tides_m2t(25,:) = (/141.97, 45.84, 0.07, 210./)
+      tides_m2t(26,:) = (/141.83, 45.79, 0.04, 210./)
+      tides_m2t(27,:) = (/140.18, 46.38, 0.01, 210./)
+      tides_m2t(28,:) = (/140.44, 48.64, 0.1 ,  30./)
+      tides_m2t(29,:) = (/140.44, 48.17, 0.07,  30./)
+      tides_m2t(30,:) = (/140.26, 47.75, 0.04,  30./)
+      tides_m2t(31,:) = (/140.06, 47.42, 0.01,  30./)
+      tides_m2t(32,:) = (/139.64, 48.02, 0.04,  60./)
+      tides_m2t(33,:) = (/139.82, 47.48, 0.01,  60./)
+      tides_m2t(34,:) = (/139.07, 47.42, 0.01,  90./)
+      tides_m2t(35,:) = (/138.69, 46.93, 0.01, 120./)
+      tides_m2t(36,:) = (/138.74, 46.6 , 0.01, 150./)
+      tides_m2t(37,:) = (/139.02, 46.29, 0.01, 180./)
+      tides_m2t(38,:) = (/140.39, 41.33, 0.1 , 210./)
+      tides_m2t(39,:) = (/140.13, 41.19, 0.07, 210./)
+      tides_m2t(40,:) = (/140.03, 41.47, 0.07, 210./)
+      tides_m2t(41,:) = (/131.99, 37.52, 0.04, 180./)
+      tides_m2t(42,:) = (/133.17, 36.23, 0.04, 150./)
+      tides_m2t(43,:) = (/132.2 , 35.87, 0.04, 120./)
+      tides_m2t(44,:) = (/131.1 , 35.85, 0.04,  90./)
+      tides_m2t(45,:) = (/130.9 , 35.86, 0.04,  60./)
+      tides_m2t(46,:) = (/130.72, 35.87, 0.04,  30./)
+      tides_m2t(47,:) = (/130.57, 35.9 , 0.04,   0./)
+      tides_m2t(48,:) = (/130.44, 35.93, 0.04, 330./)
+      tides_m2t(49,:) = (/130.28, 35.97, 0.04, 300./)
+      tides_m2t(50,:) = (/129.98, 36.04, 0.04, 270./)
+      tides_m2t(51,:) = (/129.66, 36.13, 0.04, 240./)
+      tides_m2t(52,:) = (/129.56, 36.84, 0.04, 210./)
+      tides_m2t(53,:) = (/130.45, 36.42, 0.01, 210./)
+      tides_m2t(54,:) = (/130.79, 36.6 , 0.01, 180./)
+      tides_m2t(55,:) = (/131.21, 36.41, 0.01, 150./)
+      tides_m2t(56,:) = (/130.92, 36.19, 0.01, 120./)
+      tides_m2t(57,:) = (/130.78, 36.11, 0.01,  90./)
+      tides_m2t(58,:) = (/130.72, 36.09, 0.01,  60./)
+      tides_m2t(59,:) = (/130.67, 36.08, 0.01,  30./)
+      tides_m2t(60,:) = (/130.6 , 36.07, 0.01,   0./)
+      tides_m2t(61,:) = (/130.53, 36.07, 0.01, 330./)
+      tides_m2t(62,:) = (/130.44, 36.11, 0.01, 300./)
+      tides_m2t(63,:) = (/130.37, 36.19, 0.01, 270./)
+      tides_m2t(64,:) = (/130.36, 36.32, 0.01, 240./)
+      tides_m2t(65,:) = (/131.52, 35.47, 0.07,  90./)
+      tides_m2t(66,:) = (/131.09, 35.52, 0.07,  60./)
+      tides_m2t(67,:) = (/130.76, 35.64, 0.07,  30./)
+      tides_m2t(68,:) = (/130.53, 35.72, 0.07,   0./)
+      tides_m2t(69,:) = (/130.33, 35.79, 0.07, 330./)
+      tides_m2t(70,:) = (/130.14, 35.87, 0.07, 300./)
+      tides_m2t(71,:) = (/129.85, 35.99, 0.07, 270./)
+      tides_m2t(72,:) = (/131.86, 35.07, 0.1 ,  90./)
+      tides_m2t(73,:) = (/131.22, 35.21, 0.1 ,  60./)
+      tides_m2t(74,:) = (/130.8 , 35.29, 0.1 ,  30./)
+      tides_m2t(75,:) = (/130.41, 35.39, 0.1 ,   0./)
+      tides_m2t(76,:) = (/130.07, 35.56, 0.1 , 330./)
+      tides_m2t(77,:) = (/129.81, 35.71, 0.1 , 300./)
+      tides_m2t(78,:) = (/129.61, 35.86, 0.1 , 270./)
+      tides_m2t(79,:) = (/131.27, 34.72, 0.2 ,  60./)
+      tides_m2t(80,:) = (/130.74, 34.87, 0.2 ,  30./)
+      tides_m2t(81,:) = (/130.23, 35.02, 0.2 ,   0./)
+      tides_m2t(82,:) = (/129.67, 35.27, 0.2 , 330./)
+      tides_m2t(83,:) = (/129.89, 34.55, 0.3 ,   0./)
+      tides_m2t(84,:) = (/129.38, 35.11, 0.3 , 330./)
+      tides_m2t(85,:) = (/129.67, 34.29, 0.4 ,   0./)
+      tides_m2t(86,:) = (/129.29, 35.07, 0.4 , 330./)
+      tides_m2t(87,:) = (/129.19, 35.03, 0.5 , 330./)
+      tides_m2t(88,:) = (/129.02, 34.95, 0.6 , 330./)
+
+      tides_o1t( 1,:) = (/141.68, 51.84, 0.07, 180./)
+      tides_o1t( 2,:) = (/141.73, 46.59, 0.07, 180./)
+      tides_o1t( 3,:) = (/141.68, 46.32, 0.07, 150./)
+      tides_o1t( 4,:) = (/141.75, 46.08, 0.07, 120./)
+      tides_o1t( 5,:) = (/141.93, 45.85, 0.07,  90./)
+      tides_o1t( 6,:) = (/142.07, 45.76, 0.07,  60./)
+      tides_o1t( 7,:) = (/142.25, 45.58, 0.07,  30./)
+      tides_o1t( 8,:) = (/142.28, 45.35, 0.07,   0./)
+      tides_o1t( 9,:) = (/141.94, 46.26, 0.1 , 120./)
+      tides_o1t(10,:) = (/141.98, 45.91, 0.1 ,  90./)
+      tides_o1t(11,:) = (/142.1 , 45.79, 0.1 ,  60./)
+      tides_o1t(12,:) = (/141.43, 45.3 , 0.04, 210./)
+      tides_o1t(13,:) = (/141.26, 45.89, 0.04, 180./)
+      tides_o1t(14,:) = (/141.51, 45.93, 0.04, 150./)
+      tides_o1t(15,:) = (/141.71, 45.9 , 0.04, 120./)
+      tides_o1t(16,:) = (/141.89, 45.81, 0.04,  90./)
+      tides_o1t(17,:) = (/142.02, 45.73, 0.04,  60./)
+      tides_o1t(18,:) = (/142.12, 45.61, 0.04,  30./)
+      tides_o1t(19,:) = (/142.17, 45.49, 0.04,   0./)
+      tides_o1t(20,:) = (/141.61, 45.47, 0.01, 240./)
+      tides_o1t(21,:) = (/141.57, 45.5 , 0.01, 210./)
+      tides_o1t(22,:) = (/141.54, 45.64, 0.01, 180./)
+      tides_o1t(23,:) = (/141.6 , 45.72, 0.01, 150./)
+      tides_o1t(24,:) = (/141.73, 45.77, 0.01, 120./)
+      tides_o1t(25,:) = (/141.87, 45.75, 0.01,  90./)
+      tides_o1t(26,:) = (/141.97, 45.69, 0.01,  60./)
+      tides_o1t(27,:) = (/139.4 , 42.14, 0.07, 180./)
+      tides_o1t(28,:) = (/129.73, 35.56, 0.01, 210./)
+      tides_o1t(29,:) = (/129.75, 35.25, 0.01, 180./)
+      tides_o1t(30,:) = (/129.6 , 35.05, 0.01, 150./)
+      tides_o1t(31,:) = (/129.52, 34.96, 0.01, 120./)
+      tides_o1t(32,:) = (/129.39, 34.87, 0.01,  90./)
+      tides_o1t(33,:) = (/129.31, 34.85, 0.01,  60./)
+      tides_o1t(34,:) = (/129.23, 34.87, 0.01,  30./)
+      tides_o1t(35,:) = (/129.18, 35.  , 0.01,   0./)
+      tides_o1t(36,:) = (/129.23, 35.1 , 0.01, 330./)
+      tides_o1t(37,:) = (/129.28, 35.17, 0.01, 300./)
+      tides_o1t(38,:) = (/129.34, 35.24, 0.01, 270./)
+      tides_o1t(39,:) = (/129.44, 35.34, 0.01, 240./)
+      tides_o1t(40,:) = (/130.22, 35.45, 0.04, 180./)
+      tides_o1t(41,:) = (/131.34, 35.38, 0.07, 180./)
+      tides_o1t(42,:) = (/131.76, 34.79, 0.1 , 180./)
+      tides_o1t(43,:) = (/129.94, 34.95, 0.04, 150./)
+      tides_o1t(44,:) = (/130.38, 34.79, 0.07, 150./)
+      tides_o1t(45,:) = (/130.68, 34.63, 0.1 , 150./)
+      tides_o1t(46,:) = (/129.57, 34.56, 0.04, 120./)
+      tides_o1t(47,:) = (/129.82, 34.37, 0.07, 120./)
+      tides_o1t(48,:) = (/130.11, 34.24, 0.1 , 120./)
+      tides_o1t(49,:) = (/129.52, 34.24, 0.07,  90./)
+      tides_o1t(50,:) = (/129.03, 34.46, 0.04,  60./)
+      tides_o1t(51,:) = (/128.85, 34.31, 0.07,  60./)
+      tides_o1t(52,:) = (/128.66, 34.18, 0.1 ,  60./)
+      tides_o1t(53,:) = (/128.78, 34.53, 0.04,  30./)
+      tides_o1t(54,:) = (/128.63, 34.48, 0.07,  30./)
+      tides_o1t(55,:) = (/128.44, 34.4 , 0.1 ,  30./)
+      
+      tides_k1t( 1,:) = (/141.92, 45.73, 0.01,  90./)
+      tides_k1t( 2,:) = (/141.95, 45.75, 0.04,  90./)
+      tides_k1t( 3,:) = (/142.  , 45.81, 0.07,  90./)
+      tides_k1t( 4,:) = (/142.03, 45.87, 0.1 ,  90./)
+      tides_k1t( 5,:) = (/141.98, 45.64, 0.01,  60./)
+      tides_k1t( 6,:) = (/141.82, 45.78, 0.01, 120./)
+      tides_k1t( 7,:) = (/141.85, 45.84, 0.04, 120./)
+      tides_k1t( 8,:) = (/141.91, 45.94, 0.07, 120./)
+      tides_k1t( 9,:) = (/141.96, 46.01, 0.1 , 120./)
+      tides_k1t(10,:) = (/141.7 , 45.8 , 0.01, 150./)
+      tides_k1t(11,:) = (/141.73, 45.94, 0.04, 150./)
+      tides_k1t(12,:) = (/141.83, 46.12, 0.07, 150./)
+      tides_k1t(13,:) = (/141.5 , 45.82, 0.01, 180./)
+      tides_k1t(14,:) = (/141.45, 46.17, 0.04, 180./)
+      tides_k1t(15,:) = (/141.78, 46.45, 0.07, 180./)
+      tides_k1t(16,:) = (/141.19, 45.61, 0.01, 210./)
+      tides_k1t(17,:) = (/139.83, 45.75, 0.04, 210./)
+      tides_k1t(18,:) = (/141.56, 45.49, 0.01, 240./)
+      tides_k1t(19,:) = (/141.55, 45.42, 0.04, 240./)
+      tides_k1t(20,:) = (/141.44, 51.85, 0.07, 210./)
+      tides_k1t(21,:) = (/130.44, 35.15, 0.01, 210./)
+      tides_k1t(22,:) = (/129.67, 35.34, 0.01, 240./)
+      tides_k1t(23,:) = (/129.55, 35.24, 0.01, 270./)
+      tides_k1t(24,:) = (/129.46, 35.2 , 0.01, 300./)
+      tides_k1t(25,:) = (/129.36, 35.13, 0.01, 330./)
+      tides_k1t(26,:) = (/129.3 , 35.06, 0.01,   0./)
+      tides_k1t(27,:) = (/129.28, 34.99, 0.01,  30./)
+      tides_k1t(28,:) = (/129.32, 34.91, 0.01,  60./)
+      tides_k1t(29,:) = (/129.39, 34.86, 0.01,  90./)
+      tides_k1t(30,:) = (/129.5 , 34.85, 0.01, 110./)
+      tides_k1t(31,:) = (/129.63, 34.87, 0.01, 130./)
+      tides_k1t(32,:) = (/129.8 , 34.92, 0.01, 150./)
+      tides_k1t(33,:) = (/130.04, 34.99, 0.01, 180./)
+      tides_k1t(34,:) = (/131.01, 35.03, 0.04, 210./)
+      tides_k1t(35,:) = (/130.41, 34.83, 0.04, 180./)
+      tides_k1t(36,:) = (/130.05, 34.7 , 0.04, 150./)
+      tides_k1t(37,:) = (/129.68, 34.62, 0.04, 120./)
+      tides_k1t(38,:) = (/129.15, 34.62, 0.04,  90./)
+      tides_k1t(39,:) = (/128.88, 34.75, 0.04,  60./)
+      tides_k1t(40,:) = (/128.87, 34.43, 0.07,  90./)
+      tides_k1t(41,:) = (/129.69, 34.26, 0.07, 120./)
+      tides_k1t(42,:) = (/130.24, 34.45, 0.07, 150./)
+      tides_k1t(43,:) = (/130.76, 34.64, 0.07, 180./)
+      tides_k1t(44,:) = (/131.79, 34.76, 0.07, 210./)
+      tides_k1t(45,:) = (/129.7 , 34.03, 0.1 , 120./)
+      tides_k1t(46,:) = (/130.52, 34.13, 0.1 , 150./)
+      
       m2t = 1.035
       s2t = 1.
       k1t = 0.99725
       o1t = 1.075791667
 
-      if (idx.eq.1) then
+      pi2 = 2.*3.141592654
+      dtr = 2.*3.141592654/180.
+
+      if(idx.eq.1) then
 
 ! external (2-D) elevation boundary conditions
 
@@ -1923,268 +2163,160 @@
           call xperi2d_mpi(elf,im,jm)
         endif
 !
-        if (ipery.ne.0) then
+        if (ipery.ne.0) then 
           call yperi2d_mpi(elf,im,jm) !lyo:scs1d:add yperi*:ipery:
         endif
 
-        ! tides south
-        t_est = 112
-        t_nth =  36
-        if (i_global(im)>t_est .and. i_global(1)<t_est) then
-          if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
-            t_i = minloc(i_global, 1, i_global>=t_est)
-            t_j = minloc(j_global, 1, j_global>=t_nth)
-            ! M2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.04*(
-     $               cos((time-dte/86400.)*2.*3.142/m2t            )-
-     $               cos( time            *2.*3.142/m2t            ))
-            ! S2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $               cos((time-dte/86400.)*2.*3.142/s2t+   3.142/3.)-
-     $               cos( time            *2.*3.142/s2t+   3.142/3.))
-            ! K1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $               cos((time-dte/86400.)*2.*3.142/k1t+4.*3.142/5.)-
-     $               cos( time            *2.*3.142/k1t+4.*3.142/5.))
-            ! O1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.03*(
-     $               cos((time-dte/86400.)*2.*3.142/o1t+11.*3.142/10.)-
-     $               cos( time            *2.*3.142/o1t+11.*3.142/10.))
-            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
-     $                *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
-            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
-            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
-     $                *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
-            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
-          end if
-        end if
-        t_est = 113
-        t_nth =  40
-        if (i_global(im)>t_est .and. i_global(1)<t_est) then
-          if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
-            t_i = minloc(i_global, 1, i_global>=t_est)
-            t_j = minloc(j_global, 1, j_global>=t_nth)
-            ! M2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.035*(
-     $               cos((time-dte/86400.)*2.*3.142/m2t+   3.142/2.)-
-     $               cos( time            *2.*3.142/m2t+   3.142/2.))
-            ! S2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.02*(
-     $               cos((time-dte/86400.)*2.*3.142/s2t+   3.142/2.)-
-     $               cos( time            *2.*3.142/s2t+   3.142/2.))
-            ! K1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
-     $               cos((time-dte/86400.)*2.*3.142/k1t+4.*3.142/5.)-
-     $               cos( time            *2.*3.142/k1t+4.*3.142/5.))
-            ! O1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.045*(
-     $               cos((time-dte/86400.)*2.*3.142/o1t+11.*3.142/10.)-
-     $               cos( time            *2.*3.142/o1t+11.*3.142/10.))
-            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
-     $                *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
-            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
-            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
-     $                *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
-            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
-          end if
-        end if
-        t_est = 102
-        t_nth =  44
-        if (i_global(im)>t_est .and. i_global(1)<t_est) then
-          if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
-            t_i = minloc(i_global, 1, i_global>=t_est)
-            t_j = minloc(j_global, 1, j_global>=t_nth)
-            ! M2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
-     $               cos((time-dte/86400.)*2.*3.142/m2t+   3.142  )-
-     $               cos( time            *2.*3.142/m2t+   3.142  ))
-            ! S2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $               cos((time-dte/86400.)*2.*3.142/s2t+9.*3.142/10.)-
-     $               cos( time            *2.*3.142/s2t+9.*3.142/10.))
-            ! K1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.03*(
-     $               cos((time-dte/86400.)*2.*3.142/k1t+4.*3.142/5.)-
-     $               cos( time            *2.*3.142/k1t+4.*3.142/5.))
-            ! O1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.04*(
-     $               cos((time-dte/86400.)*2.*3.142/o1t+11.*3.142/10.)-
-     $               cos( time            *2.*3.142/o1t+11.*3.142/10.))
-            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
-     $                *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
-            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
-            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
-     $                *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
-            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
-          end if
-        end if
-        t_est = 104
-        t_nth =  32
-        if (i_global(im)>t_est .and. i_global(1)<t_est) then
-          if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
-            t_i = minloc(i_global, 1, i_global>=t_est)
-            t_j = minloc(j_global, 1, j_global>=t_nth)
-            ! M2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.03*(
-     $               cos((time-dte/86400.)*2.*3.142/m2t+3.*3.142/2.)-
-     $               cos( time            *2.*3.142/m2t+3.*3.142/2.))
-            ! S2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.005*(
-     $               cos((time-dte/86400.)*2.*3.142/s2t             )-
-     $               cos( time            *2.*3.142/s2t             ))
-            ! K1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
-     $               cos((time-dte/86400.)*2.*3.142/k1t+5.*3.142/4.)-
-     $               cos( time            *2.*3.142/k1t+5.*3.142/4.))
-            ! O1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.02*(
-     $               cos((time-dte/86400.)*2.*3.142/o1t+11.*3.142/10.)-
-     $               cos( time            *2.*3.142/o1t+11.*3.142/10.))
-            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
-     $                *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
-            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
-            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
-     $                *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
-            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
-          end if
-        end if
+        if ( .true. ) then
+        ! tides S2
+        do n = 1, 38
+          t_lon = tides_s2t(n,1)
+          t_lat = tides_s2t(n,2)
+          t_amp = tides_s2t(n,3)
+          t_phs = tides_s2t(n,4)
 
-        ! tides north
-        t_est = 126
-        t_nth = 249
-        if (i_global(im)>t_est .and. i_global(1)<t_est) then
-          if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
-            t_i = minloc(i_global, 1, i_global>=t_est)
-            t_j = minloc(j_global, 1, j_global>=t_nth)
-            ! M2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.04*(
-     $               cos((time-dte/86400.)*2.*3.142/m2t            )-
-     $               cos( time            *2.*3.142/m2t            ))
-            ! S2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $               cos((time-dte/86400.)*2.*3.142/s2t+7.*3.142/4.)-
-     $               cos( time            *2.*3.142/s2t+7.*3.142/4.))
-            ! K1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $               cos((time-dte/86400.)*2.*3.142/k1t+11.*3.142/10.)-
-     $               cos( time            *2.*3.142/k1t+11.*3.142/10.))
-            ! O1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $               cos((time-dte/86400.)*2.*3.142/o1t+    3.142  )-
-     $               cos( time            *2.*3.142/o1t+    3.142  ))
-            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
-     $                *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
-            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
-            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
-     $                *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
-            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
+          min_dist = 9999999.
+          do j = 1,jm
+            do i = 1,im
+              dist = sqrt( ( east_c(i,j)-t_lon)**2
+     &                    +(north_c(i,j)-t_lat)**2 )
+              if ( dist < min_dist ) then
+                min_dist = dist
+                t_i = i
+                t_j = j
+              end if
+            end do
+          end do
+          dist = min_dist
+          call min0d_mpi(dist,master_task)
+
+          if ( min_dist == dist ) then
+            elb(t_i,t_j) = elb(t_i,t_j)-t_amp*(
+     $                cos((time-dte/86400.)*pi2/s2t+t_phs*dtr)-
+     $                cos( time            *pi2/s2t+t_phs*dtr))
+            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elb(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elb(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
           end if
-        end if
-        t_est = 105
-        t_nth = 241
-        if (i_global(im)>t_est .and. i_global(1)<t_est) then
-          if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
-            t_i = minloc(i_global, 1, i_global>=t_est)
-            t_j = minloc(j_global, 1, j_global>=t_nth)
-            ! M2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $               cos((time-dte/86400.)*2.*3.142/m2t+   3.142/2.)-
-     $               cos( time            *2.*3.142/m2t+   3.142/2.))
-            ! S2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.005*(
-     $               cos((time-dte/86400.)*2.*3.142/s2t+5.*3.142/4.)-
-     $               cos( time            *2.*3.142/s2t+5.*3.142/4.))
-            ! K1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $               cos((time-dte/86400.)*2.*3.142/k1t+11.*3.142/10.)-
-     $               cos( time            *2.*3.142/k1t+11.*3.142/10.))
-            ! O1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $               cos((time-dte/86400.)*2.*3.142/o1t+    3.142  )-
-     $               cos( time            *2.*3.142/o1t+    3.142  ))
-            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
-     $                *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
-            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
-            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
-     $                *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
-            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
+        end do
+
+        ! tides M2
+        do n = 1, 88
+          t_lon = tides_m2t(n,1)
+          t_lat = tides_m2t(n,2)
+          t_amp = tides_m2t(n,3)
+          t_phs = tides_m2t(n,4)
+
+          min_dist = 9999999.
+          do j = 1,jm
+            do i = 1,im
+              dist = sqrt( ( east_c(i,j)-t_lon)**2
+     &                    +(north_c(i,j)-t_lat)**2 )
+              if ( dist < min_dist ) then
+                min_dist = dist
+                t_i = i
+                t_j = j
+              end if
+            end do
+          end do
+          dist = min_dist
+          call min0d_mpi(dist,master_task)
+
+          if ( min_dist == dist ) then
+            elb(t_i,t_j) = elb(t_i,t_j)-t_amp*(
+     $                cos((time-dte/86400.)*pi2/m2t+t_phs*dtr)-
+     $                cos( time            *pi2/m2t+t_phs*dtr))
+            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elb(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elb(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
           end if
-        end if
-        t_est =  94
-        t_nth = 240
-        if (i_global(im)>t_est .and. i_global(1)<t_est) then
-          if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
-            t_i = minloc(i_global, 1, i_global>=t_est)
-            t_j = minloc(j_global, 1, j_global>=t_nth)
-            ! M2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $               cos((time-dte/86400.)*2.*3.142/m2t+   3.142  )-
-     $               cos( time            *2.*3.142/m2t+   3.142  ))
-            ! S2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.015*(
-     $               cos((time-dte/86400.)*2.*3.142/s2t+5.*3.142/4.)-
-     $               cos( time            *2.*3.142/s2t+5.*3.142/4.))
-            ! K1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $               cos((time-dte/86400.)*2.*3.142/k1t+23.*3.142/20.)-
-     $               cos( time            *2.*3.142/k1t+23.*3.142/20.))
-            ! O1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $               cos((time-dte/86400.)*2.*3.142/o1t+    3.142  )-
-     $               cos( time            *2.*3.142/o1t+    3.142  ))
-            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
-     $                *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
-            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
-            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
-     $                *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
-            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
+        end do
+
+        ! tides O1
+        do n = 1, 55
+          t_lon = tides_o1t(n,1)
+          t_lat = tides_o1t(n,2)
+          t_amp = tides_o1t(n,3)
+          t_phs = tides_o1t(n,4)
+
+          min_dist = 9999999.
+          do j = 1,jm
+            do i = 1,im
+              dist = sqrt( ( east_c(i,j)-t_lon)**2
+     &                    +(north_c(i,j)-t_lat)**2 )
+              if ( dist < min_dist ) then
+                min_dist = dist
+                t_i = i
+                t_j = j
+              end if
+            end do
+          end do
+          dist = min_dist
+          call min0d_mpi(dist,master_task)
+
+          if ( min_dist == dist ) then
+            elb(t_i,t_j) = elb(t_i,t_j)-t_amp*(
+     $                cos((time-dte/86400.)*pi2/o1t+t_phs*dtr)-
+     $                cos( time            *pi2/o1t+t_phs*dtr))
+            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elb(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elb(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
           end if
-        end if
-        t_est = 102
-        t_nth = 247
-        if (i_global(im)>t_est .and. i_global(1)<t_est) then
-          if (j_global(jm)>t_nth .and. j_global(1)<t_nth) then
-            t_i = minloc(i_global, 1, i_global>=t_est)
-            t_j = minloc(j_global, 1, j_global>=t_nth)
-            ! M2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $               cos((time-dte/86400.)*2.*3.142/m2t+3.*3.142/2.)-
-     $               cos( time            *2.*3.142/m2t+3.*3.142/2.))
-            ! S2
-            elf(t_i,t_j) = elf(t_i,t_j)-0.01*(
-     $               cos((time-dte/86400.)*2.*3.142/s2t+29.*3.142/20.)-
-     $               cos( time            *2.*3.142/s2t+29.*3.142/20.))
-            ! K1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $               cos((time-dte/86400.)*2.*3.142/k1t+23.*3.142/20.)-
-     $               cos( time            *2.*3.142/k1t+23.*3.142/20.))
-            ! O1
-            elf(t_i,t_j) = elf(t_i,t_j)-0.05*(
-     $               cos((time-dte/86400.)*2.*3.142/o1t+    3.142  )-
-     $               cos( time            *2.*3.142/o1t+    3.142  ))
-            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i-1,t_j))
-     $                *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
-            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
-            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elf(t_i,t_j)+d(t_i,t_j-1))
-     $                *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
-            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elf(t_i,t_j))
-     $                *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
+        end do
+
+        ! tides K1
+        do n = 1, 46
+          t_lon = tides_k1t(n,1)
+          t_lat = tides_k1t(n,2)
+          t_amp = tides_k1t(n,3)
+          t_phs = tides_k1t(n,4)
+
+          min_dist = 9999999.
+          do j = 1,jm
+            do i = 1,im
+              dist = sqrt( ( east_c(i,j)-t_lon)**2
+     &                    +(north_c(i,j)-t_lat)**2 )
+              if ( dist < min_dist ) then
+                min_dist = dist
+                t_i = i
+                t_j = j
+              end if
+            end do
+          end do
+          dist = min_dist
+          call min0d_mpi(dist,master_task)
+
+          if ( min_dist == dist ) then
+            elb(t_i,t_j) = elb(t_i,t_j)-t_amp*(
+     $                cos((time-dte/86400.)*pi2/k1t+t_phs*dtr)-
+     $                cos( time            *pi2/k1t+t_phs*dtr))
+            fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i-1,t_j))
+     $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+            fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elb(t_i,t_j))
+     $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+            fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i,t_j-1))
+     $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+            fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elb(t_i,t_j))
+     $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
           end if
+        end do
+        
+>>>>>>> 054667d52f7bb3003a013f54814da3b90703eccf
         end if
 !
         do j=1,jm
@@ -3900,6 +4032,11 @@ C  !The most south sudomains
 
             tr=ti(i,j,k)+tbias
             sr=si(i,j,k)+sbias
+            if ( sr < 0. ) then
+              print *, "Negative salinity @ ",my_task
+              print *, sr, "@", i_global(i), j_global(j)
+              sr = 0.
+            end if
             tr2=tr*tr
             tr3=tr2*tr
             tr4=tr3*tr
@@ -4617,6 +4754,15 @@ C  !The most south sudomains
       end do
 
 ! recalculate mass fluxes with antidiffusion velocity
+!      rewind(40+my_task)
+!      write(40+my_task,*) dt, xmassflux
+!      if ( my_task==master_task ) print *, "=== ",iext," ==="
+!      print '(i1,x,a2,x,2(e14.7,x,2(i3,";")))', my_task, "dt"
+!     &       , minval(dt, fsm/=0.), minloc(dt, fsm/=0.)
+!     &       , maxval(dt), maxloc(dt)
+!      print '(i1,x,a2,x,2(e15.8,x,3(i3,";")))', my_task, "xf"
+!     &       , minval(xmassflux), minloc(xmassflux)
+!     &       , maxval(xmassflux), maxloc(xmassflux)
       do k=1,kbm1
         do j=2,jmm1
           do i=2,im
@@ -4625,6 +4771,11 @@ C  !The most south sudomains
               xmassflux(i,j,k)=0.
             else
               udx=abs(xmassflux(i,j,k))
+!              write(40+my_task,*) i, j, k, aru(i,j), dt(i-1,j)
+!     &             , dt(i,j), xmassflux(i,j,k), dti2, aru(i,j)
+!              write(50+my_task,*)
+!     &             dti2*xmassflux(i,j,k)*xmassflux(i,j,k)*2.
+!              write(60+my_task,*) aru(i,j)*(dt(i-1,j)+dt(i,j))
               u2dt=dti2*xmassflux(i,j,k)*xmassflux(i,j,k)*2.
      $              /(aru(i,j)*(dt(i-1,j)+dt(i,j)))
               mol=(ff(i,j,k)-ff(i-1,j,k))
@@ -4638,6 +4789,9 @@ C  !The most south sudomains
         end do
       end do
 
+!      print '(i1,x,a2,x,2(e15.8,x,3(i3,";")))', my_task, "yf"
+!     &       , minval(ymassflux), minloc(ymassflux)
+!     &       , maxval(ymassflux), maxloc(ymassflux)
       do k=1,kbm1
         do j=2,jm
           do i=2,imm1
@@ -4659,6 +4813,9 @@ C  !The most south sudomains
         end do
       end do
 
+!      print '(i1,x,a2,x,2(e15.8,x,3(i3,";")))', my_task, "zf"
+!     &       , minval(zwflux), minloc(zwflux)
+!     &       , maxval(zwflux), maxloc(zwflux)
       do k=2,kbm1
         do j=2,jmm1
           do i=2,imm1

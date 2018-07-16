@@ -99,8 +99,8 @@
       real(kind=rk), external :: cd, heatlat, esk
 
       integer       i, j
-      real(kind=rk) arho
-     &            , cd1, ce2, ch2, ckelv, const, cp
+      real(kind=rk) arho!, cd1
+     &            , ce2, ch2, ckelv, const, cp
      &            , deltemp
      &            , ea12, emiss, esatair, esatoce, evap, expsi
      &            , fe, fh, ps
@@ -1283,6 +1283,8 @@
         waveage = .false.
         seastate = .false.
 
+        L = 1.  ! compiler warning bypass
+
 ! convert rh to specific humidity (the functions below return g/kg)
         Qs = qsat26sea(ts,P)/1000.          ! surface water specific humidity [kg/kg]
         call qsat26air(t,P,rh, Q, Pv)       ! specific humidity of air [kg/kg]
@@ -1328,6 +1330,7 @@
         ta = t+tdk
         ug = 0.5
         dter  = 0.3
+        dqer  = 0.
         ut    = sqrt( u**2 + ug**2 )
         u10   = ut * log(10./1.e-4) / log(zu/1.e-4)
         usr   = 0.035 * u10

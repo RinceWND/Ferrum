@@ -290,6 +290,9 @@
 
 ! Bulk default parameters
 !
+! Use air-sea bulk calculations
+      calc_bulk = .true.
+
 ! Calculate shortwave radiation according to Reed
       calc_swr  = .true.
 
@@ -764,10 +767,11 @@
       logical :: here, judge_inout !lyo:scs1d:
       integer :: i,j,ic,jc         !lyo:scs1d:
       real(kind=rk)    :: corcon            !lyo:scs1d:
-      character(len=120) in_file        !eda:uvforce
+!      character(len=120) in_file        !eda:uvforce
 
       namelist/bry_nml/ rfn, rfe, rfs, rfw
 
+      elb = 0.
       if ( n_north == -1 ) eln = elb( :,jm)
       if ( n_east  == -1 ) ele = elb(im,: )
       if ( n_south == -1 ) els = elb( :, 1)

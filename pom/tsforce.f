@@ -226,7 +226,7 @@
 
       return
 
-      end subroutine tsforce_init
+      end !subroutine tsforce_init
 !--------------------------------------------------------------
 
 !==============================================================
@@ -427,7 +427,7 @@
 
       return
 
-      end subroutine tsforce_main
+      end !subroutine tsforce_main
 !--------------------------------------------------------------
 
 !--------------------------------------------------------------
@@ -600,8 +600,8 @@
 
       return
 
-      end subroutine tsforce_tsflx
+      end !subroutine tsforce_tsflx
 !--------------------------------------------------------------
 
 
-      end module tsforce
+      end !module tsforce
