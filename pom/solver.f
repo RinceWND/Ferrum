@@ -2188,20 +2188,32 @@
             end do
           end do
           dist = min_dist
-          call min0d_mpi(dist,master_task)
+          call min0d_all_mpi(dist)
 
           if ( min_dist == dist ) then
+!            print *, "S2: ", t_lon, t_lat, ":"
+!     &             , east_c(t_i,t_j), north_c(t_i,t_j), "@", my_task
+!            print *, "e = ", elb(t_i,t_j), "[", min_dist, "]"
             elb(t_i,t_j) = elb(t_i,t_j)-t_amp*(
      $                cos((time-dte/86400.)*pi2/s2t+t_phs*dtr)-
      $                cos( time            *pi2/s2t+t_phs*dtr))
+            if ( t_i > 1 ) then
             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i-1,t_j))
      $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+            end if
+            if ( t_i < im ) then
             fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elb(t_i,t_j))
      $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+            end if
+            if ( t_j > 1 ) then
             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i,t_j-1))
      $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+            end if
+            if ( t_j < jm ) then
             fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elb(t_i,t_j))
      $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
+            end if
+!            print *, ">>> ", elb(t_i,t_j)
           end if
         end do
 
@@ -2225,20 +2237,32 @@
             end do
           end do
           dist = min_dist
-          call min0d_mpi(dist,master_task)
+          call min0d_all_mpi(dist,master_task)
 
           if ( min_dist == dist ) then
+!            print *, "M2: ", t_lon, t_lat, ":"
+!     &             , east_c(t_i,t_j), north_c(t_i,t_j), "@", my_task
+!            print *, "e = ", elb(t_i,t_j), "[", min_dist, "]"
             elb(t_i,t_j) = elb(t_i,t_j)-t_amp*(
      $                cos((time-dte/86400.)*pi2/m2t+t_phs*dtr)-
      $                cos( time            *pi2/m2t+t_phs*dtr))
+            if ( t_i > 1 ) then
             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i-1,t_j))
      $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+            end if
+            if ( t_i < im ) then
             fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elb(t_i,t_j))
      $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+            end if
+            if ( t_j > 1 ) then
             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i,t_j-1))
      $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+            end if
+            if ( t_j < jm ) then
             fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elb(t_i,t_j))
      $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
+            end if
+!            print *, ">>> ", elb(t_i,t_j)
           end if
         end do
 
@@ -2262,20 +2286,32 @@
             end do
           end do
           dist = min_dist
-          call min0d_mpi(dist,master_task)
+          call min0d_all_mpi(dist,master_task)
 
           if ( min_dist == dist ) then
+!            print *, "O1: ", t_lon, t_lat, ":"
+!     &             , east_c(t_i,t_j), north_c(t_i,t_j), "@", my_task
+!            print *, "e = ", elb(t_i,t_j), "[", min_dist, "]"
             elb(t_i,t_j) = elb(t_i,t_j)-t_amp*(
      $                cos((time-dte/86400.)*pi2/o1t+t_phs*dtr)-
      $                cos( time            *pi2/o1t+t_phs*dtr))
+            if ( t_i > 1 ) then
             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i-1,t_j))
      $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+            end if
+            if ( t_i < im ) then
             fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elb(t_i,t_j))
      $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+            end if
+            if ( t_j > 1 ) then
             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i,t_j-1))
      $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+            end if
+            if ( t_j < jm ) then
             fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elb(t_i,t_j))
      $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
+            end if
+!            print *, ">>> ", elb(t_i,t_j)
           end if
         end do
 
@@ -2299,20 +2335,32 @@
             end do
           end do
           dist = min_dist
-          call min0d_mpi(dist,master_task)
+          call min0d_all_mpi(dist,master_task)
 
           if ( min_dist == dist ) then
+!            print *, "K1: ", t_lon, t_lat, ":"
+!     &             , east_c(t_i,t_j), north_c(t_i,t_j), "@", my_task
+!            print *, "e = ", elb(t_i,t_j), "[", min_dist, "]"
             elb(t_i,t_j) = elb(t_i,t_j)-t_amp*(
      $                cos((time-dte/86400.)*pi2/k1t+t_phs*dtr)-
      $                cos( time            *pi2/k1t+t_phs*dtr))
+            if ( t_i > 1 ) then
             fluxua(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i-1,t_j))
      $                 *(dy(t_i,t_j)+dy(t_i-1,t_j))*ua(t_i,t_j)
+            end if
+            if ( t_i < im ) then
             fluxua(t_i+1,t_j)=.25*(d(t_i+1,t_j)+h(t_i,t_j)+elb(t_i,t_j))
      $                 *(dy(t_i+1,t_j)+dy(t_i,t_j))*ua(t_i+1,t_j)
+            end if
+            if ( t_j > 1 ) then
             fluxva(t_i,t_j)=.25*(h(t_i,t_j)+elb(t_i,t_j)+d(t_i,t_j-1))
      $                 *(dx(t_i,t_j)+dx(t_i,t_j-1))*va(t_i,t_j)
+            end if
+            if ( t_j < jm ) then
             fluxva(t_i,t_j+1)=.25*(d(t_i,t_j+1)+h(t_i,t_j)+elb(t_i,t_j))
      $                 *(dx(t_i,t_j+1)+dx(t_i,t_j))*va(t_i,t_j+1)
+            end if
+!            print *, ">>> ", elb(t_i,t_j)
           end if
         end do
         

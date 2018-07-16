@@ -313,12 +313,11 @@
       return
       end
 !_______________________________________________________________________
-      subroutine min0d_mpi(work,to)
-! send min of WORK to node TO
+      subroutine min0d_all_mpi(work)
+! send min of WORK to all nodes
       implicit none
       include 'mpif.h'
       include 'pom.h'
-      integer to
       real(kind=rk) work,tmp
       integer ierr
       integer mpi_rk
@@ -329,7 +328,7 @@
         mpi_rk = mpi_real
       end if
 ! get max
-      call mpi_reduce(work,tmp,1,mpi_rk,mpi_min,to,pom_comm,ierr)
+      call mpi_allreduce(work,tmp,1,mpi_rk,mpi_min,pom_comm,ierr)
       work=tmp
       return
       end
