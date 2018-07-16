@@ -4351,13 +4351,13 @@ C  !The most south sudomains
 ! recalculate mass fluxes with antidiffusion velocity
 !      rewind(40+my_task)
 !      write(40+my_task,*) dt, xmassflux
-      if ( my_task==master_task ) print *, "=== ",iext," ==="
-      print '(i1,x,a2,x,2(e14.7,x,2(i3,";")))', my_task, "dt"
-     &       , minval(dt, fsm/=0.), minloc(dt, fsm/=0.)
-     &       , maxval(dt), maxloc(dt)
-      print '(i1,x,a2,x,2(e15.8,x,3(i3,";")))', my_task, "xf"
-     &       , minval(xmassflux), minloc(xmassflux)
-     &       , maxval(xmassflux), maxloc(xmassflux)
+!      if ( my_task==master_task ) print *, "=== ",iext," ==="
+!      print '(i1,x,a2,x,2(e14.7,x,2(i3,";")))', my_task, "dt"
+!     &       , minval(dt, fsm/=0.), minloc(dt, fsm/=0.)
+!     &       , maxval(dt), maxloc(dt)
+!      print '(i1,x,a2,x,2(e15.8,x,3(i3,";")))', my_task, "xf"
+!     &       , minval(xmassflux), minloc(xmassflux)
+!     &       , maxval(xmassflux), maxloc(xmassflux)
       do k=1,kbm1
         do j=2,jmm1
           do i=2,im
@@ -4384,9 +4384,9 @@ C  !The most south sudomains
         end do
       end do
 
-      print '(i1,x,a2,x,2(e15.8,x,3(i3,";")))', my_task, "yf"
-     &       , minval(ymassflux), minloc(ymassflux)
-     &       , maxval(ymassflux), maxloc(ymassflux)
+!      print '(i1,x,a2,x,2(e15.8,x,3(i3,";")))', my_task, "yf"
+!     &       , minval(ymassflux), minloc(ymassflux)
+!     &       , maxval(ymassflux), maxloc(ymassflux)
       do k=1,kbm1
         do j=2,jm
           do i=2,imm1
@@ -4408,9 +4408,9 @@ C  !The most south sudomains
         end do
       end do
 
-      print '(i1,x,a2,x,2(e15.8,x,3(i3,";")))', my_task, "zf"
-     &       , minval(zwflux), minloc(zwflux)
-     &       , maxval(zwflux), maxloc(zwflux)
+!      print '(i1,x,a2,x,2(e15.8,x,3(i3,";")))', my_task, "zf"
+!     &       , minval(zwflux), minloc(zwflux)
+!     &       , maxval(zwflux), maxloc(zwflux)
       do k=2,kbm1
         do j=2,jmm1
           do i=2,imm1
