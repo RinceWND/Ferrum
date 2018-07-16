@@ -2316,7 +2316,6 @@
           end if
         end do
         
->>>>>>> 054667d52f7bb3003a013f54814da3b90703eccf
         end if
 !
         do j=1,jm
