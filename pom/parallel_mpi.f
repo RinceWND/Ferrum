@@ -45,8 +45,9 @@
 ! check number of processors
       if(nproc.ne.n_proc) then
         error_status=1
-        if(my_task.eq.master_task) write(*,'(a//a)')
-     $   'Incompatible number of processors','POM terminated with error'
+        if(my_task.eq.master_task) write(*,'(a,i3''/=''i3//a)')
+     $   'Incompatible number of processors',nproc,n_proc
+     $  ,'POM terminated with error'
         call finalize_mpi
         stop
       end if
@@ -308,6 +309,27 @@
       end if
 ! get max
       call mpi_reduce(work,tmp,1,mpi_rk,mpi_max,to,pom_comm,ierr)
+      work=tmp
+      return
+      end
+!_______________________________________________________________________
+      subroutine min0d_mpi(work,to)
+! send min of WORK to node TO
+      implicit none
+      include 'mpif.h'
+      include 'pom.h'
+      integer to
+      real(kind=rk) work,tmp
+      integer ierr
+      integer mpi_rk
+      
+      if (rk==8) then
+        mpi_rk = mpi_double_precision
+      else
+        mpi_rk = mpi_real
+      end if
+! get max
+      call mpi_reduce(work,tmp,1,mpi_rk,mpi_min,to,pom_comm,ierr)
       work=tmp
       return
       end

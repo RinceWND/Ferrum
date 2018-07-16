@@ -22,7 +22,7 @@
      $     tav, fac, cof
 
       real(kind=rk), dimension( im_local_coarse,jm_local_coarse ) :: 
-     $     ssha_a_coarse, ssha_b_coarse, ssha_coarse
+     $     ssha_a_coarse, ssha_b_coarse!, ssha_coarse
 
       real(kind=rk), dimension( im_local_coarse,jm_local_coarse ) :: 
      $     frs_coarse
@@ -92,10 +92,10 @@
 ! fhx: interpolation to fine grid. 12/13/2010
       if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid.
 
-        call interp_mask_2d(frs_coarse,0,east_e,north_e,fsm,frs)
-        call interp_mask_3d(tav_coarse,0,east_e,north_e,fsm,tav)
-        call interp_mask_3d(fac_coarse,0,east_e,north_e,fsm,fac)
-        call interp_mask_3d(cof_coarse,0,east_e,north_e,fsm,cof)
+        call interp_mask_2d(frs_coarse,0,east_e,north_e,frs)
+        call interp_mask_3d(tav_coarse,0,east_e,north_e,tav)
+        call interp_mask_3d(fac_coarse,0,east_e,north_e,fac)
+        call interp_mask_3d(cof_coarse,0,east_e,north_e,cof)
 
       if (n_west.eq.-1) then
 
@@ -218,8 +218,8 @@
 ! interpolate after read in ssha. fhx:12/13/2010  
       if(calc_interp) then ! fhx:interp_flag:add flag for interp fgrid. 
 
-        call interp_mask_2d(ssha_a_coarse,0,east_e,north_e,fsm,ssha_a)      
-        call interp_mask_2d(ssha_b_coarse,0,east_e,north_e,fsm,ssha_b)
+        call interp_mask_2d(ssha_a_coarse,0,east_e,north_e,ssha_a)
+        call interp_mask_2d(ssha_b_coarse,0,east_e,north_e,ssha_b)
       if (n_west.eq.-1) then
        do i=1,3
          ssha_a(i,:)=ssha_a(4,:)
@@ -385,8 +385,8 @@
 ! interpolate after read in ssha. fhx:12/13/2010
        if(calc_interp) then !fhx:interp_flag:add flag for interp fgrid. 
 
-        call interp_mask_2d(ssha_a_coarse,0,east_e,north_e,fsm,ssha_a)
-        call interp_mask_2d(ssha_b_coarse,0,east_e,north_e,fsm,ssha_b)       
+        call interp_mask_2d(ssha_a_coarse,0,east_e,north_e,ssha_a)
+        call interp_mask_2d(ssha_b_coarse,0,east_e,north_e,ssha_b)
        if (n_west.eq.-1) then
        do i=1,3
          ssha_a(i,:)=ssha_a(4,:)
@@ -450,7 +450,7 @@
 
 !     before
       if ( my_task == n_proc/2-1 )  
-     $     print'(/2(a,f12.5),a,l)', 
+     $     print'(/2(a,f12.5),a,l2)',
      $     "before : tb = ", tb(im/2,jm/2,1), 
      $     ", t = ", t(im/2,jm/2,1),
      $     ", mask_msla = ",mask_msla(im/2,jm/2)
@@ -481,7 +481,7 @@
      $                 corhh = 1.0 - ( 500.0 - h(i,j) ) / 300.0
 
                   ! assume some interpolation erroe exists so max = 0.95
-                  corhh = min( corhh, 0.95 )
+                  corhh = min( corhh, 0.95_rk )
 
                   ! cfrs suppresses assimilation near boundaries
                   ! frs = 1 near eastern boundary

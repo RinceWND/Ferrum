@@ -63,7 +63,7 @@
 !--------------------------------------------------------
       type(date) function str2date( str ) result(d)
  
-      character*19 :: str
+      character(len=19) :: str
            
       read(str, '(i4,1x,i2,1x,i2,1x,i2,1x,i2,1x,i2)')                    
      $     d%year, d%month, d%day, d%hour, d%min, d%sec

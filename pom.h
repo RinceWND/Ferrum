@@ -16,8 +16,8 @@
      $  jm_global_coarse,! number of global grid points in y for coarse grids
      $  im_local_coarse ,
      $  jm_local_coarse ,
-     $  x_division      ,! number of divisions from coarse to fine grids in x 
-     $  y_division      ,! number of divisions from coarse to fine grids in y 
+     $  x_division      ,! number of divisions from coarse to fine grids in x
+     $  y_division      ,! number of divisions from coarse to fine grids in y
      $  n_proc           ! number of processors
 
 
@@ -39,28 +39,16 @@
 !     $  jm_global_coarse=452  ,
 !     $  im_local_coarse=42, !90   ,   !num_of_nodes = 16  4x4
 !     $  jm_local_coarse=47, !52   ,   !num_of_nodes = 16  4x4
-!     $  x_division=2          ,     
-!     $  y_division=2          ,    
+!     $  x_division=2          ,
+!     $  y_division=2          ,
 !     $  n_proc= 110) !45             ) !num_of_nodes = 16  4x4
-        
-       parameter(
-     $  im_global=180        ,
-     $  jm_global=313         ,
-     $  kb=33                 ,
-     $  im_local=91,
-     $  jm_local=313,
-     $  im_global_coarse=180 ,
-     $  jm_global_coarse=313  ,
-     $  im_local_coarse=91,
-     $  jm_local_coarse=313,
-     $  x_division=2          ,
-     $  y_division=1          ,
-     $  n_proc= 2)
+
+      include 'domain_dist'
 
 
 ! tide parameters !fhx:tide
       integer
-     $  ntide            ! number of tidal components  
+     $  ntide            ! number of tidal components
       parameter(ntide=1) ! =0 may not work below & in solver.f !lyo:pac10:
 !_______________________________________________________________________
 ! Efective grid size
@@ -102,7 +90,7 @@
      $  j_global       ,! global j index for each point in local domain
      $  pom_comm_coarse ,! satellite data MPI group communicator
      $  i_global_coarse ,! global i index for each point in local domain
-     $  j_global_coarse ,! global j index for each point in local domain     
+     $  j_global_coarse ,! global j index for each point in local domain
      $  n_west         ,! western parallel processor ID
      $  n_east         ,! eastern parallel processor ID
      $  n_south        ,! southern parallel processor ID
@@ -261,7 +249,7 @@
      $  z              ,! sigma coordinate from z=0 (surface) to z=-1 (bottom)
      $  zz              ! sigma coordinate, intermediate between z
 
-      common/blk1d/ 
+      common/blk1d/
      $  dz(kb)         ,
      $  dzz(kb)        ,
      $  z(kb)          ,
@@ -280,6 +268,9 @@
      $  aru            ,! cell area centered on U grid points
      $  arv            ,! cell area centered on V grid points
      $  cbc            ,! bottom friction coefficient
+     $  icb            ,!:sea ice concentration at time n-1
+     $  ice            ,!:sea ice concentration
+     $  icf            ,!:sea ice concentration at time n+1
      $  cor            ,! coriolis parameter
      $  d              ,! h+el
      $  drx2d          ,! vertical integral of drhox
@@ -306,6 +297,7 @@
      $  fluxva         ,
      $  fsm            ,! mask for scalar variables
      $  h              ,! bottom depth
+     $  hi             ,! sea ice thickness
      $  north_c        ,! horizontal coordinate of cell corner points in y
      $  north_e        ,! horizontal coordinate of elevation points in y
      $  north_u        ,! horizontal coordinate of U points in y
@@ -315,17 +307,25 @@
      $  ssurf          ,
      $  swrad          ,! short wave radiation incident on the ocean surface
      $  vfluxb         ,! volume flux through water column surface at time n-1
+     $  tauiwu         ,! momentum flux through the ice-water interface
+     $  tauiwv         ,! momentum flux through the ice-water interface
      $  tps            ,
      $  tsurf          ,
      $  ua             ,! vertical mean of u at time n
      $  vfluxf         ,! volume flux through water column surface at time n+1
      $  uab            ,! vertical mean of u at time n-1
      $  uaf            ,! vertical mean of u at time n+1
+     $  uib            ,! sea ice u-velocity at time n-1
+     $  ui             ,! sea ice u-velocity
+     $  uif            ,! sea ice u-velocity at time n+1
      $  utb            ,! ua time averaged over the interval dti at time n-1
      $  utf            ,! ua time averaged over the interval dti at time n+1
      $  va             ,! vertical mean of v at time n
      $  vab            ,! vertical mean of v at time n-1
      $  vaf            ,! vertical mean of v at time n+1
+     $  vib            ,! sea ice v-velocity at time n-1
+     $  vi             ,! sea ice v-velocity
+     $  vif            ,! sea ice v-velocity at time n+1
      $  vtb            ,! va time averaged over the interval dti at time n-1
      $  vtf            ,! va time averaged over the interval dti at time n+1
      $  wssurf         ,! <ws(0)> salinity flux at the surface
@@ -349,6 +349,9 @@
      $  aru(im_local,jm_local)     ,
      $  arv(im_local,jm_local)     ,
      $  cbc(im_local,jm_local)     ,
+     $  icb(im_local,jm_local)     ,    !:rwnd
+     $  ice(im_local,jm_local)     ,    !:rwnd
+     $  icf(im_local,jm_local)     ,    !:rwnd
      $  cor(im_local,jm_local)     ,
      $  d(im_local,jm_local)       ,
      $  drx2d(im_local,jm_local)   ,
@@ -375,6 +378,7 @@
      $  fluxva(im_local,jm_local)  ,
      $  fsm(im_local,jm_local)     ,
      $  h(im_local,jm_local)       ,
+     $  hi(im_local,jm_local)      ,    !:rwnd
      $  north_c(im_local,jm_local) ,
      $  north_e(im_local,jm_local) ,
      $  north_u(im_local,jm_local) ,
@@ -384,17 +388,25 @@
      $  ssurf(im_local,jm_local)   ,
      $  swrad(im_local,jm_local)   ,
      $  vfluxb(im_local,jm_local)  ,
+     $  tauiwu(im_local,jm_local)  ,    !:rwnd
+     $  tauiwv(im_local,jm_local)  ,    !:rwnd
      $  tps(im_local,jm_local)     ,
      $  tsurf(im_local,jm_local)   ,
      $  ua(im_local,jm_local)      ,
      $  vfluxf(im_local,jm_local)  ,
      $  uab(im_local,jm_local)     ,
      $  uaf(im_local,jm_local)     ,
+     $  uib(im_local,jm_local)     ,    !:rwnd
+     $  ui(im_local,jm_local)      ,    !:rwnd
+     $  uif(im_local,jm_local)     ,    !:rwnd
      $  utb(im_local,jm_local)     ,
      $  utf(im_local,jm_local)     ,
      $  va(im_local,jm_local)      ,
      $  vab(im_local,jm_local)     ,
      $  vaf(im_local,jm_local)     ,
+     $  vib(im_local,jm_local)     ,    !:rwnd
+     $  vi(im_local,jm_local)      ,    !:rwnd
+     $  vif(im_local,jm_local)     ,    !:rwnd
      $  vtb(im_local,jm_local)     ,
      $  vtf(im_local,jm_local)     ,
      $  wssurf(im_local,jm_local)  ,
@@ -484,17 +496,18 @@
      $  zflux(im_local,jm_local,kb)
 
 ! ================================================
-! ayumi 2010/4/15 
+! ayumi 2010/4/15
 
-      logical 
-     $  calc_wind, calc_tsforce,
+      logical
+     $  calc_bulk, calc_wind, calc_tsforce,
      $  calc_river, calc_assim,
      $  calc_assimdrf, !eda
      $  calc_interp,    !fhx:interp_flag
      $  calc_tsurf_mc,  !fhx:mcsst
      $  calc_tide,       !fhx:tide
-     $  calc_uvforce     !eda:uvforce
-      integer 
+     $  calc_uvforce,    !eda:uvforce
+     &  calc_ice
+      integer
      $  num, iout
 
 ! 2-d
@@ -507,11 +520,12 @@
       real(kind=rk)
      $  u_mean, v_mean, w_mean,
      $  t_mean, s_mean, rho_mean,
-     $  kh_mean, km_mean 
+     $  kh_mean, km_mean
 
 
-      common/blklog/ 
-     $  calc_wind, 
+      common/blklog/
+     &  calc_bulk,
+     $  calc_wind,
      $  calc_tsforce,
      $  calc_river,
      $  calc_assim,
@@ -519,11 +533,12 @@
      $  calc_interp,    !fhx:interp_flag
      $  calc_tsurf_mc,  !fhx:mcsst
      $  calc_tide,       !fhx:tide
-     $  calc_uvforce     !eda:uvforce
+     $  calc_uvforce,    !eda:uvforce
+     &  calc_ice
 
 
       common/blkcon2/
-     $  num, iout          
+     $  num, iout
 
       common/blk2d2/
      $  uab_mean(im_local,jm_local)    ,
@@ -532,17 +547,17 @@
      $  wusurf_mean(im_local,jm_local) ,
      $  wvsurf_mean(im_local,jm_local) ,
      $  wtsurf_mean(im_local,jm_local) ,
-     $  wssurf_mean(im_local,jm_local)    
+     $  wssurf_mean(im_local,jm_local)
 
       common/blk3d2/
      $  u_mean(im_local,jm_local,kb)   ,
      $  v_mean(im_local,jm_local,kb)   ,
      $  w_mean(im_local,jm_local,kb)   ,
-     $  t_mean(im_local,jm_local,kb)   , 
+     $  t_mean(im_local,jm_local,kb)   ,
      $  s_mean(im_local,jm_local,kb)   ,
      $  rho_mean(im_local,jm_local,kb) ,
-     $  kh_mean(im_local,jm_local,kb)  ,  
-     $  km_mean(im_local,jm_local,kb)   
+     $  kh_mean(im_local,jm_local,kb)  ,
+     $  km_mean(im_local,jm_local,kb)
 
 
 
@@ -553,6 +568,10 @@
 !_______________________________________________________________________
 ! 1 and 2-D boundary value arrays
       real(kind=rk)
+     $  cibe           ,! sea ice concentration at the eastern open boundary
+     $  cibn           ,! sea ice concentration at the northern open boundary
+     $  cibs           ,! sea ice concentration at the southern open boundary
+     $  cibw           ,! sea ice concentration at the western open boundary
      $  ele            ,! elevation at the eastern open boundary
      $  eln            ,! elevation at the northern open boundary
      $  els            ,! elevation at the southern open boundary
@@ -579,6 +598,10 @@
      $  phue            ! M2/k1 UA phase at the eastern open boundary      !fhx:tide
 
       common/bdry1/     !lyo:20110224:alu:stcc:changed to bdry1!lyo:pac10:
+     $  cibe(jm_local)       ,
+     $  cibn(im_local)       ,
+     $  cibs(im_local)       ,
+     $  cibw(jm_local)       ,
      $  ele(jm_local)        ,
      $  eln(im_local)        ,
      $  els(im_local)        ,
@@ -614,7 +637,7 @@
 
       parameter(
      $  nfe=  1        ,
-     $  nfw=  20        ,
+     $  nfw=  1        ,
      $  nfn=  1        ,
      $  nfs=  1         )
 
@@ -685,17 +708,17 @@
 
 !_______________________________________________________________________
 ! Character variables
-      character*4
+      character(len=4)
      $  windf           !lyo: windf = ccmp, ecmw, or gfsw etc
 
-      character*26
+      character(len=26)
      $  time_start      ! date and time of start of initial run of model
 
-      character*40
+      character(len=40)
      $  source         ,
      $  title
 
-      character*120
+      character(len=120)
      $  netcdf_file    ,
      $  read_rst_file  ,
      $  write_rst_file
@@ -717,22 +740,23 @@
 
 
 ! ================================================
-      integer 
-     $  output_flag, SURF_flag  !fhx:20110131:
+      integer
+     $  output_flag, SURF_flag, monthly_flag
 !fhx:20110131:beg:
-      integer 
+      integer
      $  nums, iprints,iouts
 ! 2-d
-      real(kind=rk) 
+      real(kind=rk)
      $  usrf_mean, vsrf_mean, elsrf_mean,
      $  uwsrf_mean, vwsrf_mean,uwsrf,vwsrf
 
-      common/blkflag/ 
-     $  output_flag, 
-     $  SURF_flag 
+      common/blkflag/
+     $  output_flag,
+     $  SURF_flag,
+     &  monthly_flag
 
       common/blk0dsurf/
-     $  nums, iprints,iouts          
+     $  nums, iprints,iouts
 
       common/blk2dsurf/
      $  usrf_mean(im_local,jm_local)    ,
@@ -743,3 +767,19 @@
      $  uwsrf(im_local,jm_local)        ,   ! wind data for SURF mean output
      $  vwsrf(im_local,jm_local)
 !fhx:20110131:end:
+
+      real(kind=rk)
+     $  sf_bf                           ,   ! boundary flux (barotropic velocities) factor
+     $  sf_hf                           ,   ! heat flux factor
+     $  sf_wi                               ! wind velocity factor
+
+      common/blksensitivity/
+     $  sf_bf                           ,
+     $  sf_hf                           ,
+     $  sf_wi
+
+      real(kind=rk)
+     &  t_lo, t_hi
+
+      common/misc/
+     &  t_lo, t_hi

@@ -72,7 +72,7 @@ c-------------------------------------------------------------------------
       real(kind=rk),dimension (ndrfmax) :: ulag_o, vlag_o, ueu_b, veu_b, 
      1     lat_drf, lon_drf, u_drf, v_drf
 
-      character*20 id_in
+      character(len=20) id_in
 
       namelist/assimdrf_nml/ nassimdrf,nx, ny, beta, mindist,zd
       real(kind=rk) :: nassimdrf, nx, ny, beta, mindist,zd
@@ -373,7 +373,7 @@ C
          else
          t=C/ABS(B)
       endif
-  10  CONTINUE
+!  10  CONTINUE
       A=a2*b1-a1*b2
       B=b3*a2+b1*a4-a1*b4-a3*b2
       C=-a3*b4+a4*b3
@@ -382,7 +382,7 @@ C
          else
          s=-C/ABS(B)
       endif
-  20  CONTINUE
+!  20  CONTINUE
       f=f1*(1.-t)*(1.-s)+f2*t*(1.-s)+f3*s*t+f4*(1.-t)*s
 
       end subroutine BLINT
