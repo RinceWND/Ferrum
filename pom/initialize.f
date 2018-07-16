@@ -290,6 +290,9 @@
 
 ! Bulk default parameters
 !
+! Use air-sea bulk calculations
+      calc_bulk = .true.
+
 ! Calculate shortwave radiation according to Reed
       calc_swr  = .true.
 
