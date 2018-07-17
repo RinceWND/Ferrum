@@ -2282,13 +2282,13 @@
      $                         , status )
 ! get variables
       status=nfmpi_inq_varid(ncid,trim(v_uabe),uabe_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: uabe',status,nf_noerr)
+      call handle_error_pnetcdf('nfmpi_inq_varid: uabe',status)
       status=nfmpi_inq_varid(ncid,trim(v_uabw),uabw_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: uabw',status,nf_noerr)
+      call handle_error_pnetcdf('nfmpi_inq_varid: uabw',status)
       status=nfmpi_inq_varid(ncid,trim(v_vabs),vabs_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: vabs',status,nf_noerr)
+      call handle_error_pnetcdf('nfmpi_inq_varid: vabs',status)
       status=nfmpi_inq_varid(ncid,trim(v_vabn),vabn_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: vabn',status,nf_noerr)
+      call handle_error_pnetcdf('nfmpi_inq_varid: vabn',status)
 ! get data
       start(1)=j_global(1)
       start(2)=1
