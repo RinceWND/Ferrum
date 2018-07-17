@@ -2167,7 +2167,7 @@
           call yperi2d_mpi(elf,im,jm) !lyo:scs1d:add yperi*:ipery:
         endif
 
-        if ( .true. ) then
+        if ( .false. ) then
         ! tides S2
         do n = 1, 38
           t_lon = tides_s2t(n,1)

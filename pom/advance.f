@@ -255,9 +255,16 @@
 !_______________________________________________________________________
       subroutine mode_external
 ! calculate the external (2-D) mode
+      use module_time
+
       implicit none
       include 'pom.h'
       integer i,j
+
+      real(kind=rk), dimension(im,jm) :: Fu, Fv, Fw
+      type(date) d_now
+
+      d_now = str2date( time_start ) + int(time*86400)
 
       do j=2,jm
         do i=2,im
@@ -265,6 +272,9 @@
      $                 *(dy(i,j)+dy(i-1,j))*ua(i,j)
           fluxva(i,j)=.25*(d(i,j)+d(i,j-1))
      $                 *(dx(i,j)+dx(i,j-1))*va(i,j)
+          call sungrav(d_now%year,d_now%month,d_now%day
+     &                ,d_now%hour,d_now%min,north_c(i,j),east_c(i,j)
+     &                ,rot(i,j),Fu(i,j),Fv(i,j),Fw(i,j))
         end do
       end do
 
@@ -276,6 +286,7 @@
      $              +dte2*(-(fluxua(i+1,j)-fluxua(i,j)
      $                      +fluxva(i,j+1)-fluxva(i,j))/art(i,j)
      $                      -vfluxf(i,j))
+          elf(i,j) = elf(i,j) + 0.01*Fw(i,j)/grav*dte
         end do
       end do
 
@@ -310,7 +321,7 @@
      $              -4.*dte*uaf(i,j))
      $             /((h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
      $                 *aru(i,j))
-
+          uaf(i,j) = uaf(i,j) + 0.01*Fu(i,j)*dte
         end do
       end do
 
@@ -337,6 +348,7 @@
      $              -4.*dte*vaf(i,j))
      $             /((h(i,j)+elf(i,j)+h(i,j-1)+elf(i,j-1))
      $                 *arv(i,j))
+          vaf(i,j) = vaf(i,j) + 0.01*Fv(i,j)*dte
         end do
       end do
 
@@ -1121,3 +1133,130 @@
         end select
 
       end subroutine
+
+      subroutine sungrav(iyr,imt,idy,ihr,ime,alat,alon
+     &                  ,rot,Fu,Fv,Fw)
+
+        implicit none
+!
+        include 'realkind'
+
+        real(kind=rk), intent(in)  :: alat, alon
+        integer      , intent(in)  :: iyr, imt, idy, ihr, ime
+        real(kind=rk), intent(out) :: rot, Fu, Fv, Fw
+
+        real(kind=rk) degrad, eclips, raddeg, pi
+
+        parameter(pi=3.1415927,degrad=pi/180.,raddeg=180./pi,
+     $            eclips=23.439*degrad)
+!
+        dimension alpham(12),alb1(20),za(20),dza(19)
+
+        integer imt1, iyr1, intT1, intT2, jab
+        real(kind=rk)
+     &   albedo, alb1, alpha, alpham, aozone
+     & , bb1, bb2
+     & , capC, capG, capL, cosZen, DEC, DTOR, dza, dZen
+     & , epsiln, Fx, Fy, g360, gha, gha360
+     & , solar, SolAlt, SunBet, SunDec
+     & , tau, ThSun, TRM111, TRM112, TRM11, UT, SHA, SMLT
+     & , sun_grav, qatten, qdiff, qdir, qtot, qzer
+     & , xl360, XLCT, yrdays, za, zen
+!
+! ---   alat,alon - (lat, lon)  in radians !!
+!
+        data solar/1350./
+        data tau /0.7/
+        data aozone /0.09/
+        data yrdays /365./
+        data alb1/.719, .656, .603, .480, .385, .300, .250, .193, .164
+     $  ,.131 , .103, .084, .071, .061, .054, .039, .036, .032, .031
+     $  ,.030 /
+!
+        data za/ 90., 88., 86., 84., 82., 80., 78., 76., 74., 70., 66.
+     $  ,62., 58., 54., 50., 40., 30., 20., 10., 0.0 /
+!
+        data dza/8*2.0, 6*4.0, 5*10.0/
+!
+! --- albedo monthly values from Payne (1972) as means of the values
+! --- at 40N and 30N for the Atlantic Ocean ( hence the same latitudinal
+! --- band of the Mediterranean Sea ) :
+!
+        data alpham /0.09,0.08,0.06,0.06,0.06,0.06,0.06,0.06,
+     $               0.06,0.07,0.09,0.10/
+!
+!--------------------- calculations start -----------------------------
+!
+! --- sun hour angle :
+!
+        DTOR = DEGRAD
+        XLCT = ( 1.*ihr ) + ( 1.*ime / 60. )
+        UT   = XLCT
+
+        if ( imt > 2 ) then
+          iyr1 = iyr
+          imt1 = imt-3
+        else
+          iyr1 = iyr-1
+          imt1 = imt+9
+        end if
+
+        intT1 = int(  30.6 * imt1      + 0.5 )
+        intT2 = int( 365.25*(iyr1-1976)      )
+        SMLT  = ( (UT/24.) + idy + intT1 + intT2 - 8707.5) / 36525.
+        epsiln=  23.4393 -     0.013*SMLT
+        capG  = 357.528  + 35999.050*SMLT
+
+        if ( capG > 360. ) then
+          g360 = capG - int( capG/360. )*360.
+        else
+          g360 = capG
+        end if
+
+        capC = 1.915*sin( g360*DTOR ) + .020*sin( 2.*g360*DTOR )
+        capL = 280.46 + 36000.770*SMLT + capC
+
+        if ( capL > 360. ) then
+          xl360 = capL - int( capL/360. ) *360.
+        else
+          xl360 = capL
+        end if
+
+        alpha = xl360 -
+     &     2.466*sin( 2.*xl360*DTOR ) + .053*sin( 4.*xl360*DTOR )
+        gha = 15.*UT - 180.- capC + xl360 - alpha
+
+        if ( gha > 360. ) then
+          gha360 = gha - int( gha/360. )*360.
+        else
+          gha360 = gha
+        end if
+
+        DEC = atan( tan( epsiln*DTOR ) * sin( alpha*DTOR ) )/DTOR
+
+!     Calculate Solar Hour Angle
+        ThSun = ( GHA360 + alon*RADDEG )*degrad
+        SHA = GHA360 + ( alon*RADDEG )
+
+! --- sun declination :
+        SUNDEC = DEC * DEGRAD
+
+        sun_grav = 6.674e-11 * 1.989e30 / (149.6e9)**2
+
+        Fx = sun_grav*cos(ThSun)
+        Fy = sun_grav*sin(ThSun)*sin(alat+SunDec)
+        Fw = sun_grav*sin(ThSun)*cos(alat+SunDec)
+
+        Fu = Fx*cos(rot) - Fy*sin(rot)
+        Fv = Fx*sin(rot) - Fy*cos(rot)
+
+        TRM111 = sin( alat ) * sin( DEC*DTOR )
+        TRM112 =-cos( alat ) * cos( DEC*DTOR )
+        TRM11  = TRM111 - TRM112
+
+! --- solar noon altitude in degrees :
+        SolAlt = asin( TRM11 ) / DTOR
+        SunBet = SolAlt
+
+        return
+      end
