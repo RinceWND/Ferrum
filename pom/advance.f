@@ -261,10 +261,13 @@
       include 'pom.h'
       integer i,j
 
-      real(kind=rk), dimension(im,jm) :: Fu, Fv, Fw
+      integer       :: t_is
+      real(kind=rk) :: t_jd,t_id,t_L0,t_L1,t_s_l,t_s_r,t_s_b
+      real(kind=rk), dimension(im,jm) :: Fu_S,Fv_S,Fw_S, Fu_M,Fv_M,Fw_M
       type(date) d_now
 
       d_now = str2date( time_start ) + int(time*86400)
+      call update_vars(d_now,t_jd,t_id,t_is,t_L0,t_L1,t_s_l,t_s_r,t_s_b)
 
       do j=2,jm
         do i=2,im
@@ -272,10 +275,11 @@
      $                 *(dy(i,j)+dy(i-1,j))*ua(i,j)
           fluxva(i,j)=.25*(d(i,j)+d(i,j-1))
      $                 *(dx(i,j)+dx(i,j-1))*va(i,j)
-          call sungrav(d_now%year,d_now%month,d_now%day
-     &                ,d_now%hour,d_now%min,d_now%sec
-     &                ,north_c(i,j),east_c(i,j)
-     &                ,rot(i,j),Fu(i,j),Fv(i,j),Fw(i,j))
+          call sungrav(north_c(i,j),east_c(i,j),t_jd,t_id,t_is
+     &                ,rot(i,j),Fu_S(i,j),Fv_S(i,j),Fw_S(i,j))
+          call moongrav(north_c(i,j),east_c(i,j),t_jd,t_LO,t_L1
+     &                 ,t_s_l, t_s_r, t_s_b, t_id, t_is
+     &                 ,rot(i,j),Fu_M(i,j),Fv_M(i,j),Fw_M(i,j))
         end do
       end do
 
@@ -287,7 +291,7 @@
      $              +dte2*(-(fluxua(i+1,j)-fluxua(i,j)
      $                      +fluxva(i,j+1)-fluxva(i,j))/art(i,j)
      $                      -vfluxf(i,j))
-          elf(i,j) = elf(i,j) + 0.0001*Fw(i,j)*dte
+!          elf(i,j) = elf(i,j) + 0.0001*Fw(i,j)*dte
         end do
       end do
 
@@ -322,7 +326,7 @@
      $              -4.*dte*uaf(i,j))
      $             /((h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
      $                 *aru(i,j))
-          uaf(i,j) = uaf(i,j) + 0.0001*Fu(i,j)*dte
+          uaf(i,j) = uaf(i,j) + 0.0005*(Fu_S(i,j)+Fu_M(i,j))*dte
         end do
       end do
 
@@ -349,7 +353,7 @@
      $              -4.*dte*vaf(i,j))
      $             /((h(i,j)+elf(i,j)+h(i,j-1)+elf(i,j-1))
      $                 *arv(i,j))
-          vaf(i,j) = vaf(i,j) + 0.0001*Fv(i,j)*dte
+          vaf(i,j) = vaf(i,j) + 0.0005*(Fv_S(i,j)+Fv_M(i,j))*dte
         end do
       end do
 
@@ -1135,15 +1139,15 @@
 
       end subroutine
 
-      subroutine sungrav(iyr,imt,idy,ihr,ime,isc,lat,lon
+      subroutine sungrav(lat,lon,jd,time_in_day,time_in_sec
      &                  ,rot,Fu,Fv,Fw)
 
         implicit none
 !
         include 'realkind'
 
-        real(kind=rk), intent(in)  :: lat, lon
-        integer      , intent(in)  :: iyr, imt, idy, ihr, ime, isc
+        integer      , intent(in)  :: time_in_sec
+        real(kind=rk), intent(in)  :: lat, lon, jd, time_in_day
         real(kind=rk), intent(out) :: rot, Fu, Fv, Fw
 
         real(kind=rk) degrad, eclips, raddeg, pi, alat, alon
@@ -1151,41 +1155,18 @@
         parameter(pi=3.1415927,degrad=pi/180.,raddeg=180./pi,
      $            eclips=23.439*degrad)
 
-        integer       day, month, t_off, time_in_sec, year
         real(kind=rk) Alt, app_lon, Az
      &              , c, DEC, dist, ecc
      &              , Fx, Fy, gmst, gmst0
-     &              , h, jd, mean_anom, mean_lon
+     &              , h, mean_anom, mean_lon
      &              , obliq, RA, radius, sun_grav
-     &              , t, time_in_day, true_anom, true_lon
+     &              , t, true_anom, true_lon
      &              , w
 !
 ! ---   lat,lon - in degrees!
 !
         alat = lat*DEGRAD
         alon = lon*DEGRAD
-!
-! --- days from the epoch:
-!
-        if ( imt <= 2 ) then
-          year  = iyr - 1
-          month = imt + 12
-        end if
-        day = idy
-
-        time_in_day = ihr/24. + ime/1440. + isc/86400.
-        time_in_sec = ihr*3600. + ime*60. + isc
-
-        jd = floor(365.25*(year+4716.)) + floor(30.6001*(month+1))
-     &     + day - 1524.5
-
-        if ( jd < 2299160.5 ) then
-          t_off = 0
-        else
-          t_off = 2 - floor(year/100.) + floor(floor(year/100.)/4.)
-        end if
-
-        jd = jd + t_off
 
         t = ( jd + time_in_day - 2451545. )/36525.
 
@@ -1266,12 +1247,356 @@
 !
         sun_grav = 6.674e-11 * 1.989e30 / (dist*1.e3)**2
 
-        Fx = sun_grav*cos(Az)
-        Fy = sun_grav*sin(Az)*sin(Alt)
-        Fw = sun_grav*sin(Az)*cos(Alt)
+        Fx = sun_grav*sin(Az)*cos(Alt)
+        Fy = sun_grav*cos(Az)*cos(Alt)
+        Fw = sun_grav*sin(Alt)
 
         Fu = Fx*cos(rot) - Fy*sin(rot)
         Fv = Fx*sin(rot) - Fy*cos(rot)
 
         return
+      end
+
+      subroutine moongrav(lat,lon,jd,L0,L1,sigma_l,sigma_r,sigma_b
+     &                   ,time_in_day,time_in_sec,rot,Fu,Fv,Fw)
+
+        implicit none
+!
+        include 'realkind'
+
+        integer      , intent(in)  :: time_in_sec
+        real(kind=rk), intent(in)  :: lat, lon, time_in_day
+        real(kind=rk), intent(out) :: rot, Fu, Fv, Fw
+
+        real(kind=rk) degrad, eclips, raddeg, pi, alat, alon
+
+        parameter(pi=3.1415927,degrad=pi/180.,raddeg=180./pi,
+     $            eclips=23.439*degrad)
+
+        real(kind=rk) Alt, app_lon, Az
+     &              , DEC, dist, e
+     &              , Fx, Fy, gmst, gmst0
+     &              , h, jd, L0, L1
+     &              , moon_grav, obliq, obliqD, omega, RA
+     &              , sigma_b, sigma_l, sigma_r, t
+     &              , true_lat, true_lon
+!
+! ---   lat,lon - in degrees!
+!
+        alat = lat*DEGRAD
+        alon = lon*DEGRAD
+
+        t = (jd + time_in_day -2451545.0)/36525;
+        e = 1- 0.002516*t - 0.0000074*t*t
+!
+! --- geometric coordinates
+!
+        true_lon  = modulo( L1*RADDEG, 360. ) + sigma_l/1000000.
+        true_lat  = sigma_b/1000000.
+        dist = 385000.56 + sigma_r/1000.
+!
+! --- Apparent longitude
+!
+        app_lon = true_lon + 0.004610
+!
+! --- Obliquity of the ecliptic
+!
+        omega = (125.04452 - t*(1934.13261
+     &                      + t*(0.00220708 + t/450000.)) )*DEGRAD
+        obliq  = 23. + 26./60. + 21.448/3600.
+     &         - t*(46.8150/3600.-t*(0.00059/3600.+0.001813/3600.*t))
+        obliqD = 9.2/3600.*cos(omega) + 0.57/3600.*cos(2.*L0)
+     &         + 0.1/3600.*cos(2.*L1) - 0.09/3600.*cos(2.*omega)
+!
+! --- Correction for apparent position of the Moon
+!
+        obliq = obliq + obliqD
+!
+! --- The Moon's right ascention
+!
+        RA = (atan2( sin(true_lon*DEGRAD)*cos(obliq*DEGRAD)
+     &              -tan(true_lat*DEGRAD)*sin(obliq*DEGRAD)
+     &             , cos(true_lon*DEGRAD) )*RADDEG) / 15.
+!
+! --- Moon declination
+!
+        DEC = asin( sin(true_lat*DEGRAD)*cos(obliq*DEGRAD)
+     &             +cos(true_lat*DEGRAD)*sin(obliq*DEGRAD)
+     &             *sin(true_lon*DEGRAD) )*RADDEG
+!
+! --- Convert to horizontal coordinates
+!
+        t = ( jd - 2451545. )/36525.
+        gmst0 = ( 24110.5484 + t*(8640184.812866
+     &                           +t*( 0.093104 + 0.0000062*t)) )/3600.
+        gmst0 = modulo( gmst0, 24. )
+
+        gmst = gmst0 + (time_in_sec*1.00273790925)/3600.
+        gmst = modulo( gmst, 24. )
+
+        h = (gmst*15. + lon - (RA*15.))*DEGRAD
+        Az = atan2( -cos(DEC)*sin(h), sin(DEC)*cos(alat)
+     &                               -cos(DEC)*sin(alat)*cos(h) )
+        Alt = asin( sin(DEC)*sin(alat) + cos(alat)*cos(DEC)*cos(h) )
+
+!
+! --- Calculate Moons's gravitational accelleration
+!
+        moon_grav = 6.674e-11 * 7.36e22 / (dist*1.e3)**2
+
+        Fx = moon_grav*sin(Az)*cos(Alt)
+        Fy = moon_grav*cos(Az)*cos(Alt)
+        Fw = moon_grav*sin(Alt)
+
+        Fu = Fx*cos(rot) - Fy*sin(rot)
+        Fv = Fx*sin(rot) - Fy*cos(rot)
+
+        return
+      end
+
+      subroutine update_vars(d_now
+     &                      ,jd,time_in_day,time_in_sec
+     &                      ,L0,L1,sigma_l,sigma_r,sigma_b)
+
+        use module_time
+
+        implicit none
+
+        include 'realkind'
+
+        type(date), intent(in) :: d_now
+        real(kind=rk), intent(out) :: jd, time_in_day, L0, L1
+     &                              , sigma_l, sigma_r, sigma_b
+        integer, intent(out) :: time_in_sec
+
+        real(kind=rk) degrad, raddeg, pi
+        parameter(pi=3.1415927,degrad=pi/180.,raddeg=180./pi)
+
+        real(kind=rk) A1,A2,A3,D0,e,F0,M0,M1,t
+        integer day, month, year, t_off
+!
+! --- days from the epoch:
+!
+        year  = d_now%year
+        month = d_now%month
+        day   = d_now%day
+        if ( month <= 2 ) then
+          year  = year - 1
+          month = month + 12
+        end if
+
+        time_in_day = d_now%hour/24.+d_now%min/1440.+d_now%sec/86400.
+        time_in_sec = d_now%hour*3600 + d_now%min*60 + d_now%sec
+
+        jd = floor(365.25*(year+4716.)) + floor(30.6001*(month+1))
+     &     + day - 1524.5
+
+        if ( jd < 2299160.5 ) then
+          t_off = 0
+        else
+          t_off = 2 - floor(year/100.) + floor(floor(year/100.)/4.)
+        end if
+
+        jd = jd + t_off
+
+        t = ( jd + time_in_day - 2451545. )/36525.
+        e = 1. - t*(0.002516 - 0.0000074*t)
+        L0 = ( 280.4665 + 36000.7698*t)*DEGRAD
+        L1 = ( 218.3164477 + t*(481267.88123421
+     &                      + t*(-0.0015786
+     &                       + t*(1./538841. - t*65194000.))) )*DEGRAD
+        D0 = ( 297.8501921 + t*(445267.1114034
+     &                      + t*(-0.0018819
+     &                       + t*(1./545868. - t/113065000.))) )*DEGRAD
+        M0 = ( 357.5291092 + t*(35999.0502909
+     &                      + t*(-0.0001536 + t/24490000.)) )*DEGRAD
+        M1 = ( 134.9633964 + t*(477198.8675055
+     &                      + t*(0.0087414
+     &                       + t*(1./69699. - t/14712000.))) )*DEGRAD
+        F0 = ( 93.2720950 + t*(483202.0175233
+     &                     + t*(-0.0036539
+     &                      + t*(-1./3526000. + t/863310000.))) )*DEGRAD
+        A1 = ( 119.75 +    131.849*t )*DEGRAD
+        A2 = (  53.09 + 479264.290*t )*DEGRAD
+        A3 = ( 313.45 + 481266.484*t )*DEGRAD
+
+        sigma_l = 6288774.*    sin(               M1      )
+     &          + 1274027.*    sin(2.*D0      -   M1      )
+     &          +  658314.*    sin(2.*D0                  )
+     &          +  213618.*    sin(            2.*M1      )
+     &          -  185116.*e*  sin(         M0            )
+     &          -  114332.*    sin(                  2.*F0)
+     &          +   58793.*    sin(2.*D0      -2.*M1      )
+     &          +   57066.*e*  sin(2.*D0-   M0-   M1      )
+     &          +   53322.*    sin(2.*D0      +   M1      )
+     &          +   45758.*e*  sin(2.*D0-   M0            )
+     &          -   40923.*e*  sin(         M0-   M1      )
+     &          -   34720.*    sin(   D0                  )
+     &          -   30383.*e*  sin(         M0+   M1      )
+     &          +   15327.*    sin(2.*D0            -2.*F0)
+     &          -   12528.*    sin(               M1+2.*F0)
+     &          +   10980.*    sin(               M1-2.*F0)
+     &          +   10675.*    sin(4.*D0      -   M1      )
+     &          +   10034.*    sin(            3.*M1      )
+     &          +    8548.*    sin(4.*D0      -2.*M1      )
+     &          -    7888.*e*  sin(2.*D0+   M0-   M1      )
+     &          -    6766.*e*  sin(2.*D0+   M0            )
+     &          -    5163.*    sin(   D0      -   M1      )
+     &          +    4987.*e*  sin(   D0+   M0            )
+     &          +    4036.*e*  sin(2.*D0-   M0+   M1      )
+     &          +    3994.*    sin(2.*D0      +2.*M1      )
+     &          +    3861.*    sin(4.*D0                  )
+     &          +    3665.*    sin(2.*D0      -3.*M1      )
+     &          -    2689.*e*  sin(         M0-2.*M1      )
+     &          -    2602.*    sin(2.*D0      -   M1+2.*F0)
+     &          +    2390.*e*  sin(2.*D0-   M0-2.*M1      )
+     &          -    2348.*    sin(   D0      +   M1      )
+     &          +    2236.*e*e*sin(2.*D0-2.*M0            )
+     &          -    2120.*e*  sin(         M0+2.*M1      )
+     &          -    2069.*e*e*sin(      2.*M0            )
+     &          +    2048.*e*e*sin(2.*D0-2.*M0-   M1      )
+     &          -    1773.*    sin(2.*D0      +   M1-2.*F0)
+     &          -    1595.*    sin(2.*D0            +2.*F0)
+     &          +    1215.*e*  sin(4.*D0-   M0-   M1      )
+     &          -    1110.*    sin(            2.*M1+2.*F0)
+     &          -     892.*    sin(3.*D0      -   M1      )
+     &          -     810.*e*  sin(2.*D0+   M0+   M1      )
+     &          +     759.*e*  sin(4.*D0-   M0-2.*M1      )
+     &          -     713.*e*e*sin(      2.*M0-   M1      )
+     &          -     700.*e*e*sin(2.*D0+2.*M0-   M1      )
+     &          +     691.*e*  sin(2.*D0+   M0-2.*M1      )
+     &          +     596.*e*  sin(2.*D0-   M0      -2.*F0)
+     &          +     549.*    sin(4.*D0      +   M1      )
+     &          +     537.*    sin(            4.*M1      )
+     &          +     520.*e*  sin(4.*D0-   M0            )
+     &          -     487.*    sin(   D0      -2.*M1      )
+     &          -     399.*e*  sin(2.*D0+   M0      -2.*F0)
+     &          -     381.*    sin(            2.*M1-2.*F0)
+     &          +     351.*e*  sin(   D0+   M0+   M1      )
+     &          -     340.*    sin(3.*D0      -2.*M1      )
+     &          +     330.*    sin(4.*D0      -3.*M1      )
+     &          +     327.*e*  sin(2.*D0-   M0+2.*M1      )
+     &          -     323.*e*e*sin(      2.*M0+   M1      )
+     &          +     299.*e*  sin(   D0+   M0-   M1      )
+     &          +     294.*    sin(2.*D0      +3.*M1      )
+
+      sigma_r = -20905355.*    cos(               M1      )
+     &          - 3699111.*    cos(2.*D0      -1.*M1      )
+     &          - 2955968.*    cos(2.*D0                  )
+     &          -  569925.*    cos(            2.*M1      )
+     &          +   48888.*e*  cos(         M0            )
+     &          -    3149.*    cos(                  2.*F0)
+     &          +  246158.*    cos(2.*D0      -2.*M1      )
+     &          -  152138.*e*  cos(2.*D0-   M0-   M1      )
+     &          -  170733.*    cos(2.*D0      +   M1      )
+     &          -  204586.*e*  cos(2.*D0-   M0            )
+     &          -  129620.*e*  cos(         M0-   M1      )
+     &          +  108743.*    cos(   D0                  )
+     &          +  104755.*e*  cos(         M0+   M1      )
+     &          +   10321.*    cos(2.*D0            -2.*F0)
+     &          +   79661.*    cos(               M1-2.*F0)
+     &          -   34782.*    cos(4.*D0      -   M1      )
+     &          -   23210.*    cos(            3.*M1      )
+     &          -   21636.*    cos(4.*D0      -2.*M1      )
+     &          +   24208.*e*  cos(2.*D0+   M0-   M1      )
+     &          +   30824.*e*  cos(2.*D0+   M0            )
+     &          -    8379.*    cos(   D0      -   M1      )
+     &          -   16675.*e*  cos(   D0+   M0            )
+     &          -   12831.*e*  cos(2.*D0-   M0+   M1      )
+     &          -   10445.*    cos(2.*D0      +2.*M1      )
+     &          -   11650.*    cos(4.*D0                  )
+     &          +   14403.*    cos(2.*D0      -3.*M1      )
+     &          -    7003.*e*  cos(         M0-2.*M1      )
+     &          +   10056.*e*  cos(2.*D0-   M0-2.*M1      )
+     &          +    6322.*    cos(   D0      +   M1      )
+     &          -    9884.*e*e*cos(2.*D0-2.*M0            )
+     &          +    5751.*e*  cos(         M0+2.*M1      )
+     &          -    4950.*e*e*cos(2.*D0-2.*M0-   M1      )
+     &          +    4130.*    cos(2.*D0      +   M1-2.*F0)
+     &          -    3958.*e*  cos(4.*D0-   M0-   M1      )
+     &          +    3258.*    cos(3.*D0      -   M1      )
+     &          +    2616.*e*  cos(2.*D0+   M0+   M1      )
+     &          -    1897.*e*  cos(4.*D0-   M0-2.*M1      )
+     &          -    2117.*e*e*cos(      2.*M0-   M1      )
+     &          +    2354.*e*e*cos(2.*D0+2.*M0-   M1      )
+     &          -    1423.*    cos(4.*D0      +   M1      )
+     &          -    1117.*    cos(            4.*M1      )
+     &          -    1571.*e*  cos(4.*D0-   M0            )
+     &          -    1739.*    cos(   D0      -2.*M1      )
+     &          -    4421.*    cos(            2.*M1-2.*F0)
+     &          +    1165.*e*e*cos(      2.*M0+   M1      )
+     &          +    8752.*    cos(2.*D0      -   M1-2.*F0)
+
+        sigma_b = 5128122.*    sin(                     F0)
+     &          +  280602.*    sin(               M1+   F0)
+     &          +  277693.*    sin(               M1-   F0)
+     &          +  173237.*    sin(2.*D0            -   F0)
+     &          +   55413.*    sin(2.*D0      -   M1+   F0)
+     &          +   46271.*    sin(2.*D0      -   M1-   F0)
+     &          +   32573.*    sin(2.*D0            +   F0)
+     &          +   17198.*    sin(            2.*M1+   F0)
+     &          +    9266.*    sin(2.*D0      +   M1-   F0)
+     &          +    8822.*    sin(            2.*M1-   F0)
+     &          +    8216.*e*  sin(2.*D0-   M0      -   F0)
+     &          +    4324.*    sin(2.*D0      -2.*M1-   F0)
+     &          +    4200.*    sin(2.*D0      +   M1+   F0)
+     &          -    3359.*e*  sin(2.*D0+   M0      -   F0)
+     &          +    2463.*e*  sin(2.*D0-   M0-   M1+   F0)
+     &          +    2211.*e*  sin(2.*D0-   M0      +   F0)
+     &          +    2065.*e*  sin(2.*D0-   M0-   M1-   F0)
+     &          -    1870.*e*  sin(         M0-   M1-   F0)
+     &          +    1828.*    sin(4.*D0      -   M1-   F0)
+     &          -    1794.*e*  sin(         M0      +   F0)
+     &          -    1749.*    sin(                  3.*F0)
+     &          -    1565.*e*  sin(         M0-   M1+   F0)
+     &          -    1491.*    sin(   D0            +   F0)
+     &          -    1475.*e*  sin(         M0+   M1+   F0)
+     &          -    1410.*e*  sin(         M0+   M1-   F0)
+     &          -    1344.*e*  sin(         M0      -   F0)
+     &          -    1335.*    sin(   D0            -   F0)
+     &          +    1107.*    sin(            3.*M1+   F0)
+     &          +    1021.*    sin(4.*D0            -   F0)
+     &          +     833.*    sin(4.*D0      -   M1+   F0)
+     &          +     777.*    sin(               M1-3.*F0)
+     &          +     671.*    sin(4.*D0      -2.*M1+   F0)
+     &          +     607.*    sin(2.*D0            -3.*F0)
+     &          +     596.*    sin(2.*D0      +2.*M1-   F0)
+     &          +     491.*e*  sin(2.*D0-   M0+   M1-   F0)
+     &          -     451.*    sin(2.*D0      -2.*M1+   F0)
+     &          +     439.*    sin(            3.*M1-   F0)
+     &          +     422.*    sin(2.*D0      +2.*M1+   F0)
+     &          +     421.*    sin(2.*D0      -3.*M1-   F0)
+     &          -     366.*e*  sin(2.*D0+   M0-   M1+   F0)
+     &          -     351.*e*  sin(2.*D0+   M0      +   F0)
+     &          +     331.*    sin(4.*D0            +   F0)
+     &          +     315.*e*  sin(2.*D0-   M0+   M1+   F0)
+     &          +     302.*e*e*sin(2.*D0-2.*M0      -   F0)
+     &          -     283.*    sin(               M1+3.*F0)
+     &          -     229.*e*  sin(2.*D0+   M0+   M1-   F0)
+     &          +     223.*e*  sin(   D0+   M0      -   F0)
+     &          +     223.*e*  sin(   D0+   M0      +   F0)
+     &          -     220.*e*  sin(         M0-2.*M1-   F0)
+     &          -     220.*e*  sin(2.*D0+   M0-   M1-   F0)
+     &          -     185.*    sin(   D0      +   M1+   F0)
+     &          +     181.*e*  sin(2.*D0-   M0-2.*M1-   F0)
+     &          -     177.*e*  sin(         M0+2.*M1+   F0)
+     &          +     176.*    sin(4.*D0      -2.*M1-   F0)
+     &          +     166.*e*  sin(4.*D0-   M0-   M1-   F0)
+     &          -     164.*    sin(   D0      +   M1-   F0)
+     &          +     132.*    sin(4.*D0      +   M1-   F0)
+     &          -     119.*    sin(   D0      -   M1-   F0)
+     &          +     115.*e*  sin(4.*D0-   M0      -   F0)
+     &          +     107.*e*e*sin(2.*D0-2.*M0      +   F0)
+
+        sigma_l = sigma_l + 3958.*sin(A1)
+     &                    + 1962.*sin(L1-F0)
+     &                    +  318.*sin(A2)
+
+        sigma_b = sigma_b - 2235.*sin(L1)
+     &                    +  382.*sin(A3)
+     &                    +  175.*sin(A1-F0)
+     &                    +  175.*sin(A1+F0)
+     &                    +  127.*sin(L1-M1)
+     &                    -  115.*sin(L1+M1)
+
       end
