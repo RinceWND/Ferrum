@@ -263,11 +263,20 @@
 
       integer       :: t_is
       real(kind=rk) :: t_jd,t_id,t_L0,t_L1,t_s_l,t_s_r,t_s_b
-      real(kind=rk), dimension(im,jm) :: Fu_S,Fv_S,Fw_S, Fu_M,Fv_M,Fw_M
       type(date) d_now
 
       d_now = str2date( time_start ) + int(time*86400)
       call update_vars(d_now,t_jd,t_id,t_is,t_L0,t_L1,t_s_l,t_s_r,t_s_b)
+
+      do j=1,jm
+        do i=1,im
+          call sungrav(north_c(i,j),east_c(i,j),t_jd,t_id,t_is
+     &                ,rot(i,j),Fu_S(i,j),Fv_S(i,j),Fw_S(i,j))
+          call moongrav(north_c(i,j),east_c(i,j),t_jd,t_LO,t_L1
+     &                 ,t_s_l, t_s_r, t_s_b, t_id, t_is
+     &                 ,rot(i,j),Fu_M(i,j),Fv_M(i,j),Fw_M(i,j))
+        end do
+      end do
 
       do j=2,jm
         do i=2,im
@@ -275,11 +284,6 @@
      $                 *(dy(i,j)+dy(i-1,j))*ua(i,j)
           fluxva(i,j)=.25*(d(i,j)+d(i,j-1))
      $                 *(dx(i,j)+dx(i,j-1))*va(i,j)
-          call sungrav(north_c(i,j),east_c(i,j),t_jd,t_id,t_is
-     &                ,rot(i,j),Fu_S(i,j),Fv_S(i,j),Fw_S(i,j))
-          call moongrav(north_c(i,j),east_c(i,j),t_jd,t_LO,t_L1
-     &                 ,t_s_l, t_s_r, t_s_b, t_id, t_is
-     &                 ,rot(i,j),Fu_M(i,j),Fv_M(i,j),Fw_M(i,j))
         end do
       end do
 
@@ -291,13 +295,19 @@
      $              +dte2*(-(fluxua(i+1,j)-fluxua(i,j)
      $                      +fluxva(i,j+1)-fluxva(i,j))/art(i,j)
      $                      -vfluxf(i,j))
-!          elf(i,j) = elf(i,j) + 0.0001*Fw(i,j)*dte
+!          elf(i,j) = elf(i,j) + (Fw_S(i,j)+Fw_M(i,j))/grav
         end do
       end do
 
       call bcond(1)
 
       call exchange2d_mpi(elf,im,jm)
+      call exchange2d_mpi(Fu_S,im,jm)
+      call exchange2d_mpi(Fv_S,im,jm)
+      call exchange2d_mpi(Fw_S,im,jm)
+      call exchange2d_mpi(Fu_M,im,jm)
+      call exchange2d_mpi(Fv_M,im,jm)
+      call exchange2d_mpi(Fw_M,im,jm)
 
       if(mod(iext,ispadv).eq.0) call advave(tps)
 
@@ -310,7 +320,10 @@
      $              +.25*grav*(dy(i,j)+dy(i-1,j))
      $                *(d(i,j)+d(i-1,j))
      $                *((1.-2.*alpha)
-     $                   *(el(i,j)-el(i-1,j))
+     $                   *(el(i,j)-el(i-1,j)
+     &                    +.0005/grav
+     &                        *((Fu_S(i,j)-Fu_S(i-1,j))
+     &                         +(Fu_M(i,j)-Fu_M(i-1,j))))
      $                  +alpha*(elb(i,j)-elb(i-1,j)
      $                         +elf(i,j)-elf(i-1,j))
      $                  +e_atmos(i,j)-e_atmos(i-1,j))
@@ -319,6 +332,13 @@
         end do
       end do
 
+!      if (my_task==master_task) then
+!        print *, "dFu_S:", Fu_S(80,80)-Fu_S(79,80)
+!        print *, "dFu_M:", Fu_M(80,80)-Fu_M(79,80)
+!        print *, "dFu  :", Fu_S(80,80)-Fu_S(79,80)
+!     &                    +Fu_M(80,80)-Fu_M(79,80)
+!      end if
+
       do j=2,jmm1
         do i=2,im
           uaf(i,j)=((h(i,j)+elb(i,j)+h(i-1,j)+elb(i-1,j))
@@ -326,7 +346,7 @@
      $              -4.*dte*uaf(i,j))
      $             /((h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
      $                 *aru(i,j))
-          uaf(i,j) = uaf(i,j) + 0.0005*(Fu_S(i,j)+Fu_M(i,j))*dte
+!          uaf(i,j) = uaf(i,j) + 0.0005*(Fu_S(i,j)+Fu_M(i,j))*dte
         end do
       end do
 
@@ -338,13 +358,24 @@
      $                 +cor(i,j-1)*d(i,j-1)*(ua(i+1,j-1)+ua(i,j-1)))
      $              +.25*grav*(dx(i,j)+dx(i,j-1))
      $                *(d(i,j)+d(i,j-1))
-     $                *((1.-2.*alpha)*(el(i,j)-el(i,j-1))
+     $                *((1.-2.*alpha)
+     &                   *(el(i,j)-el(i,j-1)
+     &                    +.0005/grav
+     &                        *((Fv_S(i,j)-Fv_S(i,j-1))
+     &                         +(Fv_M(i,j)-Fv_M(i,j-1))))
      $                  +alpha*(elb(i,j)-elb(i,j-1)
      $                         +elf(i,j)-elf(i,j-1))
      $                  +e_atmos(i,j)-e_atmos(i,j-1))
      $              +dry2d(i,j)+arv(i,j)*(wvsurf(i,j)-wvbot(i,j))
         end do
       end do
+
+!      if (my_task==master_task) then
+!        print *, "dFv_S:", Fv_S(80,80)-Fv_S(79,80)
+!        print *, "dFv_M:", Fv_M(80,80)-Fv_M(79,80)
+!        print *, "dFv  :", Fv_S(80,80)-Fv_S(79,80)
+!     &                    +Fv_M(80,80)-Fv_M(79,80)
+!      end if
 
       do j=2,jm
         do i=2,imm1
@@ -353,7 +384,7 @@
      $              -4.*dte*vaf(i,j))
      $             /((h(i,j)+elf(i,j)+h(i,j-1)+elf(i,j-1))
      $                 *arv(i,j))
-          vaf(i,j) = vaf(i,j) + 0.0005*(Fv_S(i,j)+Fv_M(i,j))*dte
+!          vaf(i,j) = vaf(i,j) + 0.0005*(Fv_S(i,j)+Fv_M(i,j))*dte
         end do
       end do
 
@@ -877,6 +908,13 @@
       aam(:,:,kb) = cbc(:,:)          !lyo:20110315:botwavedrag:store cbc
       km_mean     = km_mean     + aam !lyo:20110202:save aam inst. of km
 
+      Fu_S_mean   = Fu_S_mean   + Fu_S
+      Fv_S_mean   = Fv_S_mean   + Fv_S
+      Fw_S_mean   = Fw_S_mean   + Fw_S
+      Fu_M_mean   = Fu_M_mean   + Fu_M
+      Fv_M_mean   = Fv_M_mean   + Fv_M
+      Fw_M_mean   = Fw_M_mean   + Fw_M
+
       num = num + 1
 
       return
@@ -1221,7 +1259,6 @@
         RA = atan2( cos(obliq*DEGRAD)*sin(app_lon*DEGRAD)
      &            , cos(app_lon*DEGRAD) )
         RA = modulo( RA*RADDEG, 360. )
-        RA = RA/15.
 !
 ! --- Sun declination
 !
@@ -1237,7 +1274,7 @@
         gmst = gmst0 + (time_in_sec*1.00273790925)/3600.
         gmst = modulo( gmst, 24. )
 
-        h = (gmst*15. + lon - (RA*15.))*DEGRAD
+        h = (gmst*15. + lon - RA)*DEGRAD
         Az = atan2( -cos(DEC)*sin(h), sin(DEC)*cos(alat)
      &                               -cos(DEC)*sin(alat)*cos(h) )
         Alt = asin( sin(DEC)*sin(alat) + cos(alat)*cos(DEC)*cos(h) )
@@ -1245,11 +1282,16 @@
 !
 ! --- Calculate Sun's gravitatinal accelleration
 !
-        sun_grav = 6.674e-11 * 1.989e30 / (dist*1.e3)**2
+        sun_grav = 6.6740831e-11 * 1.989e30 / (dist*1.e3)
+!        sun_grav = 1.989e30 / 5.9722e24 * (6371. / dist)**3
+!        sun_grav = sun_grav * 6.6740831e-11*1.989e30/(dist*1.e3)**2
 
         Fx = sun_grav*sin(Az)*cos(Alt)
+     &      *(dist/dist-1.-cos(Az)*cos(Alt)*6371./dist)
         Fy = sun_grav*cos(Az)*cos(Alt)
+     &      *(dist/dist-1.-sin(Az)*cos(Alt)*6371./dist)
         Fw = sun_grav*sin(Alt)
+     &      *(dist/dist-1.) ! zero
 
         Fu = Fx*cos(rot) - Fy*sin(rot)
         Fv = Fx*sin(rot) - Fy*cos(rot)
@@ -1342,11 +1384,16 @@
 !
 ! --- Calculate Moons's gravitational accelleration
 !
-        moon_grav = 6.674e-11 * 7.36e22 / (dist*1.e3)**2
+        moon_grav = 6.6740831e-11 * 7.3476e22 / (dist*1.e3)
+!        moon_grav = 7.3476e22 / 5.9722e24 * (6371. / dist)**3
+!        moon_grav = moon_grav * 6.6740831e-11*7.3476e22/(dist*1.e3)**2
 
         Fx = moon_grav*sin(Az)*cos(Alt)
+     &      *(dist/dist-1.-cos(Az)*cos(Alt)*6371./dist)
         Fy = moon_grav*cos(Az)*cos(Alt)
+     &      *(dist/dist-1.-sin(Az)*cos(Alt)*6371./dist)
         Fw = moon_grav*sin(Alt)
+     &      *(dist/dist-1.) ! zero
 
         Fu = Fx*cos(rot) - Fy*sin(rot)
         Fv = Fx*sin(rot) - Fy*cos(rot)

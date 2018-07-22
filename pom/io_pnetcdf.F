@@ -3434,10 +3434,12 @@
      &         ,    rot_varid,      h_varid,    fsm_varid,    dum_varid
      &         ,    dvm_varid,  uhtfl_varid, wusurf_varid, wvsurf_varid
      &         , wtsurf_varid, wssurf_varid,   icec_varid,     ui_varid
-     &         , vi_varid    ,   time_varid,    uab_varid,    vab_varid
+     &         ,     vi_varid,   time_varid,    uab_varid,    vab_varid
      &         ,    elb_varid,      u_varid,      v_varid,      w_varid
      &         ,      t_varid,      s_varid,    rho_varid,     km_varid
-     &         ,     kh_varid
+     &         ,     kh_varid,    fus_varid,    fvs_varid,    fws_varid
+     &         ,  utide_varid,    fum_varid,    fvm_varid,    fwm_varid
+     &         ,  vtide_varid,  wtide_varid
         integer ncid,status
         integer vdims(4)
         integer(MPI_OFFSET_KIND) start(4),edge(4)
@@ -3631,6 +3633,45 @@
      &                         ,-1,0.,'east_v north_v',.true.)
           end if
 
+          if ( calc_tide ) then
+          call def_var_pnetcdf(ncid,'u_sun',3,vdims
+     &                        ,fus_varid,NF_FLOAT
+     &                        ,'Sun u grav component','m/s^2'
+     &                        ,-1,0.,'east_e north_e',.true.)
+          call def_var_pnetcdf(ncid,'v_sun',3,vdims
+     &                        ,fvs_varid,NF_FLOAT
+     &                        ,'Sun v grav component','m/s^2'
+     &                        ,-1,0.,'east_e north_e',.true.)
+          call def_var_pnetcdf(ncid,'w_sun',3,vdims
+     &                        ,fws_varid,NF_FLOAT
+     &                        ,'Sun w grav component','m/s^2'
+     &                        ,-1,0.,'east_e north_e',.true.)
+          call def_var_pnetcdf(ncid,'u_moon',3,vdims
+     &                        ,fum_varid,NF_FLOAT
+     &                        ,'Moon u grav component','m/s^2'
+     &                        ,-1,0.,'east_e north_e',.true.)
+          call def_var_pnetcdf(ncid,'v_moon',3,vdims
+     &                        ,fvm_varid,NF_FLOAT
+     &                        ,'Moon v grav component','m/s^2'
+     &                        ,-1,0.,'east_e north_e',.true.)
+          call def_var_pnetcdf(ncid,'w_moon',3,vdims
+     &                        ,fwm_varid,NF_FLOAT
+     &                        ,'Moon w grav component','m/s^2'
+     &                        ,-1,0.,'east_e north_e',.true.)
+          call def_var_pnetcdf(ncid,'u_tide',3,vdims
+     &                        ,utide_varid,NF_FLOAT
+     &                        ,'U grav component','m/s^2'
+     &                        ,-1,0.,'east_e north_e',.true.)
+          call def_var_pnetcdf(ncid,'v_tide',3,vdims
+     &                        ,vtide_varid,NF_FLOAT
+     &                        ,'V grav component','m/s^2'
+     &                        ,-1,0.,'east_e north_e',.true.)
+          call def_var_pnetcdf(ncid,'w_tide',3,vdims
+     &                        ,wtide_varid,NF_FLOAT
+     &                        ,'W grav component','m/s^2'
+     &                        ,-1,0.,'east_e north_e',.true.)
+          end if
+
           if ( mode/= 2 ) then
             vdims(1) = x_dimid
             vdims(2) = y_dimid
@@ -3821,6 +3862,36 @@
             call handle_error_pnetcdf('nfmpi_inq_varid: vi'
      &                               , status )
           end if
+
+          if ( calc_tide ) then
+          status = nf90mpi_inq_varid(ncid,'u_sun',fus_varid)
+          call handle_error_pnetcdf('nfmpi_inq_varid: u_sun'
+     &                             , status )
+          status = nf90mpi_inq_varid(ncid,'v_sun',fvs_varid)
+          call handle_error_pnetcdf('nfmpi_inq_varid: v_sun'
+     &                             , status )
+          status = nf90mpi_inq_varid(ncid,'w_sun',fws_varid)
+          call handle_error_pnetcdf('nfmpi_inq_varid: w_sun'
+     &                             , status )
+          status = nf90mpi_inq_varid(ncid,'u_moon',fum_varid)
+          call handle_error_pnetcdf('nfmpi_inq_varid: u_moon'
+     &                             , status )
+          status = nf90mpi_inq_varid(ncid,'v_moon',fvm_varid)
+          call handle_error_pnetcdf('nfmpi_inq_varid: v_moon'
+     &                             , status )
+          status = nf90mpi_inq_varid(ncid,'w_moon',fwm_varid)
+          call handle_error_pnetcdf('nfmpi_inq_varid: w_moon'
+     &                             , status )
+          status = nf90mpi_inq_varid(ncid,'u_tide',utide_varid)
+          call handle_error_pnetcdf('nfmpi_inq_varid: u_tide'
+     &                             , status )
+          status = nf90mpi_inq_varid(ncid,'v_tide',vtide_varid)
+          call handle_error_pnetcdf('nfmpi_inq_varid: v_tide'
+     &                             , status )
+          status = nf90mpi_inq_varid(ncid,'w_tide',wtide_varid)
+          call handle_error_pnetcdf('nfmpi_inq_varid: w_tide'
+     &                             , status )
+          end if
           
           if ( mode /= 2 ) then
             status = nf90mpi_inq_varid(ncid,'u',u_varid)
@@ -3910,6 +3981,39 @@
             status=nfmpi_put_vara_real_all(ncid,vi_varid,start,edge
      &                                                            ,out2)
             call handle_error_pnetcdf('nf_put_vara_real: vi',status)
+          end if
+
+          if ( calc_tide ) then
+          out2 = real(Fu_S,4)
+          status=nfmpi_put_vara_real_all(ncid,fus_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: u_sun',status)
+          out2 = real(Fv_S,4)
+          status=nfmpi_put_vara_real_all(ncid,fvs_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: v_sun',status)
+          out2 = real(Fw_S,4)
+          status=nfmpi_put_vara_real_all(ncid,fws_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: w_sun',status)
+          out2 = real(Fu_M,4)
+          status=nfmpi_put_vara_real_all(ncid,fum_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: u_moon',status)
+          out2 = real(Fv_M,4)
+          status=nfmpi_put_vara_real_all(ncid,fvm_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: v_moon',status)
+          out2 = real(Fw_M,4)
+          status=nfmpi_put_vara_real_all(ncid,fwm_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: w_moon',status)
+          out2 = real(Fu_M+Fu_S,4)
+          status=nfmpi_put_vara_real_all(ncid,utide_varid,start,edge
+     &                                                            ,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: u_tide',status)
+          out2 = real(Fv_M+Fv_S,4)
+          status=nfmpi_put_vara_real_all(ncid,vtide_varid,start,edge
+     &                                                            ,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: v_tide',status)
+          out2 = real(Fw_M+Fw_S,4)
+          status=nfmpi_put_vara_real_all(ncid,wtide_varid,start,edge
+     &                                                            ,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: w_tide',status)
           end if
 
           start(1) = i_global(1)
@@ -4005,6 +4109,39 @@
             status=nfmpi_put_vara_real_all(ncid,vi_varid,start,edge
      &                                                            ,out2)
             call handle_error_pnetcdf('nf_put_vara_real: vi',status)
+          end if
+
+          if ( calc_tide ) then
+          out2 = real(Fu_S_mean,4)
+          status=nfmpi_put_vara_real_all(ncid,fus_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: u_sun',status)
+          out2 = real(Fv_S_mean,4)
+          status=nfmpi_put_vara_real_all(ncid,fvs_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: v_sun',status)
+          out2 = real(Fw_S_mean,4)
+          status=nfmpi_put_vara_real_all(ncid,fws_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: w_sun',status)
+          out2 = real(Fu_M_mean,4)
+          status=nfmpi_put_vara_real_all(ncid,fum_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: u_moon',status)
+          out2 = real(Fv_M_mean,4)
+          status=nfmpi_put_vara_real_all(ncid,fvm_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: v_moon',status)
+          out2 = real(Fw_M_mean,4)
+          status=nfmpi_put_vara_real_all(ncid,fwm_varid,start,edge,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: w_moon',status)
+          out2 = real(Fu_M_mean+Fu_S_mean,4)
+          status=nfmpi_put_vara_real_all(ncid,utide_varid,start,edge
+     &                                                            ,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: u_tide',status)
+          out2 = real(Fv_M_mean+Fv_S_mean,4)
+          status=nfmpi_put_vara_real_all(ncid,vtide_varid,start,edge
+     &                                                            ,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: v_tide',status)
+          out2 = real(Fw_M_mean+Fw_S_mean,4)
+          status=nfmpi_put_vara_real_all(ncid,wtide_varid,start,edge
+     &                                                            ,out2)
+          call handle_error_pnetcdf('nf_put_vara_real: w_tide',status)
           end if
 
           if ( mode /= 2 ) then

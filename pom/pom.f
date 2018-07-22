@@ -160,6 +160,12 @@
           kh_mean     = kh_mean     / real ( num )
           km_mean     = km_mean     / real ( num )
 
+          Fu_S_mean   = Fu_S_mean   / real ( num )
+          Fv_S_mean   = Fv_S_mean   / real ( num )
+          Fw_S_mean   = Fw_S_mean   / real ( num )
+          Fu_M_mean   = Fu_M_mean   / real ( num )
+          Fv_M_mean   = Fv_M_mean   / real ( num )
+          Fw_M_mean   = Fw_M_mean   / real ( num )
 
 
 !     store ssha for data assimilation to t(k=kb)
@@ -190,6 +196,12 @@
           call exchange3d_mpi( kh_mean, im, jm, kb )
           call exchange3d_mpi( km_mean, im, jm, kb )
 
+          call exchange2d_mpi( Fu_S_mean, im, jm )
+          call exchange2d_mpi( Fv_S_mean, im, jm )
+          call exchange2d_mpi( Fw_S_mean, im, jm )
+          call exchange2d_mpi( Fu_M_mean, im, jm )
+          call exchange2d_mpi( Fv_M_mean, im, jm )
+          call exchange2d_mpi( Fw_M_mean, im, jm )
 
 
 
@@ -273,6 +285,13 @@
           rho_mean    = 0.0
           kh_mean     = 0.0
           km_mean     = 0.0
+
+          Fu_S_mean   = 0.
+          Fv_S_mean   = 0.
+          Fw_S_mean   = 0.
+          Fu_M_mean   = 0.
+          Fv_M_mean   = 0.
+          Fw_M_mean   = 0.
 
           num = 0
 
