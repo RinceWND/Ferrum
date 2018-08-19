@@ -9,6 +9,7 @@
       implicit none
       include 'pom.h'
       integer i,j
+      integer, parameter :: TEST_CASE = 1
       real(kind=rk) rdisp !lyo:20110224:alu:stcc:dispensible real variable!lyo:pac10:
 !     integer io_global,jo_global,io,jo !fhx:incmix!lyo:pac10:delete
 !     real(kind=rk) xs,ys,fak!,lono,lato!lyo:pac10:moved to pom.h: !fhx:incmix
@@ -51,7 +52,11 @@
       call initialize_arrays
 
 ! read in grid data
-      call read_grid
+      if ( TEST_CASE == 0 ) then
+        call read_grid
+      else
+        call make_grid(TEST_CASE)
+      end if
 !lyo:ecs:
 !     Close northern boundary:
 !!        if(n_north.eq.-1) then
@@ -1228,3 +1233,199 @@
 
       end function judge_inout
 !-------------------------------------------------------------
+
+      subroutine make_grid( TEST_CASE )
+! Generate vertical and horizontal grid, topography, areas and masks
+      implicit none
+      include 'pom.h'
+
+      integer, intent(in) :: TEST_CASE
+      integer i,j,k
+
+! degrees to radians
+      deg2rad=pi/180.
+
+! generate grid
+      do k = 1,kb
+        z(k)  = -real(k-1)/real(kb-1)
+      end do
+      do k = 1,kb-1
+        zz(k) = .5*(z(k+1)+z(k))
+      end do
+      zz(kb) = 2.*zz(kb-1)-zz(kb-2)
+
+      do k=1,kb-1
+        dz(k) = z(k)- z(k+1)
+        dzz(k)=zz(k)-zz(k+1)
+      end do
+      dz(kb) = dz(kb-1)
+      dzz(kb)=dzz(kb-1)
+
+
+      do j = 1,jm
+        do i = 1,im
+          east_e(i,j) = 100.
+     &        + 180.*real(i_global(i)-1)/real(im_global-1)
+          north_e(i,j)= -80.
+     &        + 160.*real(j_global(j)-1)/real(jm_global-1)
+        end do
+      end do
+
+      do j = 1,jm
+        do i = 2,im
+          east_u(i,j) = .5*( east_e(i,j) + east_e(i-1,j) )
+          north_u(i,j)= .5*( north_e(i,j)+ north_e(i-1,j))
+        end do
+      end do
+      call exchange2d_mpi(east_u,  im,jm)
+      call exchange2d_mpi(north_u, im,jm)
+      if (n_west==-1) then
+        east_u(1,:) = 2.*east_u(2,:) - east_u(3,:)
+        north_u(1,:)= 2.*north_u(2,:)- north_u(3,:)
+      end if
+      do j = 1,jm
+        do i = 2,im
+          east_v(i,j) = .5*( east_e(i,j) + east_e(i-1,j) )
+          north_v(i,j)= .5*( north_e(i,j)+ north_e(i-1,j))
+        end do
+      end do
+      call exchange2d_mpi(east_v,  im,jm)
+      call exchange2d_mpi(north_v, im,jm)
+      if (n_west==-1) then
+      east_v(:,1) = 2.*east_v(:,2) - east_v(:,3)
+      north_v(:,1)= 2.*north_v(:,2)- north_v(:,3)
+      end if
+
+      do j = 1,jm
+        do i = 2,im
+          dx(i,j) = 111800.*cos(north_e(i,j)*deg2rad)
+     &                     *abs(east_u(i,j)-east_u(i-1,j))
+        end do
+      end do
+      do j = 2,jm
+        do i = 1,im
+          dy(i,j) = 111800.*cos(north_e(i,j)*deg2rad)
+     &                     *abs(north_v(i,j)-north_v(i,j-1))
+        end do
+      end do
+      call exchange2d_mpi(dx, im,jm)
+      call exchange2d_mpi(dy, im,jm)
+      if (n_west==-1) then
+        dx(1,:) = dx(2,:)
+        dy(1,:) = dy(2,:)
+      end if
+      if (n_south==-1) then
+        dx(:,1) = dx(:,2)
+        dy(:,1) = dy(:,2)
+      end if
+
+      rot = 0.
+      do j = 1,jm
+        do i = 1,im
+          h(i,j)=100.-1000.*(tanh(5.*(real(i_global(i))
+     &                               -real(im_global)/6.)
+     &                              /(real(im_global)/6.
+     &                               -real(im_global)))
+     &                      +tanh(5.*(real(j_global(j))
+     &                               -real(jm_global)/6.)
+     &                              /(real(jm_global)/6.
+     &                               -real(jm_global))))
+          !h(i,j)=h(i,j)*(1.-real(i_global(i))/real(im_global))
+          h(i,j)=h(i,j)+1000.*(tanh(5.*(real(im_global
+     &                                      -i_global(i))
+     &                               +real(im_global)/6.)
+     &                              /(real(im_global)/6.
+     &                               +real(im_global)))
+     &                      +tanh(5.*(real(jm_global-
+     &                                     j_global(j))
+     &                               +real(jm_global)/6.)
+     &                              /(real(jm_global)/6.
+     &                               +real(jm_global))))
+        end do
+      end do
+
+      fsm = 1.
+      if (n_west==-1) fsm( 1,:) = 0.
+      if (n_east==-1) fsm(im,:) = 0.
+      if (n_south==-1) fsm(:, 1) = 0.
+      if (n_north==-1) fsm(:,jm) = 0.
+
+      dvm = fsm
+      dum = fsm
+      do j=1,jm-1
+        do i=1,im
+          if (fsm(i,j)==0..and.fsm(i,j+1)/=0.) dvm(i,j+1) = 0.
+        end do
+      end do
+      do j=1,jm
+        do i=1,im-1
+          if (fsm(i,j)==0..and.fsm(i+1,j)/=0.) dum(i+1,j) = 0.
+        end do
+      end do
+      call exchange2d_mpi(dum,im_local,jm_local)
+      call exchange2d_mpi(dvm,im_local,jm_local)
+!     The followings are read in read_grid_pnetcdf:
+!     z,zz,dx,dy
+!     east_u,east_v,east_e,east_c
+!     north_u,north_v,north_e,north_c
+!     rot,h,fsm,dum,dvm
+
+
+! print vertical grid information
+      if(my_task.eq.master_task) then
+        write(6,'(/2x,a,7x,a,9x,a,9x,a,9x,a)') 'k','z','zz','dz','dzz'
+        do k=1,kb
+          write(6,'(1x,i5,4f10.3)') k,z(k),zz(k),dz(k),dzz(k)
+        end do
+      end if
+
+! set up Coriolis parameter
+        do j=1,jm
+          do i=1,im
+            cor(i,j)=2.*7.29e-5*sin(north_e(i,j)*deg2rad)
+          end do
+        end do
+
+! inertial period for temporal filter
+!      period=(2.e0*pi)/abs(cor(im/2,jm/2))/86400.e0
+
+! calculate areas of "t" and "s" cells
+      do j=1,jm
+        do i=1,im
+          art(i,j)=dx(i,j)*dy(i,j)
+        end do
+      end do
+
+! calculate areas of "u" and "v" cells
+      do j=2,jm
+        do i=2,im
+          aru(i,j)=.25*(dx(i,j)+dx(i-1,j))*(dy(i,j)+dy(i-1,j))
+          arv(i,j)=.25*(dx(i,j)+dx(i,j-1))*(dy(i,j)+dy(i,j-1))
+        end do
+      end do
+      call exchange2d_mpi(aru,im,jm)
+      call exchange2d_mpi(arv,im,jm)
+
+      if (n_west.eq.-1) then
+        do j=1,jm
+          aru(1,j)=aru(2,j)
+          arv(1,j)=arv(2,j)
+        end do
+      end if
+
+      if (n_south.eq.-1) then
+        do i=1,im
+          aru(i,1)=aru(i,2)
+          arv(i,1)=arv(i,2)
+        end do
+      end if
+
+      do i=1,im
+        do j=1,jm
+          d(i,j) =h(i,j)+el(i,j)
+          dt(i,j)=h(i,j)+et(i,j)
+        end do
+      end do
+
+      return
+      end
