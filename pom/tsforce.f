@@ -1,5 +1,10 @@
       module tsforce
 
+      use glob_atmos , only: wssurf, wtsurf
+      use glob_config, only: rk
+      use glob_domain, only: im, jm, kb
+      use glob_grid  , only: fsm
+      use glob_ocean , only: rho, s, sb, sclim, t, tb, tclim, u, v
       use wind
 
       implicit none
@@ -7,8 +12,6 @@
       private
 
       public :: tsforce_init, tsforce_main, tsforce_tsflx
-
-      include 'pom.h'
 
       real(rk), external :: heatlat
 
@@ -29,7 +32,7 @@
 
 
 !     buffers for tsurf, ssurf etc
-      real(rk), dimension( im_local, jm_local ) ::
+      real(rk), allocatable, dimension(:,:) ::
      &     el_a, el_b
      &    ,cloud_a, cloud_b, cloud
      &    ,rain_a, rain_b, rain
@@ -44,7 +47,7 @@
      &    ,dlr,dlr_a,dlr_b
      &    ,dtemp,dt_a,dt_b, dsalt,ds_a,ds_b
 
-      real(rk), dimension( im_local, jm_local, kb ) ::
+      real(rk), allocatable, dimension(:,:,:) ::
      $     tc_a, sc_a, tc_b, sc_b,
      $     tm_a, sm_a, tm_b, sm_b,
      $     tmean, smean
@@ -67,6 +70,7 @@
 !--------------------------------------------------------------
       subroutine tsforce_init( d_in )
 
+      use glob_domain, only: is_master
       use module_time
 
       implicit none
@@ -75,6 +79,27 @@
       type(date), intent(in) :: d_in
       type(date) d_tmp
       integer n
+
+
+! Allocate arrays
+      allocate(
+     &  el_a(im,jm),el_b(im,jm),cloud_a(im,jm),cloud_b(im,jm)
+     &, cloud(im,jm),rain_a(im,jm),rain_b(im,jm),rain(im,jm)
+     &, shum_a(im,jm),shum_b(im,jm),shum(im,jm),tair_a(im,jm)
+     &, tair_b(im,jm),tair(im,jm),pres_a(im,jm),pres_b(im,jm)
+     &, pres(im,jm),uwnd_a(im,jm),vwnd_a(im,jm),uwnd_b(im,jm)
+     &, vwnd_b(im,jm),uwnd(im,jm),vwnd(im,jm),tskin_a(im,jm)
+     &, tskin_b(im,jm),tskin(im,jm),sskin(im,jm),emp(im,jm)
+     &, sh(im,jm),sh_a(im,jm),sh_b(im,jm),lh(im,jm),lh_a(im,jm)
+     &, lh_b(im,jm),sr(im,jm),sr_a(im,jm),sr_b(im,jm)
+     &, lr(im,jm),lr_a(im,jm),lr_b(im,jm),dlr(im,jm)
+     &, dlr_a(im,jm),dlr_b(im,jm),dtemp(im,jm),dt_a(im,jm)
+     &, dt_b(im,jm),dsalt(im,jm),ds_a(im,jm),ds_b(im,jm)
+     &, tc_a(im,jm,kb),tc_b(im,jm,kb),sc_a(im,jm,kb)
+     &, sc_b(im,jm,kb),tm_a(im,jm,kb),tm_b(im,jm,kb)
+     &, sm_a(im,jm,kb),sm_b(im,jm,kb),tmean(im,jm,kb)
+     &, smean(im,jm,kb)
+     & )
 
 
 !     initialize
@@ -86,15 +111,33 @@
       db = 0
       pres_a = 1013.
       pres_b = 1013.
+      cloud_a = 0.
+      cloud_b = 0.
+      shum_a = 0.
+      shum_b = 0.
+      rain_a = 0.
+      rain_b = 0.
+      tair_a = 15.
+      tair_b = 15.
       dtemp = 0.
+      dt_a = 0.
+      dt_b = 0.
       dsalt = 0.
+      sr = 0.
+      uwnd_a = 0.
+      uwnd_b = 0.
+      vwnd_a = 0.
+      vwnd_b = 0.
+      tskin_a = 15.
+      tskin_b = 15.
+
 
 !     Read backward and forward TS climatology in initial state
 
 !     check leap year
-      if( ( mod( d_in%year, 4 ) .eq. 0
-     $     .and. mod( d_in%year, 100 ) .ne. 0 )
-     $     .or. mod( d_in%year, 400 ) .eq. 0 ) then
+      if(    ( mod( d_in%year,   4 ) == 0
+     $   .and. mod( d_in%year, 100 ) /= 0 )
+     $    .or. mod( d_in%year, 400 ) == 0   ) then
          mday(2) = 29
       else
          mday(2) = 28
@@ -220,8 +263,7 @@
 
       nb = n
 
-      if ( my_task == master_task )
-     $        write(*,'(/a/)') "---------- tsforce_init."
+      if ( is_master ) print '(/a/)', "---------- tsforce_init."
 
 
       return
@@ -234,6 +276,9 @@
 !--------------------------------------------------------------
       subroutine tsforce_main( d_in )
 
+      use bry
+      use glob_time  , only: dti
+      use glob_ocean , only: rmean, ssurf, tsurf
       use module_time
 
       implicit none
@@ -437,6 +482,11 @@
 
 !     surface heat/salt fluxes.
 
+      use glob_atmos , only: e_atmos, swrad, wusurf, wvsurf
+      use glob_config, only: calc_bulk, rhoref, sbias, sf_hf, tbias
+      use glob_domain, only: my_task
+      use glob_grid  , only: east_e, north_e
+      use glob_misc  , only: hi, ice
       use module_time
 
       implicit none
@@ -527,6 +577,7 @@
         sr = (1.-bb)*sr_a + bb*sr_b
         lr = (1.-bb)*lr_a + bb*lr_b
         dlr= (1.-bb)*dlr_a+ bb*dlr_b
+        swrad = -sr*fsm
 
       else
         dlr= -370.
@@ -540,8 +591,6 @@
 
         uwnd = ( 1.0 - bb ) * uwnd_a + bb * uwnd_b
         vwnd = ( 1.0 - bb ) * vwnd_a + bb * vwnd_b
-
-        swrad = -sr*fsm
 
         call bulk(im,jm,tbias,fsm,t(:,:,1),east_e,north_e,
      $              d_in%year,d_in%month,d_in%day,

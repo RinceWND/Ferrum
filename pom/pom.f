@@ -4,6 +4,10 @@
 
       program pom
 
+      use glob_config
+      use glob_domain, only: is_master
+      use glob_time  , only: dti, iend, iint
+
       use module_time
       use river
       use tsforce
@@ -15,17 +19,10 @@
       use seaice
 
       implicit none
-      include 'pom.h'
 
-      logical spinup
-      namelist/misc_nml/ spinup, t_lo, t_hi
       integer mb
 
       type(date) :: dtime
-
-      open(73, file='switch.nml',status='old')
-      read(73, nml=misc_nml)
-      close(73)
 
 ! initialize model
       call initialize
@@ -41,7 +38,7 @@
       end if
       mb = dtime%month
 
-      if ( calc_uvforce ) call uvforce_init(dtime) !eda:uvforce
+      if ( calc_uvforce ) call uvforce_init(dtime)
       call tsforce_init( dtime )
       if ( calc_tsurf_mc ) call mcsst_init(dtime) !fhx:mcsst
       if ( calc_interp ) call interp_init !fhx:interp_flag
@@ -50,10 +47,10 @@
       call assim_init( dtime )
       if ( calc_ice ) call ice_init( dtime )
 
-      if(my_task == master_task) then
-        write(*,'(a)') 'End of initialization'
-        write(*,*)
-        write(*,'("d = ",a)')  date2str( dtime )
+      if ( is_master ) then
+        print '(a)', 'End of initialization'
+        print *, ''
+        print '("d = ",a)', date2str( dtime )
       endif
 
       if(nread_rst.eq.0) !call write_output_init_pnetcdf !lyo:20110224:alu:stcc:!lyo:pac10:add this write_output_init*
@@ -94,8 +91,7 @@
 
         dtime = dtime + int( dti )
 
-        if ( my_task.eq.master_task )
-     &       write(*,'("d = ",a)')  date2str( dtime )
+        if ( is_master ) print '(" = ",a)', date2str( dtime )
 
 ! write output
         call write_output( dtime, monthly_flag, mb )
@@ -116,28 +112,32 @@
       stop
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
       real(kind=8) function realtime()
       call system_clock(i,j,k)
       realtime=dble(i)/dble(j)
       return
       end
 
-
-!_______________________________________________________________________
+!______________________________________________________________________
       subroutine write_output( d_in, output_mode, mb )
 
+      use glob_config, only: calc_assim, iprint, netcdf_file
+     &                     , output_flag
+      use glob_domain, only: im, jm, kb
+      use glob_ocean , only: ssurf, tsurf
+      use glob_out
+      use glob_time  , only: iint
       use module_time
       use assim, only : assim_store_ssha
 
       implicit none
-      include 'pom.h'
 
       type(date), intent(in) :: d_in
       integer, intent(in) :: output_mode
       integer, intent(inout) :: mb
 
-      if ( netcdf_file.ne.'nonetcdf' ) then
+      if ( netcdf_file /= 'nonetcdf' ) then
 
         if(( output_mode==0 .and. mod(iint,iprint).eq.0 ) .or.
      &     ( output_mode==1 .and. mb /= d_in%month )) then
@@ -286,17 +286,22 @@
 !
 !_______________________________________________________________________
       subroutine write_output_surf !fhx:20110131: new subr.
+
+      use glob_config, only: netcdf_file, SURF_flag
+      use glob_domain, only: im, jm
+      use glob_misc  , only: iprints, nums
+      use glob_out
+      use glob_time  , only: iint
       use module_time
 
       implicit none
-      include 'pom.h'
 
       if(netcdf_file.ne.'nonetcdf' .and. mod(iint,iprints).eq.0) then
 
 
-         usrf_mean    = usrf_mean    / real ( nums )
-         vsrf_mean    = vsrf_mean    / real ( nums )
-         elsrf_mean   = elsrf_mean   / real ( nums )
+         usrf_mean  = usrf_mean  / real ( nums )
+         vsrf_mean  = vsrf_mean  / real ( nums )
+         elsrf_mean = elsrf_mean / real ( nums )
          uwsrf_mean = uwsrf_mean / real ( nums )
          vwsrf_mean = vwsrf_mean / real ( nums )
 
@@ -312,9 +317,9 @@
      $    call write_SURF_pnetcdf(
      $        "out/SRF."//trim(netcdf_file)//".nc")
 
-         usrf_mean    = 0.0
-         vsrf_mean    = 0.0
-         elsrf_mean   = 0.0
+         usrf_mean  = 0.0
+         vsrf_mean  = 0.0
+         elsrf_mean = 0.0
          uwsrf_mean = 0.0
          vwsrf_mean = 0.0
 
@@ -329,10 +334,18 @@
 !_______________________________________________________________________
       subroutine write_restart( d_in )
 
+      use glob_atmos , only: wusurf, wvsurf
+      use glob_config, only: netcdf_file, rk
+      use glob_domain, only: im, jm, kb
+      use glob_ocean , only: aam, aam2d, advua, advva, adx2d, ady2d
+     &                     , egb, el, elb, et, etb, kh, km, kq, l
+     &                     , q2, q2b, q2l, q2lb, rho, s, sb, t, tb
+     &                     , u, ua, uab, ub, utb, v, va, vab, vb, vtb
+     &                     , w, wubot, wvbot
+      use glob_time  , only: dti, iend, iint, irestart
       use module_time
 
       implicit none
-      include 'pom.h'
 
       type(date), intent(in) :: d_in
 
@@ -422,3 +435,46 @@
       return
       end
 !-------------------------------------------------------
+
+      subroutine msg_print( msg, status, desc )
+
+        use glob_domain, only: is_master
+
+        implicit none
+
+        character(len=*), intent(in) :: msg, desc
+        integer         , intent(in) :: status
+
+        integer, parameter :: line_len = 56
+        character, dimension(5), parameter :: chr =
+     &                          (/"O","!","X","?","*"/)
+
+        integer                   i
+        character(len=64)         fmt01!, fmt02
+        character(len=line_len-4) line
+
+        if ( .not.is_master ) return
+
+        line = ""
+
+        i = line_len-3 - len(msg)
+        line(max(1,i):) = msg
+
+        write( fmt01, '("(",i2,"a)")') line_len
+        print '(/)'
+        print fmt01, ("_",i=1,line_len)
+
+        print '("[",a,"] ",a/)', chr(status), line
+
+        if ( desc == "" ) return
+
+        print fmt01, ("-",i=1,line_len)
+        print fmt01, (desc(i:i),i=1,len(desc))
+        print fmt01, ("-",i=1,line_len)
+
+        if ( status == 3 ) then
+          call finalize_mpi
+          stop
+        end if
+
+      end subroutine

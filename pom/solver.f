@@ -2,22 +2,31 @@
 
 ! main subroutines for POM
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine advave(curv2d)
-! calculate horizontal advection and diffusion
+!----------------------------------------------------------------------
+!  Calculate horizontal advection and diffusion.
+!______________________________________________________________________
+
+      use glob_config, only: mode, rk
+      use glob_domain, only: im, imm1, jm, jmm1
+     &                     , n_south, n_west
+      use glob_grid  , only: aru, arv, dx, dy
+      use glob_ocean , only: aam2d, advua, advva, cbc, d
+     &                     , fluxua, fluxva, tps, ua, uab, va, vab
+     &                     , wubot, wvbot
+
       implicit none
-      include 'pom.h'
-      real(kind=rk) curv2d(im,jm)
+
+      real(rk), dimension(im,jm), intent(out) :: curv2d
+
       integer i,j
 
 ! u-advection and diffusion
 
 ! advective fluxes
-      do j=1,jm
-        do i=1,im
-          advua(i,j)=0.
-        end do
-      end do
+      advua = 0.
 
       do j=2,jm
         do i=2,imm1
@@ -116,7 +125,7 @@
         end do
       end do
 
-      if(mode.eq.2) then
+      if ( mode == 2 ) then
 
         do j=2,jmm1
           do i=2,imm1
@@ -195,29 +204,33 @@
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine advct(xflux,yflux,curv)
-! calculate the horizontal portions of momentum advection well in
-! advance of their use in advu and advv so that their vertical integrals
-! (created in the main program) may be used in the external (2-D) mode
-! calculation
+!----------------------------------------------------------------------
+!  Calculate the horizontal portions of momentum advection well in
+! advance of their use in advu and advv so that their vertical
+! integrals (created in the main program) may be used in the
+! external (2-D) mode calculation.
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+     &                     , n_south, n_west
+      use glob_grid  , only: aru, arv, dx, dy
+      use glob_ocean , only: aam, advx, advy, dt, u, ub, v, vb
+
       implicit none
-      include 'pom.h'
-      real(kind=rk) xflux(im,jm,kb),yflux(im,jm,kb)
-      real(kind=rk) curv(im,jm,kb)
-      real(kind=rk) dtaam
+
+      real(rk), dimension(im,jm,kb), intent(out) :: xflux, yflux, curv
+
+      real(rk) dtaam
       integer i,j,k
 
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            curv(i,j,k)=0.
-            advx(i,j,k)=0.
-            xflux(i,j,k)=0.
-            yflux(i,j,k)=0.
-          end do
-        end do
-      end do
+      curv  = 0.
+      advx  = 0.
+      xflux = 0.
+      yflux = 0.
 
       do k=1,kbm1
         do j=2,jmm1
@@ -317,15 +330,9 @@
 
 ! calculate y-component of velocity advection
 
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            advy(i,j,k)=0.
-            xflux(i,j,k)=0.
-            yflux(i,j,k)=0.
-          end do
-        end do
-      end do
+      advy  = 0.
+      xflux = 0.
+      yflux = 0.
 
 ! calculate horizontal advective fluxes
       do k=1,kbm1
@@ -409,16 +416,28 @@
       end do
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine advq(qb,q,qf,xflux,yflux)
-! calculates horizontal advection and diffusion, and vertical advection
-! for turbulent quantities
+!----------------------------------------------------------------------
+!  Calculates horizontal advection and diffusion, and vertical
+! advection for turbulent quantities.
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+      use glob_grid  , only: art, dum, dvm, dx, dy, dz, h
+      use glob_ocean , only: aam, dt, etb, etf, u, v, w
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
-      real(kind=rk) qb(im,jm,kb),q(im,jm,kb),qf(im,jm,kb)
-      real(kind=rk) xflux(im,jm,kb),yflux(im,jm,kb)
+
+      real(rk), dimension(im,jm,kb), intent(in ) :: qb, q
+      real(rk), dimension(im,jm,kb), intent(out) :: qf, xflux, yflux
+
       integer i,j,k
 
 ! do horizontal advection
@@ -473,19 +492,30 @@
       return
       end
 
-!_______________________________________________________________________
-!      subroutine advt1(fb,f,fclim,ff,xflux,yflux)
+!______________________________________________________________________
+!
       subroutine advt1(fb,f,fclim,ff,xflux,yflux, var)
-! integrate conservative scalar equations
-! this is centred scheme, as originally provide in POM (previously
-! called advt)
+!----------------------------------------------------------------------
+!  Integrate conservative scalar equations.
+!  This is centred scheme, as originally provided in POM (previously
+! called advt.)
+!______________________________________________________________________
+
+      use glob_config, only: rk, tprni
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+      use glob_grid  , only: art, dum, dvm, dx, dy, dz, h, zz
+      use glob_ocean , only: aam, dt, etb, etf, tsurf, u, v, w, zflux
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
-      real(kind=rk), dimension(im,jm,kb) :: fb,f,fclim,ff,xflux,yflux
+
+      real(rk), dimension(im,jm,kb), intent(in   ) :: fclim
+      real(rk), dimension(im,jm,kb), intent(inout) :: fb, f
+      real(rk), dimension(im,jm,kb), intent(  out) :: ff,xflux,yflux
+      character(len=1)             , intent(in   ) :: var
+
       integer i,j,k
       real(kind=rk) relax !lyo:relax
-
-      character(len=1), intent(in) :: var
 
       do j=1,jm
         do i=1,im
@@ -587,25 +617,37 @@
       return
       end
 
-!_______________________________________________________________________
-!      subroutine advt2(fb,f,fclim,ff,xflux,yflux)
+!______________________________________________________________________
+!
       subroutine advt2(fb,fclim,ff,xflux,yflux,var)
-! integrate conservative scalar equations
-! this is a first-order upstream scheme, which reduces implicit
+!----------------------------------------------------------------------
+!  Integrate conservative scalar equations.
+!  This is a first-order upstream scheme, which reduces implicit
 ! diffusion using the Smolarkiewicz iterative upstream scheme with an
-! antidiffusive velocity
-! it is based on the subroutines of Gianmaria Sannino (Inter-university
-! Computing Consortium, Rome, Italy) and Vincenzo Artale (Italian
-! National Agency for New Technology and Environment, Rome, Italy)
-      implicit none
-      include 'pom.h'
-      real(kind=rk), dimension(im,jm,kb) :: fb,fclim,ff,xflux,yflux
-     &                                 ,fbmem,xmassflux,ymassflux,zwflux
-      real(kind=rk), dimension(im,jm)    :: eta
-      real(kind=rk) eps, epsval  ! rwnd: iteration check
-      integer i,j,k,itera
+! antidiffusive velocity.
+!  It is based on the subroutines of Gianmaria Sannino
+! (Inter-university Computing Consortium, Rome, Italy) and
+! Vincenzo Artale (Italian National Agency for New Technology
+! and Environment, Rome, Italy)
+!______________________________________________________________________
 
-      character(len=1), intent(in) :: var
+      use glob_config, only: nitera, rk, tprni
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1, master_task
+      use glob_grid  , only: art, dum, dvm, dx, dy, dz, h
+      use glob_ocean , only: aam, dt, etb, etf, tsurf, u, v, w, zflux
+      use glob_time  , only: dti2
+
+      implicit none
+
+      real(rk), dimension(im,jm,kb), intent(in   ) :: fclim
+      real(rk), dimension(im,jm,kb), intent(inout) :: fb
+      real(rk), dimension(im,jm,kb), intent(  out) :: ff,xflux,yflux
+      character(len=1)             , intent(in   ) :: var
+
+      real(rk), dimension(im,jm,kb) :: fbmem,xmassflux,ymassflux,zwflux
+      real(rk), dimension(im,jm)    :: eta
+      real(rk) eps, epsval  ! rwnd: iteration check
+      integer i,j,k,itera
 
       select case ( var )
         case ('T')
@@ -794,19 +836,28 @@
       return
       end
 
+!______________________________________________________________________
+!
       subroutine advtC(cbm,cf)
-! integrate conservative scalar equations
-! this is a first-order upstream scheme, which reduces implicit
-! diffusion using the Smolarkiewicz iterative upstream scheme with an
-! antidiffusive velocity
-! it is based on the subroutines of Gianmaria Sannino (Inter-university
-! Computing Consortium, Rome, Italy) and Vincenzo Artale (Italian
-! National Agency for New Technology and Environment, Rome, Italy)
+!----------------------------------------------------------------------
+!  Integrate conservative scalar equations.
+!  This is the 2-D modifiction of `advt2` for sea-ice concentration.
+!______________________________________________________________________
+
+      use glob_config, only: nitera, rk
+      use glob_domain, only: im, imm1, jm, jmm1
+      use glob_grid  , only: art, dx, dy
+      use glob_misc  , only: ui, vi
+      use glob_ocean , only: etb, etf
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
-      real(kind=rk), dimension(im,jm) :: cbm,cf,xflux,yflux
-     &                                 ,cbmem,xmassflux,ymassflux
-      real(kind=rk), dimension(im,jm)    :: eta
+
+      real(rk), dimension(im,jm), intent(in)  :: cbm
+      real(rk), dimension(im,jm), intent(out) :: cf
+
+      real(rk), dimension(im,jm) :: cbmem, eta, xflux, yflux
+     &                            , xmassflux , ymassflux
 !      real(kind=rk) eps, epsval  ! rwnd: iteration check
       integer i,j,itera
 
@@ -921,24 +972,32 @@
 !      end do
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine advu
-! do horizontal and vertical advection of u-momentum, and includes
-! coriolis, surface slope and baroclinic terms
+!----------------------------------------------------------------------
+!  Do horizontal and vertical advection of u-momentum, and includes
+! coriolis, surface slope and baroclinic terms.
+!______________________________________________________________________
+
+      use glob_atmos , only: e_atmos
+      use glob_config, only: rk
+      use glob_const , only: grav
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+      use glob_grid  , only: aru, cor, dy, dz, h
+      use glob_ocean , only: advx, drhox, dt, egb, egf, etb, etf
+     &                     , u, ub, uf, v, w
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
+
       integer i,j,k
 
 ! do vertical advection
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            uf(i,j,k)=0.
-          end do
-        end do
-      end do
+      uf = 0.
 
       do k=2,kbm1
         do j=1,jm
@@ -986,22 +1045,29 @@
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine advv
-! do horizontal and vertical advection of v-momentum, and includes
-! coriolis, surface slope and baroclinic terms
+!----------------------------------------------------------------------
+!  Do horizontal and vertical advection of v-momentum, and includes
+! coriolis, surface slope and baroclinic terms.
+!______________________________________________________________________
+
+      use glob_atmos , only: e_atmos
+      use glob_config, only: rk
+      use glob_const , only: grav
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+      use glob_grid  , only: arv, cor, dx, dz, h
+      use glob_ocean , only: advy, drhoy, dt, egb, egf, etb, etf
+     &                     , u, v, vb, vf, w
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
+
       integer i,j,k
 
 ! do vertical advection
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            vf(i,j,k)=0.
-          end do
-        end do
-      end do
+      vf = 0.
 
       do k=2,kbm1
         do j=2,jm
@@ -1049,20 +1115,25 @@
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine baropg
-! calculate  baroclinic pressure gradient
+!----------------------------------------------------------------------
+!  Calculate  baroclinic pressure gradient.
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_const , only: grav
+      use glob_domain, only: imm1, jmm1, kb, kbm1
+      use glob_grid  , only: dum, dvm, dx, dy, zz
+      use glob_ocean , only: drhox, drhoy, dt, rmean, rho
+      use glob_time  , only: ramp
+
       implicit none
-      include 'pom.h'
+
       integer i,j,k
 
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            rho(i,j,k)=rho(i,j,k)-rmean(i,j,k)
-          end do
-        end do
-      end do
+      rho = rho - rmean
 
 ! calculate x-component of baroclinic pressure gradient
       do j=2,jmm1
@@ -1141,34 +1212,34 @@
         end do
       end do
 
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            rho(i,j,k)=rho(i,j,k)+rmean(i,j,k)
-          end do
-        end do
-      end do
+      rho = rho + rmean
 
       return
+
       end
-!_______________________________________________________________________
+!______________________________________________________________________
 !fhx:Toni:npg
       subroutine baropg_mcc
-! calculate  baroclinic pressure gradient
-! 4th order correction terms, following McCalpin
+!----------------------------------------------------------------------
+!  Calculate baroclinic pressure gradient.
+!  4th order correction terms, following McCalpin.
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_const , only: grav
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+     &                     , n_south, n_west
+      use glob_grid  , only: dum, dvm, dx, dy, dzz, zz
+      use glob_ocean , only: d, drhox, drhoy, dt, rmean, rho
+      use glob_time  , only: ramp
+
       implicit none
-      include 'pom.h'
+
       integer i,j,k
       real(kind=rk) d4(im,jm),ddx(im,jm),drho(im,jm,kb),rhou(im,jm,kb)
       real(kind=rk) rho4th(0:im,0:jm,kb),d4th(0:im,0:jm)
 
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            rho(i,j,k)=rho(i,j,k)-rmean(i,j,k)
-          end do
-        end do
-      end do
+      rho = rho - rmean
 
 ! convert a 2nd order matrices to special 4th order
 ! special 4th order case
@@ -1402,11 +1473,23 @@
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine baropg_lin
+!----------------------------------------------------------------------
+!  Finite volume baroclinic pressure gradient scheme following Lin(*).
+! TODO: fix and fill up the resource.
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_const , only: grav
+      use glob_domain, only: im, jm, kb, kbm1
+      use glob_grid  , only: dum, dvm, dx, dy, dz, z
+      use glob_ocean , only: drhox, drhoy, dt, rho
+      use glob_time  , only: ramp
 
       implicit none
-      include 'pom.h'
+
       integer i,j,k
       real(kind=rk) p(im,jm,kb),fx(im,jm,kb),fc(im,jm,kb)
       real(kind=rk) dh,cff,cff1
@@ -1513,11 +1596,23 @@
 
       end subroutine
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine baropg_song_std
+!----------------------------------------------------------------------
+!  Baroclinic pressure gradient scheme following Song(*).
+! TODO: fix and fill up the resource.
+!______________________________________________________________________
+
+      use glob_config, only: rhoref, rk
+      use glob_const , only: grav
+      use glob_domain, only: im, jm, kbm1
+      use glob_grid  , only: dx, dy, dz, z, zz
+      use glob_ocean , only: d, drhox, drhoy, dt, rho
+      use glob_time  , only: ramp
 
       implicit none
-      include 'pom.h'
+
       integer i,j,k
       real(kind=rk) phix(2:im),phie(im)
       real(kind=rk) fac,fac1,fac2,fac3,cff1,cff2,cff3,cff4,gamma
@@ -1655,11 +1750,23 @@
 
       end subroutine
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine baropg_shch
+!----------------------------------------------------------------------
+!  Baroclinic pressure gradient scheme following Shchepetkin(*).
+! TODO: fix and fill up the resource.
+!______________________________________________________________________
+
+      use glob_config, only: rhoref, rk
+      use glob_const , only: grav
+      use glob_domain, only: im, imm1, jm, jmm1, kb
+      use glob_grid  , only: dx, dy, dz, z, zz
+      use glob_ocean , only: d, drhox, drhoy, dt, rho
+      use glob_time  , only: ramp
 
       implicit none
-      include 'pom.h'
+
       integer i,j,k
       real(kind=rk), parameter :: OneFifth   = .2
      &                           ,OneTwelfth = 1./12.
@@ -1854,8 +1961,7 @@
 
       end subroutine
 
-!_______________________________________________________________________
-
+!______________________________________________________________________
 !lyo:pac10:beg:
 !lyo:20110224:alu:stcc:
 !     bcond_PeriodicFRZ.f:
@@ -1867,447 +1973,475 @@
 !     bcond_standrd.f
 !
       subroutine bcond(idx)
+!----------------------------------------------------------------------
 !     boundary conditions for idelaized STCC simulation with
 !     x-periodic and y-FRZ; the y-periodic part not yet completed
 !     need also subroutines xperi2d_mpi & xperi3d_mpi
 !     included in this file also
 !lyo:scs1d:add yperi*:ipery:y-periodic part added... lyo(2012/0214)
+!______________________________________________________________________
+! TODO: MOVE TO ITS OWN MODULE!
 
-!
+      use bry
+      use glob_config, only: iperx, ipery, rk
+      use glob_const , only: grav, small
+      use glob_domain
+      use glob_grid  , only: dum, dvm, dx, dy, fsm, h, zz
+      use glob_ocean , only: dt, el, elf, kh, km, kq, l, q2, q2l, s, t
+     &                     , u, uaf, uf, v, vaf, vf, w, wubot, wvbot
+      use glob_time  , only: dti, ramp
+
       implicit none
-      include 'pom.h'
+
       integer idx
       integer i,j,k
       real(kind=rk) ga,u1,wm
       integer ii,jj
-      real(kind=rk), parameter :: hmax = 8000.0 !lyo:20110224:alu:stcc:
+!      real(kind=rk), parameter :: hmax = 8000.0 !lyo:20110224:alu:stcc:
 
-      if(idx.eq.1) then
+      if ( idx == 1 ) then
 
 ! external (2-D) elevation boundary conditions
 
 !west
-          if(n_west.eq.-1) then
-           do j=1,jm
-             elf(1,j)=elf(2,j)
-           end do
-          endif
-!east
-          if(n_east.eq.-1) then
-           do j=1,jm
-             elf(im,j)=elf(imm1,j)
-           end do
-          endif
-!north
-          if(n_north.eq.-1) then
-           do i=1,im
-            elf(i,jm)=elf(i,jmm1)
-           end do
-          endif
-!south
-          if(n_south.eq.-1) then
-           do i=1,im
-            elf(i,1)=elf(i,2)
-           end do
-          endif
-!
-        if (iperx.ne.0) then !alu:stcc:add periodic bc in x
-         call xperi2d_mpi(elf,im,jm)
-         endif
-!
-        if (ipery.ne.0) then
-         call yperi2d_mpi(elf,im,jm) !lyo:scs1d:add yperi*:ipery:
-         endif
-!
+        if ( n_west == -1 ) then
           do j=1,jm
-             do i=1,im
-                elf(i,j)=elf(i,j)*fsm(i,j)
-             end do
+            elf(1,j) = elf(2,j)
           end do
+        end if
+!east
+        if ( n_east == -1 ) then
+          do j=1,jm
+            elf(im,j) = elf(imm1,j)
+          end do
+        end if
+!north
+        if ( n_north == -1 ) then
+          do i=1,im
+            elf(i,jm) = elf(i,jmm1)
+          end do
+        end if
+!south
+        if ( n_south == -1 ) then
+          do i=1,im
+            elf(i,1) = elf(i,2)
+          end do
+        end if
+
+        if ( iperx /= 0 ) then !alu:stcc:add periodic bc in x
+          call xperi2d_mpi(elf,im,jm)
+        end if
+
+        if ( ipery /= 0 ) then
+          call yperi2d_mpi(elf,im,jm) !lyo:scs1d:add yperi*:ipery:
+        end if
+
+        elf = elf*fsm
 
         return
 
-      else if(idx.eq.2) then
+      elseif ( idx == 2 ) then
 
 ! external (2-D) velocity boundary conditions
 
 ! east
-          if(n_east.eq.-1) then
-           do j=2,jmm1
+        if ( n_east == -1 ) then
+          do j=2,jmm1
             uaf(im,j)=uabe(j)
      $                     +rfe*sqrt(grav/h(imm1,j))*(el(imm1,j)-ele(j))
             uaf(im,j)=ramp*uaf(im,j)
             vaf(im,j)=0. !(vaf(imm1,j-1)+vaf(imm1,j)+vaf(imm1,j+1))/3. !0.
-           enddo
-          end if
+          end do
+        end if
 ! west
-          if(n_west.eq.-1) then
-           do j=2,jmm1
+        if ( n_west == -1 ) then
+          do j=2,jmm1
             uaf(2,j)=uabw(j)-rfw*sqrt(grav/h(2,j))*(el(2,j)-elw(j))
             uaf(2,j)=ramp*uaf(2,j)
             uaf(1,j)=uaf(2,j)
             vaf(1,j)=0. !(vaf(2,j-1)+vaf(2,j)+vaf(2,j+1))/3. !0.
-           enddo
-          end if
+          end do
+        end if
 
 ! north
-          if(n_north.eq.-1) then
-           do i=2,imm1
+        if ( n_north == -1 ) then
+          do i=2,imm1
             vaf(i,jm)=vabn(i)
      $                     +rfn*sqrt(grav/h(i,jmm1))*(el(i,jmm1)-eln(i))
             vaf(i,jm)=ramp*vaf(i,jm)
             uaf(i,jm)=0. !(uaf(i-1,jmm1)+uaf(i,jmm1)+uaf(i+1,jmm1))/3. !0.
-           enddo
-          end if
+          end do
+        end if
 ! south
-          if(n_south.eq.-1) then
-           do i=2,imm1
+        if ( n_south == -1 ) then
+          do i=2,imm1
             vaf(i,2)=vabs(i)-rfs*sqrt(grav/h(i,2))*(el(i,2)-els(i))
             vaf(i,2)=ramp*vaf(i,2)
             vaf(i,1)=vaf(i,2)
             uaf(i,1)=0. !(uaf(i-1,2)+uaf(i,2)+uaf(i+1,2))/3. !0.
-           enddo
-          end if
-!
-        if (iperx.ne.0) then !alu:stcc:iperx
+          end do
+        end if
+
+        if ( iperx /= 0 ) then !alu:stcc:iperx
           call xperi2d_mpi(uaf,im,jm)
           call xperi2d_mpi(vaf,im,jm)
-        if (iperx.lt.0) then !free-slip north&south
-           if(n_north.eq.-1) then
-             uaf(:,jm)=uaf(:,jmm1)
-             dum(:,jm)=1.0
-           endif
-           if(n_south.eq.-1) then
+          if ( iperx < 0 ) then !free-slip north&south
+            if ( n_north == -1 ) then
+              uaf(:,jm)=uaf(:,jmm1)
+              dum(:,jm)=1.0
+            end if
+            if ( n_south == -1 ) then
               uaf(:,1)=uaf(:,2)
               dum(:,1)=1.0
-           endif
-         endif
-        endif !end if (iperx.ne.0)
-!
-        if (ipery.ne.0) then !alu:stcc:ipery
+            end if
+          end if
+        end if !end if (iperx.ne.0)
+
+        if ( ipery /= 0 ) then !alu:stcc:ipery
           call yperi2d_mpi(uaf,im,jm) !lyo:scs1d:add yperi*:ipery:
           call yperi2d_mpi(vaf,im,jm)
-        if (ipery.lt.0) then !free-slip east&west
-           if(n_east.eq.-1) then
-             vaf(im,:)=vaf(imm1,:)
-             dvm(im,:)=1.0
-           endif
-           if(n_west.eq.-1) then
+          if ( ipery < 0 ) then !free-slip east&west
+            if ( n_east == -1 ) then
+              vaf(im,:)=vaf(imm1,:)
+              dvm(im,:)=1.0
+            end if
+            if ( n_west == -1 ) then
               vaf(1,:)=vaf(2,:)
               dvm(1,:)=1.0
-           endif
-         endif
-        endif !end if (ipery.ne.0)
-!
-         do j=1,jm
-            do i=1,im
-               uaf(i,j)=uaf(i,j)*dum(i,j)
-               vaf(i,j)=vaf(i,j)*dvm(i,j)
-            end do
-         end do
+            end if
+          end if
+        end if !end if (ipery.ne.0)
+
+        uaf = uaf*dum
+        vaf = vaf*dvm
 
         return
 
-      else if(idx.eq.3) then
+      elseif ( idx == 3 ) then
 
 ! internal (3-D) velocity boundary conditions
 
 !     EAST
 !     radiation boundary conditions.
 
-         if(n_east.eq.-1) then
-            do k=1,kbm1
-               do j=2,jmm1
-                  ga = sqrt( h(im,j) / hmax )
-                  uf(im,j,k)
+        if ( n_east == -1 ) then
+          do k=1,kbm1
+            do j=2,jmm1
+              ga = sqrt( h(im,j) / hmax )
+              uf(im,j,k)
      $                 = ga * ( 0.25 * u(imm1,j-1,k)
      $                 + 0.5 * u(imm1,j,k) + 0.25 * u(imm1,j+1,k) )
      $                 + ( 1.0 - ga ) * ( 0.25 * u(im,j-1,k)
      $                 + 0.5 * u(im,j,k) + 0.25 * u(im,j+1,k) )
-                  vf(im,j,k)
+              vf(im,j,k)
      &             = (v(imm1,j-1,k)+v(imm1,j,k)+v(imm1,j+1,k))/3. !0.0.
-               enddo
-            enddo
-         endif
+            end do
+          end do
+        end if
 
 !     WEST
 !     radiation boundary conditions.
 
-         if(n_west.eq.-1) then
-            do k=1,kbm1
-               do j=2,jmm1
-                  ga = sqrt( h(1,j) / hmax )
-                  uf(2,j,k)
+        if ( n_west == -1 ) then
+          do k=1,kbm1
+            do j=2,jmm1
+              ga = sqrt( h(1,j) / hmax )
+              uf(2,j,k)
      $                 = ga * ( 0.25 * u(3,j-1,k)
      $                 + 0.5 * u(3,j,k) + 0.25 * u(3,j+1,k) )
      $                 + ( 1.0 - ga ) * ( 0.25 * u(2,j-1,k)
      $                 + 0.5 * u(2,j,k) + 0.25 * u(2,j+1,k) )
-                  uf(1,j,k)=uf(2,j,k)
-                  vf(1,j,k)
+              uf(1,j,k)=uf(2,j,k)
+              vf(1,j,k)
      &             = (v(2,j-1,k)+v(2,j,k)+v(2,j+1,k))/3. !0.0.
-               enddo
-            enddo
-          endif
+            end do
+          end do
+        end if
 
 !     NORTH
 !     radiation boundary conditions.
 
-         if(n_north.eq.-1) then
-
-            do k=1,kbm1
-               do i=2,imm1
-                  ga = sqrt( h(i,jm) / hmax )
-                  vf(i,jm,k)
+        if ( n_north == -1 ) then
+          do k=1,kbm1
+            do i=2,imm1
+              ga = sqrt( h(i,jm) / hmax )
+              vf(i,jm,k)
      $                 = ga * ( 0.25 * v(i-1,jmm1,k)
      $                 + 0.5 * v(i,jmm1,k) + 0.25 * v(i+1,jmm1,k) )
      $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,jm,k)
      $                 + 0.5 * v(i,jm,k) + 0.25 * v(i+1,jm,k) )
-                  uf(i,jm,k)
+              uf(i,jm,k)
      &             = (u(i-1,jmm1,k)+u(i,jmm1,k)+u(i+1,jmm1,k))/3. !0.0.
-               enddo
-            enddo
-          endif
+            end do
+          end do
+        end if
 
 !     SOUTH
 !     radiation boundary conditions.
 
-         if(n_south.eq.-1) then
-
-            do k=1,kbm1
-               do i=2,imm1
-                  ga = sqrt( h(i,1) / hmax )
-                  vf(i,2,k)
+        if ( n_south == -1 ) then
+          do k=1,kbm1
+            do i=2,imm1
+              ga = sqrt( h(i,1) / hmax )
+              vf(i,2,k)
      $                 = ga * ( 0.25 * v(i-1,3,k)
      $                 + 0.5 * v(i,3,k) + 0.25 * v(i+1,3,k) )
      $                 + ( 1.0 - ga ) * ( 0.25 * v(i-1,2,k)
      $                 + 0.5 * v(i,2,k) + 0.25 * v(i+1,2,k) )
-                  vf(i,1,k)=vf(i,2,k)
-!                 uf(i,jm,k)=0.e0 !lyo:debug:lyo:20110224:alu:stcc:
-                  uf(i,1,k)
+              vf(i,1,k)=vf(i,2,k)
+!              uf(i,jm,k)=0.e0 !lyo:debug:lyo:20110224:alu:stcc:
+              uf(i,1,k)
      &             = (u(i-1,2,k)+u(i,2,k)+u(i+1,2,k))/3. !0.0.
-               enddo
-            enddo
-          endif
-!
-        if (iperx.ne.0) then !alu:stcc:iperx
-        call xperi2d_mpi(wubot,im,jm)
-        call xperi2d_mpi(wvbot,im,jm)
-        call xperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-        call xperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+            end do
+          end do
+        end if
 
-        if (iperx.lt.0) then !free-slip north&south
-           if(n_north.eq.-1)           then
+        if ( iperx /= 0 ) then !alu:stcc:iperx
+          call xperi2d_mpi(wubot,im,jm)
+          call xperi2d_mpi(wvbot,im,jm)
+          call xperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
+          call xperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+
+          if ( iperx < 0 ) then !free-slip north&south
+            if ( n_north == -1 ) then
               wubot(:,jm)=wubot(:,jmm1)
               do k=1,kbm1
-               uf(:,jm,k)=uf(:,jmm1,k)
-              enddo
-            endif
-           if(n_south.eq.-1)           then
+                uf(:,jm,k)=uf(:,jmm1,k)
+              end do
+            end if
+            if ( n_south == -1 ) then
               wubot(:,1)=wubot(:,2)
               do k=1,kbm1
-               uf(:,1,k)=uf(:,2,k)
-              enddo
-            endif
-         endif
-        endif ! end if (iperx.ne.0)
+                uf(:,1,k)=uf(:,2,k)
+              end do
+            end if
+          end if
+        end if ! end if (iperx.ne.0)
 
-        if (ipery.ne.0) then !lyo:scs1d:add yperi*:ipery:
-        call yperi2d_mpi(wubot,im,jm)
-        call yperi2d_mpi(wvbot,im,jm)
-        call yperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-        call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+        if ( ipery /= 0 ) then !lyo:scs1d:add yperi*:ipery:
+          call yperi2d_mpi(wubot,im,jm)
+          call yperi2d_mpi(wvbot,im,jm)
+          call yperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
+          call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
 
-        if (ipery.lt.0) then !free-slip east&west
-           if(n_east.eq.-1)           then
+          if ( ipery < 0 ) then !free-slip east&west
+            if ( n_east == -1 ) then
               wvbot(im,:)=wvbot(imm1,:)
               do k=1,kbm1
-               vf(im,:,k)=vf(imm1,:,k)
-              enddo
-            endif
-           if(n_west.eq.-1)           then
+                vf(im,:,k)=vf(imm1,:,k)
+              end do
+            end if
+            if ( n_west == -1 ) then
               wvbot(1,:)=wvbot(2,:)
               do k=1,kbm1
-               vf(1,:,k)=vf(2,:,k)
-              enddo
-            endif
-         endif
-        endif ! end if (ipery.ne.0)
+                vf(1,:,k)=vf(2,:,k)
+              end do
+            end if
+          end if
+        end if ! end if (ipery.ne.0)
 
-         do k=1,kbm1
-            do j=1,jm
-               do i=1,im
-                  uf(i,j,k)=uf(i,j,k)*dum(i,j)
-                  vf(i,j,k)=vf(i,j,k)*dvm(i,j)
-               end do
+        do k=1,kbm1
+          do j=1,jm
+            do i=1,im
+              uf(i,j,k)=uf(i,j,k)*dum(i,j)
+              vf(i,j,k)=vf(i,j,k)*dvm(i,j)
             end do
-         end do
+          end do
+        end do
 
         return
 
-
-      else if(idx.eq.4) then
+      elseif ( idx == 4 ) then
 
 ! temperature and salinity boundary conditions (using uf and vf,
 ! respectively)
 
 !    west
-      if(n_west.eq.-1) then
+        if ( n_west == -1 ) then
 
-      do k=1,kbm1
-      do j=1,jm
-      u1=2.*u(2,j,k)*dti/(dx(1,j)+dx(2,j))
-      if(u1.ge.0.) then
-      uf(1,j,k)=t(1,j,k)-u1*(t(1,j,k)-tbw(j,k))
-      vf(1,j,k)=s(1,j,k)-u1*(s(1,j,k)-sbw(j,k))
-      else
-      uf(1,j,k)=t(1,j,k)-u1*(t(2,j,k)-t(1,j,k))
-      vf(1,j,k)=s(1,j,k)-u1*(s(2,j,k)-s(1,j,k))
-      if(k.ne.1.and.k.ne.kbm1) then
-      wm=.5*(w(2,j,k)+w(2,j,k+1))*dti
-     $   /((zz(k-1)-zz(k+1))*dt(2,j))
-      uf(1,j,k)=uf(1,j,k)-wm*(t(2,j,k-1)-t(2,j,k+1))
-      vf(1,j,k)=vf(1,j,k)-wm*(s(2,j,k-1)-s(2,j,k+1))
-      end if
-      end if !endif u1
-      enddo  !enddo j
-      enddo  !enddo k
+          do k=1,kbm1
+            do j=1,jm
+              u1 = 2.*u(2,j,k)*dti/(dx(1,j)+dx(2,j))
+              if ( u1 >= 0. ) then
+                uf(1,j,k) = t(1,j,k)-u1*(t(1,j,k)-tbw(j,k))
+                vf(1,j,k) = s(1,j,k)-u1*(s(1,j,k)-sbw(j,k))
+              else
+                uf(1,j,k) = t(1,j,k)-u1*(t(2,j,k)-t(1,j,k))
+                vf(1,j,k) = s(1,j,k)-u1*(s(2,j,k)-s(1,j,k))
+                if ( k/=1 .and. k/=kbm1 ) then
+                  wm = .5*(w(2,j,k)+w(2,j,k+1))*dti
+     $                /((zz(k-1)-zz(k+1))*dt(2,j))
+                  uf(1,j,k)=uf(1,j,k)-wm*(t(2,j,k-1)-t(2,j,k+1))
+                  vf(1,j,k)=vf(1,j,k)-wm*(s(2,j,k-1)-s(2,j,k+1))
+                end if
+              end if
+            end do
+          end do
 
-      if(nfw.gt.3) then  !west FRZ needs at least 4 pts !lyo:20110224:alu:stcc:
-      do k=1,kbm1; do j=1,jm; do i=1,nfw
-      uf(i,j,k)=uf(i,j,k)*(1.-frz(i,j))+(tobw(i,j,k)*frz(i,j))
-      vf(i,j,k)=vf(i,j,k)*(1.-frz(i,j))+(sobw(i,j,k)*frz(i,j))
-      enddo;enddo;enddo
-      end if !if(nfw.gt.3) then..
+          if ( nfw > 3 ) then  !west FRZ needs at least 4 pts !lyo:20110224:alu:stcc:
+            do k=1,kbm1
+              do j=1,jm
+                do i=1,nfw
+                  uf(i,j,k) = uf(i,j,k)*(1.-frz(i,j))
+     &                       +(tobw(i,j,k)*frz(i,j))
+                  vf(i,j,k) = vf(i,j,k)*(1.-frz(i,j))
+     &                       +(sobw(i,j,k)*frz(i,j))
+                end do
+              end do
+            end do
+          end if !if(nfw.gt.3) then..
 
-      end if !endif west
-!
+        end if !endif west
+
 !     east
-      if(n_east.eq.-1) then
+        if ( n_east == -1 ) then
 
-      do k=1,kbm1
-      do j=1,jm
-      u1=2.*u(im,j,k)*dti/(dx(im,j)+dx(imm1,j))
-      if(u1.le.0.) then
-      uf(im,j,k)=t(im,j,k)-u1*(tbe(j,k)-t(im,j,k))
-      vf(im,j,k)=s(im,j,k)-u1*(sbe(j,k)-s(im,j,k))
-      else  !lyo:pac10:debug:alu:stcc:AlsoHasSameBug
-      uf(im,j,k)=t(im,j,k)-u1*(t(im,j,k)-t(imm1,j,k))
-      vf(im,j,k)=s(im,j,k)-u1*(s(im,j,k)-s(imm1,j,k))
-      if(k.ne.1.and.k.ne.kbm1) then
-      wm=.5*(w(imm1,j,k)+w(imm1,j,k+1))*dti
-     $    /((zz(k-1)-zz(k+1))*dt(imm1,j))
-      uf(im,j,k)=uf(im,j,k)-wm*(t(imm1,j,k-1)-t(imm1,j,k+1))
-      vf(im,j,k)=vf(im,j,k)-wm*(s(imm1,j,k-1)-s(imm1,j,k+1))
-      end if
-      end if !endif u1
-      enddo  !enddo j
-      enddo  !enddo k
+          do k=1,kbm1
+            do j=1,jm
+              u1 = 2.*u(im,j,k)*dti/(dx(im,j)+dx(imm1,j))
+              if ( u1 <= 0. ) then
+                uf(im,j,k) = t(im,j,k)-u1*(tbe(j,k)-t(im,j,k))
+                vf(im,j,k) = s(im,j,k)-u1*(sbe(j,k)-s(im,j,k))
+              else  !lyo:pac10:debug:alu:stcc:AlsoHasSameBug
+                uf(im,j,k) = t(im,j,k)-u1*(t(im,j,k)-t(imm1,j,k))
+                vf(im,j,k)=s(im,j,k)-u1*(s(im,j,k)-s(imm1,j,k))
+                if ( k/=1 .and. k/=kbm1 ) then
+                  wm = .5*(w(imm1,j,k)+w(imm1,j,k+1))*dti
+     $                /((zz(k-1)-zz(k+1))*dt(imm1,j))
+                  uf(im,j,k) = uf(im,j,k)
+     &                        -wm*(t(imm1,j,k-1)-t(imm1,j,k+1))
+                  vf(im,j,k) = vf(im,j,k)
+     &                        -wm*(s(imm1,j,k-1)-s(imm1,j,k+1))
+                end if
+              end if
+            end do
+          end do
 
-      if(nfe.gt.3) then  !east FRZ needs at least 4 pts !lyo:20110224:alu:stcc:
-      do k=1,kbm1; do j=1,jm; do i=1,nfe
-      ii=im-i+1
-      uf(ii,j,k)=uf(ii,j,k)*(1.-frz(ii,j))+(tobe(i,j,k)*frz(ii,j))
-      vf(ii,j,k)=vf(ii,j,k)*(1.-frz(ii,j))+(sobe(i,j,k)*frz(ii,j))
-      enddo;enddo;enddo
-      end if !if(nfe.gt.3) then..
+          if ( nfe > 3 ) then  !east FRZ needs at least 4 pts !lyo:20110224:alu:stcc:
+            do k=1,kbm1
+              do j=1,jm
+                do i=1,nfe
+                  ii=im-i+1
+                  uf(ii,j,k) = uf(ii,j,k)*(1.-frz(ii,j))
+     &                        +(tobe(i,j,k)*frz(ii,j))
+                  vf(ii,j,k) = vf(ii,j,k)*(1.-frz(ii,j))
+     &                        +(sobe(i,j,k)*frz(ii,j))
+                end do
+              end do
+            end do
+          end if !if(nfe.gt.3) then..
 
-      end if !endif east
+        end if !endif east
 !
 !   north
-      if(n_north.eq.-1) then
+        if ( n_north == -1 ) then
 
-      do k=1,kbm1
-      do i=1,im
-      u1=2.*v(i,jm,k)*dti/(dy(i,jm)+dy(i,jmm1))
-      if(u1.le.0.) then
-      uf(i,jm,k)=t(i,jm,k)-u1*(tbn(i,k)-t(i,jm,k))
-      vf(i,jm,k)=s(i,jm,k)-u1*(sbn(i,k)-s(i,jm,k))
-      else
-      uf(i,jm,k)=t(i,jm,k)-u1*(t(i,jm,k)-t(i,jmm1,k))
-      vf(i,jm,k)=s(i,jm,k)-u1*(s(i,jm,k)-s(i,jmm1,k))
-      if(k.ne.1.and.k.ne.kbm1) then
-      wm=.5*(w(i,jmm1,k)+w(i,jmm1,k+1))*dti
-     $   /((zz(k-1)-zz(k+1))*dt(i,jmm1))
-      uf(i,jm,k)=uf(i,jm,k)-wm*(t(i,jmm1,k-1)-t(i,jmm1,k+1))
-      vf(i,jm,k)=vf(i,jm,k)-wm*(s(i,jmm1,k-1)-s(i,jmm1,k+1))
-      end if
-      end if !endif u1
-      end do !enddo i
-      end do !enddo k
+          do k=1,kbm1
+            do i=1,im
+              u1 = 2.*v(i,jm,k)*dti/(dy(i,jm)+dy(i,jmm1))
+              if ( u1 <= 0. ) then
+                uf(i,jm,k) = t(i,jm,k)-u1*(tbn(i,k)-t(i,jm,k))
+                vf(i,jm,k) = s(i,jm,k)-u1*(sbn(i,k)-s(i,jm,k))
+              else
+                uf(i,jm,k) = t(i,jm,k)-u1*(t(i,jm,k)-t(i,jmm1,k))
+                vf(i,jm,k) = s(i,jm,k)-u1*(s(i,jm,k)-s(i,jmm1,k))
+                if ( k/=1 .and. k/=kbm1 ) then
+                  wm = .5*(w(i,jmm1,k)+w(i,jmm1,k+1))*dti
+     $                /((zz(k-1)-zz(k+1))*dt(i,jmm1))
+                  uf(i,jm,k) = uf(i,jm,k)
+     &                        -wm*(t(i,jmm1,k-1)-t(i,jmm1,k+1))
+                  vf(i,jm,k) = vf(i,jm,k)
+     &                        -wm*(s(i,jmm1,k-1)-s(i,jmm1,k+1))
+                end if
+              end if
+            end do
+          end do
 
-      if(nfn.gt.3) then  !east FRZ needs at least 4 pts !lyo:20110224:alu:stcc:
-      do k=1,kbm1; do i=1,im; do j=1,nfn
-      jj=jm-j+1
-      uf(i,jj,k)=uf(i,jj,k)*(1.-frz(i,jj))+(tobn(i,j,k)*frz(i,jj))
-      vf(i,jj,k)=vf(i,jj,k)*(1.-frz(i,jj))+(sobn(i,j,k)*frz(i,jj))
-      enddo;enddo;enddo
-      end if !if(nfn.gt.3) then..
+          if ( nfn > 3 ) then  !east FRZ needs at least 4 pts !lyo:20110224:alu:stcc:
+            do k=1,kbm1
+              do i=1,im
+                do j=1,nfn
+                  jj=jm-j+1
+                  uf(i,jj,k) = uf(i,jj,k)*(1.-frz(i,jj))
+     &                        +(tobn(i,j,k)*frz(i,jj))
+                  vf(i,jj,k) = vf(i,jj,k)*(1.-frz(i,jj))
+     &                        +(sobn(i,j,k)*frz(i,jj))
+                end do
+              end do
+            end do
+          end if !if(nfn.gt.3) then..
 
-      end if !endif north
+        end if !endif north
 !
 !    south
-      if(n_south.eq.-1) then
+        if ( n_south == -1 ) then
 
-      do k=1,kbm1
-      do i=1,im
-      u1=2.*v(i,2,k)*dti/(dy(i,1)+dy(i,2))
-      if(u1.ge.0.) then
-      uf(i,1,k)=t(i,1,k)-u1*(t(i,1,k)-tbs(i,k))
-      vf(i,1,k)=s(i,1,k)-u1*(s(i,1,k)-sbs(i,k))
-      else
-      uf(i,1,k)=t(i,1,k)-u1*(t(i,2,k)-t(i,1,k))
-      vf(i,1,k)=s(i,1,k)-u1*(s(i,2,k)-s(i,1,k))
-      if(k.ne.1.and.k.ne.kbm1) then
-      wm=.5*(w(i,2,k)+w(i,2,k+1))*dti
-     $   /((zz(k-1)-zz(k+1))*dt(i,2))
-      uf(i,1,k)=uf(i,1,k)-wm*(t(i,2,k-1)-t(i,2,k+1))
-      vf(i,1,k)=vf(i,1,k)-wm*(s(i,2,k-1)-s(i,2,k+1))
-      end if
-      end if !endif u1
-      enddo  !enddo i
-      enddo  !enddo k
+          do k=1,kbm1
+            do i=1,im
+              u1 = 2.*v(i,2,k)*dti/(dy(i,1)+dy(i,2))
+              if ( u1 >= 0. ) then
+                uf(i,1,k) = t(i,1,k)-u1*(t(i,1,k)-tbs(i,k))
+                vf(i,1,k) = s(i,1,k)-u1*(s(i,1,k)-sbs(i,k))
+              else
+                uf(i,1,k) = t(i,1,k)-u1*(t(i,2,k)-t(i,1,k))
+                vf(i,1,k) = s(i,1,k)-u1*(s(i,2,k)-s(i,1,k))
+                if ( k/=1 .and. k/=kbm1 ) then
+                  wm = .5*(w(i,2,k)+w(i,2,k+1))*dti
+     $                /((zz(k-1)-zz(k+1))*dt(i,2))
+                  uf(i,1,k) = uf(i,1,k)-wm*(t(i,2,k-1)-t(i,2,k+1))
+                  vf(i,1,k) = vf(i,1,k)-wm*(s(i,2,k-1)-s(i,2,k+1))
+                end if
+              end if
+            end do
+          end do
 
-      if(nfs.gt.3) then  !east FRZ needs at least 4 pts !lyo:20110224:alu:stcc:
-      do k=1,kbm1; do i=1,im; do j=1,nfs
-      uf(i,j,k)=(uf(i,j,k)*(1.-frz(i,j)))+(tobs(i,j,k)*frz(i,j))
-      vf(i,j,k)=(vf(i,j,k)*(1.-frz(i,j)))+(sobs(i,j,k)*frz(i,j))
-      enddo;enddo;enddo
-      end if !if(nfs.gt.3) then..
+          if ( nfs > 3 ) then  !east FRZ needs at least 4 pts !lyo:20110224:alu:stcc:
+            do k=1,kbm1
+              do i=1,im
+                do j=1,nfs
+                  uf(i,j,k) = (uf(i,j,k)*(1.-frz(i,j)))
+     &                       +(tobs(i,j,k)*frz(i,j))
+                  vf(i,j,k) = (vf(i,j,k)*(1.-frz(i,j)))
+     &                       +(sobs(i,j,k)*frz(i,j))
+                end do
+              end do
+            end do
+          end if !if(nfs.gt.3) then..
 
-      end if !endif south
-!
-        if (iperx.ne.0) then !alu:stcc:iperx
+        end if !endif south
+
+        if ( iperx /= 0 ) then !alu:stcc:iperx
           call xperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
           call xperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
-        endif
-!
-        if (ipery.ne.0) then !lyo:scs1d:add yperi*:ipery:
+        end if
+
+        if ( ipery /= 0 ) then !lyo:scs1d:add yperi*:ipery:
           call yperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
           call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
-        endif
-!
-         do k=1,kbm1
-            do j=1,jm
-               do i=1,im
-                  uf(i,j,k)=uf(i,j,k)*fsm(i,j)
-                  vf(i,j,k)=vf(i,j,k)*fsm(i,j)
-               end do
+        end if
+
+        do k=1,kbm1
+          do j=1,jm
+            do i=1,im
+              uf(i,j,k) = uf(i,j,k)*fsm(i,j)
+              vf(i,j,k) = vf(i,j,k)*fsm(i,j)
             end do
-         end do
+          end do
+        end do
 
         return
 
-      else if(idx.eq.5) then
+      elseif ( idx == 5 ) then
 
 ! vertical velocity boundary conditions
 
-        if (iperx.ne.0) then !alu:stcc:iperx
-         call xperi3d_mpi(w(:,:,1:kbm1),im,jm,kbm1)
-        endif
+        if ( iperx /= 0 ) then !alu:stcc:iperx
+          call xperi3d_mpi(w(:,:,1:kbm1),im,jm,kbm1)
+        end if
 
-        if (ipery.ne.0) then !lyo:scs1d:add yperi*:ipery:
-         call yperi3d_mpi(w(:,:,1:kbm1),im,jm,kbm1)
-        endif
+        if ( ipery /= 0 ) then !lyo:scs1d:add yperi*:ipery:
+          call yperi3d_mpi(w(:,:,1:kbm1),im,jm,kbm1)
+        end if
 
         do k=1,kbm1
           do j=1,jm
@@ -2319,127 +2453,137 @@
 
         return
 
-      else if(idx.eq.6) then
+      elseif ( idx == 6 ) then
 
 ! q2 and q2l boundary conditions
 
 ! east
-       if(n_east.eq.-1) then
+        if ( n_east == -1 ) then
 
-         do k=1,kb
-           do j=1,jm
-              u1=2.*u(im,j,k)*dti/(dx(im,j)+dx(imm1,j))
-              if(u1.le.0.) then
-                uf(im,j,k)=q2(im,j,k)-u1*(small-q2(im,j,k))
-                vf(im,j,k)=q2l(im,j,k)-u1*(small-q2l(im,j,k))
+          do k=1,kb
+            do j=1,jm
+              u1 = 2.*u(im,j,k)*dti/(dx(im,j)+dx(imm1,j))
+              if ( u1 <= 0. ) then
+                uf(im,j,k) = q2(im,j,k)-u1*(small-q2(im,j,k))
+                vf(im,j,k) = q2l(im,j,k)-u1*(small-q2l(im,j,k))
               else
-                uf(im,j,k)=q2(im,j,k)-u1*(q2(im,j,k)-q2(imm1,j,k))
-                vf(im,j,k)=q2l(im,j,k)-u1*(q2l(im,j,k)-q2l(imm1,j,k))
-              endif
-           enddo
-         enddo
+                uf(im,j,k) = q2(im,j,k)-u1*(q2(im,j,k)-q2(imm1,j,k))
+                vf(im,j,k) = q2l(im,j,k)-u1*(q2l(im,j,k)-q2l(imm1,j,k))
+              end if
+            end do
+          end do
 
-       end if
+        end if
 
 ! west
-       if(n_west.eq.-1) then
+        if ( n_west == -1 ) then
 
-         do k=1,kb
-           do j=1,jm
-              u1=2.*u(2,j,k)*dti/(dx(1,j)+dx(2,j))
-              if(u1.ge.0.) then
-                uf(1,j,k)=q2(1,j,k)-u1*(q2(1,j,k)-small)
-                vf(1,j,k)=q2l(1,j,k)-u1*(q2l(1,j,k)-small)
+          do k=1,kb
+            do j=1,jm
+              u1 = 2.*u(2,j,k)*dti/(dx(1,j)+dx(2,j))
+              if ( u1 >= 0. ) then
+                uf(1,j,k) = q2(1,j,k)-u1*(q2(1,j,k)-small)
+                vf(1,j,k) = q2l(1,j,k)-u1*(q2l(1,j,k)-small)
               else
-                uf(1,j,k)=q2(1,j,k)-u1*(q2(2,j,k)-q2(1,j,k))
-                vf(1,j,k)=q2l(1,j,k)-u1*(q2l(2,j,k)-q2l(1,j,k))
-              endif
-           enddo
-         enddo
+                uf(1,j,k) = q2(1,j,k)-u1*(q2(2,j,k)-q2(1,j,k))
+                vf(1,j,k) = q2l(1,j,k)-u1*(q2l(2,j,k)-q2l(1,j,k))
+              end if
+            end do
+          end do
 
-       end if
+        end if
 
 ! north
-       if(n_north.eq.-1) then
+        if ( n_north == -1 ) then
 
-         do k=1,kb
-           do i=1,im
-              u1=2.*v(i,jm,k)*dti/(dy(i,jm)+dy(i,jmm1))
-              if(u1.le.0.) then
-                uf(i,jm,k)=q2(i,jm,k)-u1*(small-q2(i,jm,k))
-                vf(i,jm,k)=q2l(i,jm,k)-u1*(small-q2l(i,jm,k))
+          do k=1,kb
+            do i=1,im
+              u1 = 2.*v(i,jm,k)*dti/(dy(i,jm)+dy(i,jmm1))
+              if ( u1 <= 0. ) then
+                uf(i,jm,k) = q2(i,jm,k)-u1*(small-q2(i,jm,k))
+                vf(i,jm,k) = q2l(i,jm,k)-u1*(small-q2l(i,jm,k))
               else
-                uf(i,jm,k)=q2(i,jm,k)-u1*(q2(i,jm,k)-q2(i,jmm1,k))
-                vf(i,jm,k)=q2l(i,jm,k)-u1*(q2l(i,jm,k)-q2l(i,jmm1,k))
-              endif
-           enddo
-         end do
+                uf(i,jm,k) = q2(i,jm,k)-u1*(q2(i,jm,k)-q2(i,jmm1,k))
+                vf(i,jm,k) = q2l(i,jm,k)-u1*(q2l(i,jm,k)-q2l(i,jmm1,k))
+              end if
+            end do
+          end do
 
-       endif
+        end if
 
 ! south
-       if(n_south.eq.-1) then
+        if ( n_south == -1 ) then
 
-         do k=1,kb
-           do i=1,im
-              u1=2.*v(i,2,k)*dti/(dy(i,1)+dy(i,2))
-              if(u1.ge.0.) then
-                uf(i,1,k)=q2(i,1,k)-u1*(q2(i,1,k)-small)
-                vf(i,1,k)=q2l(i,1,k)-u1*(q2l(i,1,k)-small)
+          do k=1,kb
+            do i=1,im
+              u1 = 2.*v(i,2,k)*dti/(dy(i,1)+dy(i,2))
+              if ( u1 >= 0. ) then
+                uf(i,1,k) = q2(i,1,k)-u1*(q2(i,1,k)-small)
+                vf(i,1,k) = q2l(i,1,k)-u1*(q2l(i,1,k)-small)
               else
-                uf(i,1,k)=q2(i,1,k)-u1*(q2(i,2,k)-q2(i,1,k))
-                vf(i,1,k)=q2l(i,1,k)-u1*(q2l(i,2,k)-q2l(i,1,k))
-              endif
-           enddo
-         enddo
+                uf(i,1,k) = q2(i,1,k)-u1*(q2(i,2,k)-q2(i,1,k))
+                vf(i,1,k) = q2l(i,1,k)-u1*(q2l(i,2,k)-q2l(i,1,k))
+              end if
+            end do
+          end do
 
-       end if
-!
-        if (iperx.ne.0) then !alu:stcc:iperx
-         call xperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-         call xperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
-         call xperi3d_mpi(kh(:,:,1:kbm1),im,jm,kbm1)
-         call xperi3d_mpi(km(:,:,1:kbm1),im,jm,kbm1)
-         call xperi3d_mpi(kq(:,:,1:kbm1),im,jm,kbm1)
-         call xperi3d_mpi(l(:,:,1:kbm1),im,jm,kbm1)
-        endif
+        end if
 
-        if (ipery.ne.0) then !lyo:scs1d:add yperi*:ipery:
-         call yperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-         call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
-         call yperi3d_mpi(kh(:,:,1:kbm1),im,jm,kbm1)
-         call yperi3d_mpi(km(:,:,1:kbm1),im,jm,kbm1)
-         call yperi3d_mpi(kq(:,:,1:kbm1),im,jm,kbm1)
-         call yperi3d_mpi(l(:,:,1:kbm1),im,jm,kbm1)
-        endif
+        if ( iperx /= 0 ) then !alu:stcc:iperx
+          call xperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
+          call xperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+          call xperi3d_mpi(kh(:,:,1:kbm1),im,jm,kbm1)
+          call xperi3d_mpi(km(:,:,1:kbm1),im,jm,kbm1)
+          call xperi3d_mpi(kq(:,:,1:kbm1),im,jm,kbm1)
+          call xperi3d_mpi(l(:,:,1:kbm1),im,jm,kbm1)
+        end if
+
+        if ( ipery /= 0 ) then !lyo:scs1d:add yperi*:ipery:
+          call yperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
+          call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+          call yperi3d_mpi(kh(:,:,1:kbm1),im,jm,kbm1)
+          call yperi3d_mpi(km(:,:,1:kbm1),im,jm,kbm1)
+          call yperi3d_mpi(kq(:,:,1:kbm1),im,jm,kbm1)
+          call yperi3d_mpi(l(:,:,1:kbm1),im,jm,kbm1)
+        end if
 
         do k=1,kb
           do j=1,jm
             do i=1,im
-              uf(i,j,k)=uf(i,j,k)*fsm(i,j)
-              vf(i,j,k)=vf(i,j,k)*fsm(i,j)
+              uf(i,j,k) = uf(i,j,k)*fsm(i,j)
+              vf(i,j,k) = vf(i,j,k)*fsm(i,j)
             end do
           end do
         end do
 
         return
 
-      endif
+      end if
 
       end
-!_______________________________________________________________________
+
+!______________________________________________________________________
+!
       subroutine xperi2d_mpi(wrk,nx,ny) !lyo:20110224:alu:stcc:
-! doing periodic bc in x
-! pass from east to west and also pass from west to east
+!----------------------------------------------------------------------
+!  Doing periodic bc in x.
+!  Pass from east to west and also pass from west to east.
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: im_global, im_local, my_task
+     &                     , n_east, n_west, POM_COMM
+      use mpi
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer nx,ny
-      real(kind=rk) wrk(nx,ny)
+
+      integer , intent(in   ) :: nx,ny
+      real(rk), intent(inout) :: wrk(nx,ny)
+
       integer j,ierr,nproc_x
       integer dest_task,sour_task
       integer istatus(mpi_status_size)
-      real(kind=rk) sendbuf(ny),recvbuf(ny)
+      real(rk) sendbuf(ny),recvbuf(ny)
 
 ! determine the number of processors in x
       if(mod(im_global-2,im_local-2).eq.0) then
@@ -2465,13 +2609,14 @@
          do j=1,ny
            sendbuf(j)=wrk(nx-2,j)
          end do
-         call mpi_send(sendbuf,ny,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+! TODO: change MPI_REAL to MPI_RK and move the whole subroutine to parallel_mpi.f
+         call mpi_send(sendbuf,ny,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
 
        !first time to recieve
-         call mpi_recv(recvbuf,ny,mpi_real,sour_task,sour_task,
-     $                pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,ny,MPI_REAL,sour_task,sour_task,
+     $                POM_COMM,istatus,ierr)
          do j=1,ny
           wrk(nx,j)=recvbuf(j)
          end do
@@ -2480,8 +2625,8 @@
          do j=1,ny
            sendbuf(j)=wrk(nx-1,j)
          end do
-         call mpi_send(sendbuf,ny,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+         call mpi_send(sendbuf,ny,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
       endif !if(n_east.eq.-1)
 
@@ -2491,8 +2636,8 @@
         dest_task=my_task+nproc_x-1
 
         ! first time to recieve
-         call mpi_recv(recvbuf,ny,mpi_real,sour_task,sour_task,
-     $                pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,ny,MPI_REAL,sour_task,sour_task,
+     $                POM_COMM,istatus,ierr)
          do j=1,ny
            wrk(1,j)=recvbuf(j)
          end do
@@ -2502,12 +2647,12 @@
          do j=1,ny
            sendbuf(j)=wrk(3,j)
          end do
-         call mpi_send(sendbuf,ny,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+         call mpi_send(sendbuf,ny,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
         ! second time to recieve
-         call mpi_recv(recvbuf,ny,mpi_real,sour_task,sour_task,
-     $                pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,ny,MPI_REAL,sour_task,sour_task,
+     $                POM_COMM,istatus,ierr)
 
 
          do j=1,ny
@@ -2521,20 +2666,29 @@
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine xperi3d_mpi(wrk,nx,ny,nz) !lyo:20110224:alu:stcc:
-! doing periodic bc in x
-! pass from east to west and also pass from west to east
+!----------------------------------------------------------------------
+!  Doing periodic bc in x.
+!  Pass from east to west and also pass from west to east.
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: im_global, im_local, my_task
+     &                     , n_east, n_west, POM_COMM
+      use mpi
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer nx,ny,nz
-      real(kind=rk) wrk(nx,ny,nz)
+
+      integer , intent(in   ) :: nx,ny,nz
+      real(rk), intent(inout) :: wrk(nx,ny,nz)
+
       integer i,j,k
       integer ierr,nproc_x
       integer dest_task,sour_task
       integer istatus(mpi_status_size)
-      real(kind=rk) sendbuf(ny*nz),recvbuf(ny*nz)
+      real(rk) sendbuf(ny*nz),recvbuf(ny*nz)
 
 
 
@@ -2565,12 +2719,12 @@ C  !The most east sudomains
            sendbuf(i)=wrk(nx-2,j,k)
           end do
          end do
-         call mpi_send(sendbuf,ny*nz,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+         call mpi_send(sendbuf,ny*nz,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
         ! first time to recieve
-         call mpi_recv(recvbuf,ny*nz,mpi_real,sour_task,sour_task,
-     $                 pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,ny*nz,MPI_REAL,sour_task,sour_task,
+     $                 POM_COMM,istatus,ierr)
          do k=1,nz
           do j=1,ny
            i=j+(k-1)*ny
@@ -2585,8 +2739,8 @@ C  !The most east sudomains
            sendbuf(i)=wrk(nx-1,j,k)
           end do
          end do
-         call mpi_send(sendbuf,ny*nz,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+         call mpi_send(sendbuf,ny*nz,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
       endif!if(n_east.eq.-1)
 
@@ -2596,8 +2750,8 @@ C  !The most west sudomains
        dest_task=my_task+nproc_x-1
 
         ! first time to recieve
-         call mpi_recv(recvbuf,ny*nz,mpi_real,sour_task,sour_task,
-     $                pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,ny*nz,MPI_REAL,sour_task,sour_task,
+     $                POM_COMM,istatus,ierr)
          do k=1,nz
           do j=1,ny
            i=j+(k-1)*ny
@@ -2613,12 +2767,12 @@ C  !The most west sudomains
            sendbuf(i)=wrk(3,j,k)
           end do
          end do
-         call mpi_send(sendbuf,ny*nz,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+         call mpi_send(sendbuf,ny*nz,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
         ! second time to recieve
-         call mpi_recv(recvbuf,ny*nz,mpi_real,sour_task,sour_task,
-     $                pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,ny*nz,MPI_REAL,sour_task,sour_task,
+     $                POM_COMM,istatus,ierr)
          do k=1,nz
           do j=1,ny
            i=j+(k-1)*ny
@@ -2637,9 +2791,13 @@ C  !The most west sudomains
       subroutine yperi2d_mpi(wrk,nx,ny)
 ! doing periodic bc in y
 ! pass from north to south and also pass from south to north
+      use glob_config, only: rk
+      use glob_domain, only: jm_global, jm_local, my_task
+     &                     , n_north, n_south, POM_COMM
+      use mpi
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
+
       integer nx,ny
       real(kind=rk) wrk(nx,ny)
       integer i,ierr,nproc_y
@@ -2670,13 +2828,13 @@ C  !The most north sudomains
          do i=1,nx
            sendbuf(i)=wrk(i,ny-2)
          end do
-         call mpi_send(sendbuf,nx,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+         call mpi_send(sendbuf,nx,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
 
        !first time to recieve
-         call mpi_recv(recvbuf,nx,mpi_real,sour_task,sour_task,
-     $                pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,nx,MPI_REAL,sour_task,sour_task,
+     $                POM_COMM,istatus,ierr)
          do i=1,nx
           wrk(i,ny)=recvbuf(i)
          end do
@@ -2685,8 +2843,8 @@ C  !The most north sudomains
          do i=1,nx
            sendbuf(i)=wrk(i,ny-1)
          end do
-         call mpi_send(sendbuf,nx,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+         call mpi_send(sendbuf,nx,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
       endif !if(n_north.eq.-1)
 
@@ -2696,8 +2854,8 @@ C  !The most south sudomains
         dest_task=my_task+nproc_y-1
 
         ! first time to recieve
-         call mpi_recv(recvbuf,nx,mpi_real,sour_task,sour_task,
-     $                pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,nx,MPI_REAL,sour_task,sour_task,
+     $                POM_COMM,istatus,ierr)
          do i=1,nx
            wrk(i,1)=recvbuf(i)
          end do
@@ -2707,12 +2865,12 @@ C  !The most south sudomains
          do i=1,nx
            sendbuf(i)=wrk(i,3)
          end do
-         call mpi_send(sendbuf,nx,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+         call mpi_send(sendbuf,nx,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
         ! second time to recieve
-         call mpi_recv(recvbuf,nx,mpi_real,sour_task,sour_task,
-     $                pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,nx,MPI_REAL,sour_task,sour_task,
+     $                POM_COMM,istatus,ierr)
 
 
          do i=1,nx
@@ -2729,9 +2887,13 @@ C  !The most south sudomains
       subroutine yperi3d_mpi(wrk,nx,ny,nz)
 ! doing periodic bc in y
 ! pass from north to south and also pass from south to north
+      use glob_config, only: rk
+      use glob_domain, only: jm_global, jm_local, my_task
+     &                     , n_north, n_south, POM_COMM
+      use mpi
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
+
       integer nx,ny,nz
       real(kind=rk) wrk(nx,ny,nz)
       integer i,j,k
@@ -2769,12 +2931,12 @@ C  !The most north sudomains
            sendbuf(j)=wrk(i,ny-2,k)
           end do
          end do
-         call mpi_send(sendbuf,nx*nz,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+         call mpi_send(sendbuf,nx*nz,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
         ! first time to recieve
-         call mpi_recv(recvbuf,nx*nz,mpi_real,sour_task,sour_task,
-     $                 pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,nx*nz,MPI_REAL,sour_task,sour_task,
+     $                 POM_COMM,istatus,ierr)
          do k=1,nz
           do i=1,nx
            j=i+(k-1)*nx
@@ -2789,8 +2951,8 @@ C  !The most north sudomains
            sendbuf(j)=wrk(i,ny-1,k)
           end do
          end do
-         call mpi_send(sendbuf,nx*nz,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+         call mpi_send(sendbuf,nx*nz,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
       endif!if(n_north.eq.-1)
 
@@ -2800,8 +2962,8 @@ C  !The most south sudomains
        dest_task=my_task+nproc_y-1
 
         ! first time to recieve
-         call mpi_recv(recvbuf,nx*nz,mpi_real,sour_task,sour_task,
-     $                pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,nx*nz,MPI_REAL,sour_task,sour_task,
+     $                POM_COMM,istatus,ierr)
          do k=1,nz
           do i=1,nx
            j=i+(k-1)*nx
@@ -2817,12 +2979,12 @@ C  !The most south sudomains
            sendbuf(j)=wrk(i,3,k)
           end do
          end do
-         call mpi_send(sendbuf,nx*nz,mpi_real,dest_task,my_task,
-     $                   pom_comm,ierr)
+         call mpi_send(sendbuf,nx*nz,MPI_REAL,dest_task,my_task,
+     $                   POM_COMM,ierr)
 
         ! second time to recieve
-         call mpi_recv(recvbuf,nx*nz,mpi_real,sour_task,sour_task,
-     $                pom_comm,istatus,ierr)
+         call mpi_recv(recvbuf,nx*nz,MPI_REAL,sour_task,sour_task,
+     $                POM_COMM,istatus,ierr)
          do k=1,nz
           do i=1,nx
            j=i+(k-1)*nx
@@ -2836,24 +2998,35 @@ C  !The most south sudomains
 
       return
       end
-!_______________________________________________________________________
+!______________________________________________________________________
 !lyo:scs1d:add yperi*:ipery:end:
 !lyo:pac10:beg:
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine bcond_nwatl(idx)
+!----------------------------------------------------------------------
 ! boundary conditions for the Mid-Atlantic Bight/NWAtl model.
 ! only the eastern boundary is open.
 ! annual mean uabe is specified (2-d velocity b.c.).
 ! radiation b.c. for 3-d uv,and advection b.c. for 3-d ts.
+!______________________________________________________________________
 
-      use river, only : totq
+      use bry
+      use glob_bry
+      use glob_config, only: calc_tide, ntide, rk
+      use glob_const , only: grav, pi, small
+      use glob_domain
+      use glob_grid  , only: dx, dy, dum, dvm, fsm, h
+      use glob_ocean , only: elf, s, t, u, uaf, uf, vaf, vf, w
+      use glob_time  , only: dti, ramp, time
+      use river      , only: totq
 
       implicit none
-      include 'pom.h'
-      integer idx
+
+      integer, intent(in) :: idx
       integer i,j,k
       real(kind=rk) ga,u1
-      real(kind=rk) hmax
+!      real(kind=rk) hmax
       real(kind=rk) dum_area(jm), dum_flow(jm)
       real(kind=rk) sum_area, sum_flow, mean_uabe, uriv
       real(kind=rk) rdisp,rad_param,ome(6),ramt(6),phi0(6)   !fhx:tide
@@ -2906,7 +3079,7 @@ C  !The most south sudomains
          call psum_mpi( dum_flow, jm, sum_flow )
 
 
-         if ( my_task == master_task ) then
+         if ( is_master ) then
 
 !     mean u-velocity at the eastern boundary.
 
@@ -2973,7 +3146,7 @@ C  !The most south sudomains
 
          end if
 
-!         if ( my_task == master_task ) print*, mean_uabe, uriv
+!         if ( is_master ) print*, mean_uabe, uriv
 
          do j=1,jm
             do i=1,im
@@ -3109,14 +3282,28 @@ C  !The most south sudomains
       endif
 
       end
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine bcond0(idx)
-! apply open boundary conditions
-! closed boundary conditions are automatically enabled through
+!----------------------------------------------------------------------
+!  Apply open boundary conditions.
+!  Closed boundary conditions are automatically enabled through
 ! specification of the masks, dum, dvm and fsm, in which case the open
-! boundary conditions, included below, will be overwritten
+! boundary conditions, included below, will be overwritten.
+!______________________________________________________________________
+
+      use bry
+      use glob_bry
+      use glob_config, only: rk
+      use glob_const , only: grav, pi, small
+      use glob_grid  , only: dum, dvm, dx, dy, fsm, h, zz
+      use glob_domain
+      use glob_ocean , only: dt, el, elf, q2, q2l, s, t
+     &                     , u, uaf, uf, v, va, vaf, vf, w
+
+      use glob_time  , only: dte, dti, ramp, time
       implicit none
-      include 'pom.h'
+
       integer idx
       integer i,j,k
       real(kind=rk) u1,wm,gae
@@ -3401,13 +3588,24 @@ C  !The most south sudomains
 
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine bcondorl(idx)
-! this is an optional subroutine replacing  bcond and using Orlanski's
+!----------------------------------------------------------------------
+!  This is an optional subroutine replacing  bcond and using Orlanski's
 ! scheme (J. Comp. Phys. 21, 251-269, 1976), specialized for the
-! seamount problem
+! seamount problem.
+!______________________________________________________________________
+
+      use bry
+      use glob_config, only: rk
+      use glob_domain
+      use glob_grid  , only: dum, dvm, fsm
+      use glob_ocean , only: elf, s, sb, t, tb
+     &                     , u, ua, ub, uab, uaf, uf, vaf, vf, w
+
       implicit none
-      include 'pom.h'
+
       integer idx
       real(kind=rk) cl,denom
       integer i,j,k
@@ -3518,8 +3716,8 @@ C  !The most south sudomains
         do k=1,kbm1
           do j=1,jm
             ! east
-            if(n_east.eq.-1) then
               ube(j,k)=ub(im,j,k)
+            if(n_east.eq.-1) then
               denom=(uf(im-1,j,k)+tb(im-1,j,k)-2.*t(im-2,j,k))
               if(denom.eq.0.) denom=0.01
               cl=(tb(im-1,j,k)-uf(im-1,j,k))/denom
@@ -3614,14 +3812,24 @@ C  !The most south sudomains
 
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine dens(si,ti,rhoo)
-! calculate (density-1000.)/rhoref.
+!----------------------------------------------------------------------
+!  Calculate (density-1000.)/rhoref.
 ! see: Mellor, G.L., 1991, J. Atmos. Oceanic Tech., 609-611
-! note: if pressure is not used in dens, buoyancy term (boygr) in
-! subroutine profq must be changed (see note in subroutine profq)
+!  NOTE: if pressure is not used in dens, buoyancy term (boygr) in
+! subroutine profq must be changed (see note in subroutine profq.)
+!______________________________________________________________________
+
+      use glob_config, only: rhoref, rk, sbias, tbias
+      use glob_const , only: grav
+      use glob_domain, only: im, jm, kb, kbm1
+      use glob_grid  , only: fsm, zz
+      use glob_ocean , only: d
+
       implicit none
-      include 'pom.h'
+
       real(kind=rk) si(im,jm,kb),ti(im,jm,kb),rhoo(im,jm,kb)
       integer i,j,k
       real(kind=rk) cr,p,rhor,sr,tr,tr2,tr3,tr4
@@ -3661,43 +3869,56 @@ C  !The most south sudomains
       end do
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine profq(sm,sh,dh,cc)
-! solve for q2 (twice the turbulent kinetic energy), q2l (q2 x turbulent
-! length scale), km (vertical kinematic viscosity) and kh (vertical
-! kinematic diffusivity), using a simplified version of the level 2 1/2
-! model of Mellor and Yamada (1982)
-! in this version, the Craig-Banner sub-model whereby breaking wave tke
-! is injected into the surface is included. However, we use an
+!----------------------------------------------------------------------
+!  Solve for q2 (twice the turbulent kinetic energy),
+! q2l (q2 x turbulent length scale), km (vertical kinematic viscosity)
+! and kh (vertical kinematic diffusivity), using a simplified version 
+! of the level 2 1/2 model of Mellor and Yamada (1982).
+!  In this version, the Craig-Banner sub-model whereby breaking
+! wave tke is injected into the surface is included. However, we use an
 ! analytical solution to the near surface tke equation to solve for q2
-! at the surface giving the same result as C-B diffusion. The new scheme
-! is simpler and more robust than the latter scheme
+! at the surface giving the same result as C-B diffusion. The new
+! scheme is simpler and more robust than the latter scheme.
+!______________________________________________________________________
+
+      use glob_atmos , only: wusurf, wvsurf
+      use glob_config, only: rhoref, rk, sbias, tbias, umol
+      use glob_const , only: grav, kappa, small
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+     &                     , n_east, n_north, n_south, n_west
+      use glob_grid  , only: dzz, dz, fsm, h, z, zz
+      use glob_ocean , only: a, c, dtef, ee, etf, gg, kh, km, kq, l
+     &                     , q2, q2b, q2lb, rho, s, t
+     &                     , u, uf, v, vf, wubot, wvbot
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
-      real(kind=rk) sm(im,jm,kb),sh(im,jm,kb),cc(im,jm,kb)
-      real(kind=rk) gh(im,jm,kb),boygr(im,jm,kb),dh(im,jm),stf(im,jm,kb)
-      real(kind=rk) prod(im,jm,kb)
-      real(kind=rk) a1,a2,b1,b2,c1
-      real(kind=rk) coef1,coef2,coef3,coef4,coef5
-      real(kind=rk) const1,e1,e2,ghc
-      real(kind=rk) p,sef,sp,tp
-      real(kind=rk) l0(im,jm)
-      real(kind=rk) cbcnst,surfl,shiw
-      real(kind=rk) utau2
-      integer i,j,k,ki
+
+      real(rk), dimension(im,jm,kb), intent(out) :: cc, sh, sm
+      real(rk), dimension(im,jm   ), intent(out) :: dh
+
+      real(rk), dimension(im,jm,kb) :: boygr, gh, prod, stf
+      real(rk), dimension(im,jm   ) :: l0
+      real(rk)    a1,    a2,    b1,    b2,    c1
+     &       , coef1, coef2, coef3, coef4, coef5
+     &       ,const1,    e1,    e2,   ghc
+     &       ,     p,   sef,    sp,    tp
+     &       ,cbcnst, surfl,  shiw
+     &       , utau2
+      integer i, j, k, ki
 
       data a1,b1,a2,b2,c1/0.92,16.6,0.74,10.1,0.08/
       data e1/1.8/,e2/1.33/
       data sef/1./
       data cbcnst/100./surfl/2.e5/shiw/0.0/
 
-      do j=1,jm
-        do i=1,im
-          dh(i,j)=h(i,j)+etf(i,j)
-        end do
-      end do
+      dh = h + etf
 
       do k=2,kbm1
         do j=1,jm
@@ -3986,19 +4207,32 @@ C  !The most south sudomains
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine proft(f,wfsurf,fsurf,nbc,dh)
-! solves for vertical diffusion of temperature and salinity using method
-! described by Richmeyer and Morton (1967)
-! note: wfsurf and swrad are negative values when water column is
-! warming or salt is being added
+!----------------------------------------------------------------------
+!  Solves for vertical diffusion of temperature and salinity using
+! method described by Richmeyer and Morton (1967).
+!  NOTE: wfsurf and swrad are negative values when water column is
+! warming or salt is being added.
+!______________________________________________________________________
+
+      use glob_atmos , only: swrad
+      use glob_config, only: ntp, rk, umol
+      use glob_domain, only: im, jm, kb, kbm1, kbm2
+      use glob_grid  , only: dz, dzz, h, z
+      use glob_ocean , only: a, c, ee, etf, gg, kh
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
-      real(kind=rk) f(im,jm,kb),wfsurf(im,jm)
-      real(kind=rk) fsurf(im,jm),dh(im,jm)
-      integer nbc
-      real(kind=rk) rad(im,jm,kb),r(5),ad1(5),ad2(5)
-      integer i,j,k,ki
+
+      real(rk), dimension(im,jm,kb), intent(inout) :: f
+      real(rk), dimension(im,jm   ), intent(in   ) :: fsurf, wfsurf
+      real(rk), dimension(im,jm   ), intent(  out) :: dh
+      integer                      , intent(in   ) :: nbc
+
+      real(rk) rad(im,jm,kb), r(5), ad1(5), ad2(5)
+      integer i, j, k, ki
 
 ! irradiance parameters after Paulson and Simpson (1977)
 !       ntp               1      2       3       4       5
@@ -4020,11 +4254,7 @@ C  !The most south sudomains
 
 ! the following section solves the equation
 !     dti2*(kh*f')'-f=-fb
-      do j=1,jm
-        do i=1,im
-          dh(i,j)=h(i,j)+etf(i,j)
-        end do
-      end do
+      dh = h + etf
 
       do k=2,kbm1
         do j=1,jm
@@ -4040,15 +4270,9 @@ C  !The most south sudomains
 
 ! calculate penetrative radiation. At the bottom any unattenuated
 ! radiation is deposited in the bottom layer
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            rad(i,j,k)=0.
-          end do
-        end do
-      end do
+      rad = 0.
 
-      if(nbc.eq.2.or.nbc.eq.4) then
+      if ( nbc == 2 .or. nbc == 4 ) then
         do k=1,kbm1
           do j=1,jm
             do i=1,im
@@ -4061,7 +4285,7 @@ C  !The most south sudomains
       endif
 
 
-      if(nbc.eq.1) then
+      if ( nbc == 1 ) then
 
         do j=1,jm
           do i=1,im
@@ -4072,7 +4296,7 @@ C  !The most south sudomains
         end do
 
 
-      else if(nbc.eq.2) then
+      elseif ( nbc == 2 ) then
 
         do j=1,jm
           do i=1,im
@@ -4085,17 +4309,12 @@ C  !The most south sudomains
         end do
 
 
-      else if(nbc.eq.3.or.nbc.eq.4) then
+      elseif ( nbc == 3 .or. nbc == 4) then
 
-        do j=1,jm
-          do i=1,im
-            ee(i,j,1)=0.
-            gg(i,j,1)=fsurf(i,j)
-          end do
-        end do
+        ee(:,:,1) = 0.
+        gg(:,:,1) = fsurf
 
-
-      endif
+      end if
 
       do k=2,kbm2
         do j=1,jm
@@ -4126,22 +4345,43 @@ C  !The most south sudomains
         do j=1,jm
           do i=1,im
           f(i,j,ki)=(ee(i,j,ki)*f(i,j,ki+1)+gg(i,j,ki))
+              if (isnan(f(i,j,ki))) then
+                print *, "[ PROFT ]"
+                print *, " ee: ", ee(i,j,ki)
+                print *, " f+: ", f(i,j,ki+1)
+                print *, " gg: ", gg(i,j,ki)
+                print *, " sw: ", swrad(i,j)
+                print *, " wf: ", wfsurf(i,j)
+                stop
+              end if
           end do
         end do
       end do
 
 
-
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine profu
-! solves for vertical diffusion of x-momentum using method described by
-! Richmeyer and Morton (1967)
-! note: wusurf has the opposite sign to the wind speed
+!----------------------------------------------------------------------
+!  Solves for vertical diffusion of x-momentum using method described
+! by Richmeyer and Morton (1967).
+!  NOTE: wusurf has the opposite sign to the wind speed.
+!______________________________________________________________________
+
+      use glob_atmos , only: wusurf
+      use glob_config, only: rk, umol
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1, kbm2
+      use glob_grid  , only: dum, dz, dzz, h
+      use glob_ocean , only: a, c, cbc, ee, etf, gg, km, tps
+     &                     , ub, uf, vb, wubot
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
+
       real(kind=rk) dh(im,jm)
       integer i,j,k,ki
 
@@ -4229,13 +4469,25 @@ C  !The most south sudomains
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine profv
-! solves for vertical diffusion of x-momentum using method described by
-! Richmeyer and Morton (1967)
-! note: wvsurf has the opposite sign to the wind speed
+!----------------------------------------------------------------------
+!  Solves for vertical diffusion of x-momentum using method described
+! by Richmeyer and Morton (1967).
+!  NOTE: wvsurf has the opposite sign to the wind speed.
+!______________________________________________________________________
+
+      use glob_atmos , only: wvsurf
+      use glob_config, only: rk, umol
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1, kbm2
+      use glob_grid  , only: dvm, dz, dzz, h
+      use glob_ocean , only: a, c, cbc, ee, etf, gg, km, tps
+     &                     , vb, ub, vf, wvbot
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
+
       real(kind=rk) dh(im,jm)
       integer i,j,k,ki
 
@@ -4323,16 +4575,28 @@ C  !The most south sudomains
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine smol_adif(xmassflux,ymassflux,zwflux,ff)
-! calculate the antidiffusive velocity used to reduce the numerical
-! diffusion associated with the upstream differencing scheme
-! this is based on a subroutine of Gianmaria Sannino (Inter-university
+!----------------------------------------------------------------------
+!  Calculate the antidiffusive velocity used to reduce the numerical
+! diffusion associated with the upstream differencing scheme.
+!  This is based on a subroutine of Gianmaria Sannino (Inter-university
 ! Computing Consortium, Rome, Italy) and Vincenzo Artale (Italian
-! National Agency for New Technology and Environment, Rome, Italy)
+! National Agency for New Technology and Environment, Rome, Italy).
+!______________________________________________________________________
+
+      use glob_config, only: rk, sw
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+      use glob_grid  , only: aru, arv, dzz, fsm
+      use glob_ocean , only: dt
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
-      real(kind=rk),dimension(im,jm,kb) :: ff,xmassflux,ymassflux,zwflux
+
+      real(rk), dimension(im,jm,kb), intent(inout) :: ff, xmassflux,
+     &                                                ymassflux, zwflux
+
       real(kind=rk) mol,abs_1,abs_2
       real(kind=rk) value_min,epsilon
       real(kind=rk) udx,u2dt,vdy,v2dt,wdz,w2dt
@@ -4351,7 +4615,7 @@ C  !The most south sudomains
 ! recalculate mass fluxes with antidiffusion velocity
 !      rewind(40+my_task)
 !      write(40+my_task,*) dt, xmassflux
-!      if ( my_task==master_task ) print *, "=== ",iext," ==="
+!      if ( is_master ) print *, "=== ",iext," ==="
 !      print '(i1,x,a2,x,2(e14.7,x,2(i3,";")))', my_task, "dt"
 !     &       , minval(dt, fsm/=0.), minloc(dt, fsm/=0.)
 !     &       , maxval(dt), maxloc(dt)
@@ -4434,16 +4698,23 @@ C  !The most south sudomains
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine smol_adifC(xmassflux,ymassflux,cf)
-! calculate the antidiffusive velocity used to reduce the numerical
-! diffusion associated with the upstream differencing scheme
-! this is based on a subroutine of Gianmaria Sannino (Inter-university
-! Computing Consortium, Rome, Italy) and Vincenzo Artale (Italian
-! National Agency for New Technology and Environment, Rome, Italy)
+!----------------------------------------------------------------------
+! This is a 2D modification of `smol_adif` for sea-ice concentration.
+!______________________________________________________________________
+
+      use glob_config, only: rk, sw
+      use glob_domain, only: im, imm1, jm, jmm1, kb
+      use glob_grid  , only: aru, arv, fsm
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
-      real(kind=rk),dimension(im,jm) :: cf,xmassflux,ymassflux
+
+      real(rk), dimension(im,jm), intent(inout) :: cf
+     &                                           , xmassflux, ymassflux
+
       real(kind=rk) mol,abs_1,abs_2
       real(kind=rk) value_min,epsilon
       real(kind=rk) udx,u2dt,vdy,v2dt
@@ -4494,12 +4765,24 @@ C  !The most south sudomains
 
       return
       end
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine vertvl(xflux,yflux)
-! calculates vertical velocity
+!----------------------------------------------------------------------
+!  Calculates vertical velocity.
+!______________________________________________________________________
+
+      use glob_atmos , only: vfluxb, vfluxf
+      use glob_config, only: rk
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+      use glob_grid  , only: dx, dy, dz
+      use glob_ocean , only: dt, etb, etf, u, v, w
+      use glob_time  , only: dti2
+
       implicit none
-      include 'pom.h'
-      real(kind=rk) xflux(im,jm,kb),yflux(im,jm,kb)
+
+      real(rk), dimension(im,jm,kb), intent(out) :: xflux, yflux
+
       integer i,j,k
 
 ! reestablish boundary conditions

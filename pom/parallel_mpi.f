@@ -2,112 +2,142 @@
 
 ! subroutines for communicating between processors using MPI
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine initialize_mpi
-! set up MPI execution environment and define the POM communicator
+!----------------------------------------------------------------------
+!  Set up MPI execution environment and define the POM communicator
+!______________________________________________________________________
+
+      use glob_domain, only: error_status, is_master, master_task
+     &                     , my_task     , POM_COMM , POM_COMM_COARSE
+      use mpi        , only: mpi_comm_rank, mpi_init, MPI_COMM_WORLD
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
+
       integer ierr
+
 ! initiate MPI environment
       call mpi_init(ierr)
+
 ! determine processor rank
-      call mpi_comm_rank(mpi_comm_world,my_task,ierr)
-      pom_comm=mpi_comm_world
-      pom_comm_coarse=mpi_comm_world
-      master_task=0
-      error_status=0
+      call mpi_comm_rank(MPI_COMM_WORLD,my_task,ierr)
+
+      POM_COMM        = MPI_COMM_WORLD
+      POM_COMM_COARSE = MPI_COMM_WORLD
+      master_task  = 0
+      error_status = 0
+
+      is_master = ( my_task == master_task )
+
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine finalize_mpi
-! terminate the MPI execution environment
+!----------------------------------------------------------------------
+!  Terminate the MPI execution environment
+!______________________________________________________________________
+
+      use mpi, only: mpi_finalize
+
       implicit none
-      include 'mpif.h'
+
       integer ierr
+
 ! terminate MPI environment
       call mpi_finalize(ierr)
+
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine distribute_mpi
-! distribute the model domain across processors
+!----------------------------------------------------------------------
+!  Distribute the model domain across processors
+!______________________________________________________________________
+
+      use glob_domain
+      use mpi        , only: mpi_comm_size
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
+
       integer i,j,ierr,nproc,nproc_x,nproc_y
 
 ! determine the number of processors
-      call mpi_comm_size(pom_comm,nproc,ierr)
+      call mpi_comm_size(POM_COMM,nproc,ierr)
 
 ! check number of processors
-      if(nproc.ne.n_proc) then
-        error_status=1
-        if(my_task.eq.master_task) write(*,'(a,i3''/=''i3//a)')
-     $   'Incompatible number of processors',nproc,n_proc
-     $  ,'POM terminated with error'
+      if ( nproc /= n_proc ) then
+        error_status = 1
+        if ( is_master ) print '(a,i3''/=''i3//a)'
+     &  , 'Incompatible number of processors',nproc,n_proc
+     &  , 'POM terminated with error'
         call finalize_mpi
         stop
       end if
 
 ! determine the number of processors in x
-      if(mod(im_global-2,im_local-2).eq.0) then
-        nproc_x=(im_global-2)/(im_local-2)
+      if ( mod(im_global-2,im_local-2) == 0 ) then
+        nproc_x = (im_global-2)/(im_local-2)
       else
-        nproc_x=(im_global-2)/(im_local-2) + 1
+        nproc_x = (im_global-2)/(im_local-2) + 1
       end if
 
 ! determine the number of processors in y
-      if(mod(jm_global-2,jm_local-2).eq.0) then
-        nproc_y=(jm_global-2)/(jm_local-2)
+      if ( mod(jm_global-2,jm_local-2) == 0 ) then
+        nproc_y = (jm_global-2)/(jm_local-2)
       else
-        nproc_y=(jm_global-2)/(jm_local-2) + 1
+        nproc_y = (jm_global-2)/(jm_local-2) + 1
       end if
 
 ! check local size
-      if(nproc_x*nproc_y.gt.n_proc) then
-        error_status=1
-        if(my_task.eq.master_task) write(*,'(a//a)')
-     $   'im_local or jm_local is too low','POM terminated with error'
+      if ( nproc_x*nproc_y > n_proc ) then
+        error_status = 1
+        if ( is_master ) print '(a//a)'
+     &  , 'im_local or jm_local is too low'
+     &  , 'POM terminated with error'
         call finalize_mpi
         stop
       end if
 
 ! detemine global and local indices
-      im=im_local
+      im = im_local
       do i=1,im_local
-        i_global(i)=0
+        i_global(i) = 0
       end do
       do i=1,im
-        i_global(i)=i+mod(my_task,nproc_x)*(im-2)
-        if(i_global(i).gt.im_global) then
-          im=i-1
-          i_global(i)=0
+        i_global(i) = i + mod(my_task,nproc_x)*(im-2)
+        if ( i_global(i) > im_global ) then
+          im = i-1
+          i_global(i) = 0
           cycle
         end if
       end do
-      imm1=im-1
-      imm2=im-2
+      imm1 = im-1
+      imm2 = im-2
 
-      jm=jm_local
+      jm = jm_local
       do j=1,jm_local
-        j_global(j)=0
+        j_global(j) = 0
       end do
       do j=1,jm
-        j_global(j)=j+(my_task/nproc_x)*(jm-2)
-        if(j_global(j).gt.jm_global) then
-          jm=j-1
-          j_global(j)=0
+        j_global(j) = j + (my_task/nproc_x)*(jm-2)
+        if ( j_global(j) > jm_global ) then
+          jm = j-1
+          j_global(j) = 0
           cycle
         end if
       end do
-      jmm1=jm-1
-      jmm2=jm-2
+      jmm1 = jm-1
+      jmm2 = jm-2
 
-      kbm1=kb-1
-      kbm2=kb-2
+      kbm1 = kb-1
+      kbm2 = kb-2
 ! detemine global and local indices for coarse grids
 !      im_coarse=im_local_coarse
 !      do i=1,im_local_coarse
@@ -143,75 +173,82 @@
 !!      kbm2=kb-2
 
 ! determine the neighbors (tasks)
-      n_east=my_task+1
-      n_west=my_task-1
-      n_north=my_task+nproc_x
-      n_south=my_task-nproc_x
+      n_east  = my_task + 1
+      n_west  = my_task - 1
+      n_north = my_task + nproc_x
+      n_south = my_task - nproc_x
 
-      if(mod(n_east,nproc_x).eq.0) n_east=-1
-      if(mod(n_west+1,nproc_x).eq.0) n_west=-1
-      if(n_north/nproc_x.eq.nproc_y) n_north=-1
-      if((n_south+nproc_x)/nproc_x.eq.0) n_south=-1
+      if ( mod(n_east  ,nproc_x) == 0 ) n_east = -1
+      if ( mod(n_west+1,nproc_x) == 0 ) n_west = -1
+      if (  n_north         /nproc_x == nproc_y ) n_north = -1
+      if ( (n_south+nproc_x)/nproc_x == 0       ) n_south = -1
 
       return
       end
-!_______________________________________________________________________
+!______________________________________________________________________
 !fhx: a new distribute mpi for wind and assim data to do the interpolation.2010/12/06
+!
       subroutine distribute_mpi_coarse
-! distribute the wind/assim data domain across processors
+!----------------------------------------------------------------------
+!  Distribute the wind/assim data domain across processors
+!______________________________________________________________________
+
+      use glob_domain
+      use mpi        , only: mpi_comm_size
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
+
       integer i,j,ierr,nproc,nproc_x,nproc_y
 
 ! determine the number of processors
-      call mpi_comm_size(pom_comm_coarse,nproc,ierr)
+      call mpi_comm_size(POM_COMM_coarse,nproc,ierr)
 
 ! check number of processors
-      if(nproc.ne.n_proc) then
-        error_status=1
-        if(my_task.eq.master_task) write(*,'(a//a)')
-     $'Incompatible number of processors C','POM terminated with error'
+      if ( nproc /= n_proc ) then
+        error_status = 1
+        if ( is_master ) print '(a//a)'
+     &  , 'Incompatible number of processors for coarse grid'
+     &  , 'POM terminated with error'
         call finalize_mpi
         stop
       end if
 
 ! determine the number of processors in x
-      if(mod(im_global_coarse-2,im_local_coarse-2).eq.0) then
-        nproc_x=(im_global_coarse-2)/(im_local_coarse-2)
+      if ( mod(im_global_coarse-2,im_local_coarse-2) == 0 ) then
+        nproc_x = (im_global_coarse-2)/(im_local_coarse-2)
       else
-        nproc_x=(im_global_coarse-2)/(im_local_coarse-2) + 1
+        nproc_x = (im_global_coarse-2)/(im_local_coarse-2) + 1
       end if
 
 ! determine the number of processors in y
-      if(mod(jm_global_coarse-2,jm_local_coarse-2).eq.0) then
-        nproc_y=(jm_global_coarse-2)/(jm_local_coarse-2)
+      if ( mod(jm_global_coarse-2,jm_local_coarse-2) == 0 ) then
+        nproc_y = (jm_global_coarse-2)/(jm_local_coarse-2)
       else
-        nproc_y=(jm_global_coarse-2)/(jm_local_coarse-2) + 1
+        nproc_y = (jm_global_coarse-2)/(jm_local_coarse-2) + 1
       end if
 
 ! check local size
-      if(nproc_x*nproc_y.gt.n_proc) then
-        error_status=1
-        if(my_task.eq.master_task) write(*,'(a//a)')
-     $   'im_local_coarse or jm_local_coarse is too low',
-     $   'POM terminated with error'
+      if ( nproc_x*nproc_y > n_proc ) then
+        error_status = 1
+        if ( is_master ) print '(a//a)'
+     &  , 'im_local_coarse or jm_local_coarse is too low'
+     &  , 'POM terminated with error'
         call finalize_mpi
         stop
       end if
 
 
 ! detemine global and local indices for coarse grids
-      im_coarse=im_local_coarse
+      im_coarse = im_local_coarse
       do i=1,im_local_coarse
-        i_global_coarse(i)=0
+        i_global_coarse(i) = 0
       end do
 
       do i=1,im_coarse
-        i_global_coarse(i)=i+mod(my_task,nproc_x)*(im_coarse-2)
-        if(i_global_coarse(i).gt.im_global_coarse) then
-          im_coarse=i-1
-          i_global_coarse(i)=0
+        i_global_coarse(i) = i + mod(my_task,nproc_x)*(im_coarse-2)
+        if ( i_global_coarse(i) > im_global_coarse ) then
+          im_coarse = i-1
+          i_global_coarse(i) = 0
           cycle
         end if
       end do
@@ -231,15 +268,15 @@
 !      imm1=im-1
 !      imm2=im-2
 
-      jm_coarse=jm_local_coarse
+      jm_coarse = jm_local_coarse
       do j=1,jm_local_coarse
-        j_global_coarse(j)=0
+        j_global_coarse(j) = 0
       end do
       do j=1,jm_coarse
-        j_global_coarse(j)=j+(my_task/nproc_x)*(jm_coarse-2)
-        if(j_global_coarse(j).gt.jm_global_coarse) then
-          jm_coarse=j-1
-          j_global_coarse(j)=0
+        j_global_coarse(j) = j + (my_task/nproc_x)*(jm_coarse-2)
+        if ( j_global_coarse(j) > jm_global_coarse ) then
+          jm_coarse = j-1
+          j_global_coarse(j) = 0
           cycle
         end if
       end do
@@ -252,501 +289,591 @@
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine sum0i_mpi(work,to)
-! send sum of WORK to node TO
+!----------------------------------------------------------------------
+!  Send integer sum of WORK to node TO
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: POM_COMM
+      use mpi        , only: mpi_reduce
+     &                     , MPI_INTEGER, MPI_SUM
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer to
-      integer work,tmp
-      integer ierr
+
+      integer, intent(in)    :: to
+      integer, intent(inout) :: work
+
+      integer ierr, tmp
 
 ! sum data
-      call mpi_reduce(work,tmp,1,mpi_integer,mpi_sum,to,pom_comm,ierr)
+      call mpi_reduce(work,tmp,1,MPI_INTEGER,MPI_SUM,to,POM_COMM,ierr)
       work=tmp
+
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine sum0d_mpi(work,to)
-! send sum of WORK to node TO
+!----------------------------------------------------------------------
+!  Send real sum of WORK to node TO
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: POM_COMM
+      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_REAL
+     &                     , mpi_reduce          , MPI_SUM
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer to
-      real(kind=rk) work,tmp
-      integer ierr
-      integer mpi_rk
+
+      integer , intent(in)    :: to
+      real(rk), intent(inout) :: work
+
+      integer  ierr, MPI_RK
+      real(rk) tmp
       
-      if (rk==8) then
-        mpi_rk = mpi_double_precision
+      if ( rk == 8 ) then
+        MPI_RK = MPI_DOUBLE_PRECISION
       else
-        mpi_rk = mpi_real
+        MPI_RK = MPI_REAL
       end if
 ! sum data
-      call mpi_reduce(work,tmp,1,mpi_rk,mpi_sum,to,pom_comm,ierr)
-!      call mpi_reduce(work,tmp,1,mpi_double_precision
-!     $     ,mpi_sum,to,pom_comm,ierr)
+      call mpi_reduce(work,tmp,1,MPI_RK,MPI_SUM,to,POM_COMM,ierr)
       work=tmp
+
       return
+
       end
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine max0d_mpi(work,to)
-! send sum of WORK to node TO
+!----------------------------------------------------------------------
+!  Send real maximum of WORK to node TO
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: POM_COMM
+      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_MAX
+     &                     , MPI_REAL            , mpi_reduce
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer to
-      real(kind=rk) work,tmp
-      integer ierr
-      integer mpi_rk
+
+      integer , intent(in)    :: to
+      real(rk), intent(inout) :: work
+
+      integer  ierr, MPI_RK
+      real(rk) tmp
       
-      if (rk==8) then
-        mpi_rk = mpi_double_precision
+      if ( rk == 8 ) then
+        MPI_RK = MPI_DOUBLE_PRECISION
       else
-        mpi_rk = mpi_real
+        MPI_RK = MPI_REAL
       end if
 ! get max
-      call mpi_reduce(work,tmp,1,mpi_rk,mpi_max,to,pom_comm,ierr)
+      call mpi_reduce(work,tmp,1,MPI_RK,MPI_MAX,to,POM_COMM,ierr)
       work=tmp
+
       return
+
       end
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine bcast0i_mpi(work,from)
-! send WORK to all nodes from node FROM
+!----------------------------------------------------------------------
+!  Send integer WORK to all nodes from node FROM
+!______________________________________________________________________
+
+      use glob_domain, only: POM_COMM
+      use mpi        , only: mpi_bcast, MPI_INTEGER
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer from
-      integer work
+
+      integer, intent(in)    :: from
+      integer, intent(inout) :: work
+
       integer ierr
 
 ! broadcast data
-      call mpi_bcast(work,1,mpi_integer,from,pom_comm,ierr)
+      call mpi_bcast(work,1,MPI_INTEGER,from,POM_COMM,ierr)
+
       return
+
       end
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine bcast0d_mpi(work,from)
-! send WORK to all nodes from node FROM
+!----------------------------------------------------------------------
+!  Send real WORK to all nodes from node FROM
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: POM_COMM
+      use mpi        , only: mpi_bcast
+     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer from
-      real(kind=rk) work
-      integer ierr
-      integer mpi_rk
+
+      integer , intent(in)    :: from
+      real(rk), intent(inout) :: work
+
+      integer ierr, MPI_RK
       
-      if (rk==8) then
-        mpi_rk = mpi_double_precision
+      if ( rk == 8 ) then
+        MPI_RK = MPI_DOUBLE_PRECISION
       else
-        mpi_rk = mpi_real
+        MPI_RK = MPI_REAL
       end if
 ! broadcast data
-      call mpi_bcast(work,1,mpi_rk,from,pom_comm,ierr)
-!      call mpi_bcast(work,1,mpi_double_precision,from,pom_comm,ierr)
+      call mpi_bcast(work,1,MPI_RK,from,POM_COMM,ierr)
+
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine exchange2d_mpi(work,nx,ny)
-! exchange ghost cells around 2d local grids
-! one band at a time
+!----------------------------------------------------------------------
+!  Exchange ghost cells around 2D local grids
+!  One band at a time
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: my_task, n_east, n_north
+     &                     , n_south, n_west, POM_COMM
+      use mpi        , only: mpi_recv            , mpi_send
+     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+     &                     , MPI_STATUS_SIZE
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer nx,ny
-      real(kind=rk) work(nx,ny)
-      integer i,j
-      integer ierr
-      integer istatus(mpi_status_size)
-      real(kind=rk) send_east(ny),recv_west(ny)
-      real(kind=rk) send_west(ny),recv_east(ny)
-      real(kind=rk) send_north(nx),recv_south(nx)
-      real(kind=rk) send_south(nx),recv_north(nx)
-      integer mpi_rk
+
+      integer , intent(in)    :: nx,ny
+      real(rk), intent(inout) :: work(nx,ny)
+
+      integer  i,j
+      integer  ierr, MPI_RK
+      integer  istatus(MPI_STATUS_SIZE)
+      real(rk) send_east(ny) ,recv_west(ny)
+      real(rk) send_west(ny) ,recv_east(ny)
+      real(rk) send_north(nx),recv_south(nx)
+      real(rk) send_south(nx),recv_north(nx)
       
-      if (rk==8) then
-        mpi_rk = mpi_double_precision
+      if ( rk == 8 ) then
+        MPI_RK = MPI_DOUBLE_PRECISION
       else
-        mpi_rk = mpi_real
+        MPI_RK = MPI_REAL
       end if
 
 ! send ghost cell data to the east
-      if(n_east.ne.-1) then
+      if ( n_east /= -1 ) then
         do j=1,ny
-          send_east(j)=work(nx-1,j)
+          send_east(j) = work(nx-1,j)
         end do
-        call mpi_send(send_east,ny,mpi_rk,n_east,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_east,ny,MPI_RK,n_east,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the west
-      if(n_west.ne.-1) then
-        call mpi_recv(recv_west,ny,mpi_rk,n_west,n_west,
-     $                pom_comm,istatus,ierr)
+      if ( n_west /= -1 ) then
+        call mpi_recv(recv_west,ny,MPI_RK,n_west,n_west,
+     &                POM_COMM,istatus,ierr)
         do j=1,ny
-          work(1,j)=recv_west(j)
+          work(1,j) = recv_west(j)
         end do
       end if
 
 ! send ghost cell data to the west
-      if(n_west.ne.-1) then
+      if ( n_west /= -1 ) then
         do j=1,ny
-          send_west(j)=work(2,j)
+          send_west(j) = work(2,j)
         end do
-        call mpi_send(send_west,ny,mpi_rk,n_west,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_west,ny,MPI_RK,n_west,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the east
-      if(n_east.ne.-1) then
-        call mpi_recv(recv_east,ny,mpi_rk,n_east,n_east,
-     $                pom_comm,istatus,ierr)
+      if ( n_east /= -1 ) then
+        call mpi_recv(recv_east,ny,MPI_RK,n_east,n_east,
+     &                POM_COMM,istatus,ierr)
         do j=1,ny
-          work(nx,j)=recv_east(j)
+          work(nx,j) = recv_east(j)
         end do
       end if
 
 ! send ghost cell data to the north
-      if(n_north.ne.-1) then
+      if ( n_north /= -1 ) then
         do i=1,nx
-          send_north(i)=work(i,ny-1)
+          send_north(i) = work(i,ny-1)
         end do
-        call mpi_send(send_north,nx,mpi_rk,n_north,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_north,nx,MPI_RK,n_north,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the south
-      if(n_south.ne.-1) then
-        call mpi_recv(recv_south,nx,mpi_rk,n_south,n_south,
-     $                pom_comm,istatus,ierr)
+      if ( n_south /= -1 ) then
+        call mpi_recv(recv_south,nx,MPI_RK,n_south,n_south,
+     &                POM_COMM,istatus,ierr)
         do i=1,nx
-          work(i,1)=recv_south(i)
+          work(i,1) = recv_south(i)
         end do
       end if
 
 ! send ghost cell data to the south
-      if(n_south.ne.-1) then
+      if ( n_south /= -1 ) then
         do i=1,nx
-          send_south(i)=work(i,2)
+          send_south(i) = work(i,2)
         end do
-        call mpi_send(send_south,nx,mpi_rk,n_south,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_south,nx,MPI_RK,n_south,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the north
-      if(n_north.ne.-1) then
-        call mpi_recv(recv_north,nx,mpi_rk,n_north,n_north,
-     $                pom_comm,istatus,ierr)
+      if ( n_north /= -1 ) then
+        call mpi_recv(recv_north,nx,MPI_RK,n_north,n_north,
+     &                POM_COMM,istatus,ierr)
         do i=1,nx
-          work(i,ny)=recv_north(i)
+          work(i,ny) = recv_north(i)
         end do
       end if
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine exchange3d_mpi(work,nx,ny,nz)
-! exchange ghost cells around 3d local grids
-! one band at a time
+!----------------------------------------------------------------------
+!  Exchange ghost cells around 3D local grids
+!  One band at a time
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: my_task, n_east, n_north
+     &                     , n_south, n_west, POM_COMM
+      use mpi        , only: mpi_recv, mpi_send
+     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+     &                     , MPI_STATUS_SIZE
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer nx,ny,nz
-      real(kind=rk) work(nx,ny,nz)
-      integer i,j,k
-      integer ierr
-      integer istatus(mpi_status_size)
-      real(kind=rk) send_east(ny*nz),recv_west(ny*nz)
-      real(kind=rk) send_west(ny*nz),recv_east(ny*nz)
-      real(kind=rk) send_north(nx*nz),recv_south(nx*nz)
-      real(kind=rk) send_south(nx*nz),recv_north(nx*nz)
-      integer mpi_rk
+
+      integer , intent(in)    :: nx,ny,nz
+      real(rk), intent(inout) :: work(nx,ny,nz)
+
+      integer  i,j,k
+      integer  ierr, MPI_RK
+      integer  istatus(MPI_STATUS_SIZE)
+      real(rk) send_east(ny*nz) ,recv_west(ny*nz)
+      real(rk) send_west(ny*nz) ,recv_east(ny*nz)
+      real(rk) send_north(nx*nz),recv_south(nx*nz)
+      real(rk) send_south(nx*nz),recv_north(nx*nz)
       
-      if (rk==8) then
-        mpi_rk = mpi_double_precision
+      if ( rk == 8 ) then
+        MPI_RK = MPI_DOUBLE_PRECISION
       else
-        mpi_rk = mpi_real
+        MPI_RK = MPI_REAL
       end if
 
 ! send ghost cell data to the east
-      if(n_east.ne.-1) then
+      if ( n_east /= -1 ) then
         do k=1,nz
           do j=1,ny
-            i=j+(k-1)*ny
-            send_east(i)=work(nx-1,j,k)
+            i = j + (k-1)*ny
+            send_east(i) = work(nx-1,j,k)
           end do
         end do
-        call mpi_send(send_east,ny*nz,mpi_rk,n_east,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_east,ny*nz,MPI_RK,n_east,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the west
-      if(n_west.ne.-1) then
-        call mpi_recv(recv_west,ny*nz,mpi_rk,n_west,n_west,
-     $                pom_comm,istatus,ierr)
+      if ( n_west /= -1 ) then
+        call mpi_recv(recv_west,ny*nz,MPI_RK,n_west,n_west,
+     &                POM_COMM,istatus,ierr)
         do k=1,nz
           do j=1,ny
-            i=j+(k-1)*ny
-            work(1,j,k)=recv_west(i)
+            i = j + (k-1)*ny
+            work(1,j,k) = recv_west(i)
           end do
         end do
       end if
 
 ! send ghost cell data to the west
-      if(n_west.ne.-1) then
+      if ( n_west /= -1 ) then
         do k=1,nz
          do j=1,ny
-            i=j+(k-1)*ny
-            send_west(i)=work(2,j,k)
+            i = j + (k-1)*ny
+            send_west(i) = work(2,j,k)
           end do
         end do
-        call mpi_send(send_west,ny*nz,mpi_rk,n_west,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_west,ny*nz,MPI_RK,n_west,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the east
-      if(n_east.ne.-1) then
-        call mpi_recv(recv_east,ny*nz,mpi_rk,n_east,n_east,
-     $                pom_comm,istatus,ierr)
+      if ( n_east /= -1 ) then
+        call mpi_recv(recv_east,ny*nz,MPI_RK,n_east,n_east,
+     &                POM_COMM,istatus,ierr)
         do k=1,nz
          do j=1,ny
-            i=j+(k-1)*ny
-            work(nx,j,k)=recv_east(i)
+            i = j + (k-1)*ny
+            work(nx,j,k) = recv_east(i)
           end do
         end do
       end if
 
 ! send ghost cell data to the north
-      if(n_north.ne.-1) then
+      if ( n_north /= -1 ) then
         do k=1,nz
           do i=1,nx
-            j=i+(k-1)*nx
-            send_north(j)=work(i,ny-1,k)
+            j = i + (k-1)*nx
+            send_north(j) = work(i,ny-1,k)
           end do
         end do
-        call mpi_send(send_north,nx*nz,mpi_rk,n_north,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_north,nx*nz,MPI_RK,n_north,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the south
-      if(n_south.ne.-1) then
-        call mpi_recv(recv_south,nx*nz,mpi_rk,n_south,n_south,
-     $                pom_comm,istatus,ierr)
+      if ( n_south /= -1 ) then
+        call mpi_recv(recv_south,nx*nz,MPI_RK,n_south,n_south,
+     &                POM_COMM,istatus,ierr)
         do k=1,nz
           do i=1,nx
-            j=i+(k-1)*nx
-            work(i,1,k)=recv_south(j)
+            j = i + (k-1)*nx
+            work(i,1,k) = recv_south(j)
           end do
         end do
       end if
 
 ! send ghost cell data to the south
-      if(n_south.ne.-1) then
+      if ( n_south /= -1 ) then
         do k=1,nz
           do i=1,nx
-            j=i+(k-1)*nx
-            send_south(j)=work(i,2,k)
+            j = i + (k-1)*nx
+            send_south(j) = work(i,2,k)
           end do
         end do
-        call mpi_send(send_south,nx*nz,mpi_rk,n_south,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_south,nx*nz,MPI_RK,n_south,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the north
-      if(n_north.ne.-1) then
-        call mpi_recv(recv_north,nx*nz,mpi_rk,n_north,n_north,
-     $                pom_comm,istatus,ierr)
+      if ( n_north /= -1 ) then
+        call mpi_recv(recv_north,nx*nz,MPI_RK,n_north,n_north,
+     &                POM_COMM,istatus,ierr)
         do k=1,nz
           do i=1,nx
-            j=i+(k-1)*nx
-            work(i,ny,k)=recv_north(j)
+            j = i + (k-1)*nx
+            work(i,ny,k) = recv_north(j)
           end do
         end do
       end if
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine psum_mpi( work, nx, sum_out )
-! 
+!----------------------------------------------------------------------
+!  TODO: Check if this crap is even needed 
 ! ayumi 2010/6/1
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: is_master, n_proc, POM_COMM
+      use mpi        , only: MPI_DOUBLE_PRECISION, mpi_gather
+     &                     , MPI_REAL
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer nx
-      real(kind=rk), intent(in) ::  work(nx)
-      real(kind=rk), intent(out) ::  sum_out
-      real(kind=rk) buf( nx, n_proc )
-      integer i, j
-      integer ierr
-      integer mpi_rk
+
+      integer , intent(in)  :: nx
+      real(rk), intent(in)  :: work(nx)
+      real(rk), intent(out) :: sum_out
+
+      integer  i, j
+      integer  ierr, MPI_RK
+      real(rk) buf( nx, n_proc )
       
-      if (rk==8) then
-        mpi_rk = mpi_double_precision
+      if ( rk == 8 ) then
+        MPI_RK = MPI_DOUBLE_PRECISION
       else
-        mpi_rk = mpi_real
+        MPI_RK = MPI_REAL
       end if
 
-      buf = 0.0
-      sum_out = 0.0
+      buf     = 0.
+      sum_out = 0.
     
-      call mpi_gather( work,nx, mpi_rk, 
-     $                 buf, nx, mpi_rk,
-     $                 0, pom_comm, ierr )                      
+      call mpi_gather( work, nx, MPI_RK, 
+     &                 buf , nx, MPI_RK,
+     &                 0, POM_COMM, ierr )                      
 
 
-      if ( my_task == master_task ) then
-         do j = 1, n_proc
-            do i = 1, nx
-               sum_out = sum_out + buf(i,j)
-            enddo
-         enddo
-      endif
-
+      if ( is_master ) then
+        do j = 1, n_proc
+          do i = 1, nx
+            sum_out = sum_out + buf(i,j)
+          end do
+        end do
+      end if
 
       return
 
       end
-!_______________________________________________________________________
+!______________________________________________________________________
 !fhx:Toni:npg
+!
       subroutine order2d_mpi(work2,work4,nx,ny)
-! convert a 2nd order 2d matrix to special 4th order 2d matrix
+!----------------------------------------------------------------------
+!  Convert a 2nd order 2D matrix to special 4th order 2D matrix
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: my_task, n_east, n_north
+     &                     , n_south, n_west, POM_COMM
+      use mpi        , only: mpi_recv            , mpi_send
+     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+     &                     , MPI_STATUS_SIZE
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer nx,ny
-      real(kind=rk) work2(nx,ny),work4(0:nx,0:ny)
-      integer i,j
-      integer ierr
-      integer istatus(mpi_status_size)
-      real(kind=rk) send_east(ny),recv_west(ny)
-      real(kind=rk) send_north(nx),recv_south(nx)
-      integer mpi_rk
+
+      integer , intent(in)  :: nx,ny
+      real(rk), intent(in)  :: work2(nx,ny)
+      real(rk), intent(out) :: work4(0:nx,0:ny)
+
+      integer  i,j
+      integer  ierr, MPI_RK
+      integer  istatus(MPI_STATUS_SIZE)
+      real(rk) send_east(ny) ,recv_west(ny)
+      real(rk) send_north(nx),recv_south(nx)
       
-      if (rk==8) then
-        mpi_rk = mpi_double_precision
+      if ( rk == 8 ) then
+        MPI_RK = MPI_DOUBLE_PRECISION
       else
-        mpi_rk = mpi_real
+        MPI_RK = MPI_REAL
       end if
 
-      work4=0.
-      do i=1,nx
-        do j=1,ny
-          work4(i,j)=work2(i,j)
-        end do
-      end do
+      work4 = 0.
+      work4(1:nx,1:ny) = work2
 
 ! send ghost cell data to the east
-      if(n_east.ne.-1) then
+      if ( n_east /= -1 ) then
         do j=1,ny
-          send_east(j)=work2(nx-2,j)
+          send_east(j) = work2(nx-2,j)
         end do
-        call mpi_send(send_east,ny,mpi_rk,n_east,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_east,ny,MPI_RK,n_east,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the west
-      if(n_west.ne.-1) then
-        call mpi_recv(recv_west,ny,mpi_rk,n_west,n_west,
-     $                pom_comm,istatus,ierr)
+      if ( n_west /= -1 ) then
+        call mpi_recv(recv_west,ny,MPI_RK,n_west,n_west,
+     &                POM_COMM,istatus,ierr)
         do j=1,ny
-          work4(0,j)=recv_west(j)
+          work4(0,j) = recv_west(j)
         end do
       end if
 
 ! send ghost cell data to the north
-      if(n_north.ne.-1) then
+      if ( n_north /= -1 ) then
         do i=1,nx
-          send_north(i)=work2(i,ny-2)
+          send_north(i) = work2(i,ny-2)
         end do
-        call mpi_send(send_north,nx,mpi_rk,n_north,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_north,nx,MPI_RK,n_north,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the south
-      if(n_south.ne.-1) then
-        call mpi_recv(recv_south,nx,mpi_rk,n_south,n_south,
-     $                pom_comm,istatus,ierr)
+      if ( n_south /= -1 ) then
+        call mpi_recv(recv_south,nx,MPI_RK,n_south,n_south,
+     &                POM_COMM,istatus,ierr)
         do i=1,nx
-          work4(i,0)=recv_south(i)
+          work4(i,0) = recv_south(i)
         end do
       end if
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
 !fhx:Toni:npg
+!
       subroutine order3d_mpi(work2,work4,nx,ny,nz)
-! convert a 2nd order 3d matrix to special 4th order 3d matrix
+!----------------------------------------------------------------------
+!  Convert a 2nd order 3D matrix to special 4th order 3D matrix
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: my_task, n_east, n_north
+     &                     , n_south, n_west, POM_COMM
+      use mpi        , only: mpi_recv            , mpi_send
+     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+     &                     , MPI_STATUS_SIZE
+
       implicit none
-      include 'mpif.h'
-      include 'pom.h'
-      integer nx,ny,nz
-      real(kind=rk) work2(nx,ny,nz),work4(0:nx,0:ny,nz)
-      integer i,j,k
-      integer ierr
-      integer istatus(mpi_status_size)
-      real(kind=rk) send_east(ny*nz),recv_west(ny*nz)
-      real(kind=rk) send_north(nx*nz),recv_south(nx*nz)
-      integer mpi_rk
+
+      integer , intent(in)  :: nx,ny,nz
+      real(rk), intent(in)  :: work2(nx,ny,nz)
+      real(rk), intent(out) :: work4(0:nx,0:ny,nz)
+
+      integer  i,j,k
+      integer  ierr, MPI_RK
+      integer  istatus(MPI_STATUS_SIZE)
+      real(rk) send_east(ny*nz) ,recv_west(ny*nz)
+      real(rk) send_north(nx*nz),recv_south(nx*nz)
       
-      if (rk==8) then
-        mpi_rk = mpi_double_precision
+      if ( rk == 8 ) then
+        MPI_RK = MPI_DOUBLE_PRECISION
       else
-        mpi_rk = mpi_real
+        MPI_RK = MPI_REAL
       end if
 
-      work4=0.
-      do i=1,nx
-        do j=1,ny
-          do k=1,nz
-            work4(i,j,k)=work2(i,j,k)
-          end do
-        end do
-      end do
+      work4 = 0.
+      work4(1:nx,1:ny,1:nz) = work2
 
 ! send ghost cell data to the east
-      if(n_east.ne.-1) then
+      if ( n_east /= -1 ) then
         do k=1,nz
           do j=1,ny
-            i=j+(k-1)*ny
-            send_east(i)=work2(nx-2,j,k)
+            i = j + (k-1)*ny
+            send_east(i) = work2(nx-2,j,k)
           end do
         end do
-        call mpi_send(send_east,ny*nz,mpi_rk,n_east,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_east,ny*nz,MPI_RK,n_east,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the west
-      if(n_west.ne.-1) then
-        call mpi_recv(recv_west,ny*nz,mpi_rk,n_west,n_west,
-     $                pom_comm,istatus,ierr)
+      if ( n_west /= -1 ) then
+        call mpi_recv(recv_west,ny*nz,MPI_RK,n_west,n_west,
+     &                POM_COMM,istatus,ierr)
         do k=1,nz
           do j=1,ny
-            i=j+(k-1)*ny
-            work4(0,j,k)=recv_west(i)
+            i = j + (k-1)*ny
+            work4(0,j,k) = recv_west(i)
           end do
         end do
       end if
 
 ! send ghost cell data to the north
-      if(n_north.ne.-1) then
+      if ( n_north /= -1 ) then
         do k=1,nz
           do i=1,nx
-            j=i+(k-1)*nx
-            send_north(j)=work2(i,ny-2,k)
+            j = i + (k-1)*nx
+            send_north(j) = work2(i,ny-2,k)
           end do
         end do
-        call mpi_send(send_north,nx*nz,mpi_rk,n_north,my_task,
-     $                pom_comm,ierr)
+        call mpi_send(send_north,nx*nz,MPI_RK,n_north,my_task,
+     &                POM_COMM,ierr)
       end if
 ! recieve ghost cell data from the south
-      if(n_south.ne.-1) then
-        call mpi_recv(recv_south,nx*nz,mpi_rk,n_south,n_south,
-     $                pom_comm,istatus,ierr)
+      if ( n_south /= -1 ) then
+        call mpi_recv(recv_south,nx*nz,MPI_RK,n_south,n_south,
+     &                POM_COMM,istatus,ierr)
         do k=1,nz
           do i=1,nx
-            j=i+(k-1)*nx
-            work4(i,0,k)=recv_south(j)
+            j = i + (k-1)*nx
+            work4(i,0,k) = recv_south(j)
           end do
         end do
       end if
 
       return
+
       end
-
-

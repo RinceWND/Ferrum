@@ -1,12 +1,13 @@
       module uvforce
 
+      use glob_config, only: rk, sf_bf
+      use glob_domain, only: im, jm, kb, is_master
+
       implicit none
 
       private
 
       public :: uvforce_init, uvforce_main
-
-      include 'pom.h'
 
       logical, parameter :: read_transport = .true.
       integer, parameter :: n_bry = 3
@@ -22,11 +23,9 @@
 !      real(kind=rk), dimension( jm_local ) ::
 !     $     uabe_a, uabw_a, uabe_b, uabw_b
 
-      real(kind=rk), dimension( im_local, kb ) ::
+      real(kind=rk), allocatable, dimension(:,:) ::
      $     vbs_a, vbn_a, vbs_b, vbn_b
-
-      real(kind=rk), dimension( jm_local, kb ) ::
-     $     ube_a, ubw_a, ube_b, ubw_b
+     $   , ube_a, ubw_a, ube_b, ubw_b
 
       real(kind=rk), dimension( 10 ) ::
      &     trans_a, trans_b, transport
@@ -35,7 +34,7 @@
 
       integer :: mon_a, mon_b, sec_in_month, mid_in_month
       integer :: k
-      character(len=7) :: infile_a, infile_b
+      character(len=7) :: infile_b
       real(kind=rk) :: aa
 
 
@@ -46,6 +45,7 @@
 !--------------------------------------------------------------
       subroutine uvforce_init( d_in )
 
+      use glob_config, only: rk
       use module_time
 
       implicit none
@@ -53,6 +53,11 @@
 !     intent(in)
       type(date), intent(in) :: d_in
 
+! Allocate arrays
+      allocate(
+     &  vbs_a(im,kb),vbs_b(im,kb),vbn_a(im,kb),vbn_b(im,kb)
+     &, ube_a(jm,kb),ube_b(jm,kb),ubw_a(jm,kb),ubw_b(jm,kb)
+     & )
 
 !     check leap year
       if( ( mod( d_in%year, 4 ) .eq. 0
@@ -116,8 +121,7 @@
       end if
 
 
-      if ( my_task == master_task )
-     $        write(*,'(/a/)') "---------- uvforce_init."
+      if ( is_master ) print '(/a/)', "---------- uvforce_init."
 
 
       return
@@ -125,11 +129,17 @@
       end subroutine uvforce_init
 !--------------------------------------------------------------
 
-!==============================================================
-! Read & time-interpolation of U & V boundary condition
-!--------------------------------------------------------------
+!______________________________________________________________________
+!
       subroutine uvforce_main( d_in )
+!----------------------------------------------------------------------
+!  Read & time-interpolation of U & V boundary condition.
+!______________________________________________________________________
 
+      use bry        , only: uabe, ube, uabw, ubw, vabn, vbn, vabs, vbs
+      use glob_config, only: rk
+      use glob_grid  , only: dz
+      use glob_time  , only: dti
       use module_time
 
       implicit none
@@ -270,9 +280,15 @@
 
       subroutine transport_to_velocities
 
-        implicit none
+        use bry        , only: uabe, uabw, vabn, vabs
+        use glob_config, only: rk
+        use glob_domain, only: i_global, im_global, imm1
+     &                       , j_global, jm_global, jmm1
+     &                       , n_east, n_north, n_south, n_west
+        use glob_grid  , only: dum, dvm, dx, dy, h
+        use glob_ocean , only: elf
 
-        include 'pom.h'
+        implicit none
 
         integer i,j,n
         real(kind=rk) area

@@ -2,12 +2,18 @@
 
 ! advance POM
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine advance
+!----------------------------------------------------------------------
+!  Advance model a step
+!______________________________________________________________________
+
+        use glob_config, only: calc_ice, isplit
+        use glob_time  , only: iext
         use seaice
 ! advance POM 1 step in time
       implicit none
-      include 'pom.h'
 
 ! get time
       call get_time
@@ -55,11 +61,17 @@
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine get_time
-! return the model time
+!----------------------------------------------------------------------
+!  Return the model time
+!______________________________________________________________________
+
+      use glob_time, only: dti, iint, ramp, time, time0
+
       implicit none
-      include 'pom.h'
+
       time=dti*float(iint)/86400.+time0
       ramp=1.
 !      if(lramp) then
@@ -71,11 +83,20 @@
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine surface_forcing
-! set time dependent surface boundary conditions
+!----------------------------------------------------------------------
+!  Set time dependent surface boundary conditions
+!____ DOES NOTHING ____________________________________________________
+
+      use glob_atmos , only: vfluxf
+      use glob_config, only: rk, tbias
+      use glob_domain, only: im, jm
+      use glob_ocean , only: t, w
+
       implicit none
-      include 'pom.h'
+
       integer i,j
       real(kind=rk) tatm,satm
 
@@ -131,11 +152,21 @@
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine lateral_viscosity
-! set the lateral viscosity
+!----------------------------------------------------------------------
+!  Set the lateral viscosity
+!______________________________________________________________________
+
+      use glob_config, only: aam_init, horcon, mode, n1d, npg
+      use glob_domain, only: im, imm1, jm, jmm1, kbm1
+      use glob_grid  , only: dx, dy
+      use glob_misc  , only: aamfac
+      use glob_ocean , only: a, aam, c, ee, u, v
+
       implicit none
-      include 'pom.h'
+
       integer i,j,k
 ! if mode=2 then initial values of aam2d are used. If one wishes
 ! to use Smagorinsky lateral viscosity and diffusion for an
@@ -146,20 +177,20 @@
 ! calculate Smagorinsky lateral viscosity:
 ! ( hor visc = horcon*dx*dy*sqrt((du/dx)**2+(dv/dy)**2
 !                                +.5*(du/dy+dv/dx)**2) )
-      if(mode.ne.2) then
+      if ( mode /= 2 ) then
+
         call advct(a,c,ee)
 
         call pgscheme(npg)
 
 !lyo:scs1d:
-        if (n1d.ne.0) then
-        aam(:,:,:)=aam_init
+        if ( n1d /= 0 ) then
+          aam(:,:,:) = aam_init
         else
-!
-        do k=1,kbm1
-          do j=2,jmm1
-            do i=2,imm1
-              aam(i,j,k)=horcon*dx(i,j)*dy(i,j)*aamfac(i,j)       !fhx:incmix
+          do k=1,kbm1
+            do j=2,jmm1
+              do i=2,imm1
+                aam(i,j,k) = horcon*dx(i,j)*dy(i,j)*aamfac(i,j)       !fhx:incmix
      $                    *sqrt( ((u(i+1,j,k)-u(i,j,k))/dx(i,j))**2
      $                          +((v(i,j+1,k)-v(i,j,k))/dy(i,j))**2
      $                    +.5*(.25*(u(i,j+1,k)+u(i+1,j+1,k)
@@ -168,11 +199,11 @@
      $                    +.25*(v(i+1,j,k)+v(i+1,j+1,k)
      $                           -v(i-1,j,k)-v(i-1,j+1,k))
      $                    /dx(i,j)) **2)
+              end do
             end do
           end do
-        end do
 
-        endif !lyo:scs1d:
+        end if !lyo:scs1d:
 !
 ! create sponge zones
 !        do k=1,kbm1
@@ -185,58 +216,58 @@
 !        end do
 
         call exchange3d_mpi(aam(:,:,1:kbm1),im,jm,kbm1)
+
       end if
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine mode_interaction
-! form vertical averages of 3-D fields for use in external (2-D) mode
+!----------------------------------------------------------------------
+!  Form vertical averages of 3-D fields for use in external (2-D) mode
+!______________________________________________________________________
+
+      use glob_config, only: mode
+      use glob_domain, only: im, jm, kbm1
+      use glob_grid  , only: dz
+      use glob_ocean
+      use glob_time  , only: isp2i, ispi
+
       implicit none
-      include 'pom.h'
+
       integer i,j,k
 
-      if(mode.ne.2) then
+      if ( mode /= 2 ) then
 
-        do j=1,jm
-          do i=1,im
-            adx2d(i,j)=0.
-            ady2d(i,j)=0.
-            drx2d(i,j)=0.
-            dry2d(i,j)=0.
-            aam2d(i,j)=0.
-          end do
-        end do
+        adx2d = 0.
+        ady2d = 0.
+        drx2d = 0.
+        dry2d = 0.
+        aam2d = 0.
 
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              adx2d(i,j)=adx2d(i,j)+advx(i,j,k)*dz(k)
-              ady2d(i,j)=ady2d(i,j)+advy(i,j,k)*dz(k)
-              drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(k)
-              dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)*dz(k)
-              aam2d(i,j)=aam2d(i,j)+aam(i,j,k)*dz(k)
+              adx2d(i,j) = adx2d(i,j) +  advx(i,j,k)*dz(k)
+              ady2d(i,j) = ady2d(i,j) +  advy(i,j,k)*dz(k)
+              drx2d(i,j) = drx2d(i,j) + drhox(i,j,k)*dz(k)
+              dry2d(i,j) = dry2d(i,j) + drhoy(i,j,k)*dz(k)
+              aam2d(i,j) = aam2d(i,j) +   aam(i,j,k)*dz(k)
             end do
           end do
         end do
 
         call advave(tps)
 
-        do j=1,jm
-          do i=1,im
-            adx2d(i,j)=adx2d(i,j)-advua(i,j)
-            ady2d(i,j)=ady2d(i,j)-advva(i,j)
-          end do
-        end do
+        adx2d = adx2d - advua
+        ady2d = ady2d - advva
 
       end if
 
-      do j=1,jm
-        do i=1,im
-          egf(i,j)=el(i,j)*ispi
-        end do
-      end do
+      egf = el*ispi
 
       do j=1,jm
         do i=2,im
@@ -250,13 +281,27 @@
       end do
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine mode_external
-! calculate the external (2-D) mode
+!----------------------------------------------------------------------
+!  Calculate the external (2-D) mode
+!______________________________________________________________________
+
+      use glob_atmos , only: e_atmos, vfluxf, wusurf, wvsurf
+      use bry        , only: bc_vel_ext, bc_zeta
+      use glob_config, only: alpha, ispadv, isplit, smoth
+      use glob_const , only: grav
+      use glob_domain, only: im, imm1, jm, jmm1
+      use glob_grid  , only: art, aru, arv, cor, dx, dy, fsm, h
+      use glob_ocean
+      use glob_time  , only: dte, dte2, iext, isp2i, ispi
+
       implicit none
-      include 'pom.h'
+
       integer i,j
 
       do j=2,jm
@@ -279,11 +324,11 @@
         end do
       end do
 
-      call bcond(1)
+      call bc_zeta ! bcond(1)
 
       call exchange2d_mpi(elf,im,jm)
 
-      if(mod(iext,ispadv).eq.0) call advave(tps)
+      if ( mod(iext,ispadv) == 0 ) call advave(tps)
 
       do j=2,jmm1
         do i=2,im
@@ -340,58 +385,41 @@
         end do
       end do
 
-      call bcond(2)
+      call bc_vel_ext ! bcond(2)
 
       call exchange2d_mpi(uaf,im,jm)
       call exchange2d_mpi(vaf,im,jm)
 
-      if(iext.eq.(isplit-2))then
-        do j=1,jm
-          do i=1,im
-            etf(i,j)=.25*smoth*elf(i,j)
-          end do
-        end do
+      if     ( iext == (isplit-2) ) then
 
-      else if(iext.eq.(isplit-1)) then
+        etf = .25*smoth*elf
 
-        do j=1,jm
-          do i=1,im
-            etf(i,j)=etf(i,j)+.5*(1.-.5*smoth)*elf(i,j)
-          end do
-        end do
+      elseif ( iext == (isplit-1) ) then
 
-      else if(iext.eq.isplit) then
+        etf = etf + .5*(1.-.5*smoth)*elf
 
-        do j=1,jm
-          do i=1,im
-            etf(i,j)=(etf(i,j)+.5*elf(i,j))*fsm(i,j)
-          end do
-        end do
+      elseif ( iext ==  isplit    ) then
+
+        etf = ( etf + .5*elf )*fsm
 
       end if
 
 ! apply filter to remove time split
-      do j=1,jm
-        do i=1,im
-          ua(i,j)=ua(i,j)+.5*smoth*(uab(i,j)-2.*ua(i,j)+uaf(i,j))
-          va(i,j)=va(i,j)+.5*smoth*(vab(i,j)-2.*va(i,j)+vaf(i,j))
-          el(i,j)=el(i,j)+.5*smoth*(elb(i,j)-2.*el(i,j)+elf(i,j))
-          elb(i,j)=el(i,j)
-          el(i,j)=elf(i,j)
-          d(i,j)=h(i,j)+el(i,j)
-          uab(i,j)=ua(i,j)
-          ua(i,j)=uaf(i,j)
-          vab(i,j)=va(i,j)
-          va(i,j)=vaf(i,j)
-        end do
-      end do
+      ua = ua + .5*smoth*( uab - 2.*ua + uaf )
+      va = va + .5*smoth*( vab - 2.*va + vaf )
+      el = el + .5*smoth*( elb - 2.*el + elf )
+      elb = el
+      el  = elf
+      d   = h + el
+      uab = ua
+      ua  = uaf
+      vab = va
+      va  = vaf
 
-      if(iext.ne.isplit) then
-        do j=1,jm
-          do i=1,im
-            egf(i,j)=egf(i,j)+el(i,j)*ispi
-          end do
-        end do
+      if ( iext /= isplit ) then
+
+        egf = egf + el*ispi
+
         do j=1,jm
           do i=2,im
             utf(i,j)=utf(i,j)+ua(i,j)*(d(i,j)+d(i-1,j))*isp2i
@@ -402,27 +430,39 @@
             vtf(i,j)=vtf(i,j)+va(i,j)*(d(i,j)+d(i,j-1))*isp2i
           end do
         end do
-       end if
+
+      end if
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine mode_internal
-! calculate the internal (3-D) mode
-      implicit none
-      include 'pom.h'
-      integer i,j,k
-      real(kind=rk) dxr,dxl,dyt,dyb
+!----------------------------------------------------------------------
+!  Calculate the internal (3-D) mode
+!______________________________________________________________________
 
-      if((iint.ne.1.or.time0.ne.0.).and.mode.ne.2) then
+      use glob_atmos , only: vfluxb, vfluxf, wssurf, wtsurf
+      use bry        , only: bc_ts, bc_turb, bc_vel_int, bc_vel_vert
+      use glob_const , only: small
+      use glob_config, only: mode, nadv, nbcs, nbct, nread_rst
+     &                     , rk, smoth, t_lo, t_hi
+      use glob_domain
+      use glob_grid  , only: dx, dy, dz, fsm, h, zz
+      use glob_ocean
+      use glob_time
+
+      implicit none
+
+      integer i,j,k
+      real(rk) dxr,dxl,dyt,dyb
+
+      if ( (iint/=1 .or. time0/=0.) .and. mode/=2 ) then
 
 ! adjust u(z) and v(z) such that depth average of (u,v) = (ua,va)
-        do j=1,jm
-          do i=1,im
-            tps(i,j)=0.
-          end do
-        end do
+        tps = 0.
 
         do k=1,kbm1
           do j=1,jm
@@ -479,101 +519,79 @@
 ! calculate w from u, v, dt (h+et), etf and etb
         call vertvl(a,c)
 
-        call bcond(5)
+        call bc_vel_vert ! bcond(5)
 
         call exchange3d_mpi(w,im,jm,kb)
 
 ! set uf and vf to zero
-        do k=1,kb
-          do j=1,jm
-            do i=1,im
-              uf(i,j,k)=0.
-              vf(i,j,k)=0.
-            end do
-          end do
-        end do
+        uf = 0.
+        vf = 0.
 
 ! calculate q2f and q2lf using uf, vf, a and c as temporary variables
         call advq(q2b,q2,uf,a,c)
         call advq(q2lb,q2l,vf,a,c)
         call profq(a,c,tps,dtef)
 
+! an attempt to prevent underflow (DEBUG)
         where(q2l.lt..5*small) q2l = .5*small
         where(q2lb.lt..5*small) q2lb = .5*small
-        call bcond(6)
 
+        call bc_turb ! bcond(6)
 
         call exchange3d_mpi(uf(:,:,2:kbm1),im,jm,kbm2)
         call exchange3d_mpi(vf(:,:,2:kbm1),im,jm,kbm2)
 
-        do k=1,kb
-          do j=1,jm
-            do i=1,im
-              q2(i,j,k)=q2(i,j,k)
-     $                   +.5*smoth*(uf(i,j,k)+q2b(i,j,k)
-     $                                -2.*q2(i,j,k))
-              q2l(i,j,k)=q2l(i,j,k)
-     $                   +.5*smoth*(vf(i,j,k)+q2lb(i,j,k)
-     $                                -2.*q2l(i,j,k))
-              q2b(i,j,k)=q2(i,j,k)
-              q2(i,j,k)=uf(i,j,k)
-              q2lb(i,j,k)=q2l(i,j,k)
-              q2l(i,j,k)=vf(i,j,k)
-            end do
-          end do
-        end do
+        q2  = q2  + .5*smoth*( q2b  -2.*q2  + uf )
+        q2l = q2l + .5*smoth*( q2lb -2.*q2l + vf )
+        q2b = q2
+        q2  = uf
+        q2lb= q2l
+        q2l = vf
 
 
 ! calculate tf and sf using uf, vf, a and c as temporary variables
         if( mode /= 4 .and. ( iint > 2 .or. nread_rst == 1 ) ) then
-          if(nadv.eq.1) then
-!            call advt1(tb,t,tclim,uf,a,c)
-!            call advt1(sb,s,sclim,vf,a,c)
+
+          if     ( nadv == 1 ) then
+
             call advt1(tb,t,tclim,uf,a,c,'T')
             call advt1(sb,s,sclim,vf,a,c,'S')
-          else if(nadv.eq.2) then
-!            call advt2(tb,tclim,uf,a,c)
-!            call advt2(sb,sclim,vf,a,c)
+
+          elseif ( nadv == 2 ) then
+
             call advt2(tb,tclim,uf,a,c,'T')
             call advt2(sb,sclim,vf,a,c,'S')
+
           else
-            error_status=1
-            write(6,'(/''Error: invalid value for nadv'')')
-          endif
+
+            error_status = 1
+            print *, '(/''Error: invalid value for nadv'')'
+
+          end if
 
 
           call proft(uf,wtsurf,tsurf,nbct,tps)
           call proft(vf,wssurf,ssurf,nbcs,tps)
 
 
-          call bcond(4)
-          if (t_lo > -999.) then
-            where (uf<t_lo) uf = t_lo
+          call bc_ts ! bcond(4)
+          if ( t_lo > -999. ) then
+            where ( uf < t_lo ) uf = t_lo
           end if
-          if (t_hi <  999.) then
-            where (uf>t_hi) uf = t_hi
+          if ( t_hi <  999. ) then
+            where ( uf > t_hi ) uf = t_hi
           end if
 
 
           call exchange3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
           call exchange3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
 
-          do k=1,kb
-            do j=1,jm
-              do i=1,im
-                t(i,j,k)=t(i,j,k)
-     $                    +.5*smoth*(uf(i,j,k)+tb(i,j,k)
-     $                                 -2.*t(i,j,k))
-                s(i,j,k)=s(i,j,k)
-     $                    +.5*smoth*(vf(i,j,k)+sb(i,j,k)
-     $                                 -2.*s(i,j,k))
-                tb(i,j,k)=t(i,j,k)
-                t(i,j,k)=uf(i,j,k)
-                sb(i,j,k)=s(i,j,k)
-                s(i,j,k)=vf(i,j,k)
-              end do
-            end do
-          end do
+          t = t + .5*smoth*( tb -2.*t + uf )
+          s = s + .5*smoth*( sb -2.*s + vf )
+          tb = t
+          t  = uf
+          sb = s
+          s  = vf
 
           call dens(s,t,rho)
 
@@ -585,16 +603,12 @@
         call profu
         call profv
 
-        call bcond(3)
+        call bc_vel_int ! bcond(3)
 
         call exchange3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
         call exchange3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
 
-        do j=1,jm
-          do i=1,im
-            tps(i,j)=0.
-          end do
-        end do
+        tps = 0.
 
         do k=1,kbm1
           do j=1,jm
@@ -615,11 +629,7 @@
           end do
         end do
 
-        do j=1,jm
-          do i=1,im
-            tps(i,j)=0.
-          end do
-        end do
+        tps = 0.
 
         do k=1,kbm1
           do j=1,jm
@@ -640,44 +650,28 @@
           end do
         end do
 
-        do k=1,kb
-          do j=1,jm
-            do i=1,im
-              ub(i,j,k)=u(i,j,k)
-              u(i,j,k)=uf(i,j,k)
-              vb(i,j,k)=v(i,j,k)
-              v(i,j,k)=vf(i,j,k)
-            end do
-          end do
-        end do
+        ub = u
+        u  = uf
+        vb = v
+        v  = vf
 
       end if
 
-      do j=1,jm
-        do i=1,im
-          egb(i,j)=egf(i,j)
-          etb(i,j)=et(i,j)
-          et(i,j)=etf(i,j)
-          dt(i,j)=h(i,j)+et(i,j)
-          utb(i,j)=utf(i,j)
-          vtb(i,j)=vtf(i,j)
-          vfluxb(i,j)=vfluxf(i,j)
-        end do
-      end do
+      egb = egf
+      etb = et
+      et  = etf
+      dt  = h + et
+      utb = utf
+      vtb = vtf
+      vfluxb = vfluxf
 
 ! calculate real w as wr
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            wr(i,j,k)=0.
-          end do
-        end do
-      end do
+      wr = 0.
 
       do k=1,kbm1
         do j=1,jm
           do i=1,im
-            tps(i,j)=zz(k)*dt(i,j) + et(i,j)
+            tps(i,j) = zz(k)*dt(i,j) + et(i,j)
           end do
         end do
         do j=2,jmm1
@@ -722,29 +716,38 @@
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine print_section
-! print output
+!----------------------------------------------------------------------
+!  Print output
+!______________________________________________________________________
+
+      use glob_config, only: iprint, sbias, tbias, rk
+      use glob_domain
+      use glob_grid  , only: art, dz, fsm
+      use glob_ocean , only: et, dt, sb, tb
+      use glob_time
+
       implicit none
-      include 'pom.h'
-      real(kind=rk) area_tot,vol_tot,d_area,d_vol
-      real(kind=rk) elev_ave, temp_ave, salt_ave
+
+      real(rk) area_tot, vol_tot, d_vol
+      real(rk) elev_ave, temp_ave, salt_ave
       integer i,j,k
 
-      if(mod(iint,iprint).eq.0) then
+      if ( mod(iint,iprint) == 0 ) then
 
 ! print time
-        if(my_task.eq.master_task) write(6,'(/
-     $    ''**********************************************************''
+        if ( is_master ) print '(/
+     $    ''=========================================================''
      $    /''time ='',f9.4,'', iint ='',i8,'', iext ='',i8,
-     $    '', iprint ='',i8)') time,iint,iext,iprint
+     $    '', iprint ='',i8)', time,iint,iext,iprint
 
 ! check for errors
         call   sum0i_mpi(error_status,master_task)
         call bcast0i_mpi(error_status,master_task)
-        if(error_status.ne.0) then
-          if(my_task.eq.master_task) write(*,'(/a)')
-     $                                       'POM terminated with error'
+        if ( error_status /= 0 ) then
+          if ( is_master ) print *, 'POM terminated with error'
           call finalize_mpi
           stop
         end if
@@ -757,22 +760,20 @@
         elev_ave = 0.
 
         do k=1,kbm1
-           do j=1,jm
-              do i=1,im
-                 d_area   = dx(i,j) * dy(i,j)
-                 d_vol    = d_area * dt(i,j) * dz(k) * fsm(i,j)
-                 vol_tot  = vol_tot + d_vol
-                 temp_ave = temp_ave + tb(i,j,k)*d_vol
-                 salt_ave = salt_ave + sb(i,j,k)*d_vol
-              end do
-           end do
+          do j=1,jm
+            do i=1,im
+              d_vol    = art(i,j) * dt(i,j) * dz(k) * fsm(i,j)
+              vol_tot  = vol_tot + d_vol
+              temp_ave = temp_ave + tb(i,j,k)*d_vol
+              salt_ave = salt_ave + sb(i,j,k)*d_vol
+            end do
+          end do
         end do
 
         do j=1,jm
           do i=1,im
-             d_area = dx(i,j) * dy(i,j)
-             area_tot = area_tot + d_area
-             elev_ave = elev_ave + et(i,j) * d_area
+            area_tot = area_tot + art(i,j)
+            elev_ave = elev_ave + et(i,j) * art(i,j)
           end do
         end do
 
@@ -784,62 +785,82 @@
         call sum0d_mpi( area_tot, master_task )
 
 ! print averages
-        if(my_task.eq.master_task) then
+        if ( is_master ) then
 
           temp_ave = temp_ave / vol_tot
           salt_ave = salt_ave / vol_tot
           elev_ave = elev_ave / area_tot
-          write(*,'(a,e15.8,2(a,f11.8),a)')
-     $       "mean ; et = ",elev_ave," m, tb = ",
-     $       temp_ave + tbias," deg, sb = ",
-     $       salt_ave + sbias," psu"
+          print '(a,e15.8,2(a,f11.8),a)'
+     &        , "mean ; et = ", elev_ave, " m, tb = "
+     &        , temp_ave + tbias, " deg, sb = "
+     &        , salt_ave + sbias, " psu"
 
         end if
 
       end if
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine check_velocity
-! check if velocity condition is violated
+!----------------------------------------------------------------------
+!  Check if velocity condition is violated
+!______________________________________________________________________
+
+      use glob_config, only: iprint, rk, vmaxl
+      use glob_domain
+      use glob_time  , only: iext, iint, time
+      use glob_ocean , only: vaf
+
       implicit none
-      include 'pom.h'
-      real(kind=rk) vamax
-      integer i,j
-      integer imax,jmax
+
+      real(rk) vamax
+      integer  i,j
+      integer  imax,jmax
 
       vamax = 0.
 
       do j=1,jm
         do i=1,im
-          if(abs(vaf(i,j)).ge.vamax) then
-            vamax=abs(vaf(i,j))
-            imax=i
-            jmax=j
+          if ( abs(vaf(i,j)) /= vamax ) then
+            vamax = abs(vaf(i,j))
+            imax = i
+            jmax = j
           end if
         end do
       end do
 
-      if(vamax.gt.vmaxl) then
-        if (error_status.eq.0) write(*,'(/
+      if ( vamax > vmaxl ) then
+        if ( error_status == 0 ) print '(/
      $    ''Error: velocity condition violated @ processor '',i3,/
      $    ''time ='',f9.4,
      $    '', iint ='',i8,'', iext ='',i8,'', iprint ='',i8,/
-     $    ''vamax ='',e12.3,''   imax,jmax ='',2i5)')
-     $    my_task,time,iint,iext,iprint,vamax,imax,jmax
-        error_status=1
+     $    ''vamax ='',e12.3,''   imax,jmax ='',2i5)'
+     $    , my_task,time,iint,iext,iprint,vamax,imax,jmax
+        error_status = 1
       end if
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine store_mean
+!----------------------------------------------------------------------
+!  Store averages for further output (if enabled)
+!______________________________________________________________________
+
+      use glob_atmos , only: wssurf, wtsurf, wusurf, wvsurf
+      use glob_domain, only: kb
+      use glob_ocean , only: aam, cbc, elb, kh, rho, s, t, u, uab
+     &                     , v, vab, w, wubot, wvbot
+      use glob_out
 
       implicit none
-      include 'pom.h'
 
       uab_mean    = uab_mean    + uab
       vab_mean    = vab_mean    + vab
@@ -864,15 +885,24 @@
 
       return
       end
-!_______________________________________________________________________
-      subroutine store_surf_mean !fhx:20110131:add new subr. for surf mean
+
+!______________________________________________________________________
+!
+      subroutine store_surf_mean
+!----------------------------------------------------------------------
+!  Store avrages for surface output
+!______________________________________________________________________
+
+      use glob_atmos, only: uwsrf, vwsrf
+      use glob_misc , only: nums
+      use glob_ocean, only: elb, u, v
+      use glob_out
 
       implicit none
-      include 'pom.h'
 
-      usrf_mean    = usrf_mean    + u(:,:,1)
-      vsrf_mean    = vsrf_mean    + v(:,:,1)
-      elsrf_mean    = elsrf_mean    + elb
+      usrf_mean  = usrf_mean  + u(:,:,1)
+      vsrf_mean  = vsrf_mean  + v(:,:,1)
+      elsrf_mean = elsrf_mean + elb
       uwsrf_mean = uwsrf_mean + uwsrf
       vwsrf_mean = vwsrf_mean + vwsrf
 
@@ -991,12 +1021,16 @@
 !      return
 !      end
 !
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine check_nan
+!----------------------------------------------------------------------
+!  Check for NaNs present
+!______________________________________________________________________
+
+      use glob_ocean, only: s, t, u, v
 
       implicit none
-
-      include 'pom.h'
 
       call detect_nan( u, "u" )
       call detect_nan( v, "v" )
@@ -1004,53 +1038,65 @@
       call detect_nan( s, "s" )
 
       return
+
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine detect_nan( var, varname )
+!----------------------------------------------------------------------
+!  Check an array for NaNs
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: i_global, im, j_global, jm, kb
+      use glob_grid  , only: h
 
       implicit none
-      include 'pom.h'
 
       integer i, j, k, num_nan
       real(kind=rk), intent(in) :: var(im,jm,kb)
       character(len=*),intent(in)  :: varname
-!      logical isnanf
 
       num_nan = 0
 
-      do i=1,im
-         do j=1,jm
-            do k=1,kb
-               if ( isnan(var(i,j,k)) ) then
-                  print'(2a,3i4,2f12.4)',
-     $                 "detect nan : ",varname,
-     $                 i_global(i),j_global(j),k,
-     $                 var(i,j,k),h(i,j)
-                  if ( k .eq. 1 ) num_nan = num_nan + 1
-               endif
-            enddo
-         enddo
-      enddo
+      do k=1,kb
+        do j=1,jm
+          do i=1,im
+            if ( isnan(var(i,j,k)) ) then
+              print '(2a,3i4,2f12.4)'
+     &            , "detect nan : ",varname
+     &            , i_global(i), j_global(j), k
+     &            , var(i,j,k), h(i,j)
+              if ( k == 1 ) num_nan = num_nan + 1
+            end if
+          end do
+        end do
+      end do
 
-      if ( num_nan .ne. 0 ) then
-         print'(2a,2(a,i6))',
-     $        " detect_nan : ", varname,
-     $        "j_global(1) = ", j_global(1),
-     $        ",   num_nan = ", num_nan
+      if ( num_nan /= 0 ) then
+        print '(2a,2(a,i6))'
+     &      , " detect_nan : ", varname
+     &      , "j_global(1) = ", j_global(1)
+     &      , ",   num_nan = ", num_nan
 !         call finalize_mpi
-         stop
-      endif
+        stop
+      end if
 
       return
+
       end
-!_______________________________________________________________________
+
+!______________________________________________________________________
 !fhx:tide:debug
       subroutine check_nan_2d
+!----------------------------------------------------------------------
+!  Check for NaNs present in 2D
+!______________________________________________________________________
+
+      use glob_ocean, only: elf, uaf, vaf
 
       implicit none
-
-      include 'pom.h'
 
       call detect_nan_2d( uaf, "uaf" )
       call detect_nan_2d( vaf, "vaf" )
@@ -1058,13 +1104,24 @@
 
 
       return
+
       end
-!_______________________________________________________________________
+
+!______________________________________________________________________
 !fhx:tide;debug
       subroutine detect_nan_2d( var, varname )
+!----------------------------------------------------------------------
+!  Check a 2D array for NaNs
+!______________________________________________________________________
+
+      use glob_atmos
+      use glob_config, only: rk
+      use glob_domain, only: i_global, im, j_global, jm
+      use glob_grid  , only: h
+      use glob_time  , only: time
+      use glob_ocean
 
       implicit none
-      include 'pom.h'
 
       integer i, j, num_nan
       real(kind=rk), intent(in) :: var(im,jm)
@@ -1073,20 +1130,19 @@
 
       num_nan = 0
 
-      do i=1,im
-         do j=1,jm
-               if ( isnan(var(i,j)) ) then
-                  print'(2a,2i4,3f12.4)',
-     $                 "detect nan : ",varname,
-     $                 i_global(i),j_global(j),
-     $                 var(i,j),h(i,j),time
-                       num_nan = num_nan + 1
-               endif
+      do j=1,jm
+        do i=1,im
+          if ( isnan(var(i,j)) ) then
+            print '(2a,2i4,3f12.4)',
+     $            "detect nan : ",varname,
+     $            i_global(i),j_global(j),
+     $            var(i,j),h(i,j),time
+                  num_nan = num_nan + 1
+          end if
+        end do
+      end do
 
-         enddo
-      enddo
-
-      if ( num_nan .ne. 0 ) then
+      if ( num_nan /= 0 ) then
          print'(2a,2(a,i6))',
      $        " detect_nan : ", varname,
      $        "j_global(1) = ", j_global(1),
@@ -1097,9 +1153,13 @@
 
       return
       end
-!_______________________________________________________________________
 
+!______________________________________________________________________
+!
       subroutine pgscheme(npg)
+!----------------------------------------------------------------------
+!  Redirect to a proper PGF scheme
+!______________________________________________________________________
 
         implicit none
 

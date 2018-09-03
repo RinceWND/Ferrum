@@ -107,7 +107,7 @@
      &            , Qe, Qh, Qu
      &            , rd, rhnow, rho, rhom, rnow, rho_cpw
      &            , sigma, solar, sol_net, sp, ss, sstk, stp
-     &            , taux, tauy, tnowk
+     &            , tnowk
      &            , usrf, vsrf
      &            , wair, wflux, wsatair, wsatoce
 !
@@ -378,8 +378,12 @@
 ! --- calculates : Qu = Qb + QH + QE
 !
             QU = qbw + qh + qe
-            if (isnan(QU)) then
-            print *, ":", i,j,qbw, qh, qe
+            if (isnan(QU).or.abs(QU).gt.1.e3) then
+            print *, "[ HEAT ]", i,j,qbw, qh, qe, "@", my_task
+            print *, "cloud:", cld
+            print *, "tnowk:", tnowk
+            print *, "ea12:", ea12
+            stop
             end if
 !
 ! --- 1. Devide upward heat flux by rho*Cpw

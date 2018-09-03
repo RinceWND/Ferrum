@@ -1,63 +1,73 @@
       module wind
 
+      use glob_config, only: calc_interp, calc_wind, rk, sf_wi
+      use glob_domain, only: n_south, n_west
+      use glob_grid  , only: east_e, north_e
+
       implicit none
 
       private
 
       public :: wind_init, wind_main
 
-      include 'pom.h'
-
       integer, parameter :: wn = 4
       logical, parameter :: calc_mflx = .true.
 
-      real(kind=rk), dimension( im_local, jm_local ) ::
-     $  uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd_fine, vwnd_fine
+      real(kind=rk), allocatable, dimension(:,:) ::
+     &  uwnd_a, vwnd_a, uwnd_b, vwnd_b, uwnd_fine, vwnd_fine
+     &, uwnd_coarse, vwnd_coarse
 
-!lyo:pac10:more efficient:Comment out the followings
-!     real(kind=rk), dimension( im_local, jm_local ) :: !fhx:20110131:
-!    $ uwind_surf, vwind_surf
-
-      real(kind=rk), dimension( im_local_coarse, jm_local_coarse ) ::
-     $  uwnd_coarse, vwnd_coarse
-
-      real(kind=rk), dimension( im_local_coarse, jm_local_coarse, wn )::
-     $  uwnd_buf_coarse, vwnd_buf_coarse
-
-      real(kind=rk), dimension( im_local, jm_local, wn ) ::
-     $  uwnd_buf, vwnd_buf 
+      real(kind=rk), allocatable, dimension(:,:,:) ::
+     &  uwnd_buf_coarse, vwnd_buf_coarse, uwnd_buf, vwnd_buf 
 
       integer :: nsec(4)=(/ 0, 6*3600, 12*3600, 18*3600 /)
       integer :: sec_in_day, i, j, k
       
       real(kind=rk), parameter :: rhoa = 1.22, rhow = 1025.0
-      real(kind=rk) :: aa, uwnd, vwnd, cda, uvabs!, rdisp !lyo:pac10:add rdisp
+      real(kind=rk) aa, uwnd, vwnd, cda, uvabs!, rdisp !lyo:pac10:add rdisp
 
       character(len=16) :: infile
 
 
       contains
 
-!==================================================================
-! Initialize variables for wind 
-!------------------------------------------------------------------
+!______________________________________________________________________
+!
       subroutine wind_init( d_in )
-      
+!----------------------------------------------------------------------
+!  Initialize variables for wind.
+!______________________________________________________________________
+
+      use glob_config, only: rk
+      use glob_domain, only: im, im_coarse, is_master, jm, jm_coarse
+!     &                     , n_south
       use module_time
       use interp
-      
+
       implicit none
 
-      ! intent(in)
       type(date), intent(in) :: d_in
 
-      ! local     
       type(date) :: d_off, d_fwd
-
-!      logical :: lexist
 
       integer n
 
+
+! Allocate arrays
+      allocate(
+     &  uwnd_a(im,jm), vwnd_a(im,jm), uwnd_b(im,jm), vwnd_b(im,jm)
+     &, uwnd_buf(im,jm,wn),vwnd_buf(im,jm,wn)
+     &, uwnd_fine(im,jm),vwnd_fine(im,jm)
+     &, uwnd_coarse(im_coarse,jm_coarse)
+     &, vwnd_coarse(im_coarse,jm_coarse)
+     &, uwnd_buf_coarse(im_coarse,jm_coarse,wn)
+     &, vwnd_buf_coarse(im_coarse,jm_coarse,wn)
+     & )
+
+      uwnd_a = 0.
+      uwnd_b = 0.
+      vwnd_a = 0.
+      vwnd_b = 0.
 
       ! initialize
       n = 1
@@ -211,21 +221,29 @@
       endif   !if ( calc_wind ) then
 
 
-      if ( my_task == master_task ) then
-         write(*,'(/a/)') "----------- wind_init."
+      if ( is_master ) then
+         print '(/a/)', "----------- wind_init."
       endif
 
       return
 
       end subroutine wind_init
-!-----------------------------------------------------------------
 
-!=================================================================
-! Read & time-interpolate wind data. 
-! Calclate wind stress wusurf and wvsurf.
-!-----------------------------------------------------------------
+!______________________________________________________________________
+!
       subroutine wind_main( d_in )
+!----------------------------------------------------------------------
+!  Read & time-interpolate wind data. 
+!  Calclate wind stress wusurf and wvsurf.
+!______________________________________________________________________
 
+      use glob_atmos , only: uwsrf, vwsrf, wusurf, wvsurf
+      use glob_config, only: cbcmax, cbcmin, z0b
+      use glob_domain, only: im, jm, kbm1
+      use glob_grid  , only: fsm, h, zz
+      use glob_misc  , only: ice
+      use glob_ocean , only: cbc, u, v, wubot, wvbot
+      use glob_time  , only: dti
       use module_time
       use interp
 
@@ -353,7 +371,8 @@
 !           uwnd=uwnd*rdisp; vwnd=vwnd*rdisp
           if ( calc_mflx ) then
 !lyo:pac10:more efficient:
-            uwsrf(i,j)=uwnd; vwsrf(i,j)=vwnd;
+            uwsrf(i,j) = uwnd
+            vwsrf(i,j) = vwnd
 
             uvabs = sqrt( (uwnd-u(i,j,1))**2 + (vwnd-v(i,j,1))**2 )
 

@@ -1,5 +1,8 @@
       module assim
 
+      use glob_config, only: calc_interp, rk
+      use glob_domain, only: im, jm
+      use glob_grid  , only: east_e, north_e
       use module_time
 
       implicit none
@@ -8,27 +11,16 @@
 
       public :: assim_init, assim_main, assim_store_ssha
 
-      include 'pom.h'
-
       integer :: iassim
 
-      real(kind=rk), dimension( im_local, jm_local ) :: 
+      real(kind=rk), allocatable, dimension(:,:) ::
      $     ssha_a, ssha_b, ssha
+     $   , frs, frs_coarse
+     $   , ssha_a_coarse, ssha_b_coarse!, ssha_coarse
 
-      real(kind=rk), dimension( im_local, jm_local ) :: 
-     $     frs
-
-      real(kind=rk), dimension( im_local, jm_local, kb ) ::
+      real(kind=rk), allocatable, dimension(:,:,:) ::
      $     tav, fac, cof
-
-      real(kind=rk), dimension( im_local_coarse,jm_local_coarse ) :: 
-     $     ssha_a_coarse, ssha_b_coarse!, ssha_coarse
-
-      real(kind=rk), dimension( im_local_coarse,jm_local_coarse ) :: 
-     $     frs_coarse
-
-      real(kind=rk), dimension( im_local_coarse,jm_local_coarse,kb ) ::
-     $     tav_coarse, fac_coarse, cof_coarse
+     $   , tav_coarse, fac_coarse, cof_coarse
      
 
       real(kind=rk), parameter :: errval = -999.
@@ -42,7 +34,7 @@
 
       character(len=30) :: infile
 
-      logical, dimension( im_local, jm_local ) ::
+      logical, allocatable, dimension(:,:) ::
      $     mask_msla
 
       integer ::  i, j
@@ -58,6 +50,11 @@
 !------------------------------------------------------------------
       subroutine assim_init( d_in )
 
+      use bry        , only: frz
+      use glob_config, only: calc_assim
+      use glob_domain, only: im_coarse, is_master, jm_coarse, kb
+     &                     , n_south, n_west
+      use glob_time  , only: dti
       use interp
 
       implicit none
@@ -68,6 +65,19 @@
       ! local
       integer :: status, access
 !      logical :: lexist
+
+
+      allocate(
+     &  ssha_a(im,jm), ssha_b(im,jm), ssha(im,jm), frs(im,jm)
+     &, ssha_a_coarse(im_coarse,jm_coarse)
+     &, ssha_b_coarse(im_coarse,jm_coarse)
+     &, frs_coarse(im_coarse,jm_coarse)
+     &, tav(im,jm,kb), fac(im,jm,kb), cof(im,jm,kb)
+     &, tav_coarse(im_coarse,jm_coarse,kb)
+     &, fac_coarse(im_coarse,jm_coarse,kb)
+     &, cof_coarse(im_coarse,jm_coarse,kb)
+     &, mask_msla(im,jm)
+     & )
 
       if ( calc_assim ) then
 
@@ -80,8 +90,8 @@
 
          iassim = max( int( nassim * 24 * 3600 / dti ), 1 )
       
-         if ( my_task == master_task ) 
-     $        write(*,'(/a,2(i4,a))') "assimilation interval : ",
+         if ( is_master ) 
+     $        print '(/a,2(i4,a))', "assimilation interval : ",
      $        int(nassim), "days, every  ", iassim, " time steps."
 
 !     read information for data assimilation
@@ -133,13 +143,13 @@
         
          if ( dstart > d_in ) then
 
-            if ( my_task == master_task ) then
-               write(*,'(/2a)') 
-     $              "Before assimilation period. d_in : "
-     $              , date2str(d_in)
-               write(*,'(2a)') "no assimilation until "
-     $              , dstart_str
-            endif
+            if ( is_master ) then
+               print '(/2a)'
+     &             , "Before assimilation period. d_in : "
+     &             ,  date2str(d_in)
+               print '(2a)', "no assimilation until "
+     &             , dstart_str
+            end if
             
             d1 = dstart
             d2 = dstart
@@ -164,10 +174,10 @@
                if ( status == 0 ) then
                   d1 = d_buf
                else
-                  if ( my_task == master_task ) then
-                   write(*,'(/2a)') 
-     $              "missing satellite data at assim_init : "
-     $              , trim(infile)
+                 if ( is_master ) then
+                   print '(/2a)'
+     $                 , "missing satellite data at assim_init : "
+     $                 , trim(infile)
                  endif
 
 !               go to 200   !fhx:debug
@@ -242,7 +252,7 @@
       endif  ! if(calc_interp) then !fhx:interp_flag
 
       
-         if ( my_task == master_task ) then
+         if ( is_master ) then
             write(*,'(/4a)')  "assim backward & forward : "
      $           , date2str(d1)," ", date2str(d2)
             write(*,'(/a/)')  "---------- assim_init. "
@@ -251,7 +261,7 @@
       else
          
 
-         if ( my_task == master_task ) then
+         if ( is_master ) then
             write(*,'(/a)')  "no assimilation. "
             write(*,'(/a/)')  "---------- assim_init. "
          endif
@@ -281,6 +291,12 @@
 !------------------------------------------------------------------
       subroutine assim_main( d_in )
 
+!      use glob_config, only: 
+      use glob_domain, only: i_global, im, j_global, jm, kb, kbm1
+     &                     , my_task, n_proc, n_south, n_west
+      use glob_grid  , only: h, zz
+      use glob_ocean , only: t, tb, tclim
+      use glob_time  , only: iint
       use module_time
       use interp
 
@@ -528,9 +544,10 @@
 !------------------------------------------------------------------
       subroutine assim_store_ssha( var, varname, d_in )
 
+      use glob_domain, only: im, is_master, jm
       use module_time
 
-      real(kind=rk), dimension( im_local, jm_local )
+      real(kind=rk), dimension( im, jm )
      $     , intent(inout) :: var
       character(len=*) , intent(in) :: varname
       type(date), intent(in) :: d_in
@@ -543,7 +560,7 @@
 
          var = ssha
 
-         if ( my_task == master_task ) then
+         if ( is_master ) then
             write(*,'(/2a)')  
      $           " ssha used in last assmilation is stored to "
      $           , varname
