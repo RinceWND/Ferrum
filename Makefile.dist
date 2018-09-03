@@ -1,0 +1,103 @@
+#
+# sbPOM makefile
+#
+
+#-----------------------------------------------------------------------
+# Settings that depend on the system and the compiler
+#-----------------------------------------------------------------------
+# Set macros
+CPP = cpp -P
+#FC = ftn   #yoyo
+#LD = ftn
+FC = mpifort
+LD = mpifort
+CLEAN = rm
+
+# Set miscellaneous compiler flags
+MISCFLAGS = -g -fcheck=all -fbacktrace -fbounds-check -Wall#-ffpe-trap=underflow,denormal,zero,overflow -Wall #-Warray-temporaries -Wcharacter-truncation -Wconversion-extra  -Wrealloc-lhs
+
+# Set libraries and include files
+# NETCDFINC = -I/autofs/na1_sw/eslogin/p-netcdf/1.1.1/cnl3.1.gnu/include #yoyo
+# NETCDFLIB = -L/autofs/na1_sw/eslogin/p-netcdf/1.1.1/cnl3.1.gnu/lib
+NETCDFINC = -I/usr/include -I./
+NETCDFLIB = -L/usr/lib/x86_64-linux-gnu
+
+#FFLAGS = -ip -O3 -lmpi  $(NETCDFINC)
+#FFLAGS = -check bounds -check format -lmpi  $(NETCDFINC)
+#FFLAGS = -check bounds  -lmpi  $(NETCDFINC)
+#FFLAGS = -O3 -fp-model precise  -assume byterecl $(NETCDFINC)
+#FFLAGS = -O3 -debug minimal -fp-model precise -override-limits $(NETCDFINC)
+FFLAGS = -O3 $(NETCDFINC) $(MISCFLAGS)
+
+#LIBS = -ip  -O3  -lmpi $(NETCDFLIB) -lpnetcdf
+#LIBS =  -check bounds  -lmpi $(NETCDFLIB) -lpnetcdf
+#LIBS = -O3 -fp-model precise -assume byterecl  $(NETCDFLIB) -lpnetcdf
+# LIBS = -O3 -debug minimal -fp-model precise -override-limits $(NETCDFLIB) -lpnetcdf
+LIBS = $(NETCDFLIB) -lpnetcdf
+#-----------------------------------------------------------------------
+# Set the executable
+#-----------------------------------------------------------------------
+BIN = ferrum
+
+#-----------------------------------------------------------------------
+# Define directories
+#-----------------------------------------------------------------------
+SRCDIR = pom
+OBJDIR = obj
+OUTDIR = out
+
+#-----------------------------------------------------------------------
+# Define objects
+#-----------------------------------------------------------------------
+OBJS = globals.o        \
+       bry.o            \
+       parallel_mpi.o   \
+       module_time.o    \
+       io_pnetcdf.o     \
+       seaice.o         \
+       advance.o        \
+       river.o          \
+       solver.o         \
+       initialize.o     \
+       interp.o         \
+       wind.o           \
+       tsforce.o        \
+       heat.o           \
+       assim.o          \
+       assim_drf.o      \
+       mcsst.o          \
+       uvforce.o        \
+       pom.o
+VPATH = $(SRCDIR)
+
+#-----------------------------------------------------------------------
+# Set implicit rules for compilation
+#-----------------------------------------------------------------------
+%.o: %.f90
+	@echo
+	$(FC) -c $(FFLAGS) -ffree-form $<
+
+%.o: %.f
+	@echo
+	$(FC) -c $(FFLAGS)  $<
+
+#-----------------------------------------------------------------------
+# Set implicit rules for dependencies
+#-----------------------------------------------------------------------
+%.f: %.F
+	@echo
+	$(CPP) $(FFLAGS) $< > $*.f
+
+#-----------------------------------------------------------------------
+# Create the executable
+#-----------------------------------------------------------------------
+$(BIN): $(OBJS)
+	@mkdir -p $(OUTDIR)
+	@echo
+	$(LD) $(FFLAGS) -o $(BIN) $(OBJS) $(LIBS)
+
+#-----------------------------------------------------------------------
+# Cleaning target
+#-----------------------------------------------------------------------
+clean:
+	@rm -f *.o *.mod *.il $(BIN)

@@ -1,0 +1,9 @@
+&domain_nml
+ im_global = 180
+ jm_global = 160
+ im_local  = 91
+ jm_local  = 81
+ kb        = 18
+
+ n_proc    = 4
+/
