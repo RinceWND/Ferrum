@@ -296,7 +296,7 @@
 !  Send integer sum of WORK to node TO
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: POM_COMM
       use mpi        , only: mpi_reduce
      &                     , MPI_INTEGER, MPI_SUM
@@ -323,7 +323,7 @@
 !  Send real sum of WORK to node TO
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: POM_COMM
       use mpi        , only: MPI_DOUBLE_PRECISION, MPI_REAL
      &                     , mpi_reduce          , MPI_SUM
@@ -355,7 +355,7 @@
 !  Send real maximum of WORK to node TO
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: POM_COMM
       use mpi        , only: MPI_DOUBLE_PRECISION, MPI_MAX
      &                     , MPI_REAL            , mpi_reduce
@@ -410,7 +410,7 @@
 !  Send real WORK to all nodes from node FROM
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: POM_COMM
       use mpi        , only: mpi_bcast
      &                     , MPI_DOUBLE_PRECISION, MPI_REAL
@@ -442,7 +442,7 @@
 !  One band at a time
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
       use mpi        , only: mpi_recv            , mpi_send
@@ -548,7 +548,7 @@
 !  One band at a time
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
       use mpi        , only: mpi_recv, mpi_send
@@ -678,7 +678,7 @@
 ! ayumi 2010/6/1
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: is_master, n_proc, POM_COMM
       use mpi        , only: MPI_DOUBLE_PRECISION, mpi_gather
      &                     , MPI_REAL
@@ -726,7 +726,7 @@
 !  Convert a 2nd order 2D matrix to special 4th order 2D matrix
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
       use mpi        , only: mpi_recv            , mpi_send
@@ -800,7 +800,7 @@
 !  Convert a 2nd order 3D matrix to special 4th order 3D matrix
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
       use mpi        , only: mpi_recv            , mpi_send

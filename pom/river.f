@@ -1,8 +1,8 @@
       module river
 
-      use glob_atmos , only: vfluxf
-      use glob_config, only: calc_river, rk
-      use glob_const , only: pi
+      use air        , only: vfluxf
+      use config     , only: calc_river
+      use glob_const , only: pi, rk
       use glob_domain, only: im, jm, master_task, my_task
       use glob_grid  , only: art
 

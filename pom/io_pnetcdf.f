@@ -1,17 +1,17 @@
-! Updated (in/grid/grid.nc & >2GB) io_pnetcdf.F combining FH+Alu
-!     This version is for FH's case with AluUpperSST & AluUpperSSS
-!     commented out
+!______________________________________________________________________
 !
-! io_pnetcdf.F !lyo:pac10:Incorporating Alu's version for pac10
-!              !          in ncu's /home/lyo/gaea/alu/pac10
-
 ! parallel NetCDF I/O
+!______________________________________________________________________
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine def_var_pnetcdf(ncid,name,nvdims,vdims,varid,vartype
      &                          ,long_name,units,nofill,fillval
      &                          ,coords,lcoords)
-! defines variable in netcdf file
+!----------------------------------------------------------------------
+!  Defines variable in netcdf file.
+!______________________________________________________________________
+
         use pnetcdf, only: nf90mpi_def_var     , nf90mpi_put_att
      &                   , nf90mpi_def_var_fill
      &                   , NF_NOERR
@@ -87,7 +87,7 @@
 ! ayumi 2010/5/10
       subroutine write_output_pnetcdf0( netcdf_out_file )
 ! write output data
-        use glob_config, only: calc_ice, mode, time_start, title
+        use config     , only: calc_ice, mode, title
         use glob_domain, only: i_global, im, im_global, is_master
      &                       , j_global, jm, jm_global
      &                       , kb, POM_COMM
@@ -100,7 +100,7 @@
      &                       , s_mean, t_mean, u_mean, uab_mean
      &                       , v_mean, vab_mean, w_mean, wssurf_mean
      &                       , wtsurf_mean, wusurf_mean, wvsurf_mean
-        use glob_time  , only: time
+        use model_run  , only: time, time_start
         use mpi    , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf, only: nf90mpi_close    , nf90mpi_create
      &                   , nf90mpi_def_dim  , nf90mpi_enddef
@@ -519,18 +519,21 @@
         return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
 !      subroutine write_restart_pnetcdf
       subroutine write_restart_pnetcdf( netcdf_out_file )
-! write data for a seamless restart
-        use glob_atmos , only: wusurf, wvsurf
-        use glob_config, only: rk, spinup, time_start
-     &                       , title
+!----------------------------------------------------------------------
+!  Write data for seamless restart.
+!______________________________________________________________________
+
+        use air        , only: wusurf, wvsurf
+        use config     , only: rk, spinup, title
         use glob_domain, only: i_global, im, im_global, is_master
      &                       , j_global, jm, jm_global
      &                       , kb, POM_COMM
         use glob_ocean
-        use glob_time  , only: dti, iint, irestart, time, time0
+        use glob_out   , only: irestart
+        use model_run  , only: dti, iint, time, time0, time_start
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf
 
@@ -944,12 +947,14 @@
 
       return
       end
-
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine read_grid_pnetcdf
-! read grid data
+!----------------------------------------------------------------------
+!  Read grid data.
+!______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use glob_grid
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
@@ -1096,7 +1101,7 @@
 !_______________________________________________________________________
       subroutine read_grid_pnetcdf0  ! fhx:called by subroutine "interp_init"
 ! read original grid data for wind and satellite data
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use glob_misc
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
@@ -1161,11 +1166,16 @@
       return
       end
 
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine read_restart_pnetcdf
-! read data for a seamless restart
-        use glob_atmos , only: wusurf, wvsurf
-        use glob_config, only: read_rst_file, rk
+!----------------------------------------------------------------------
+!  Read data for a seamless restart.
+!______________________________________________________________________
+
+        use air        , only: wusurf, wvsurf
+        use config     , only: restart_file
+        use glob_const , only: rk
         use glob_domain
         use glob_ocean
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
@@ -1194,12 +1204,12 @@
         edge  = 1
 
 ! open netcdf restart file
-        write(netcdf_in_file,'(''in/'',a)') trim(read_rst_file)
+        write(netcdf_in_file,'(''in/'',a)') trim(restart_file)
         if ( is_master )
      &       print '(/''reading file '',a)', trim(netcdf_in_file)
         status = nf90mpi_open( POM_COMM, netcdf_in_file, NF_NOWRITE
      &                       , MPI_INFO_NULL, ncid )
-        call handle_error_pnetcdf('nfmpi_open: '//trim(read_rst_file)
+        call handle_error_pnetcdf('nfmpi_open: '//trim(restart_file)
      &                           , status )
 
 ! get variables
@@ -1402,7 +1412,7 @@
 !  Read initial temperature and salinity
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use glob_grid  , only: fsm
       use glob_ocean , only: elb
@@ -1507,7 +1517,7 @@
 !  Read montly climatology of temperature and salinity
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use glob_grid  , only: fsm
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
@@ -1580,7 +1590,7 @@
 !  Read xy-averaged, monthly-mean temp & salt
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -1647,7 +1657,7 @@
 !  Read xy-averaged, monthly-mean temp & salt
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -1725,138 +1735,6 @@
 
       return
       end
-
-!______________________________________________________________________
-!
-      subroutine read_boundary_conditions_pnetcdf !lyo:pac10:not used!
-!----------------------------------------------------------------------
-!  Read boundary conditions
-!______________________________________________________________________
-
-      use bry        , only:  ele,  eln,  els,  elw
-     &                     ,  sbe,  sbn,  sbs,  sbw
-     &                     ,  tbe,  tbn,  tbs,  tbw
-     &                     , uabe, uabw, vabn, vabs
-      use glob_config, only: netcdf_file, rk
-      use glob_domain
-      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
-      use pnetcdf
-
-      implicit none
-
-      integer, external :: get_var_real_1d, get_var_real_2d
-
-      character(len=120) netcdf_bc_file
-      integer ncid,status
-      integer tw_varid,sw_varid,uw_varid,ew_varid
-      integer te_varid,se_varid,ue_varid,ee_varid
-      integer ts_varid,ss_varid,vs_varid,es_varid
-      integer tn_varid,sn_varid,vn_varid,en_varid
-      integer(MPI_OFFSET_KIND) start(4),edge(4)
-
-      start = 1
-      edge = 1
-
-! open netcdf ic file
-      write(netcdf_bc_file,'(''in/'',a,''.bc.nc'')')
-     &  trim(netcdf_file)
-
-      if ( is_master )
-     &     print '(/''reading file '',a)', trim(netcdf_bc_file)
-      status=nfmpi_open(POM_COMM,netcdf_bc_file,NF_NOWRITE,
-     &                  MPI_INFO_NULL,ncid)
-      call handle_error_pnetcdf( 'nfmpi_open: '//netcdf_bc_file
-     &                         , status )
-
-! get variables
-      status=nfmpi_inq_varid(ncid,'tw',tw_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: tw',status)
-      status=nfmpi_inq_varid(ncid,'sw',sw_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: sw',status)
-      status=nfmpi_inq_varid(ncid,'uw',uw_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: uw',status)
-      status=nfmpi_inq_varid(ncid,'ew',ew_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: ew',status)
-      status=nfmpi_inq_varid(ncid,'te',te_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: te',status)
-      status=nfmpi_inq_varid(ncid,'se',se_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: se',status)
-      status=nfmpi_inq_varid(ncid,'ue',ue_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: ue',status)
-      status=nfmpi_inq_varid(ncid,'ee',ee_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: ee',status)
-      status=nfmpi_inq_varid(ncid,'ts',ts_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: ts',status)
-      status=nfmpi_inq_varid(ncid,'ss',ss_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: ss',status)
-      status=nfmpi_inq_varid(ncid,'vs',vs_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: vs',status)
-      status=nfmpi_inq_varid(ncid,'es',es_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: es',status)
-      status=nfmpi_inq_varid(ncid,'tn',tn_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: tn',status)
-      status=nfmpi_inq_varid(ncid,'sn',sn_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: sn',status)
-      status=nfmpi_inq_varid(ncid,'vn',vn_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: vn',status)
-      status=nfmpi_inq_varid(ncid,'en',en_varid)
-      call handle_error_pnetcdf('nfmpi_inq_varid: en',status)
-
-! get data
-      start(1)=j_global(1)
-      edge(1)=jm
-      status = get_var_real_1d(ncid,uw_varid,start,edge,uabw)
-      call handle_error_pnetcdf('get_var_real: uabw',status)
-      status = get_var_real_1d(ncid,ew_varid,start,edge,elw)
-      call handle_error_pnetcdf('get_var_real: elw',status)
-      status = get_var_real_1d(ncid,ue_varid,start,edge,uabe)
-      call handle_error_pnetcdf('get_var_real: uabe',status)
-      status = get_var_real_1d(ncid,ee_varid,start,edge,ele)
-      call handle_error_pnetcdf('get_var_real: ele',status)
-
-      start(1)=i_global(1)
-      edge(1)=im
-      status = get_var_real_1d(ncid,vs_varid,start,edge,vabs)
-      call handle_error_pnetcdf('get_var_real: vabs',status)
-      status = get_var_real_1d(ncid,es_varid,start,edge,els)
-      call handle_error_pnetcdf('get_var_real: els',status)
-      status = get_var_real_1d(ncid,vn_varid,start,edge,vabn)
-      call handle_error_pnetcdf('get_var_real: vabn',status)
-      status = get_var_real_1d(ncid,en_varid,start,edge,eln)
-      call handle_error_pnetcdf('get_var_real: eln',status)
-
-      start(1)=j_global(1)
-      start(2)=1
-      edge(1)=jm
-      edge(2)=kb
-      status = get_var_real_2d(ncid,tw_varid,start,edge,tbw)
-      call handle_error_pnetcdf('get_var_real: tbw',status)
-      status = get_var_real_2d(ncid,sw_varid,start,edge,sbw)
-      call handle_error_pnetcdf('get_var_real: sbw',status)
-      status = get_var_real_2d(ncid,te_varid,start,edge,tbe)
-      call handle_error_pnetcdf('get_var_real: tbe',status)
-      status = get_var_real_2d(ncid,se_varid,start,edge,sbe)
-      call handle_error_pnetcdf('get_var_real: sbe',status)
-
-      start(1)=i_global(1)
-      start(2)=1
-      edge(1)=im
-      edge(2)=kb
-      status = get_var_real_2d(ncid,ts_varid,start,edge,tbs)
-      call handle_error_pnetcdf('get_var_real: tbs',status)
-      status = get_var_real_2d(ncid,ss_varid,start,edge,sbs)
-      call handle_error_pnetcdf('get_var_real: sbs',status)
-      status = get_var_real_2d(ncid,tn_varid,start,edge,tbn)
-      call handle_error_pnetcdf('get_var_real: tbn',status)
-      status = get_var_real_2d(ncid,sn_varid,start,edge,sbn)
-      call handle_error_pnetcdf('get_var_real: sbn',status)
-
-! close file
-      status = nfmpi_close(ncid)
-      call handle_error_pnetcdf( 'nf_close', status )
-
-      return
-      end
 !______________________________________________________________________
 !
       subroutine read_wind_pnetcdf0(n,wu,wv) !lyo:pac10:not used!
@@ -1864,7 +1742,8 @@
 !  Read wind stress
 !______________________________________________________________________
 
-      use glob_config, only: netcdf_file, rk
+      use config     , only: netcdf_file
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -1918,11 +1797,6 @@
       return
       end
 !______________________________________________________________________
-!----------------------------------------------------------------------
-
-
-
-!______________________________________________________________________
 !
       subroutine read_tsclim_monthly_pnetcdf(tm,sm,tc,sc,ht,in_file,n)
 !----------------------------------------------------------------------
@@ -1930,7 +1804,7 @@
 ! as well as xy-averaged temperature an saliniy fields.
 !______________________________________________________________________
 
-        use glob_config, only: rk
+        use glob_const , only: rk
         use glob_domain
         use glob_grid  , only: fsm
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
@@ -2043,7 +1917,7 @@
 !  Read monthly climatology of wind
 !______________________________________________________________________
 
-        use glob_config, only: rk
+        use glob_const , only: rk
         use glob_domain
         use glob_grid  , only: fsm
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
@@ -2109,7 +1983,7 @@
 !  Read monthly SST and SSS
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -2169,7 +2043,7 @@
 !  Read boundary normal velocities
 !______________________________________________________________________
 
-        use glob_config, only: rk
+        use glob_const , only: rk
         use glob_domain
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf
@@ -2245,7 +2119,6 @@
         else
 
           if ( is_master ) then
-!----------------------------------------------------------------------!
             print *,'(/''[!] Warning from `read_bc_pnetcdf`'')'
             print *,'(/''bc file '',a)', trim(netcdf_file)
             print *,'(/''does not exist. Fallback to zero.'')'
@@ -2264,10 +2137,10 @@
 !
       subroutine read_bc_transport_pnetcdf(trans,y,x, in_file, n)
 !----------------------------------------------------------------------
-!  Read volume transport at boundaries
+!  Read volume transport at boundaries.
 !______________________________________________________________________
 
-        use glob_config, only: rk
+        use glob_const , only: rk
         use glob_domain
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf
@@ -2373,7 +2246,8 @@
 !fhx:tide:read tide at the eastern boundary for PROFS
 !______________________________________________________________________
 
-      use glob_config, only: ntide, rk
+      use config     , only: ntide
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -2445,10 +2319,11 @@
 !
       subroutine read_mflx_pnetcdf( uflx, vflx, filename, n )
 !----------------------------------------------------------------------
-!  Read wind stress
+!  Read wind stress.
 !______________________________________________________________________
 
-      use glob_config, only: rk, windf
+      use config     , only: windf
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -2513,10 +2388,10 @@
 !
       subroutine read_wind_pnetcdfc( uwnd_out, vwnd_out, filename, n )
 !----------------------------------------------------------------------
-!  Read wind stress from coarse grid
+!  Read wind stress from coarse grid.
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -2637,10 +2512,10 @@
 !
       subroutine read_heat_pnetcdf( sh, lh, sr, lr, dlr, filename, n )
 !----------------------------------------------------------------------
-!  Read heat fluxes
+!  Read heat fluxes.
 !______________________________________________________________________
 
-        use glob_config, only: rk
+        use glob_const , only: rk
         use glob_domain
         use mpi        , only: MPI_OFFSET_KIND, MPI_INFO_NULL
         use pnetcdf    , only: nf90mpi_close, nf90mpi_inq_varid
@@ -2731,10 +2606,10 @@
 !
       subroutine read_surf_corr_pnetcdf( dtemp, dsalt, filename, n )
 !----------------------------------------------------------------------
-!  Read surface layer SST and SSS correction
+!  Read surface layer SST and SSS correction.
 !______________________________________________________________________
 
-        use glob_config, only: rk
+        use glob_const , only: rk
         use glob_domain
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf    , only: nf90mpi_close, nf90mpi_inq_varid
@@ -2801,13 +2676,13 @@
 
 !______________________________________________________________________
 !
-      subroutine read_ncep_bulk_pnetcdf(pres,tair,rhum,rain,cloud
-     &                                 ,uwnd,vwnd,tskn, filename,n)
+      subroutine read_bulk_pnetcdf(pres,tair,rhum,rain,cloud
+     &                            ,uwnd,vwnd,tskn, filename,n)
 !----------------------------------------------------------------------
-!  Read bulk data
+!  Read bulk air-sea interaction data.
 !______________________________________________________________________
 
-        use glob_config, only: rk
+        use glob_const , only: rk
         use glob_domain
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf    , only: nf90mpi_close    , nf90mpi_get_att
@@ -2950,10 +2825,10 @@
 !
       subroutine read_ice_pnetcdf( ci, filename )
 !----------------------------------------------------------------------
-!  Read ice concentration
+!  Read ice concentration.
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use glob_grid  , only: fsm
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
@@ -3011,10 +2886,10 @@
 !
       subroutine read_msla_pnetcdf( ssha_out, filename )
 !----------------------------------------------------------------------
-! read mean sea level anomaly data
+!  Read mean sea level anomaly data.
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -3070,10 +2945,10 @@
 !
       subroutine read_msla_pnetcdfc( ssha_out, filename )
 !----------------------------------------------------------------------
-! read mean sea level anomaly data
+!  Read mean sea level anomaly data.
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -3135,10 +3010,10 @@
       subroutine read_assiminfo_pnetcdf
      &     ( frs_out, tav_out, fac_out, cof_out )
 !----------------------------------------------------------------------
-!  Read information for data assimilation
+!  Read information for data assimilation.
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -3217,10 +3092,10 @@
       subroutine read_assiminfo_pnetcdfc
      &     ( frs_out, tav_out, fac_out, cof_out )
 !----------------------------------------------------------------------
-!  Read information for data assimilation
+!  Read information for data assimilation.
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -3302,10 +3177,10 @@
 !fhx:mcsst:start
       subroutine read_mcsst_pnetcdf( mcsst_out, filename )
 !----------------------------------------------------------------------
-!  Read mean MCSST data
+!  Read mean MCSST data.
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -3368,17 +3243,18 @@
 !
       subroutine write_output_pnetcdf( netcdf_out_file )
 !----------------------------------------------------------------------
-!  Write output data
+!  Write output data.
 !______________________________________________________________________
 
-        use glob_atmos
-        use glob_config, only: calc_ice, mode, rk, time_start, title
+        use air
+        use config     , only: calc_ice, mode, title
+        use glob_const , only: rk
         use glob_domain
         use glob_grid
         use glob_misc
         use glob_ocean
         use glob_out
-        use glob_time
+        use model_run  , only: time, time_start
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf    , only: nf90mpi_close    , nf90mpi_create
      &                       , nf90mpi_def_dim  , nf90mpi_enddef
@@ -4029,16 +3905,16 @@
 !
       subroutine write_SURF_pnetcdf( netcdf_out_file )
 !----------------------------------------------------------------------
-!  Write surface fields
+!  Write surface fields.
 !______________________________________________________________________
 
-        use glob_atmos
-        use glob_config, only: rk, time_start, title
+        use air
+        use config     , only: title
+        use glob_const , only: rk
         use glob_domain
         use glob_grid
-        use glob_misc  , only: iouts
         use glob_out
-        use glob_time
+        use model_run  , only: time, time_start
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf    , only: nf90mpi_close    , nf90mpi_create
      &                       , nf90mpi_def_dim  , nf90mpi_enddef
@@ -4254,17 +4130,18 @@
 !
       subroutine write_output_init_pnetcdf( netcdf_out_file )
 !----------------------------------------------------------------------
-!  Write initial state output file
+!  Write initial state output file.
 !______________________________________________________________________
 
-        use glob_atmos
+        use air
         use bry
-        use glob_config, only: rk, time_start, title
+        use config     , only: title
+        use glob_const , only: rk
         use glob_domain
         use glob_grid
         use glob_misc
         use glob_ocean
-        use glob_time
+        use model_run  , only: time, time_start
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf    , only: nf90mpi_close    , nf90mpi_create
      &                       , nf90mpi_def_dim  , nf90mpi_enddef
@@ -4510,24 +4387,24 @@
 !--East
         start(1) = j_global(1)
         edge(1) = jm
-        out2(1,:) = real(ele,4)
+        out2(1,:) = real(el_bry%est(1,:),4)
         status=nfmpi_put_vara_real_all(ncid,ele_varid,start,edge
      &                                                     ,out2(1,:))
         call handle_error_pnetcdf('nf_put_var_real: ele',status)
 !--West
-        out2(1,:) = real(elw,4)
+        out2(1,:) = real(el_bry%wst(1,:),4)
         status=nfmpi_put_vara_real_all(ncid,elw_varid,start,edge
      &                                                     ,out2(1,:))
         call handle_error_pnetcdf('nf_put_var_real: elw',status)
 !--South
         start(1) = i_global(1)
         edge(1) = im
-        out2(:,1) = real(els,4)
+        out2(:,1) = real(el_bry%sth(:,1),4)
         status=nfmpi_put_vara_real_all(ncid,els_varid,start,edge
      &                                                     ,out2(:,1))
         call handle_error_pnetcdf('nf_put_var_real: els',status)
 !--North
-        out2(:,1) = real(eln,4)
+        out2(:,1) = real(el_bry%nth(:,1),4)
         status=nfmpi_put_vara_real_all(ncid,eln_varid,start,edge
      &                                                     ,out2(:,1))
         call handle_error_pnetcdf('nf_put_var_real: eln',status)
@@ -4795,7 +4672,7 @@
 !  Macro for reading 1D variable.
 !______________________________________________________________________
 
-        use glob_config, only: rk
+        use glob_const , only: rk
         use mpi
         use pnetcdf
 
@@ -4878,7 +4755,7 @@
 !  Macro for reading 2D variable.
 !______________________________________________________________________
 
-        use glob_config, only: rk
+        use glob_const , only: rk
         use mpi
         use pnetcdf
 
@@ -4973,7 +4850,7 @@
 !  Macro for reading 3D variable.
 !______________________________________________________________________
 
-        use glob_config, only: rk
+        use glob_const , only: rk
         use mpi
         use pnetcdf
 

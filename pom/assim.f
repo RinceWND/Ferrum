@@ -1,6 +1,7 @@
       module assim
 
-      use glob_config, only: calc_interp, rk
+      use config     , only: calc_interp
+      use glob_const , only: rk
       use glob_domain, only: im, jm
       use glob_grid  , only: east_e, north_e
       use module_time
@@ -50,11 +51,12 @@
 !------------------------------------------------------------------
       subroutine assim_init( d_in )
 
-      use bry        , only: frz
-      use glob_config, only: calc_assim
-      use glob_domain, only: im_coarse, is_master, jm_coarse, kb
+      use bry        , only: frz, USE_SPONGE
+      use config     , only: calc_assim
+      use glob_domain, only: im, im_coarse, is_master
+     &                     , jm, jm_coarse, kb
      &                     , n_south, n_west
-      use glob_time  , only: dti
+      use model_run  , only: dti
       use interp
 
       implicit none
@@ -65,7 +67,6 @@
       ! local
       integer :: status, access
 !      logical :: lexist
-
 
       allocate(
      &  ssha_a(im,jm), ssha_b(im,jm), ssha(im,jm), frs(im,jm)
@@ -134,7 +135,7 @@
       frs = reshape(frs_coarse,shape(frs))
       tav = reshape(tav_coarse,shape(tav))
       fac = reshape(fac_coarse,shape(fac))
-      cof = reshape(cof_coarse,shape(cof))      
+      cof = reshape(cof_coarse,shape(cof))
 
       endif  ! if(calc_interp) then !fhx:interp_flag
 
@@ -277,9 +278,15 @@
 !200   return
 !yoyo:200 return
 200   continue
-      frs(:,:)=frz(:,:) !lyo:pac10:exp032:quick fix for frs
-                        !instead of reading from assiminfo.nc
-                        !which may have frs=1 everywhere
+
+      if ( USE_SPONGE ) then
+        frs = frz !lyo:pac10:exp032:quick fix for frs
+                          !instead of reading from assiminfo.nc
+                          !which may have frs=1 everywhere
+      else
+        frs = 0.
+      end if
+
       return
 
       end subroutine assim_init
@@ -296,7 +303,7 @@
      &                     , my_task, n_proc, n_south, n_west
       use glob_grid  , only: h, zz
       use glob_ocean , only: t, tb, tclim
-      use glob_time  , only: iint
+      use model_run  , only: iint
       use module_time
       use interp
 

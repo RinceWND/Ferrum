@@ -1,7 +1,7 @@
       module tsforce
 
-      use glob_atmos , only: wssurf, wtsurf
-      use glob_config, only: rk
+      use air        , only: wssurf, wtsurf
+      use glob_const , only: rk
       use glob_domain, only: im, jm, kb
       use glob_grid  , only: fsm
       use glob_ocean , only: rho, s, sb, sclim, t, tb, tclim, u, v
@@ -56,7 +56,7 @@
 !     $     uw_a, vw_a, uw_b, vw_b
 
       integer :: mon_a, mon_b, sec_in_month, mid_in_month
-      integer :: i, j, k, nb, mb, db
+      integer :: i, j, nb, mb, db
       character(len=14) :: infile_b
       real(rk) aa, bb
       real(rk) days_in_year
@@ -221,9 +221,9 @@
 
         write( infile_b, '( i4.4,".nc" )' ) d_in%year
 
-        call read_ncep_bulk_pnetcdf( pres_a,  tair_a, shum_a
-     &                             , rain_a, cloud_a, uwnd_a
-     &                             , vwnd_a, tskin_a, infile_b, n)
+        call read_bulk_pnetcdf( pres_a,  tair_a, shum_a
+     &                        , rain_a, cloud_a, uwnd_a
+     &                        , vwnd_a, tskin_a, infile_b, n)
 
       end if
 
@@ -247,9 +247,9 @@
 
         write( infile_b, '( i4.4,".nc" )' ) d_in%year
 
-        call read_ncep_bulk_pnetcdf( pres_b,  tair_b, shum_b
-     &                             , rain_b, cloud_b, uwnd_b
-     &                             , vwnd_b, tskin_b, infile_b, n)
+        call read_bulk_pnetcdf( pres_b,  tair_b, shum_b
+     &                        , rain_b, cloud_b, uwnd_b
+     &                        , vwnd_b, tskin_b, infile_b, n)
 
       end if
 
@@ -277,13 +277,12 @@
       subroutine tsforce_main( d_in )
 
       use bry
-      use glob_time  , only: dti
+      use glob_domain, only: n_east, n_north, n_south, n_west
+      use model_run  , only: dti
       use glob_ocean , only: rmean, ssurf, tsurf
       use module_time
 
       implicit none
-
-      integer :: ii, jj
 
       ! intent(in)
       type(date), intent(in) :: d_in
@@ -390,10 +389,27 @@
 
       tclim = ( 1. - aa ) * tc_a       + aa * tc_b
       sclim = ( 1. - aa ) * sc_a       + aa * sc_b
-      eln   = ( 1. - aa ) * el_a(:,jm) + aa * el_b(:,jm)
-      ele   = ( 1. - aa ) * el_a(im,:) + aa * el_b(im,:)
-      els   = ( 1. - aa ) * el_a(:, 1) + aa * el_b(:, 1)
-      elw   = ( 1. - aa ) * el_a( 1,:) + aa * el_b( 1,:)
+
+      if ( n_north == -1 ) then
+        EL_bry % NTH(:,1)
+     &      = ( 1. - aa ) * el_a(:,jm) + aa * el_b(:,jm)
+      end if
+
+      if ( n_east == -1 ) then
+        EL_bry % EST(1,:)
+     &      = ( 1. - aa ) * el_a(im,:) + aa * el_b(im,:)
+      end if
+
+      if ( n_south == -1 ) then
+        EL_bry % STH(:,1)
+     &      = ( 1. - aa ) * el_a(:, 1) + aa * el_b(:, 1)
+      end if
+
+      if ( n_west == -1 ) then
+        EL_bry % WST(1,:)
+     &      = ( 1. - aa ) * el_a( 1,:) + aa * el_b( 1,:)
+      end if
+
       if ( corr_surface ) then
         dtemp=( 1. - aa ) * dt_a       + aa * dt_b
         dsalt=( 1. - aa ) * ds_a       + aa * ds_b
@@ -418,58 +434,6 @@
 !        print *, rmean(106-i_global(1)+1,214-j_global(jm)+1,:)
 !      end if
 
-!     set boundary condition.
-
-!----------------------------------------------------------------------!
-!lyo:20110224:alu:stcc:
-!     Use tob* and sob* instead - see below commented lines
-!     to be deleted in future - will get rid of tbe,sbe,tbw,sbw,tbn,sbn,
-!     tbs & sbs througout the code
-!     do k=1,kb
-!        do j=1,jm
-!           tbe( j, k ) = tclim( im, j, k ) * fsm( im, j )
-!           sbe( j, k ) = sclim( im, j, k ) * fsm( im, j )
-!           tbw( j, k ) = tclim(  1, j, k ) * fsm(  1, j )
-!           sbw( j, k ) = sclim(  1, j, k ) * fsm(  1, j )
-!         enddo
-!        do i=1,im
-!           tbn( i, k ) = tclim( i, jm, k ) * fsm( i, jm )
-!           sbn( i, k ) = sclim( i, jm, k ) * fsm( i, jm )
-!           tbs( i, k ) = tclim( i,  1, k ) * fsm( i,  1 )
-!           sbs( i, k ) = sclim( i,  1, k ) * fsm( i,  1 )
-!        enddo
-!     enddo
-!----------------------------------------------------------------------!
-      do k=1,kb
-         do j=1,jm
-            do i=1,nfw
-               tobw(i,j,k) = tclim( i, j, k) * fsm( i, j)
-               sobw(i,j,k) = sclim( i, j, k) * fsm( i, j)
-               enddo
-            do i=1,nfe
-               ii=im-i+1
-               tobe(i,j,k) = tclim(ii, j, k) * fsm(ii, j)
-               sobe(i,j,k) = sclim(ii, j, k) * fsm(ii, j)
-               enddo
-               tbw(j,k) = tobw(1,j,k); sbw(j,k) = sobw(1,j,k)
-               tbe(j,k) = tobe(1,j,k); sbe(j,k) = sobe(1,j,k)
-          enddo
-         do i=1,im
-            do j=1,nfs
-               tobs(i,j,k) = tclim( i, j, k) * fsm( i, j)
-               sobs(i,j,k) = sclim( i, j, k) * fsm( i, j)
-               enddo
-            do j=1,nfn
-               jj=jm-j+1
-               tobn(i,j,k) = tclim( i,jj, k) * fsm( i,jj)
-               sobn(i,j,k) = sclim( i,jj, k) * fsm( i,jj)
-               enddo
-               tbs(i,k) = tobs(i,1,k); sbs(i,k) = sobs(i,1,k)
-               tbn(i,k) = tobn(i,1,k); sbn(i,k) = sobn(i,1,k)
-          enddo
-      enddo
-!----------------------------------------------------------------------!
-
       return
 
       end subroutine tsforce_main
@@ -482,8 +446,8 @@
 
 !     surface heat/salt fluxes.
 
-      use glob_atmos , only: e_atmos, swrad, wusurf, wvsurf
-      use glob_config, only: calc_bulk, rhoref, sbias, sf_hf, tbias
+      use air        , only: e_atmos, swrad, wusurf, wvsurf
+      use config     , only: calc_bulk, rhoref, sbias, sf_hf, tbias
       use glob_domain, only: my_task
       use glob_grid  , only: east_e, north_e
       use glob_misc  , only: hi, ice
@@ -535,7 +499,7 @@
      $           exist=lexist)
 
           swrad  = 0.
-          call read_ncep_bulk_pnetcdf(pres_b,tair_b,shum_b,rain_b
+          call read_bulk_pnetcdf(pres_b,tair_b,shum_b,rain_b
      $                     ,cloud_b,uwnd_b,vwnd_b,tskin_b,infile_b,n)
 
         end if

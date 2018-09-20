@@ -9,8 +9,8 @@
 !  Advance model a step
 !______________________________________________________________________
 
-        use glob_config, only: calc_ice, isplit
-        use glob_time  , only: iext
+        use config   , only: calc_ice
+        use model_run, only: iext, isplit
         use seaice
 ! advance POM 1 step in time
       implicit none
@@ -68,7 +68,7 @@
 !  Return the model time
 !______________________________________________________________________
 
-      use glob_time, only: dti, iint, ramp, time, time0
+      use model_run, only: dti, iint, ramp, time, time0
 
       implicit none
 
@@ -90,15 +90,19 @@
 !  Set time dependent surface boundary conditions
 !____ DOES NOTHING ____________________________________________________
 
-      use glob_atmos , only: vfluxf
-      use glob_config, only: rk, tbias
+      use air        , only: air_step, vfluxf
+      use config     , only: rk, tbias
       use glob_domain, only: im, jm
       use glob_ocean , only: t, w
+      use model_run  , only: dtime
 
       implicit none
 
       integer i,j
       real(kind=rk) tatm,satm
+
+
+      call air_step( dtime )
 
       do j=1,jm
         do i=1,im
@@ -159,7 +163,7 @@
 !  Set the lateral viscosity
 !______________________________________________________________________
 
-      use glob_config, only: aam_init, horcon, mode, n1d, npg
+      use config     , only: aam_init, horcon, mode, n1d, npg
       use glob_domain, only: im, imm1, jm, jmm1, kbm1
       use glob_grid  , only: dx, dy
       use glob_misc  , only: aamfac
@@ -168,6 +172,7 @@
       implicit none
 
       integer i,j,k
+
 ! if mode=2 then initial values of aam2d are used. If one wishes
 ! to use Smagorinsky lateral viscosity and diffusion for an
 ! external (2-D) mode calculation, then appropiate code can be
@@ -230,11 +235,11 @@
 !  Form vertical averages of 3-D fields for use in external (2-D) mode
 !______________________________________________________________________
 
-      use glob_config, only: mode
+      use config     , only: mode
       use glob_domain, only: im, jm, kbm1
       use glob_grid  , only: dz
       use glob_ocean
-      use glob_time  , only: isp2i, ispi
+      use model_run  , only: isp2i, ispi
 
       implicit none
 
@@ -291,14 +296,14 @@
 !  Calculate the external (2-D) mode
 !______________________________________________________________________
 
-      use glob_atmos , only: e_atmos, vfluxf, wusurf, wvsurf
+      use air        , only: e_atmos, vfluxf, wusurf, wvsurf
       use bry        , only: bc_vel_ext, bc_zeta
-      use glob_config, only: alpha, ispadv, isplit, smoth
+      use config     , only: alpha, ispadv, smoth
       use glob_const , only: grav
       use glob_domain, only: im, imm1, jm, jmm1
       use glob_grid  , only: art, aru, arv, cor, dx, dy, fsm, h
       use glob_ocean
-      use glob_time  , only: dte, dte2, iext, isp2i, ispi
+      use model_run  , only: dte, dte2, iext, isp2i, ispi, isplit,iint
 
       implicit none
 
@@ -310,6 +315,13 @@
      $                 *(dy(i,j)+dy(i-1,j))*ua(i,j)
           fluxva(i,j)=.25*(d(i,j)+d(i,j-1))
      $                 *(dx(i,j)+dx(i,j-1))*va(i,j)
+          if (abs(fluxua(i,j))>1.e3) then
+            print *, "FLUXUA", iint, iext
+            print *, "d    : ", d(i,j)
+            print *, "ua   : ", ua(i,j)
+            print *, "va   : ", va(i,j)
+            stop
+          end if
         end do
       end do
 
@@ -321,6 +333,14 @@
      $              +dte2*(-(fluxua(i+1,j)-fluxua(i,j)
      $                      +fluxva(i,j+1)-fluxva(i,j))/art(i,j)
      $                      -vfluxf(i,j))
+          if (isnan(elf(i,j))) then
+            print *, "ELF", iint, iext
+            print *, "elb  : ", elb(i,j)
+            print *, "flxua: ", fluxua(i,j)
+            print *, "flxva: ", fluxva(i,j)
+            print *, "vflux: ", vfluxf(i,j)
+            stop
+          end if
         end do
       end do
 
@@ -344,6 +364,36 @@
      $                         +elf(i,j)-elf(i-1,j))
      $                  +e_atmos(i,j)-e_atmos(i-1,j))
      $              +drx2d(i,j)+aru(i,j)*(wusurf(i,j)-wubot(i,j))
+          if (abs(uaf(i,j))>20.) then
+            print *, "!!UAF", uaf(i,j), iint, iext
+            print *, "uab  : ", uab(i,j)
+            print *, "adx2d: ", adx2d(i,j)
+            print *, "advua: ", advua(i,j)
+            print *, "cor  : ", cor(i,j)
+            print *, "d    : ", d(i,j)
+            print *, "v+1  : ", va(i,j+1)
+            print *, "va   : ", va(i,j)
+            print *, "cor-1: ", cor(i-1,j)
+            print *, "d-1  : ", d(i-1,j)
+            print *, "va-+ : ", va(i-1,j+1)
+            print *, "va-1 : ", va(i-1,j)
+            print *, "grav : ", grav
+            print *, "dy   : ", dy(i,j)
+            print *, "dy-1 : ", dy(i-1,j)
+            print *, "el   : ", el(i,j)
+            print *, "el-1 : ", el(i-1,j)
+            print *, "elf  : ", elf(i,j)
+            print *, "elf-1: ", elf(i-1,j)
+            print *, "e_atm: ", e_atmos(i,j)
+            print *, "e_at-: ", e_atmos(i-1,j)
+            print *, "drx2d: ", drx2d(i,j)
+            print *, "wusrf: ", wusurf(i,j)
+            print *, "wubot: ", wubot(i,j)
+            print *, "aru  : ", aru(i,j)
+            print *, "(1)  : ", (h(i,j)+elb(i,j)+h(i-1,j)+elb(i-1,j))
+            print *, "(2)  : ", (h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
+            stop
+          end if
 
         end do
       end do
@@ -355,7 +405,25 @@
      $              -4.*dte*uaf(i,j))
      $             /((h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
      $                 *aru(i,j))
-
+          if (abs(uaf(i,j))>20.) then
+            print *, "UAF", uaf(i,j), iint, iext
+            print *, "uab  : ", uab(i,j)
+            print *, "d    : ", d(i,j)
+            print *, "va   : ", va(i,j)
+            print *, "v+1  : ", va(i,j+1)
+            print *, "elb  : ", elb(i,j)
+            print *, "elf  : ", elf(i,j)
+            print *, "e_atm: ", e_atmos(i,j)
+            print *, "wusrf: ", wusurf(i,j)
+            print *, "wubot: ", wubot(i,j)
+            print *, "drx2d: ", drx2d(i,j)
+            print *, "advua: ", advua(i,j)
+            print *, "adx2d: ", adx2d(i,j)
+            print *, "aru  : ", aru(i,j)
+            print *, "(1)  : ", (h(i,j)+elb(i,j)+h(i-1,j)+elb(i-1,j))
+            print *, "(2)  : ", (h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
+            stop
+          end if
         end do
       end do
 
@@ -385,10 +453,25 @@
         end do
       end do
 
+      if (maxval(abs(uaf))>10.) then
+        print *, "[ UAF BEFORE BCOND ]"
+        stop
+      end if
+
       call bc_vel_ext ! bcond(2)
+
+      if (maxval(abs(uaf))>10.) then
+        print *, "[ UAF BEFORE EXCHANGE ]"
+        stop
+      end if
 
       call exchange2d_mpi(uaf,im,jm)
       call exchange2d_mpi(vaf,im,jm)
+
+      if (maxval(abs(uaf))>10.) then
+        print *, "[ UAF AFTER EXCHANGE ]"
+        stop
+      end if
 
       if     ( iext == (isplit-2) ) then
 
@@ -408,6 +491,17 @@
       ua = ua + .5*smoth*( uab - 2.*ua + uaf )
       va = va + .5*smoth*( vab - 2.*va + vaf )
       el = el + .5*smoth*( elb - 2.*el + elf )
+      do j=1,jm
+        do i=1,im
+          if (abs(ua(i,j))>10.) then
+            print *, "UA", iint, iext
+            print *, "uab  : ", uab(i,j)
+            print *, "uaf  : ", uaf(i,j)
+            stop
+          end if
+        end do
+      end do
+
       elb = el
       el  = elf
       d   = h + el
@@ -444,20 +538,21 @@
 !  Calculate the internal (3-D) mode
 !______________________________________________________________________
 
-      use glob_atmos , only: vfluxb, vfluxf, wssurf, wtsurf
+      use air        , only: vfluxb, vfluxf, wssurf, wtsurf
       use bry        , only: bc_ts, bc_turb, bc_vel_int, bc_vel_vert
-      use glob_const , only: small
-      use glob_config, only: mode, nadv, nbcs, nbct, nread_rst
-     &                     , rk, smoth, t_lo, t_hi
+      use glob_const , only: rk, small
+      use config     , only: mode, nadv, nbcs, nbct, do_restart
+     &                     , smoth, t_lo, t_hi
       use glob_domain
       use glob_grid  , only: dx, dy, dz, fsm, h, zz
       use glob_ocean
-      use glob_time
+      use model_run
 
       implicit none
 
       integer i,j,k
       real(rk) dxr,dxl,dyt,dyb
+
 
       if ( (iint/=1 .or. time0/=0.) .and. mode/=2 ) then
 
@@ -550,7 +645,7 @@
 
 
 ! calculate tf and sf using uf, vf, a and c as temporary variables
-        if( mode /= 4 .and. ( iint > 2 .or. nread_rst == 1 ) ) then
+        if( mode /= 4 .and. ( iint > 2 .or. do_restart ) ) then
 
           if     ( nadv == 1 ) then
 
@@ -723,11 +818,13 @@
 !  Print output
 !______________________________________________________________________
 
-      use glob_config, only: iprint, sbias, tbias, rk
+      use config     , only: sbias, tbias
+      use glob_const , only: rk
       use glob_domain
       use glob_grid  , only: art, dz, fsm
       use glob_ocean , only: et, dt, sb, tb
-      use glob_time
+      use glob_out   , only: iprint
+      use model_run
 
       implicit none
 
@@ -810,10 +907,12 @@
 !  Check if velocity condition is violated
 !______________________________________________________________________
 
-      use glob_config, only: iprint, rk, vmaxl
+      use config     , only: vmaxl
+      use glob_const , only: rk
       use glob_domain
-      use glob_time  , only: iext, iint, time
+      use model_run  , only: iext, iint, time
       use glob_ocean , only: vaf
+      use glob_out   , only: iprint
 
       implicit none
 
@@ -854,7 +953,7 @@
 !  Store averages for further output (if enabled)
 !______________________________________________________________________
 
-      use glob_atmos , only: wssurf, wtsurf, wusurf, wvsurf
+      use air        , only: wssurf, wtsurf, wusurf, wvsurf
       use glob_domain, only: kb
       use glob_ocean , only: aam, cbc, elb, kh, rho, s, t, u, uab
      &                     , v, vab, w, wubot, wvbot
@@ -893,8 +992,7 @@
 !  Store avrages for surface output
 !______________________________________________________________________
 
-      use glob_atmos, only: uwsrf, vwsrf
-      use glob_misc , only: nums
+      use air       , only: uwsrf, vwsrf
       use glob_ocean, only: elb, u, v
       use glob_out
 
@@ -1048,7 +1146,7 @@
 !  Check an array for NaNs
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: i_global, im, j_global, jm, kb
       use glob_grid  , only: h
 
@@ -1114,11 +1212,11 @@
 !  Check a 2D array for NaNs
 !______________________________________________________________________
 
-      use glob_atmos
-      use glob_config, only: rk
+      use air
+      use glob_const , only: rk
       use glob_domain, only: i_global, im, j_global, jm
       use glob_grid  , only: h
-      use glob_time  , only: time
+      use model_run  , only: time
       use glob_ocean
 
       implicit none

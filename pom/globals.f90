@@ -1,117 +1,37 @@
-module glob_config
+module glob_const
 
   implicit none
 
   public
 
 ! Get precision parameter
-  include 'realkind'
-
-!----------------------------------------------------------------------
-! Input variables
-!----------------------------------------------------------------------
-  integer            &
-    mode             & ! calculation mode
-  , ntp              & ! water type
-  , ispadv           & ! step interval for updating external advective terms
-  , isplit           & ! dti/dte
-  , iprint           & ! interval in iint at which variables are printed
-  , nadv             & ! advection scheme
-  , nbct             & ! surface temperature boundary condition
-  , nbcs             & ! surface salinity boundary condition
-  , nitera           & ! maximum number of iterations for Smolarkiewicz scheme
-  , npg              & ! pressure gradient scheme
-  , nread_rst        & ! index to start from restart file
-  , iperx            & !periodic boundary condition in x direction !alu:stcc
-  , ipery            & !periodic boundary condition in y direction !lyo:scs1d:
-  , n1d                !n1d .ne. 0 for 1d-simulation !lyo:scs1d:
+  include 'realkind'   ! integer, parameter :: rk = 8
+                       ! or 4... 16 is not supported by NetCDF.
 
   real(kind=rk)      &
-    alpha            & ! weight for surface slope term in external eq
-  , rhoref           & ! reference density
-  , sbias            & ! salinity bias
-  , slmax            & 
-  , tbias            & ! temperature bias
-  , tprni            & ! inverse horizontal turbulent Prandtl number
-  , umol             & ! background viscosity
-  , vmaxl            & ! max vaf used to test for model blow-up
-  , write_rst        & 
-  , aam_init         & ! initial value of aam
-  , cbcmax           & ! maximum bottom friction coefficient
-  , cbcmin           & ! minimum bottom friction coefficient
-  , days             & ! run duration in days
-  , horcon           & ! smagorinsky diffusivity coefficient
-  , prtd1            & ! initial print interval (days)
-  , prtd2            & ! final print interval (days)
-  , smoth            & ! constant to prevent solution splitting
-  , sw               & ! smoothing parameter for Smolarkiewicz scheme
-  , z0b              & ! bottom roughness
-  , lono,lato        & ! lon,lat where aam*(1+fak) larger influence (xs,ys)
-  , xs,ys,fak          ! set lono or lato=999.     to skip !lyo:pac10:
-! , period           & ! inertial period
+    deg2rad          & ! pi/180.
+  , grav             & ! gravitational acceleration
+  , kappa            & ! von Karman's constant
+  , ohm              & ! Earth's rotation angular frequency 
+  , pi               & ! pi
+  , sec2day          & ! 1./86400.
+  , small              ! small value
 
-  character(len=26)  &
-    time_start         ! date and time of start of initial run of model
+  contains
 
-  character(len=40)  &
-    source           & ! TODO: Remove; unused var
-  , title
+    subroutine initialize_constants !( constants_override_nml ) : TODO
 
-  character(len=120) &
-    netcdf_file      & ! output netcdf filename
-  , read_rst_file    & ! restart filename
-  , write_rst_file     ! output restart filename (TODO: Remove; unused var)
+      pi      = atan(1.)*4.  ! PI
+      deg2rad = pi/180.      ! degrees to radians conversion factor
+      grav    = 9.806        ! gravity constant (m/s^2)
+      small   = 1.e-10       ! small value
+      kappa   = 0.4          ! VonKarman's constant
+      ohm     = 7.29e-5      ! angular frequency of Earth
+      sec2day = 1./86400.    ! seconds to days conversion factor
 
+    end subroutine
 
-  parameter( lono=999.0,lato=999.0, xs=1.5,ys=1.5, fak=0.5)
-
-
-!----------------------------------------------------------------------
-! Module switches
-!----------------------------------------------------------------------
-  logical            &
-    calc_bulk        & ! use bulk formulations for surface fluxes
-  , calc_wind        & ! use surface wind stress BC
-  , calc_tsforce     & ! use surface heat flux BC
-  , calc_river       & ! use river discharge       [ NOT TESTED ]
-  , calc_assim       & ! use SST assimilation      [ NOT TESTED ]
-  , calc_assimdrf    & ! use drifter assimilation  [ NOT TESTED ]
-  , calc_interp      & ! use interpolation (wind?) [ NOT TESTED ]
-  , calc_tsurf_mc    & ! use MCSST                 [ NOT TESTED ]
-  , calc_tide        & ! use tides                 [ NOT TESTED ]
-  , calc_uvforce     & ! use lateral BC for velocities
-  , calc_ice         & ! use simple ice drag model [ TODO: TEST ]
-  , spinup             ! spinup flag - freeze initial forcing
-
-
-!----------------------------------------------------------------------
-! Strings
-!----------------------------------------------------------------------
-  character(len=4) &
-    windf      ! TODO: remove this path
-
-  integer          &
-    output_flag    &
-  , SURF_flag      &
-  , monthly_flag
-
-  real(kind=rk)    &
-    sf_bf          & ! boundary flux (barotropic velocities) factor
-  , sf_hf          & ! heat flux factor
-  , sf_wi            ! wind velocity factor
-
-  real(kind=rk)    &
-    t_lo, t_hi
-
-!----------------------------------------------------------------------
-! Tide parameters
-!----------------------------------------------------------------------
-  integer            &
-    ntide              ! number of tidal components
-
-  parameter( ntide=1 )
-
-end module glob_config
+end module glob_const
 
 
 module glob_domain
@@ -248,9 +168,76 @@ module glob_domain
 end module glob_domain
 
 
-module glob_time
+module glob_out
 
-  use glob_config, only: rk
+  use glob_const, only: rk
+
+  implicit none
+
+  public
+
+!----------------------------------------------------------------------
+! Scalars
+!----------------------------------------------------------------------
+  integer          &
+    nums           &
+  , iprint         & ! interval [iint] at which variables are printed
+  , iprints        & ! interval [iint] for writing SURF?
+  , irestart       & ! restart file writing time step [in iint]
+  , iouts
+
+  real(kind=rk)    &
+    prtd1          & ! output interval (days)
+  , prtd2          & ! output interval for SURF.* file (days)
+  , write_rst        ! restart output interval [days]
+
+!----------------------------------------------------------------------
+! Averages for 2D variables' output
+!----------------------------------------------------------------------
+  real(kind=rk)              &
+       , allocatable         &
+       , dimension(:,:)   :: &
+! Standard output
+    elb_mean         &
+  , uab_mean         &
+  , vab_mean         &
+  , wssurf_mean      &
+  , wtsurf_mean      &
+  , wusurf_mean      &
+  , wvsurf_mean      &
+! Surface output
+  , elsrf_mean       &
+  , usrf_mean        &
+  , uwsrf_mean       & ! wind x-velocity output field?
+  , vsrf_mean        &
+  , vwsrf_mean         ! wind y-velocity output field?
+
+
+!----------------------------------------------------------------------
+! Averages for 3D variables' output
+!----------------------------------------------------------------------
+  real(kind=rk)              &
+       , allocatable         &
+       , dimension(:,:,:) :: &
+    kh_mean          &
+  , km_mean          &
+  , rho_mean         &
+  , s_mean           &
+  , t_mean           &
+  , u_mean           &
+  , v_mean           &
+  , w_mean
+
+  integer &
+    num, iout
+
+end module glob_out
+
+
+module model_run
+
+  use glob_const , only: rk
+  use module_time
 
   implicit none
 
@@ -263,10 +250,12 @@ module glob_time
     iint             & ! internal mode step counter
   , iend             & ! total internal mode time steps
   , iext             & ! external mode step counter
-  , irestart           ! restart file writing time step (in iint)
+  , isplit             ! dti/dte
+
 
   real(kind=rk)      &
-    dte              & ! external (2-D) time step (s)
+    days             & ! run duration in days
+  , dte              & ! external (2-D) time step (s)
   , dte2             & ! 2*dte
   , dti              & ! internal (3-D) time step (s)
   , dti2             & ! 2*dti
@@ -276,47 +265,68 @@ module glob_time
   , time             & ! model time (days)
   , time0              ! initial time (days)
 
-end module glob_time
+  character(len=26)  &
+    time_start       & ! date and time of start of initial run of model
+  , datetime           ! current model datetime string
 
-
-module glob_const
-
-  use glob_config, only: rk
-
-  implicit none
-
-  public
-
-
-  real(kind=rk)      &
-    deg2rad          & ! pi/180.
-  , grav             & ! gravitational acceleration
-  , kappa            & ! von Karman's constant
-  , ohm              & ! Earth's rotation angular frequency 
-  , pi               & ! pi
-  , sec2day          & ! 1./86400.
-  , small              ! small value
+  type(date)         &
+    dtime              ! current model datetime variable
 
   contains
 
-    subroutine initialize_constants
+    subroutine initialize_time( time_string )
 
-      pi      = atan(1.)*4.  ! PI
-      deg2rad = pi/180.      ! degrees to radians conversion factor
-      grav    = 9.806        ! gravity constant (m/s^2)
-      small   = 1.e-10       ! small value
-      kappa   = 0.4          ! VonKarman's constant
-      ohm     = 7.29e-5      ! angular frequency of Earth
-      sec2day = 1./86400.    ! seconds to days conversion factor
+      use glob_out, only: iprint, iprints, irestart   &
+                        , prtd1 , prtd2  , write_rst
+
+      implicit none
+
+      character(len=*), intent(in) :: time_string
+
+      type(date) dtime_offset
+
+! Determine internal timestep
+      dti  = dte*float(isplit)
+      dte2 = dte*2
+      dti2 = dti*2
+
+! Define number of steps and output intervals
+      iend    = max0( nint( days*24.*3600./dti), 2 )
+      iprint  = max ( nint(prtd1*24.*3600./dti), 1 )
+      irestart= nint(  write_rst*24.*3600./dti     )
+      iprints = nint(      prtd2*24.*3600./dti     ) !fhx:20110131:add 3hrly output
+
+      ispi = 1./    float(isplit)
+      isp2i= 1./(2.*float(isplit))
+
+! Initialize time
+! Do not offset time if not restarting
+      if ( time_string /= '' ) then
+
+        dtime_offset = str2date(  time_start(1:19) )
+        dtime        = str2date( time_string(1:19) )
+
+        time0 = real( (dtime-dtime_offset)/86400 )
+
+      else
+
+        dtime = str2date( time_start )
+
+        time0 = 0.
+
+      end if
+
+      time = time0
+
 
     end subroutine
 
-end module glob_const
+end module model_run
 
 
 module glob_grid
 
-  use glob_config, only: rk
+  use glob_const, only: rk
 
   implicit none
 
@@ -364,7 +374,7 @@ end module glob_grid
 
 module glob_ocean
 
-  use glob_config, only: rk
+  use glob_const, only: rk
 
   implicit none
 
@@ -459,52 +469,13 @@ module glob_ocean
 end module glob_ocean
 
 
-
-module glob_atmos
-
-  use glob_config, only: rk
-
-  implicit none
-
-  public
-
-
-!----------------------------------------------------------------------
-! Air-Sea interaction related arrays
-!----------------------------------------------------------------------
-  real(kind=rk)              &
-       , allocatable         &
-       , dimension(:,:)   :: &
-    e_atmos          & ! atmospheric pressure
-  , swrad            & ! short wave radiation incident on the ocean surface
-  , uwsrf            & ! wind speed in x-direction
-  , vfluxb           & ! volume flux through water column surface at time n-1
-  , vfluxf           & ! volume flux through water column surface at time n+1
-  , vwsrf            & ! wind speed in y-direction
-  , wssurf           & ! <ws(0)> salinity flux at the surface
-  , wtsurf           & ! <wt(0)> temperature flux at the surface
-  , wusurf           & ! <wu(0)> momentum flux at the surface
-  , wvsurf             ! <wv(0)> momentum flux at the surface
-
-
-end module glob_atmos
-
-
 module glob_misc
 
-  use glob_config, only: rk
+  use glob_const, only: rk
 
   implicit none
 
   public
-
-!----------------------------------------------------------------------
-! Scalars
-!----------------------------------------------------------------------
-  integer          &
-    nums           &
-  , iprints        &
-  , iouts
 
 !----------------------------------------------------------------------
 ! 2-D arrays
@@ -533,60 +504,9 @@ module glob_misc
 end module glob_misc
 
 
-module glob_out
-
-  use glob_config, only: rk
-
-  implicit none
-
-  public
-
-!----------------------------------------------------------------------
-! Averages for 2D variables' output
-!----------------------------------------------------------------------
-  real(kind=rk)              &
-       , allocatable         &
-       , dimension(:,:)   :: &
-! Standard output
-    elb_mean         &
-  , uab_mean         &
-  , vab_mean         &
-  , wssurf_mean      &
-  , wtsurf_mean      &
-  , wusurf_mean      &
-  , wvsurf_mean      &
-! Surface output
-  , elsrf_mean       &
-  , usrf_mean        &
-  , uwsrf_mean       & ! wind x-velocity output field?
-  , vsrf_mean        &
-  , vwsrf_mean         ! wind y-velocity output field?
-
-
-!----------------------------------------------------------------------
-! Averages for 3D variables' output
-!----------------------------------------------------------------------
-  real(kind=rk)              &
-       , allocatable         &
-       , dimension(:,:,:) :: &
-    kh_mean          &
-  , km_mean          &
-  , rho_mean         &
-  , s_mean           &
-  , t_mean           &
-  , u_mean           &
-  , v_mean           &
-  , w_mean
-
-  integer &
-    num, iout
-
-end module glob_out
-
-
 module glob_bry
 
-  use glob_config, only: rk
+  use glob_const, only: rk
 
   implicit none
 

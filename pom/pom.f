@@ -4,9 +4,10 @@
 
       program pom
 
-      use glob_config
+      use config
       use glob_domain, only: is_master
-      use glob_time  , only: dti, iend, iint
+      use io
+      use model_run  , only: dti, dtime, iend, iint
 
       use module_time
       use river
@@ -22,20 +23,10 @@
 
       integer mb
 
-      type(date) :: dtime
 
 ! initialize model
       call initialize
 
-! starting date and time
-! read date from restart file name !fhx:
-! ...only if restart is enabled
-      if ( nread_rst /= 0 ) then
-        dtime = str2date( read_rst_file(1:13)//":"//
-     &  read_rst_file(15:16)//":"//read_rst_file(18:19) )
-      else
-        dtime = str2date( time_start )
-      end if
       mb = dtime%month
 
       if ( calc_uvforce ) call uvforce_init(dtime)
@@ -46,20 +37,18 @@
       call river_init( dtime )
       call assim_init( dtime )
       if ( calc_ice ) call ice_init( dtime )
+! TODO: Move all of these to initialize?
+      call msg_print("INITIALIZATION COMPLETE", 1, "")
+
+      if ( .not.do_restart ) call out_init( trim(netcdf_file) )
 
       if ( is_master ) then
-        print '(a)', 'End of initialization'
-        print *, ''
-        print '("d = ",a)', date2str( dtime )
-      endif
-
-      if(nread_rst.eq.0) !call write_output_init_pnetcdf !lyo:20110224:alu:stcc:!lyo:pac10:add this write_output_init*
-     &    call write_output_init_pnetcdf(
-     &        "out/init."//trim(netcdf_file)//".nc")
-
+        call msg_print("BEGIN NUMERICAL EXPERIMENT", 1, "")
+        print '(" = ",a)', date2str( dtime )
+      end if
 
 ! main loop
-      do iint=1,iend
+      do iint = 1,iend
 
 
 !     external forcings
@@ -122,12 +111,12 @@
 !______________________________________________________________________
       subroutine write_output( d_in, output_mode, mb )
 
-      use glob_config, only: calc_assim, iprint, netcdf_file
+      use config     , only: calc_assim, netcdf_file
      &                     , output_flag
       use glob_domain, only: im, jm, kb
       use glob_ocean , only: ssurf, tsurf
       use glob_out
-      use glob_time  , only: iint
+      use model_run  , only: iint
       use module_time
       use assim, only : assim_store_ssha
 
@@ -139,7 +128,7 @@
 
       if ( netcdf_file /= 'nonetcdf' ) then
 
-        if(( output_mode==0 .and. mod(iint,iprint).eq.0 ) .or.
+        if(( output_mode==0 .and. mod(iint,iprint)==0 ) .or.
      &     ( output_mode==1 .and. mb /= d_in%month )) then
 
           mb = d_in%month
@@ -258,21 +247,21 @@
 
           end if
 
-          uab_mean    = 0.0
-          vab_mean    = 0.0
-          elb_mean    = 0.0
-          wusurf_mean = 0.0
-          wvsurf_mean = 0.0
-          wtsurf_mean = 0.0
-          wssurf_mean = 0.0
-          u_mean      = 0.0
-          v_mean      = 0.0
-          w_mean      = 0.0
-          t_mean      = 0.0
-          s_mean      = 0.0
-          rho_mean    = 0.0
-          kh_mean     = 0.0
-          km_mean     = 0.0
+          uab_mean    = 0.
+          vab_mean    = 0.
+          elb_mean    = 0.
+          wusurf_mean = 0.
+          wvsurf_mean = 0.
+          wtsurf_mean = 0.
+          wssurf_mean = 0.
+          u_mean      = 0.
+          v_mean      = 0.
+          w_mean      = 0.
+          t_mean      = 0.
+          s_mean      = 0.
+          rho_mean    = 0.
+          kh_mean     = 0.
+          km_mean     = 0.
 
           num = 0
 
@@ -281,68 +270,71 @@
 
       return
       end !subroutine write_output
-!-------------------------------------------------------
-
+!______________________________________________________________________
 !
-!_______________________________________________________________________
       subroutine write_output_surf !fhx:20110131: new subr.
+!----------------------------------------------------------------------
+!  Prepares output vars and calls output procedure.
+!______________________________________________________________________
 
-      use glob_config, only: netcdf_file, SURF_flag
+      use config     , only: netcdf_file, SURF_flag
       use glob_domain, only: im, jm
-      use glob_misc  , only: iprints, nums
       use glob_out
-      use glob_time  , only: iint
+      use model_run  , only: iint
       use module_time
 
       implicit none
 
-      if(netcdf_file.ne.'nonetcdf' .and. mod(iint,iprints).eq.0) then
+      if (      netcdf_file /= 'nonetcdf'
+     &    .and. mod(iint,iprints) == 0   ) then
 
-
-         usrf_mean  = usrf_mean  / real ( nums )
-         vsrf_mean  = vsrf_mean  / real ( nums )
-         elsrf_mean = elsrf_mean / real ( nums )
-         uwsrf_mean = uwsrf_mean / real ( nums )
-         vwsrf_mean = vwsrf_mean / real ( nums )
-
+        usrf_mean  = usrf_mean  / real ( nums )
+        vsrf_mean  = vsrf_mean  / real ( nums )
+        elsrf_mean = elsrf_mean / real ( nums )
+        uwsrf_mean = uwsrf_mean / real ( nums )
+        vwsrf_mean = vwsrf_mean / real ( nums )
 
 !     fill up ghost cells before output
-         call exchange2d_mpi( usrf_mean, im, jm )
-         call exchange2d_mpi( vsrf_mean, im, jm )
-         call exchange2d_mpi( elsrf_mean, im, jm )
-         call exchange2d_mpi( uwsrf_mean, im, jm )
-         call exchange2d_mpi( vwsrf_mean, im, jm )
+        call exchange2d_mpi( usrf_mean, im, jm )
+        call exchange2d_mpi( vsrf_mean, im, jm )
+        call exchange2d_mpi( elsrf_mean, im, jm )
+        call exchange2d_mpi( uwsrf_mean, im, jm )
+        call exchange2d_mpi( vwsrf_mean, im, jm )
 
-       if (SURF_flag==1)
+        if ( SURF_flag == 1 )
      $    call write_SURF_pnetcdf(
      $        "out/SRF."//trim(netcdf_file)//".nc")
 
-         usrf_mean  = 0.0
-         vsrf_mean  = 0.0
-         elsrf_mean = 0.0
-         uwsrf_mean = 0.0
-         vwsrf_mean = 0.0
+        usrf_mean  = 0.0
+        vsrf_mean  = 0.0
+        elsrf_mean = 0.0
+        uwsrf_mean = 0.0
+        vwsrf_mean = 0.0
 
-         nums = 0
+        nums = 0
 
-      endif
+      end if
 
       return
       end
-!-------------------------------------------------------
-
-!_______________________________________________________________________
+!______________________________________________________________________
+!
       subroutine write_restart( d_in )
+!----------------------------------------------------------------------
+!  Exchanges all output variables and writes restart file.
+!______________________________________________________________________
 
-      use glob_atmos , only: wusurf, wvsurf
-      use glob_config, only: netcdf_file, rk
+      use air        , only: wusurf, wvsurf
+      use config     , only: netcdf_file
+      use glob_const , only: rk
       use glob_domain, only: im, jm, kb
       use glob_ocean , only: aam, aam2d, advua, advva, adx2d, ady2d
      &                     , egb, el, elb, et, etb, kh, km, kq, l
      &                     , q2, q2b, q2l, q2lb, rho, s, sb, t, tb
      &                     , u, ua, uab, ub, utb, v, va, vab, vb, vtb
      &                     , w, wubot, wvbot
-      use glob_time  , only: dti, iend, iint, irestart
+      use glob_out   , only: irestart
+      use model_run  , only: dti, iend, iint
       use module_time
 
       implicit none
@@ -351,16 +343,15 @@
 
 !lyo:exp302:The following changes will create a restart 1day after the
 !     initial date_start0 to be used for next-day's ncast&fcast
-      real(kind=rk), parameter :: write_rst1d = 1.0 !lyo:exp302:daily analysis restart
-      integer irestart1d, ncount           !           each run for next-day
-      data ncount/0/                       !           fcast
+      real(kind=rk), parameter :: write_rst1d = 1.0
+      integer irestart1d, ncount ! each run for next-day
+      data ncount/0/             ! fcast
 
-      irestart1d=nint(write_rst1d*86400./dti)                    !lyo:exp302:
-      if(     (mod(iint,irestart)   == 0                  )        !lyo:exp302:
-     $   .or. (mod(iint,irestart1d) == 0 .and. ncount.eq.0)        !lyo:exp302:
-     &   .or. ( iint == iend ) ) then
-         ncount=1                                                  !lyo:exp302:
-!     if( mod(iint,irestart) == 0 ) then                           !lyo:exp302:
+      irestart1d = nint(write_rst1d*86400./dti)
+      if (     (mod(iint,irestart)   == 0                  )
+     &    .or. (mod(iint,irestart1d) == 0 .and. ncount == 0)
+     &    .or. ( iint == iend ) ) then
+        ncount = 1
 
 ! fill up ghost cells
 ! They have to be filled in creating a restart file,
@@ -425,18 +416,22 @@
         call exchange3d_mpi(q2lb,im,jm,kb)
 
 
-         call write_restart_pnetcdf(
+        call write_restart_pnetcdf(
      $        "out/"//date2str(d_in)//"."//
      $        trim(netcdf_file)//".rst" )
 
-      endif
+      end if
 
 
       return
       end
-!-------------------------------------------------------
-
+!______________________________________________________________________
+!
       subroutine msg_print( msg, status, desc )
+!----------------------------------------------------------------------
+!  Prints a message. TODO: move to a separate module since other
+! modules depend on this routine.
+!______________________________________________________________________
 
         use glob_domain, only: is_master
 
@@ -446,8 +441,8 @@
         integer         , intent(in) :: status
 
         integer, parameter :: line_len = 56
-        character, dimension(5), parameter :: chr =
-     &                          (/"O","!","X","?","*"/)
+        character, dimension(6), parameter :: chr =
+     &                          (/"O","!","X","?","*"," "/)
 
         integer                   i
         character(len=64)         fmt01!, fmt02
@@ -457,10 +452,16 @@
 
         line = ""
 
+! Print simple message if only `DESC` is present.
+        if ( msg == '' .and. desc /= '' ) then
+          print '("[",a,"] ",a/)', chr(status), desc
+          return
+        end if
+
+        write( fmt01, '("(",i2,"a)")') line_len
         i = line_len-3 - len(msg)
         line(max(1,i):) = msg
 
-        write( fmt01, '("(",i2,"a)")') line_len
         print '(/)'
         print fmt01, ("_",i=1,line_len)
 

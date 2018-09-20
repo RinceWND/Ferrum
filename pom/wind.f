@@ -1,6 +1,7 @@
       module wind
 
-      use glob_config, only: calc_interp, calc_wind, rk, sf_wi
+      use config     , only: calc_interp, calc_wind, sf_wi
+      use glob_const , only: rk
       use glob_domain, only: n_south, n_west
       use glob_grid  , only: east_e, north_e
 
@@ -38,7 +39,7 @@
 !  Initialize variables for wind.
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: im, im_coarse, is_master, jm, jm_coarse
 !     &                     , n_south
       use module_time
@@ -237,13 +238,13 @@
 !  Calclate wind stress wusurf and wvsurf.
 !______________________________________________________________________
 
-      use glob_atmos , only: uwsrf, vwsrf, wusurf, wvsurf
-      use glob_config, only: cbcmax, cbcmin, z0b
+      use air        , only: uwsrf, vwsrf, wusurf, wvsurf
+      use config     , only: cbcmax, cbcmin, z0b
       use glob_domain, only: im, jm, kbm1
       use glob_grid  , only: fsm, h, zz
       use glob_misc  , only: ice
       use glob_ocean , only: cbc, u, v, wubot, wvbot
-      use glob_time  , only: dti
+      use model_run  , only: dti
       use module_time
       use interp
 

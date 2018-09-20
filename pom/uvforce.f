@@ -1,6 +1,7 @@
       module uvforce
 
-      use glob_config, only: rk, sf_bf
+      use config     , only: sf_bf
+      use glob_const , only: rk
       use glob_domain, only: im, jm, kb, is_master
 
       implicit none
@@ -18,10 +19,10 @@
 
 
 !      real(kind=rk), dimension( im_local ) ::
-!     $     vabs_a, vabn_a, vabs_b, vabn_b
+!     $     VA_bry % STH_a, VA_bry % NTH_a, VA_bry % STH_b, VA_bry % NTH_b
 !
 !      real(kind=rk), dimension( jm_local ) ::
-!     $     uabe_a, uabw_a, uabe_b, uabw_b
+!     $     UA_bry % EST_a, UA_bry % WST_a, UA_bry % EST_b, UA_bry % WST_b
 
       real(kind=rk), allocatable, dimension(:,:) ::
      $     vbs_a, vbn_a, vbs_b, vbn_b
@@ -45,7 +46,7 @@
 !--------------------------------------------------------------
       subroutine uvforce_init( d_in )
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use module_time
 
       implicit none
@@ -136,10 +137,10 @@
 !  Read & time-interpolation of U & V boundary condition.
 !______________________________________________________________________
 
-      use bry        , only: uabe, ube, uabw, ubw, vabn, vbn, vabs, vbs
-      use glob_config, only: rk
+      use bry        , only: U_bry, UA_bry, V_bry, VA_bry
+      use glob_const , only: rk
       use glob_grid  , only: dz
-      use glob_time  , only: dti
+      use model_run  , only: dti
       use module_time
 
       implicit none
@@ -200,10 +201,10 @@
       if ( sec_in_month > mid_in_month  .and.
      $     sec_in_month - mid_in_month <= int( dti ) ) then
 
-!         uabe_a = uabe_b
-!         uabw_a = uabw_b
-!         vabs_a = vabs_b
-!         vabn_a = vabn_b
+!         UA_bry % EST_a = UA_bry % EST_b
+!         UA_bry % WST_a = UA_bry % WST_b
+!         VA_bry % STH_a = VA_bry % STH_b
+!         VA_bry % NTH_a = VA_bry % NTH_b
 
          ube_a = ube_b
          ubw_a = ubw_b
@@ -244,30 +245,30 @@
 !        print *, my_task, ": VOLTR [Sv]: ", transport(1:n_bry)
 !        if ( my_task == 1 ) then
 !          print *, my_task, ": TsuV [m/s]: "
-!     &         , minval(vabs), ";", maxval(vabs)
+!     &         , minval(VA_bry % STH), ";", maxval(VA_bry % STH)
 !        end if
 !        if ( my_task == 3 ) then
 !          print *, my_task, ": TsgUSoy [m/s]: "
-!     &         , minval(uabe), ";", maxval(uabe)
+!     &         , minval(UA_bry % EST), ";", maxval(UA_bry % EST)
 !        end if
 
       else
 
-        ube = ( 1.0 - aa ) * ube_a + aa * ube_b
-        ubw = ( 1.0 - aa ) * ubw_a + aa * ubw_b
-        vbs = ( 1.0 - aa ) * vbs_a + aa * vbs_b
-        vbn = ( 1.0 - aa ) * vbn_a + aa * vbn_b
+        U_bry % EST(1,:,:) = ( 1.0 - aa ) * ube_a + aa * ube_b
+        U_bry % WST(1,:,:) = ( 1.0 - aa ) * ubw_a + aa * ubw_b
+        V_bry % STH(:,1,:) = ( 1.0 - aa ) * vbs_a + aa * vbs_b
+        V_bry % NTH(:,1,:) = ( 1.0 - aa ) * vbn_a + aa * vbn_b
 
   !     integrate vertically
-        uabe = 0.
-        uabw = 0.
-        vabs = 0.
-        vabn = 0.
-        do k=1,kb
-          uabe = uabe + ube(:,k)*dz(k)
-          uabw = uabw + ubw(:,k)*dz(k)
-          vabs = vabs + vbs(:,k)*dz(k)
-          vabn = vabn + vbn(:,k)*dz(k)
+        UA_bry % EST = 0.
+        UA_bry % WST = 0.
+        VA_bry % STH = 0.
+        VA_bry % NTH = 0.
+        do k=1,kb ! TODO: This short form won't accumulate values!
+          UA_bry % EST(1,:) = UA_bry%EST(1,:) + U_bry%EST(1,:,k)*dz(k)
+          UA_bry % WST(1,:) = UA_bry%WST(1,:) + U_bry%WST(1,:,k)*dz(k)
+          VA_bry % STH(:,1) = VA_bry%STH(1,:) + V_bry%STH(:,1,k)*dz(k)
+          VA_bry % NTH(:,1) = VA_bry%NTH(1,:) + V_bry%NTH(:,1,k)*dz(k)
         end do
 
       end if
@@ -280,8 +281,8 @@
 
       subroutine transport_to_velocities
 
-        use bry        , only: uabe, uabw, vabn, vabs
-        use glob_config, only: rk
+        use bry        , only: UA_bry, VA_bry
+        use glob_const , only: rk
         use glob_domain, only: i_global, im_global, imm1
      &                       , j_global, jm_global, jmm1
      &                       , n_east, n_north, n_south, n_west
@@ -337,10 +338,11 @@
      &                    .and. int(y(1,n)) == jm_global ) then
 
                 if ( x1 > 0 .and. x2 <= im ) then
-                  vabn(x1:x2) = dvm(x1:x2,jm)*transport(n) / area
+                  VA_bry % NTH(x1:x2,1) =
+     &              dvm(x1:x2,jm)*transport(n) / area
                 end if
 !              print *, my_task, " @N TR: ", transport(n)
-!              print *, my_task, " @N mV: ", vabn(x1)
+!              print *, my_task, " @N mV: ", VA_bry % NTH(x1)
 
               end if
             end if
@@ -380,10 +382,11 @@
      &                    .and. int(x(1,n)) == im_global ) then
 
                 if ( y1 > 0 .and. y2 <= jm ) then
-                  uabe(y1:y2) = dum(im,y1:y2)*transport(n) / area
+                  UA_bry % EST(1,y1:y2) =
+     &              dum(im,y1:y2)*transport(n) / area
                 end if
 !              print *, my_task, " @E TR: ", transport(n)
-!              print *, my_task, " @E mV: ", uabe(y1)
+!              print *, my_task, " @E mV: ", UA_bry % EST(y1)
 
               end if
             end if
@@ -421,7 +424,8 @@
             if ( n_south == -1 ) then
               if ( y(1,n) == y(2,n) .and. int(y(1,n)) == 1 ) then
 
-                vabs(x1:x2) = dvm(x1:x2,1)*transport(n) / area
+                VA_bry % STH(x1:x2,1) =
+     &            dvm(x1:x2,1)*transport(n) / area
 
               end if
             end if
@@ -460,10 +464,11 @@
      &                    .and. int(x(1,n)) == im_global ) then
 
                 if ( y1 > 0 .and. y2 <= jm ) then
-                  uabw(y1:y2) = dum(1,y1:y2)*transport(n) / area
+                  UA_bry % WST(1,y1:y2) =
+     &              dum(1,y1:y2)*transport(n) / area
                 end if
 !              print *, my_task, " @W TR: ", transport(n)
-!              print *, my_task, " @W mV: ", uabw(y1)
+!              print *, my_task, " @W mV: ", UA_bry % WST(y1)
 
               end if
             end if

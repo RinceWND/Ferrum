@@ -1,9 +1,7 @@
       module  module_time
-      
+
       implicit none
-      
-!      include 'pom.h'
-      
+
       type date
       integer :: year, month, day, hour, min, sec
       end type date
@@ -15,7 +13,7 @@
       interface operator(-)
       module procedure dif_date
       end interface
-  
+
       interface operator(>=)
       module procedure ge_date
       end interface
@@ -33,10 +31,10 @@
 
 
       type(date), intent(in) :: d1, d2
-      
+
 
       ge_date = lge( date2str( d1 ), date2str( d2 ) )
-      
+
 
       end function ge_date
 !=====================================================================
@@ -237,5 +235,72 @@
       
       end function inc_leap
 !=====================================================================     
+
+!______________________________________________________________________
+!
+      integer function interval_of_year( d, i )
+!----------------------------------------------------------------------
+!  Counts the number of full time intervals `i` [sec] for date `d`
+! since the start of the year `d%year`.
+!______________________________________________________________________
+
+        implicit none
+
+        type(date), intent(in) :: d
+        integer   , intent(in) :: i
+
+        type(date) d0
+
+        d0 = str2date("1979-01-01 00:00:00")
+        d0%year = d%year
+
+        interval_of_year = ( d - d0 ) / i
+
+      end function
+
+!______________________________________________________________________
+!
+      real function chunk_of_year( d, i )
+!----------------------------------------------------------------------
+!  Counts the time since the start of the year for date `d`
+! in chunks of `i`.
+!______________________________________________________________________
+
+        implicit none
+
+        type(date), intent(in) :: d
+        integer   , intent(in) :: i
+
+        type(date) d0
+
+        d0 = str2date("1979-01-01 00:00:00")
+        d0%year = d%year
+
+        chunk_of_year = ( d - d0 ) / real(abs(i))
+
+      end function
+!______________________________________________________________________
+!
+      integer function max_chunks_in_year( y, i )
+!----------------------------------------------------------------------
+!  Gets the maximum time since the start of the year `y`
+! in chunks of `i`.
+!______________________________________________________________________
+
+        implicit none
+
+        integer, intent(in) :: y, i
+
+        type(date) d0, d1
+
+        d0 = str2date("1979-01-01 00:00:00")
+        d1 = d0
+        d0%year = y
+        d1%year = y+1
+
+        max_chunks_in_year = ( d1 - d0 ) / abs(i)
+
+      end function
+
 
       end module

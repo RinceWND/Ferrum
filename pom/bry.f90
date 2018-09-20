@@ -11,7 +11,7 @@
 
 module bry
 
-  use glob_config, only: rk
+  use config     , only: rk ! SO... If a module uses some other module's variable, another module can access the variable through this "medium" module?
   use glob_domain, only: im, imm1, imm2, jm, jmm1, jmm2, kb, kbm1
 
   implicit none
@@ -39,12 +39,17 @@ module bry
 ! Constants
 !----------------------------------------------------------------------
   integer*2, parameter ::  & ! Boundary conditions named constants
-    bc0GRADIENT       = 0  & !  zero-gradient condition
+    bc0GRADIENT       = 0  & !  zero-gradient (free-slip) condition
   , bc3POINTSMOOTH    = 1  & !  smoothing with 3 interior points
   , bcCLAMPED         = 2  & !  forced value condition
   , bcFLATHER         = 3  & !  Flather (tidal) condition
   , bcINOUTFLOW       = 4  & !  in-, outflow condition
   , bcRADIATION       = 5    !  radiation condition
+
+!----------------------------------------------------------------------
+! Configuration
+!----------------------------------------------------------------------
+  logical USE_SPONGE   ! Flag for sponge zones
 
   real(kind=rk)      &
     hmax             & ! maximal water depth
@@ -54,41 +59,6 @@ module bry
   , rfw                ! flag for western open boundary
 
 !-------------------------------------------------------------------
-! 1D boundary core (ocean) arrays
-!-------------------------------------------------------------------
-  real(kind=rk)              &
-       , allocatable         &
-       , dimension(:)     :: &
-    ele       & ! elevation at the eastern open boundary
-  , eln       & ! elevation at the northern open boundary
-  , els       & ! elevation at the southern open boundary
-  , elw       & ! elevation at the western open boundary
-  , uabe      & ! vertical mean of u at the eastern open boundary
-  , uabw      & ! vertical mean of u at the western open boundary
-  , vabn      & ! vertical mean of v at the northern open boundary
-  , vabs        ! vertical mean of v at the southern open boundary
-
-!-------------------------------------------------------------------
-! 2D boundary core (ocean) arrays
-!-------------------------------------------------------------------
-  real(kind=rk)              &
-       , allocatable         &
-       , dimension(:,:)   :: &
-    sbe       & ! salinity at the eastern open boundary
-  , sbn       & ! salinity at the northern open boundary
-  , sbs       & ! salinity at the southern open boundary
-  , sbw       & ! salinity at the western open boundary
-  , tbe       & ! temperature at the eastern open boundary
-  , tbn       & ! temperature at the northern open boundary
-  , tbs       & ! temperature at the southern open boundary
-  , tbw       & ! temperature at the western open boundary
-  , ube       & ! u at the eastern open boundary
-  , ubw       & ! u at the western open boundary
-  , vbn       & ! v at the northern open boundary
-  , vbs         ! v at the southern open boundary
-
-
-!-------------------------------------------------------------------
 ! Boundary relaxation thickness
 !-------------------------------------------------------------------
   integer    &
@@ -96,13 +66,6 @@ module bry
   , NFN      & ! relax pnts next to bound n
   , NFS      & ! relax pnts next to bound s
   , NFW        ! relax pnts next to bound w
-
-  parameter( &
-    NFE=  1  &
-  , NFS=  1  &
-  , NFN=  1  &
-  , NFW=  1  &
-   )
 
 !----------------------------------------------------------------------
 ! Custom types definition (some types are private, but not vars)
@@ -134,7 +97,8 @@ module bry
   end type
 
   type BRY_1D                        ! 1D arrays for boundaries
-    real, allocatable, private     & !
+    real(kind=rk)                  & !
+        , allocatable              & !
         , dimension(:)     :: est  & !   east
                             , nth  & !   north
                             , sth  & !   south
@@ -142,7 +106,8 @@ module bry
   end type BRY_1D
 
   type BRY_2D                        ! 2D arrays for boundaries
-    real, allocatable, private     & ! 
+    real(kind=rk)                  & !
+        , allocatable              & !
         , dimension(:,:)   :: est  & ! ( I think you get the idea )
                             , nth  & !
                             , sth  & !
@@ -150,7 +115,8 @@ module bry
   end type BRY_2D
 
   type BRY_3D                        ! 3D arrays for boundaries
-    real, allocatable, private     & !
+    real(kind=rk)                  & !
+        , allocatable              & !
         , dimension(:,:,:) :: est  & !
                             , nth  & !
                             , sth  & !
@@ -168,55 +134,86 @@ module bry
   type (bry_3d) s_bry, t_bry, u_bry, v_bry
 
 !----------------------------------------------------------------------
-! New 1D (enhanced to 2D) boundary arrays
+! Sponge layer arrays
 !----------------------------------------------------------------------
   real(kind=rk)              &
        , allocatable         &
        , dimension(:,:)   :: &
     aamfrz      & ! sponge factor - increased aam at boundaries
-  , frz         & ! flow-relax-coefficient at boundaries
-  , elobe       & ! elevation at the eastern open boundary
-  , elobn       & ! elevation at the northern open boundary
-  , elobs       & ! elevation at the southern open boundary
-  , elobw       & ! elevation at the western open boundary
-  , uaobe       & ! vertical mean of u at the eastern open boundary
-  , uaobn       & ! vertical mean of u at the northern open boundary
-  , uaobs       & ! vertical mean of u at the southern open boundary
-  , uaobw       & ! vertical mean of u at the western open boundary
-  , vaobe       & ! vertical mean of v at the eastern open boundary
-  , vaobn       & ! vertical mean of v at the northern open boundary
-  , vaobs       & ! vertical mean of v at the southern open boundary
-  , vaobw         ! vertical mean of v at the western open boundary
+  , frz           ! flow-relax-coefficient at boundaries
 
-
-!-------------------------------------------------------------------
-! New 2D (enhanced to 3D) boundary arrays
-!-------------------------------------------------------------------
-  real(kind=rk)              &
-       , allocatable         &
-       , dimension(:,:,:) :: &
-    sobe       & ! salinity at the eastern open boundary
-  , sobn       & ! salinity at the northern open boundary
-  , sobs       & ! salinity at the southern open boundary
-  , sobw       & ! salinity at the western open boundary
-  , tobe       & ! temperature at the eastern open boundary
-  , tobn       & ! temperature at the northern open boundary
-  , tobs       & ! temperature at the southern open boundary
-  , tobw       & ! temperature at the western open boundary
-  , uobe       & ! u at the eastern open boundary
-  , uobn       & ! u at the northern open boundary
-  , uobs       & ! u at the southern open boundary
-  , uobw       & ! u at the western open boundary
-  , vobe       & ! v at the eastern open boundary
-  , vobn       & ! v at the northern open boundary
-  , vobs       & ! v at the southern open boundary
-  , vobw         ! v at the western open boundary
 
   contains
 
 !______________________________________________________________________
 !
-    subroutine initialize_boundary
+    subroutine allocate_boundary
+!----------------------------------------------------------------------
+!  Allocates boundary arrays.
+!______________________________________________________________________
+
+      implicit none
+
+! Allocate arrays
+      if ( hasEAST ) then
+        allocate(               &
+          el_bry%est(NFE,jm)    &
+        , ua_bry%est(NFE,jm)    &
+        , va_bry%est(NFE,jm)    &
+        , S_bry%est(NFE,jm,kb)  &
+        , T_bry%est(NFE,jm,kb)  &
+        , U_bry%est(NFE,jm,kb)  &
+        , V_bry%est(NFE,jm,kb)  &
+         )
+      end if
+
+      if ( hasNORTH ) then
+        allocate(               &
+          el_bry%nth(im,NFN)    &
+        , ua_bry%nth(im,NFN)    &
+        , va_bry%nth(im,NFN)    &
+        , S_bry%nth(im,NFN,kb)  &
+        , T_bry%nth(im,NFN,kb)  &
+        , U_bry%nth(im,NFN,kb)  &
+        , V_bry%nth(im,NFN,kb)  &
+         )
+      end if
+
+      if ( hasSOUTH ) then
+        allocate(               &
+          el_bry%sth(im,NFS)    &
+        , ua_bry%sth(im,NFS)    &
+        , va_bry%sth(im,NFS)    &
+        , S_bry%sth(im,NFS,kb)  &
+        , T_bry%sth(im,NFS,kb)  &
+        , U_bry%sth(im,NFS,kb)  &
+        , V_bry%sth(im,NFS,kb)  &
+         )
+      end if
+
+      if ( hasWEST ) then
+        allocate(               &
+          el_bry%wst(NFW,jm)    &
+        , ua_bry%wst(NFW,jm)    &
+        , va_bry%wst(NFW,jm)    &
+        , S_bry%wst(NFW,jm,kb)  &
+        , T_bry%wst(NFW,jm,kb)  &
+        , U_bry%wst(NFW,jm,kb)  &
+        , V_bry%wst(NFW,jm,kb)  &
+         )
+      end if
+
+      if ( USE_SPONGE ) then
+        allocate(        &
+          aamfrz(im,jm)  &
+        ,    frz(im,jm)  &
+         )
+      end if
+
+    end subroutine allocate_boundary
+!______________________________________________________________________
+!
+    subroutine initialize_boundary( config )
 !----------------------------------------------------------------------
 !  Initialize arrays for boundary conditions.
 !______________________________________________________________________
@@ -225,8 +222,21 @@ module bry
 
       implicit none
 
+      character(len=*), intent(in) :: config
+
+      logical periodic_x, periodic_y
+
+      namelist/bry_nml/                           &
+        Hmax, periodic_x, periodic_y, USE_SPONGE
+
 ! Set max depth
       hmax = 8000.
+
+! Set default relaxation thickness
+      NFE = 1
+      NFN = 1
+      NFS = 1
+      NFW = 1
 
 ! Set boundary flags
       hasEAST  = .false.
@@ -239,9 +249,12 @@ module bry
       if ( n_south == -1 ) hasSOUTH = .true.
       if ( n_west  == -1 ) hasWEST  = .true.
 
+! Default configuration flags
+      USE_SPONGE = .false.
+
 ! Default periodic
-      periodic_bc%x = .false.
-      periodic_bc%y = .false.
+      periodic_x = .false.
+      periodic_y = .false.
 
 
 ! Default BC types
@@ -284,86 +297,154 @@ module bry
       BC % ts % SOUTH = bcINOUTFLOW
       BC % ts % WEST  = bcINOUTFLOW
 
+! Override configuration
+      open ( 73, file = config, status = 'old' )
+      read ( 73, nml = bry_nml )
+      close( 73 )
+
+! Manage derived type variables
+      periodic_bc % x = periodic_x
+      periodic_bc % y = periodic_y
 
 ! Allocate arrays
-      allocate(                                     &
-        el_bry%est(NFE,jm), el_bry%nth(im,NFN)      &
-      , el_bry%sth(im,NFS), el_bry%wst(NFW,jm)      &
-      , ua_bry%est(NFE,jm), ua_bry%nth(im,NFN)      &
-      , ua_bry%sth(im,NFS), ua_bry%wst(NFW,jm)      &
-      , va_bry%est(NFE,jm), va_bry%nth(im,NFN)      &
-      , va_bry%sth(im,NFS), va_bry%wst(NFW,jm)      &
-       )
-
-      allocate(                                         &
-        S_bry%est(NFE,jm,kb), S_bry%nth(im,NFN,kb)      &
-      , S_bry%sth(im,NFS,kb), S_bry%wst(NFW,jm,kb)      &
-      , T_bry%est(NFE,jm,kb), T_bry%nth(im,NFN,kb)      &
-      , T_bry%sth(im,NFS,kb), T_bry%wst(NFW,jm,kb)      &
-      , U_bry%est(NFE,jm,kb), U_bry%nth(im,NFN,kb)      &
-      , U_bry%sth(im,NFS,kb), U_bry%wst(NFW,jm,kb)      &
-      , V_bry%est(NFE,jm,kb), V_bry%nth(im,NFN,kb)      &
-      , V_bry%sth(im,NFS,kb), V_bry%wst(NFW,jm,kb)      &
-       )
-
-      allocate(       &
-        uabe(jm)      &
-!      , uabn(im)      &
-!      , uabs(im)      &
-      , uabw(jm)      &
-!      , vabe(jm)      &
-      , vabn(im)      &
-      , vabs(im)      &
-!      , vabw(jm)      &
-       )
-
-      allocate(         &
-        sbe(jm,kb)      &
-      , sbn(im,kb)      &
-      , sbs(im,kb)      &
-      , sbw(jm,kb)      &
-      , tbe(jm,kb)      &
-      , tbn(im,kb)      &
-      , tbs(im,kb)      &
-      , tbw(jm,kb)      &
-       )
-
-      allocate(             &
-        elobe(NFE,jm)       &
-      , elobw(NFW,jm)       &
-      , elobn(im,NFN)       &
-      , elobs(im,NFS)       &
-      , sobe(NFE,jm,kb)     &
-      , sobw(NFW,jm,kb)     &
-      , sobn(im,NFN,kb)     &
-      , sobs(im,NFS,kb)     &
-      , tobe(NFE,jm,kb)     &
-      , tobw(NFW,jm,kb)     &
-      , tobn(im,NFN,kb)     &
-      , tobs(im,NFS,kb)     &
-      , uaobe(NFE,jm)       &
-      , uaobw(NFW,jm)       &
-      , uaobn(im,NFN)       &
-      , uaobs(im,NFS)       &
-      , uobe(NFE,jm,kb)     &
-      , uobw(NFW,jm,kb)     &
-      , uobn(im,NFN,kb)     &
-      , uobs(im,NFS,kb)     &
-      , vaobe(NFE,jm)       &
-      , vaobw(NFW,jm)       &
-      , vaobn(im,NFN)       &
-      , vaobs(im,NFS)       &
-      , vobe(NFE,jm,kb)     &
-      , vobw(NFW,jm,kb)     &
-      , vobn(im,NFN,kb)     &
-      , vobs(im,NFS,kb)     &
-      , frz(im,jm)          &
-      , aamfrz(im,jm)       &
-       )
-
+      call allocate_boundary
 
 
     end subroutine
+!______________________________________________________________________
+!
+    subroutine initial_conditions_boundary
+!----------------------------------------------------------------------
+!  Sets up initial conditions for boundary arrays.
+!______________________________________________________________________
+
+      use glob_const , only: SEC2DAY
+      use glob_domain, only: im, jm, n_east, n_north, n_south, n_west
+      use glob_grid  , only: fsm
+      use glob_ocean , only: elb, sclim, tclim
+      use model_run  , only: dti
+
+      implicit none
+
+      integer  ii, jj
+      real(rk) rdisp
+    
+! Initial conditions ! TODO: Move to a separate subroutine?
+      if ( hasEAST ) then
+
+        EL_bry % EST(1,:) = elb(im,:)
+
+        UA_bry % EST = 0.
+        VA_bry % EST = 0.
+
+        U_bry % EST = 0.
+        V_bry % EST = 0.
+
+        do k=1,kb
+          do j=1,jm
+            do i=1,NFE
+              ii=im-i+1
+              T_bry%EST(i,j,k) = tclim(ii,j,k) * fsm(ii,j)
+              S_bry%EST(i,j,k) = sclim(ii,j,k) * fsm(ii,j)
+            end do
+          end do
+        end do
+
+      end if
+
+
+      if ( hasWEST ) then
+
+        EL_bry % WST(1,:) = elb(1,:)
+
+        UA_bry % WST = 0.
+        VA_bry % WST = 0.
+
+        U_bry % WST = 0.
+        V_bry % WST = 0.
+
+        do k=1,kb
+          do j=1,jm
+            do i=1,NFW
+              T_bry%WST(i,j,k) = tclim(i,j,k) * fsm(i,j)
+              S_bry%WST(i,j,k) = sclim(i,j,k) * fsm(i,j)
+            end do
+          end do
+        end do
+
+      end if
+
+
+      if ( hasNORTH ) then
+
+        EL_bry % NTH(:,1) = elb(:,jm)
+
+        UA_bry % NTH = 0.
+        VA_bry % NTH = 0.
+
+        U_bry % NTH = 0.
+        V_bry % NTH = 0.
+
+        do k=1,kb
+          do i=1,im
+            do j=1,NFN
+              jj=jm-j+1
+              T_bry%NTH(i,j,k) = tclim(i,jj,k) * fsm(i,jj)
+              S_bry%NTH(i,j,k) = sclim(i,jj,k) * fsm(i,jj)
+            end do
+          end do
+        end do
+
+      end if
+
+
+      if ( hasSOUTH ) then
+
+        EL_bry % STH(:,1) = elb(:,1)
+
+        UA_bry % STH = 0.
+        VA_bry % STH = 0.
+
+        U_bry % STH = 0.
+        V_bry % STH = 0.
+
+        do k=1,kb
+          do i=1,im
+            do j=1,NFS
+              T_bry%STH(i,j,k) = tclim(i,j,k) * fsm(i,j)
+              S_bry%STH(i,j,k) = sclim(i,j,k) * fsm(i,j)
+            end do
+          end do
+        end do
+
+      end if
+
+
+      if ( USE_SPONGE ) then
+!lyo:pac10:beg:
+! set lateral boundary FRZ & SPONGE layer parameters !lyo:20110224:alu:stcc:
+!      call bfrz(   nfw,   nfe,    nfs,    nfn,
+!     $          n_west,n_east,n_south,n_north,
+!     $              im,    jm,      6,    frz)       !FRZ:
+!     For FRZ in bcond: T[n+1]={ (1-frz)*T[n] + frz*Tobs },
+!     the inverse-relax-time = frz/dti,
+!     so that since "bfrz" gives frz=1 @boundaries,
+!     frz=1 (=dti/dti) -> inverse-relax-time = 1/dti @boundaries, and
+!     frz=dti/86400.   -> inverse-relax-time = 1/86400 @boundaries etc.
+        rdisp = dti*SEC2DAY
+        frz = frz*rdisp !lyo:stcc:mar_:dec_:
+!     rdisp=1.;         frz(:,:)=frz(:,:)*rdisp !lyo:stcc:
+!     For aam is increased by (1.+aamfrz(i,j)) in subr lateral_viscosity
+        call bfrz(     0,     0,      0,      0   &
+                 ,n_west,n_east,n_south,n_north   &
+                 ,    im,    jm,      6, aamfrz)       !SPONGE:
+        rdisp  = 0.
+        aamfrz = aamfrz*rdisp
+!lyo:pac10:end:
+      end if
+
+
+    end subroutine initial_conditions_boundary
 
 !______________________________________________________________________
 !
@@ -459,7 +540,7 @@ module bry
       use glob_const , only: GRAV
       use glob_grid  , only: dum, dvm, h
       use glob_ocean , only: el, uaf, vaf
-      use glob_time  , only: ramp
+      use model_run  , only: ramp
 
       implicit none
 
@@ -471,14 +552,14 @@ module bry
         call xperi2d_mpi(vaf,im,jm)
         if ( hasNORTH ) then
           if ( BC % VEL2D % TANG % NORTH == bc0GRADIENT ) then
-            uaf(:,jm)=uaf(:,jmm1)
-            dum(:,jm)=1.0
+            uaf(:,jm) = uaf(:,jmm1)
+            dum(:,jm) = 1.
           end if
         end if
         if ( hasSOUTH ) then
           if ( BC % VEL2D % TANG % SOUTH == bc0GRADIENT ) then
-            uaf(:,1)=uaf(:,2)
-            dum(:,1)=1.0
+            uaf(:,1) = uaf(:,2)
+            dum(:,1) = 1.
           end if
         end if
 
@@ -696,6 +777,7 @@ module bry
         end if
 
       end if ! periodic_y end
+
 
 ! Apply u- and v-masks
       uaf = uaf*dum
@@ -1031,7 +1113,7 @@ module bry
 
       use glob_grid  , only: dx, dy, fsm, zz
       use glob_ocean , only: dt, s, t, u, uf, v, vf, w
-      use glob_time  , only: dti
+      use model_run  , only: dti
 
       implicit none
 
@@ -1304,7 +1386,7 @@ module bry
 
             case ( bcINOUTFLOW )
               do k = 1,kbm1
-                do j = 1,jm
+                do i = 1,im
                   u1 = 2.*v(i,2,k)*dti / (dy(i,1)+dy(i,2))
                   if ( u1 >= 0. ) then
                     uf(i,1,k) = t(i,1,k)                        &
@@ -1393,85 +1475,117 @@ module bry
 
       use glob_const , only: SMALL
       use glob_grid  , only: dx, dy, fsm
-      use glob_ocean , only: q2, q2l, u, uf, v, vf
-      use glob_time  , only: dti
+      use glob_ocean , only: kh, km, kq, l, q2, q2l, u, uf, v, vf
+      use model_run  , only: dti
 
       implicit none
 
       real(rk) u1
 
 
-! East
-      if ( hasEAST ) then
+! Apply periodic BC in x-dimension
+      if ( periodic_bc % x ) then
 
-        do k = 1,kb
-          do j = 1,jm
-            u1 = 2.*u(im,j,k)*dti / (dx(im,j)+dx(imm1,j))
-            if ( u1 <= 0. ) then
-              uf(im,j,k) = q2(im,j,k)  - u1*(SMALL-q2(im,j,k))
-              vf(im,j,k) = q2l(im,j,k) - u1*(SMALL-q2l(im,j,k))
-            else
-              uf(im,j,k) = q2(im,j,k)  - u1*(q2(im,j,k)-q2(imm1,j,k))
-              vf(im,j,k) = q2l(im,j,k) - u1*(q2l(im,j,k)-q2l(imm1,j,k))
-            end if
+        call xperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
+        call xperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+        call xperi3d_mpi(kh(:,:,1:kbm1),im,jm,kbm1)
+        call xperi3d_mpi(km(:,:,1:kbm1),im,jm,kbm1)
+        call xperi3d_mpi(kq(:,:,1:kbm1),im,jm,kbm1)
+        call xperi3d_mpi( l(:,:,1:kbm1),im,jm,kbm1)
+
+      else
+! EAST
+        if ( hasEAST ) then
+
+          do k = 1,kb
+            do j = 1,jm
+              u1 = 2.*u(im,j,k)*dti / (dx(im,j)+dx(imm1,j))
+              if ( u1 <= 0. ) then
+                uf(im,j,k) = q2(im,j,k)  - u1*(SMALL-q2(im,j,k))
+                vf(im,j,k) = q2l(im,j,k) - u1*(SMALL-q2l(im,j,k))
+              else
+                uf(im,j,k) = q2(im,j,k)                      &
+                           - u1*(q2(im,j,k)-q2(imm1,j,k))
+                vf(im,j,k) = q2l(im,j,k)                     &
+                           - u1*(q2l(im,j,k)-q2l(imm1,j,k))
+              end if
+            end do
           end do
-        end do
+
+        end if
+
+! WEST
+        if ( hasWEST ) then
+
+          do k = 1,kb
+            do j = 1,jm
+              u1 = 2.*u(2,j,k)*dti / (dx(1,j)+dx(2,j))
+              if ( u1 >= 0. ) then
+                uf(1,j,k) = q2(1,j,k)  - u1*(q2(1,j,k)-SMALL)
+                vf(1,j,k) = q2l(1,j,k) - u1*(q2l(1,j,k)-SMALL)
+              else
+                uf(1,j,k) = q2(1,j,k)  - u1*(q2(2,j,k)-q2(1,j,k))
+                vf(1,j,k) = q2l(1,j,k) - u1*(q2l(2,j,k)-q2l(1,j,k))
+              end if
+            end do
+          end do
+
+        end if
 
       end if
 
-! North
-      if ( hasNORTH ) then
 
-        do k = 1,kb
-          do i = 1,im
-            u1 = 2.*v(i,jm,k)*dti / (dy(i,jm)+dy(i,jmm1))
-            if ( u1 <= 0. ) then
-              uf(i,jm,k) = q2(i,jm,k)  - u1*(SMALL-q2(i,jm,k))
-              vf(i,jm,k) = q2l(i,jm,k) - u1*(SMALL-q2l(i,jm,k))
-            else
-              uf(i,jm,k) = q2(i,jm,k)  - u1*(q2(i,jm,k)-q2(i,jmm1,k))
-              vf(i,jm,k) = q2l(i,jm,k) - u1*(q2l(i,jm,k)-q2l(i,jmm1,k))
-            end if
+! Apply periodic BC in y-dimension
+      if ( periodic_bc % y ) then
+
+        call yperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
+        call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+        call yperi3d_mpi(kh(:,:,1:kbm1),im,jm,kbm1)
+        call yperi3d_mpi(km(:,:,1:kbm1),im,jm,kbm1)
+        call yperi3d_mpi(kq(:,:,1:kbm1),im,jm,kbm1)
+        call yperi3d_mpi( l(:,:,1:kbm1),im,jm,kbm1)
+
+      else
+! NORTH
+        if ( hasNORTH ) then
+
+          do k = 1,kb
+            do i = 1,im
+              u1 = 2.*v(i,jm,k)*dti / (dy(i,jm)+dy(i,jmm1))
+              if ( u1 <= 0. ) then
+                uf(i,jm,k) = q2(i,jm,k)  - u1*(SMALL-q2(i,jm,k))
+                vf(i,jm,k) = q2l(i,jm,k) - u1*(SMALL-q2l(i,jm,k))
+              else
+                uf(i,jm,k) = q2(i,jm,k)                      &
+                           - u1*(q2(i,jm,k)-q2(i,jmm1,k))
+                vf(i,jm,k) = q2l(i,jm,k)                     &
+                           - u1*(q2l(i,jm,k)-q2l(i,jmm1,k))
+              end if
+            end do
           end do
-        end do
+
+        end if
+
+! SOUTH
+        if ( hasSOUTH ) then
+
+          do k=1,kb
+            do i=1,im
+              u1 = 2.*v(i,2,k)*dti / (dy(i,1)+dy(i,2))
+              if ( u1 >= 0. ) then
+                uf(i,1,k) = q2(i,1,k)  - u1*(q2(i,1,k)-SMALL)
+                vf(i,1,k) = q2l(i,1,k) - u1*(q2l(i,1,k)-SMALL)
+              else
+                uf(i,1,k) = q2(i,1,k)  - u1*(q2(i,2,k)-q2(i,1,k))
+                vf(i,1,k) = q2l(i,1,k) - u1*(q2l(i,2,k)-q2l(i,1,k))
+              end if
+            end do
+          end do
+
+        end if
 
       end if
 
-! south
-      if ( hasSOUTH ) then
-
-        do k=1,kb
-          do i=1,im
-            u1 = 2.*v(i,2,k)*dti / (dy(i,1)+dy(i,2))
-            if ( u1 >= 0. ) then
-              uf(i,1,k) = q2(i,1,k)  - u1*(q2(i,1,k)-SMALL)
-              vf(i,1,k) = q2l(i,1,k) - u1*(q2l(i,1,k)-SMALL)
-            else
-              uf(i,1,k) = q2(i,1,k)  - u1*(q2(i,2,k)-q2(i,1,k))
-              vf(i,1,k) = q2l(i,1,k) - u1*(q2l(i,2,k)-q2l(i,1,k))
-            end if
-          end do
-        end do
-
-      end if
-
-! West
-      if ( hasWEST ) then
-
-        do k = 1,kb
-          do j = 1,jm
-            u1 = 2.*u(2,j,k)*dti / (dx(1,j)+dx(2,j))
-            if ( u1 >= 0. ) then
-              uf(1,j,k) = q2(1,j,k)  - u1*(q2(1,j,k)-SMALL)
-              vf(1,j,k) = q2l(1,j,k) - u1*(q2l(1,j,k)-SMALL)
-            else
-              uf(1,j,k) = q2(1,j,k)  - u1*(q2(2,j,k)-q2(1,j,k))
-              vf(1,j,k) = q2l(1,j,k) - u1*(q2l(2,j,k)-q2l(1,j,k))
-            end if
-          end do
-        end do
-
-      end if
 
 ! Apply rho-mask
       do k=1,kb

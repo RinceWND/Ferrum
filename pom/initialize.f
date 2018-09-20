@@ -1,7 +1,7 @@
 ! initialize.f
 
-! initialize POM: define constant, read initial values, grid and initial
-! conditions
+!  Initializes POM: defines constants, reads initial values, grid and
+! initial conditions.
 
 !______________________________________________________________________
 !
@@ -10,26 +10,27 @@
 !  Initializes POM.
 !______________________________________________________________________
 
-      use bry        , only: aamfrz, frz
-      use glob_config
-      use glob_const , only: SEC2DAY
+      use config
+      use glob_const , only: initialize_constants
       use glob_domain
-      use glob_grid  , only: dum, dvm, east_e, north_e, fsm, h
+      use glob_grid  , only: east_e, north_e, h
       use glob_misc  , only: aamfac
       use glob_ocean , only: d, dt, el, et
-      use glob_time  , only: dti, time, time0
+      use model_run  , only: dtime, initialize_time, time, time0
 
       implicit none
 
-      integer i,j
       integer, parameter :: TEST_CASE = 1
-      real(kind=rk) rdisp !lyo:20110224:alu:stcc:dispensible real variable!lyo:pac10:
-!     integer io_global,jo_global,io,jo !fhx:incmix!lyo:pac10:delete
-!     real(kind=rk) xs,ys,fak!,lono,lato!lyo:pac10:moved to pom.h: !fhx:incmix
 
 
-! Read domain distribution (TODO: get rid of hardcoded parameter)
+! Read domain distribution (TODO: get rid of hardcoded parameters)
       call read_domain_dist( 'domain.nml' )
+
+! Read configuration files
+      call read_config( 'config.nml' )
+!______________________________________________________________________
+!  `read_config` initializes all parameters to their default values
+! prior to reading them.
 
 ! initialize the MPI execution environment and create communicator for
 !internal POM communications
@@ -41,94 +42,40 @@
 ! distribute the coarse wind/assim data domain across processors
       call distribute_mpi_coarse   !fhx:20101206
 
-! fhx:interp_flag
-! fhx:fgrid
-      if (  ((im_global_coarse-2)*x_division == (im_global-2))
-     $ .and.((jm_global_coarse-2)*y_division == (jm_global-2)) ) then
+! decide on interpolation feasibility (sets calc_interp flag)
+      call check_interpolation
 
-        calc_interp = .TRUE.
+! Initialize various constants
+      call initialize_constants
 
-      else if ( (im_global_coarse == im_global)
-     $     .and.(jm_global_coarse == jm_global) ) then
-
-        calc_interp = .FALSE.
-
-      else
-
-        if ( is_master ) print '(a//a)'
-     &    , 'Incompatible number of *_global and *_global_coarse'
-     &    , 'POM terminated with error'
-        stop
-
-      end if
-
-! allocate and initialize arrays (TODO: allocate them before or after initializing MPI?)
+! Allocate and initialize arrays
+!  (TODO: allocate them before or after initializing MPI?)
       call initialize_arrays
 
-! read input values and define constants
-      call read_input
+! Initialize time
+      call initialize_time( restart_file )
+!______________________________________________________________________
+!  Uses `restart_file` string to offset time.
+!  If `do_restart` is .false. this string is forced to be empty, thus
+! the offseting is ignored.
 
-! read in grid data
-      if ( TEST_CASE == 0 ) then
-        call read_grid
-      else
-        call make_grid(TEST_CASE)
-      end if
+! Print configuration
+      call print_config
 
-!lyo:ecs:
-!     Close northern boundary:
-!!        if(n_north.eq.-1) then
-!          do j=jm-5,jm
-!!           do j=jm-0,jm
-!!           fsm(:,j)=0.0
-!!           h(:,j)=1.0
-!!          enddo
-!!        endif
-!
+! Initialize grid
+      call initialize_grid( TEST_CASE )
 
-! derive u- and v-mask from rho-mask
-      do j=1,jm
-        do i=2,im
-          dum(i,j) = fsm(i,j)*fsm(i-1,j)
-        end do
-      end do
-      dum(1,:) = dum(2,:)
-      do j=2,jm
-        do i=1,im
-          dvm(i,j) = fsm(i,j)*fsm(i,j-1)
-        end do
-      end do
-      dvm(:,1) = dvm(:,2)
+! The model is initialized. Below is some updates. TODO: Separate?
+      call msg_print("MODEL CORE INITIALIZED", 1, "")
 
-      call exchange2d_mpi(  h,im,jm)
-      call exchange2d_mpi(fsm,im,jm)
-      call exchange2d_mpi(dum,im,jm)
-      call exchange2d_mpi(dvm,im,jm)
+! Initialize modules
+      call initialize_modules
 
 ! read initial and lateral boundary conditions
       call initial_conditions
 
 ! read laterel boundary conditions
       call lateral_boundary_conditions !ayumi:20100407
-
-!lyo:pac10:beg:
-! set lateral boundary FRZ & SPONGE layer parameters !lyo:20110224:alu:stcc:
-!      call bfrz(   nfw,   nfe,    nfs,    nfn,
-!     $          n_west,n_east,n_south,n_north,
-!     $              im,    jm,      6,    frz)       !FRZ:
-!     For FRZ in bcond: T[n+1]={ (1-frz)*T[n] + frz*Tobs },
-!     the inverse-relax-time = frz/dti,
-!     so that since "bfrz" gives frz=1 @boundaries,
-!     frz=1 (=dti/dti) -> inverse-relax-time = 1/dti @boundaries, and
-!     frz=dti/86400.   -> inverse-relax-time = 1/86400 @boundaries etc.
-      rdisp=dti*SEC2DAY; frz(:,:)=frz(:,:)*rdisp !lyo:stcc:mar_:dec_:
-!     rdisp=1.;         frz(:,:)=frz(:,:)*rdisp !lyo:stcc:
-!     For aam is increased by (1.+aamfrz(i,j)) in subr lateral_viscosity
-      call bfrz(     0,     0,      0,      0,
-     $          n_west,n_east,n_south,n_north,
-     $              im,    jm,      6, aamfrz)       !SPONGE:
-      rdisp=0.; aamfrz(:,:)=aamfrz(:,:)*rdisp
-!lyo:pac10:end:
 
 ! read M2 tidal amplitude & phase
       if ( calc_tide ) call read_tide      !fhx:tide
@@ -148,15 +95,17 @@
       end if
 
 ! read restart data from a previous run
-      if ( nread_rst /= 0 ) then
+      if ( do_restart ) then
         call read_restart_pnetcdf
 ! update elevation
         d  = h+el
         dt = h+et
 ! update time
-        time=time0
+        time = time0
       end if
 
+! read previous (initial) record
+      call modules_bc_init( dtime )
 
 ! write grid and initial conditions
       if (output_flag == 1) then
@@ -183,302 +132,8 @@
         stop
       end if
 
-      call msg_print("MODEL CORE INITIALIZED", 1, "")
+      call msg_print("MODEL STATE UPDATED", 1, "")
 
-
-      return
-
-      end
-
-!______________________________________________________________________
-!
-      subroutine read_input
-!----------------------------------------------------------------------
-!  Reads input values and defines constants.
-!______________________________________________________________________
-
-      use glob_config
-      use glob_const
-      use glob_domain, only: is_master
-      use glob_misc  , only: iprints
-      use glob_time
-      use module_time
-
-      implicit none
-
-      include 'io.h'
-      include 'bulk.h'
-
-      namelist/pom_nml/ title,netcdf_file,mode,nadv,nitera,sw,npg,dte, !fhx:Toni:npg
-     $                  isplit,time_start,nread_rst,read_rst_file
-     $                 ,write_rst,write_rst_file,days,prtd1,prtd2
-     $                 ,iperx,ipery,n1d !lyo:scs1d:add iper* & n1d in pom.nml
-                                        !n1d .ne. 0 for 1d simulation
-     $                 ,windf           !lyo: windf = ccmp, ecmw, or gfsw etc
-     $                 ,nbct,nbcs,tprni,umol,z0b,ntp
-
-      namelist/switch_nml/
-     $     calc_bulk, calc_wind, calc_tsforce, calc_river, calc_assim,
-     $     calc_assimdrf,         !eda
-     $     calc_tsurf_mc, calc_tide,!fhx:mcsst; fhx:tide
-     $     calc_uvforce,         !eda:uvforce
-     $     calc_ice,
-     $     output_flag, SURF_flag, monthly_flag !fhx:20110131:
-      type(date) ::  dtime, dtime0
-
-      namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
-      namelist/misc_nml/ spinup, t_lo, t_hi
-      namelist/input_files_nml/
-     &  grid_path, bc_path, clim_path, mean_path
-     &, bulk_path, flux_path
-      namelist/input_vars_nml/
-     &  dlwr_name, lht_name, lwr_name, prat_name, pres_name
-     &, rhum_name, sht_name, sst_name, swr_name, tair_name
-     &, tcld_name, umf_name, uwnd_name, vmf_name, vwnd_name
-     &, wgst_name
-      namelist/bulk_nml/ calc_swr, use_coare, lwrad_formula
-
-! Input of filenames and constants
-
-! Logical for inertial ramp (.true. if inertial ramp to be applied
-! to wind stress and baroclinic forcing, otherwise .false.)
-!      lramp=.false.
-
-! Reference density (recommended values: 1025 for seawater,
-! 1000 for freswater; S.I. units):
-      rhoref=1025.
-
-! Temperature bias (deg. C)
-      tbias=0.
-
-! Salinity bias
-      sbias=0.
-
-! Bottom roughness (metres)
-      z0b=.01
-
-! Minimum bottom friction coeff.
-      cbcmin=.0025
-
-! Maximum bottom friction coeff.
-      cbcmax=5. !1.e0   !lyo:20110315:botwavedrag:
-
-! Smagorinsky diffusivity coeff.
-      horcon=0.2  !lyo:pac10:exp004: !=0.1e0
-
-! Inverse horizontal turbulent Prandtl number (ah/am; dimensionless):
-! NOTE that tprni=0.e0 yields zero horizontal diffusivity!
-      tprni=.2
-
-! Background viscosity used in subroutines profq, proft, profu and
-! profv (S.I. units):
-      umol=2.e-5
-
-! Maximum magnitude of vaf (used in check that essentially tests
-! for CFL violation):
-      vmaxl=5. !lyo:debug:100.e0
-
-! Maximum allowable value of:
-!   <difference of depths>/<sum of depths>
-! for two adjacent cells (dimensionless). This is used in subroutine
-! slpmax. If >= 1, then slpmax is not applied:
-      slmax=2.
-
-! Water type, used in subroutine proft.
-!    ntp    Jerlov water type
-!     1            i
-!     2            ia
-!     3            ib
-!     4            ii
-!     5            iii
-      ntp=2
-
-! Surface temperature boundary condition, used in subroutine proft:
-!    nbct   prescribed    prescribed   short wave
-!           temperature      flux      penetration
-!     1        no           yes           no
-!     2        no           yes           yes
-!     3        yes          no            no
-!     4        yes          no            yes
-      nbct=1
-
-! Surface salinity boundary condition, used in subroutine proft:
-!    nbcs   prescribed    prescribed
-!            salinity      flux
-!     1        no           yes
-!     3        yes          no
-! NOTE that only 1 and 3 are allowed for salinity.
-      nbcs=1
-
-! Step interval during which external (2-D) mode advective terms are
-! not updated (dimensionless):
-      ispadv=5
-
-! Constant in temporal filter used to prevent solution splitting
-! (dimensionless):
-      smoth=0.10
-
-! Weight used for surface slope term in external (2-D) dynamic
-! equation (a value of alpha = 0.e0 is perfectly acceptable, but the
-! value, alpha=.225e0 permits a longer time step):
-      alpha=0.225
-
-! Initial value of aam:
-      aam_init=500.
-
-! Bulk default parameters
-!
-! Use air-sea bulk calculations
-      calc_bulk = .true.
-
-! Calculate shortwave radiation according to Reed
-      calc_swr  = .true.
-
-! Do not use COARE algorithm for heat fluxes estimation by default
-      use_coare = .false.
-
-
-! Other parameters and flags
-      sf_bf = 1.
-      sf_hf = 1.
-      sf_wi = 1.
-      t_lo = -999.
-      t_hi =  999.
-      iperx = 0
-      ipery = 0
-
-! read input namelist
-      open(73,file='pom.nml',status='old')
-      read(73,nml=pom_nml)
-      close(73)
-
-! read main switches
-      open(73,file='switch.nml',status='old')
-      read(73,nml=switch_nml)
-      read(73,nml=misc_nml)
-      read(73,nml=sensitivity_nml)
-      close(73)
-
-! read main switches
-      open(73,file='io.nml',status='old')
-      read(73,nml=input_files_nml)
-      read(73,nml=input_vars_nml)
-      close(73)
-
-! read bulk configuration
-      open(73,file='bulk.nml',status='old')
-      read(73,nml=bulk_nml)
-      close(73)
-
-! End of input of constants
-
-! Initialize various constants
-      call initialize_constants
-
-      dti=dte*float(isplit)
-      dte2=dte*2
-      dti2=dti*2
-
-      iend=max0(nint(days*24.*3600./dti),2)
-      iprint=max(nint(prtd1*24.*3600./dti),1)
-      irestart=nint(write_rst*24.*3600./dti)
-      iprints=nint(prtd2*24.*3600./dti) !fhx:20110131:add 3hrly output
-
-      ispi=1./float(isplit)
-      isp2i=1./(2.*float(isplit))
-
-! Initialise time
-! Do not offset time if not restarting
-      if ( nread_rst /= 0 ) then
-
-        dtime0 = str2date( time_start(1:19) )
-        dtime = str2date( read_rst_file(1:13)//":"//
-     &  read_rst_file(15:16)//":"//read_rst_file(18:19) )
-
-        time0 = real( (dtime-dtime0)/86400, rk )
-
-      else
-
-        time0 = 0.
-
-      end if
-
-!      if (is_master) then
-!         print*, 'dtime',dtime
-!         print*, 'dtime0',dtime0
-!         print*, time0
-!      endif
-
-!      time0=0.e0
-      time=time0 !lyo:20110224:alu:stcc:!lyo:pac10:
-
-! print initial summary
-      if ( is_master ) then
-        print '(/'' title      = '',a40)', title
-        print '(/'' mode       = '',i10)', mode
-        print '('' nadv       = '',i10)', nadv
-        print '('' nitera     = '',i10)', nitera
-        print '('' sw         = '',f10.4)', sw
-        print '('' npg        = '',i10)', npg    !fhx:Toni:npg
-        print '('' nread_rst  = '',i10)', nread_rst
-        print '('' write_rst  = '',f10.4)', write_rst
-        print '('' irestart   = '',i10)', irestart
-        print '('' dte        = '',f10.2)', dte
-        print '('' dti        = '',f10.1)', dti
-        print '('' isplit     = '',i10)', isplit
-        print '('' time_start = '',a26)', time_start
-        print '('' days       = '',f10.4)', days
-        print '('' iend       = '',i10)', iend
-        print '('' prtd1      = '',f10.4)', prtd1
-        print '('' iprint     = '',i10)', iprint
-        print '('' prtd2      = '',f10.4)', prtd2
-        print '('' rhoref     = '',f10.3)', rhoref
-        print '('' tbias      = '',f10.3)', tbias
-        print '('' sbias      = '',f10.3)', sbias
-        print '('' grav       = '',f10.4)', grav
-        print '('' Kappa      = '',f10.4)', Kappa
-        print '('' z0b        = '',f10.6)', z0b
-        print '('' cbcmin     = '',f10.6)', cbcmin
-        print '('' cbcmax     = '',f10.6)', cbcmax
-        print '('' horcon     = '',f10.3)', horcon
-        print '('' tprni      = '',f10.4)', tprni
-        print '('' umol       = '',f10.4)', umol
-        print '('' vmaxl      = '',f10.4)', vmaxl
-        print '('' slmax      = '',f10.4)', slmax
-        print '('' lono,lato  = '',2f10.4)', lono,lato
-        print '('' xs,ys,fak  = '',3f10.4)', xs,ys,fak
-        print '('' iperx,ipery= '',2i10)', iperx,ipery
-        print '('' ntp        = '',i10)', ntp
-        print '('' nbct       = '',i10)', nbct
-        print '('' nbcs       = '',i10)', nbcs
-        print '('' ispadv     = '',i10)', ispadv
-        print '('' smoth      = '',f10.4)', smoth
-        print '('' alpha      = '',f10.4)', alpha
-!        print '('' lramp      = '',l10)', lramp
-        print '('' calc_wind      = '',l2)', calc_wind
-        print '('' calc_tsforce   = '',l2)', calc_tsforce
-        print '('' calc_river     = '',l2)', calc_river
-        print '('' calc_assim     = '',l2)', calc_assim
-        print '('' calc_assimdrf  = '',l2)', calc_assimdrf !eda
-        print '('' calc_uvforce   = '',l2)', calc_uvforce !eda:uvforce
-        print '('' calc_tsurf_mc  = '',l2)', calc_tsurf_mc !fhx:mcsst
-        print '('' calc_tide      = '',l2)', calc_tide     !fhx:tide
-        print '('' calc_interp    = '',l2)', calc_interp   !fhx:interp_flag
-        print '('' output_flag    = '',i2)', output_flag  !fhx:20110131:
-        print '('' SURF_flag      = '',i2)', SURF_flag    !fhx:20110131:
-        print '(/'' Sensitivity:'')'
-        print '(''   heat flux     = '',f10.4)', sf_hf
-        print '(''   wind speed    = '',f10.4)', sf_wi
-        print '(''   lat.velocities= '',f10.4)', sf_bf
-        if ( calc_bulk ) then
-          print '(/'' Air-Sea Bulk: [ ENABLED ]'')'
-          print '(''   calc swrad    = '',l2)', calc_swr
-          print '(''   use COARE     = '',l2)', use_coare
-          print '(''   longwave form.= '',i2)', lwrad_formula
-        else
-          print '(/'' Air-Sea Bulk: [ DISABLED ]'')'
-        end if
-      end if
 
       return
 
@@ -493,10 +148,10 @@
 
 !     ayumi 2010/5/14
 !      use river, only : totq
+      use air        , only: initialize_air
       use bry        , only: initialize_boundary
-      use glob_atmos
-      use glob_bry
-      use glob_config, only: ntide, rk
+      use config     , only: ntide
+      use glob_const , only: rk
       use glob_domain, only: im, im_coarse, jm, jm_coarse, kb, kbm1
       use glob_grid
       use glob_misc
@@ -504,8 +159,6 @@
       use glob_out
 
       implicit none
-
-      integer i,j,k
 
 !     ayumi 2010/5/14
 !      totq = 0.e0
@@ -515,8 +168,6 @@
 
       iouts = 0 !fhx:20110131:
 
-
-      call initialize_boundary
 
       allocate(
      &  dz(kb), dzz(kb), z(kb), zz(kb)
@@ -549,7 +200,6 @@
      $  east_e(im,jm)  ,
      $  east_u(im,jm)  ,
      $  east_v(im,jm)  ,
-     $  e_atmos(im,jm) ,
      $  egb(im,jm)     ,
      $  egf(im,jm)     ,
      $  el(im,jm)      ,
@@ -570,14 +220,11 @@
      $  psi(im,jm)     ,
      $  rot(im,jm)     ,
      $  ssurf(im,jm)   ,
-     $  swrad(im,jm)   ,
-     $  vfluxb(im,jm)  ,
      $  tauiwu(im,jm)  ,    !:rwnd
      $  tauiwv(im,jm)  ,    !:rwnd
      $  tps(im,jm)     ,
      $  tsurf(im,jm)   ,
      $  ua(im,jm)      ,
-     $  vfluxf(im,jm)  ,
      $  uab(im,jm)     ,
      $  uaf(im,jm)     ,
      $  uib(im,jm)     ,    !:rwnd
@@ -593,12 +240,8 @@
      $  vif(im,jm)     ,    !:rwnd
      $  vtb(im,jm)     ,
      $  vtf(im,jm)     ,
-     $  wssurf(im,jm)  ,
-     $  wtsurf(im,jm)  ,
      $  wubot(im,jm)   ,
-     $  wusurf(im,jm)  ,
      $  wvbot(im,jm)   ,
-     $  wvsurf(im,jm)  ,
      $  alon_coarse(im_coarse,jm_coarse) ,
      $  alat_coarse(im_coarse,jm_coarse) ,
      $  mask_coarse(im_coarse,jm_coarse)
@@ -663,16 +306,17 @@
      $  km_mean(im,jm,kb)
      & )
 
-      allocate(
-     $  cibe(jm)       ,
-     $  cibn(im)       ,
-     $  cibs(im)       ,
-     $  cibw(jm)       ,
-     $  ampe(jm,ntide) ,
-     $  phae(jm,ntide) ,
-     $  amue(jm,ntide) ,
-     $  phue(jm,ntide)
-     & )
+! TODO: move to seaice and tide modules
+!      allocate(
+!     $  cibe(jm)       ,
+!     $  cibn(im)       ,
+!     $  cibs(im)       ,
+!     $  cibw(jm)       ,
+!     $  ampe(jm,ntide) ,
+!     $  phae(jm,ntide) ,
+!     $  amue(jm,ntide) ,
+!     $  phue(jm,ntide)
+!     & )
 
 
       allocate(
@@ -681,48 +325,71 @@
      $  elsrf_mean(im,jm)   ,
      $  uwsrf_mean(im,jm)   ,
      $  vwsrf_mean(im,jm)   ,
-     $  uwsrf(im,jm)        ,   ! wind data for SURF mean output
-     $  vwsrf(im,jm)
      & )
 
 ! 2-D and 3-D arrays
-      do j=1,jm
-        do i=1,im
-          cor(i,j)    =0.
-          e_atmos(i,j)=0.
-          vfluxb(i,j) =0.
-          vfluxf(i,j) =0.
-          wusurf(i,j) =0.
-          wvsurf(i,j) =0.
-          tauiwu(i,j) =0.
-          tauiwv(i,j) =0.
-          wtsurf(i,j) =0.
-          wssurf(i,j) =0.
-          swrad(i,j)  =0.
-          drx2d(i,j)  =0.
-          dry2d(i,j)  =0.
-          uwsrf(i,j)  =0.     !fhx:20110131:wind u for SURF output
-          vwsrf(i,j)  =0.     !fhx:20110131:wind v for SURF output
-          wubot(i,j)  =0.     !lyo:20110315:botwavedrag:
-          wvbot(i,j)  =0.     !lyo:20110315:botwavedrag:
-          aamfac(i,j) =1.     !fhx:incmix
-          hi(i,j)=.35
-        end do
-      end do
+      elf    = 0.
+      cor    = 0.
+      tauiwu = 0.
+      tauiwv = 0.
+      drx2d  = 0.
+      dry2d  = 0.
+      wubot  = 0.     !lyo:20110315:botwavedrag:
+      wvbot  = 0.     !lyo:20110315:botwavedrag:
+      aamfac = 1.     !fhx:incmix
+      hi     =  .35
 
-      do k=1,kbm1
-        do j=1,jm
-          do i=1,im
-            ub(i,j,k)=0.
-            vb(i,j,k)=0.
-          end do
-        end do
-      end do
-
+      ub(:,:,1:kbm1) = 0.
+      vb(:,:,1:kbm1) = 0.
 
 
       return
       end
+
+!______________________________________________________________________
+!
+      subroutine initialize_grid( TEST_CASE )
+!----------------------------------------------------------------------
+!  Reads of generates grid.
+!______________________________________________________________________
+
+      use glob_domain, only: im, imm1, jm, jmm1
+      use glob_grid
+
+      implicit none
+
+      integer, intent(in) :: TEST_CASE
+
+      if ( TEST_CASE == 0 ) then
+! read in grid data
+        call read_grid
+      else
+        call make_grid(TEST_CASE)
+      end if
+
+!lyo:ecs:
+!     Close northern boundary:
+!!        if(n_north.eq.-1) then
+!          do j=jm-5,jm
+!!           do j=jm-0,jm
+!!           fsm(:,j)=0.0
+!!           h(:,j)=1.0
+!!          enddo
+!!        endif
+!
+
+! derive u- and v-mask from rho-mask
+      dum(2:im,:) = fsm(2:im,:)*fsm(1:imm1,:)
+      dum(1   ,:) = dum(2   ,:)
+      dvm(:,2:jm) = fsm(:,2:jm)*fsm(:,1:jmm1)
+      dvm(:,1   ) = dvm(:,2   )
+
+      call exchange2d_mpi(  h,im,jm)
+      call exchange2d_mpi(fsm,im,jm)
+      call exchange2d_mpi(dum,im,jm)
+      call exchange2d_mpi(dvm,im,jm)
+
+      end subroutine ! initialize_grid
 
 !______________________________________________________________________
 !
@@ -731,9 +398,9 @@
 !  Set up vertical and horizontal grid, topography, areas and masks.
 !______________________________________________________________________
 
-      use glob_config, only: n1d, rk
-      use glob_const , only: DEG2RAD, Ohm, SMALL
-      use glob_domain, only: im, is_master, jm, kb, n_south, n_west
+      use config     , only: n1d
+      use glob_const , only: DEG2RAD, Ohm, rk, SMALL
+      use glob_domain, only: im, jm, kb, n_south, n_west
       use glob_grid
       use glob_ocean , only: d, dt, el, et
 
@@ -797,13 +464,7 @@
       dz(kb) = dz(kb-1) !=0. !lyo:20110202 =0 is dangerous but checked
       dzz(kb)=dzz(kb-1) !=0. !thro' code - and found to be ok.
 
-! print vertical grid information
-      if ( is_master ) then
-        print '(/2x,a,7x,a,9x,a,9x,a,9x,a)', 'k','z','zz','dz','dzz'
-        do k=1,kb
-          print '(1x,i5,4f10.3)', k,z(k),zz(k),dz(k),dzz(k)
-        end do
-      end if
+      call print_grid_vert
 
 ! set up Coriolis parameter
       cor = 2.*Ohm*sin(north_e*DEG2RAD)
@@ -855,20 +516,19 @@
 
       use bry
       use glob_bry
-      use glob_config, only: read_rst_file, rk
+      use config     , only: restart_file
+      use glob_const , only: rk
       use glob_domain
-      use glob_grid  , only: fsm
       use glob_ocean , only: elb, rmean, rho, s, sb, sclim
      &                     , t, tb, tclim
 
       implicit none
 
       integer i,j,k, n
-      integer :: ii, jj                !lyo:pac10:
       character(len=120) netcdf_ic_file     !lyo:20110202:
       logical :: fexist                !lyo:20110202:
 
-      read(read_rst_file, '(5x,i2)') n
+      read(restart_file, '(5x,i2)') n
 
 ! read initial temperature and salinity from ic file
 !      call read_initial_ts_pnetcdf(kb,tb,sb)
@@ -890,7 +550,7 @@
         endif
 
       else
-        call msg_print("Failed reading clim...", 2, "")
+        call msg_print("", 2, "Failed reading clim...")
         tb = 15.
         sb = 33.
         tclim = 15.
@@ -932,37 +592,12 @@
 !     enddo
 
 !lyo:pac10:beg:From /lustre/ltfs/scratch/Yu-Lin.Chang/sbPOM/stcc_exp/dx10_wind_5pe-5_kb350/pom/initialize.f; NOT from Alu's stcc code which does not have below
-      do k=1,kb
-         do j=1,jm
-            do i=1,nfw
-               tobw(i,j,k) = tclim( i, j, k) * fsm( i, j)
-               sobw(i,j,k) = sclim( i, j, k) * fsm( i, j)
-               enddo
-            do i=1,nfe
-               ii=im-i+1
-               tobe(i,j,k) = tclim(ii, j, k) * fsm(ii, j)
-               sobe(i,j,k) = sclim(ii, j, k) * fsm(ii, j)
-               enddo
-               tbw(j,k) = tobw(1,j,k); sbw(j,k) = sobw(1,j,k)
-               tbe(j,k) = tobe(1,j,k); sbe(j,k) = sobe(1,j,k)
-          enddo
-         do i=1,im
-            do j=1,nfs
-               tobs(i,j,k) = tclim( i, j, k) * fsm( i, j)
-               sobs(i,j,k) = sclim( i, j, k) * fsm( i, j)
-               enddo
-            do j=1,nfn
-               jj=jm-j+1
-               tobn(i,j,k) = tclim( i,jj, k) * fsm( i,jj)
-               sobn(i,j,k) = sclim( i,jj, k) * fsm( i,jj)
-               enddo
-               tbs(i,k) = tobs(i,1,k); sbs(i,k) = sobs(i,1,k)
-               tbn(i,k) = tobn(i,1,k); sbn(i,k) = sobn(i,1,k)
-          enddo
-      enddo
 !lyo:pac10:end:
 
 !      call read_ice_pnetcdf( "ice.19790102.nc", icb )
+
+! Set initial conditions for modules.
+      call initial_conditions_boundary
 
       return
       end
@@ -976,8 +611,8 @@
 ! ayumi 2010/4/7
 !______________________________________________________________________
 
-      use bry        , only: RFE, RFN, RFS, RFW
-      use glob_config, only: iperx, ipery, rk
+      use bry        , only: periodic_bc
+      use glob_const , only: rk
       use glob_domain, only: i_global, im, im_global
      &                     , j_global, jm, jm_global, master_task
       use glob_grid  , only: cor
@@ -989,25 +624,12 @@
       real(kind=rk)    :: corcon            !lyo:scs1d:
 !      character(len=120) in_file        !eda:uvforce
 
-      namelist/bry_nml/ rfn, rfe, rfs, rfw
-
-!      if ( n_north == -1 ) eln = elb( :,jm)
-!      if ( n_east  == -1 ) ele = elb(im,: )
-!      if ( n_south == -1 ) els = elb( :, 1)
-!      if ( n_west  == -1 ) elw = elb( 1,: )
 !     call read_uabe_pnetcdf(uabe)
 !eda:uvforce
 !      if (.not. calc_uvforce) then
 !        write(in_file,'(a)') "bc.nc"
 !        call read_bc_pnetcdf(uabe, uabw, vabs, vabn, in_file, 1)
 !      endif
-
-!     Radiation factors for use in subroutine bcond !alu:20101216
-!      rfe=0.; rfw=0.; rfn=0.; rfs=0. !=1 Flather; =0 clamped
-      rfe=1.; rfw=1.; rfn=1.; rfs=1. !=1 Flather; =0 clamped
-      open(73,file='bry.nml',status='old')
-      read(73,nml=bry_nml)
-      close(73)
 
 ! Periodic in "x" and/or "y"?  !lyo:20110224:alu:stcc:
 !     iperx.ne.0 if x-periodic; ipery.ne.0 if y-periodic               !
@@ -1017,7 +639,7 @@
 !lyo:scs1d:moved to namelist: pom.nml
 !lyo:scs1d:cannot be beta-plane if double-periodic (note cor(*,*)
 !     was previously defined in "call read_grid")
-      if (iperx.eq.1 .and. ipery.eq.1) then
+      if ( periodic_bc%x .and. periodic_bc%y ) then
       ic = (im_global+1)/2; jc = (jm_global+1)/2
          here = judge_inout( ic, jc,
      $                       i_global(1), i_global(im),
@@ -1064,7 +686,7 @@
 !                ... l.oey --- lyo@princeton.edu (Jan/2008)
 !----------------------------------------------------------------------
 
-      use glob_config, only: rk
+      use glob_const , only: rk
 
       implicit none
 
@@ -1164,7 +786,7 @@
 !fhx:tide:read tidal amplitude & phase at the eastern boundary for PROFS
 !______________________________________________________________________
 
-        use glob_config, only: rk
+        use glob_const , only: rk
 
 !      call read_tide_east_pnetcdf(ampe,phae)
         call read_tide_east_pnetcdf(ampe,phae,amue,phue)
@@ -1184,9 +806,9 @@
 ! initial conditions.
 !______________________________________________________________________
 
-      use glob_atmos , only: vfluxf
-      use glob_config, only: aam_init, npg, rk
-      use glob_const , only: SMALL
+      use air        , only: vfluxf
+      use config     , only: aam_init, npg
+      use glob_const , only: rk, SMALL
       use glob_domain, only: im, is_master, jm, kb, kbm1
       use glob_grid  , only: dz, h
       use glob_ocean , only: aam, d, drhox, drhoy, drx2d, dry2d, dt
@@ -1254,7 +876,25 @@
       return
 
       end
+!______________________________________________________________________
+!
+      subroutine initialize_modules
+!----------------------------------------------------------------------
+!  Initialize all neccessary modules.
+!______________________________________________________________________
 
+      use air, only: initialize_air
+      use bry, only: initialize_boundary
+      use io , only: initialize_io
+
+      implicit none
+
+
+      call initialize_boundary( 'config.nml' )
+      call initialize_air( 'config.nml' )
+      call initialize_io( 'config.nml' )
+
+      end subroutine initialize_modules
 !______________________________________________________________________
 !
       subroutine bottom_friction
@@ -1262,8 +902,8 @@
 !  Calculates the bottom friction coefficient.
 !______________________________________________________________________
 
-      use glob_config, only: cbcmax, cbcmin, rk, z0b
-      use glob_const , only: Kappa
+      use config     , only: cbcmax, cbcmin, z0b
+      use glob_const , only: Kappa, rk
       use glob_domain, only: im, jm, kbm1
       use glob_grid  , only: h, zz
       use glob_ocean , only: cbc
@@ -1293,7 +933,7 @@
 !  Interpolate vertically.
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
 
       implicit none
 
@@ -1359,7 +999,7 @@
 !  Interpolate using splines.
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
 
       implicit none
 
@@ -1418,7 +1058,7 @@
 !  Spline interpolation? [ DESCRIPTION NOT PROVIDED ]
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
       use glob_domain, only: error_status
 
       implicit none
@@ -1464,7 +1104,7 @@
 !     Output: aam is modified
 !______________________________________________________________________
 
-      use glob_config, only: rk
+      use glob_const , only: rk
 
       implicit none
 
@@ -1531,8 +1171,7 @@
 !  Generate vertical and horizontal grid, topography, areas and masks.
 !______________________________________________________________________
 
-      use glob_config, only: rk
-      use glob_const , only: DEG2RAD
+      use glob_const , only: DEG2RAD, rk
       use glob_domain
       use glob_grid
       use glob_ocean , only: d, dt, el, et
@@ -1585,15 +1224,15 @@
         east_u(1,:) = 2.*east_u(2,:) - east_u(3,:)
         north_u(1,:)= 2.*north_u(2,:)- north_u(3,:)
       end if
-      do j = 1,jm
-        do i = 2,im
-          east_v(i,j) = .5*( east_e(i,j) + east_e(i-1,j) )
-          north_v(i,j)= .5*( north_e(i,j)+ north_e(i-1,j))
+      do j = 2,jm
+        do i = 1,im
+          east_v(i,j) = .5*( east_e(i,j) + east_e(i,j-1) )
+          north_v(i,j)= .5*( north_e(i,j)+ north_e(i,j-1))
         end do
       end do
       call exchange2d_mpi( east_v, im,jm)
       call exchange2d_mpi(north_v, im,jm)
-      if (n_west==-1) then
+      if (n_south==-1) then
       east_v(:,1) = 2.*east_v(:,2) - east_v(:,3)
       north_v(:,1)= 2.*north_v(:,2)- north_v(:,3)
       end if
@@ -1673,13 +1312,7 @@
 !     rot,h,fsm,dum,dvm
 
 
-! print vertical grid information
-      if ( is_master ) then
-        print '(/2x,a,7x,a,9x,a,9x,a,9x,a)', 'k','z','zz','dz','dzz'
-        do k=1,kb
-          print '(1x,i5,4f10.3)', k,z(k),zz(k),dz(k),dzz(k)
-        end do
-      end if
+      call print_grid_vert
 
 ! set up Coriolis parameter
         do j=1,jm
@@ -1720,3 +1353,79 @@
       return
 
       end
+!______________________________________________________________________
+!
+      subroutine print_grid_vert
+!----------------------------------------------------------------------
+!  Prints vertical sigma distribution.
+!______________________________________________________________________
+
+      use glob_domain, only: is_master, kb
+      use glob_grid  , only: z, zz, dz, dzz
+
+      implicit none
+
+      integer k
+
+! print vertical grid information
+      if ( is_master ) then
+        print '(/a)', "=========== VERTICAL DISCRETIZATION ==========="
+        print '(/3x,a,9x,a,8x,a,8x,a,8x,a)', 'k','z','zz','dz','dzz'
+        do k=1,kb
+          print '(1x,i5,4f10.3)', k,z(k),zz(k),dz(k),dzz(k)
+        end do
+      end if
+
+      end subroutine
+
+!______________________________________________________________________
+! fhx:interp_flag
+! fhx:fgrid
+      subroutine check_interpolation
+!----------------------------------------------------------------------
+!  Decides on wether to use interpolation or not.
+!______________________________________________________________________
+
+      use config     , only: calc_interp
+      use glob_domain, only: im_global, im_global_coarse, is_master
+     &                     , jm_global, jm_global_coarse
+     &                     , x_division, y_division
+
+      implicit none
+
+      if (  ((im_global_coarse-2)*x_division == (im_global-2))
+     $ .and.((jm_global_coarse-2)*y_division == (jm_global-2)) ) then
+
+        calc_interp = .TRUE.
+
+      else if ( (im_global_coarse == im_global)
+     $     .and.(jm_global_coarse == jm_global) ) then
+
+        calc_interp = .FALSE.
+
+      else
+
+        if ( is_master ) print '(a//a)'
+     &    , 'Incompatible number of *_global and *_global_coarse'
+     &    , 'POM terminated with error'
+        stop
+
+      end if
+
+      end subroutine
+
+!______________________________________________________________________
+!
+      subroutine modules_bc_init( dtime )
+
+        use air        , only: air_init
+        use module_time
+
+        implicit none
+
+        type(date), intent(in) :: dtime
+
+
+        call air_init( dtime )
+
+      end subroutine
