@@ -771,7 +771,7 @@
 
       namelist/bry_nml/ rfn, rfe, rfs, rfw
 
-      elb = 0.
+!      elb = 0.
       if ( n_north == -1 ) eln = elb( :,jm)
       if ( n_east  == -1 ) ele = elb(im,: )
       if ( n_south == -1 ) els = elb( :, 1)

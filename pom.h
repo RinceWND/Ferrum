@@ -783,3 +783,15 @@
 
       common/misc/
      &  t_lo, t_hi
+
+      real(kind=rk), dimension(im_local,jm_local) ::
+     &  Fu_S, Fv_S, Fw_S
+     &, Fu_M, Fv_M, Fw_M
+     &, Fu_S_mean, Fv_S_mean, Fw_S_mean
+     &, Fu_M_mean, Fv_M_mean, Fw_M_mean
+
+      common/tide/
+     &  Fu_S, Fv_S, Fw_S
+     &, Fu_M, Fv_M, Fw_M
+     &, Fu_S_mean, Fv_S_mean, Fw_S_mean
+     &, Fu_M_mean, Fv_M_mean, Fw_M_mean

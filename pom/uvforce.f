@@ -8,7 +8,7 @@
 
       include 'pom.h'
 
-      logical, parameter :: read_transport = .true.
+      logical, parameter :: read_transport = .false.
       integer, parameter :: n_bry = 3
 
 !     days in month
