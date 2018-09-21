@@ -4678,6 +4678,7 @@
         integer uabe_varid,uabw_varid,vabs_varid,vabn_varid,hi_varid
         integer tbe_varid,tbw_varid,tbs_varid,tbn_varid,uf_varid
         integer sbe_varid,sbw_varid,sbs_varid,sbn_varid,vf_varid
+        integer km_varid,kh_varid
         integer ncid,status,flags
         integer vdims(4)
         integer(mpi_offset_kind) length
@@ -4823,10 +4824,10 @@
      $                     'Sea ice v-flux','conc/sec',
      $                     -1,0.,'east_v north_v',.true.)
 !
-!      vdims(1)=x_dimid
-!      vdims(2)=y_dimid
-!      vdims(3)=z_dimid
-!      vdims(4)=time_dimid
+      vdims(1)=x_dimid
+      vdims(2)=y_dimid
+      vdims(3)=z_dimid
+      vdims(4)=time_dimid
 !      call def_var_pnetcdf(ncid,'t',4,vdims,t_varid,nf_float,
 !     $                     'potential temperature','K',
 !     $                     'east_e north_e zz',.true.)
@@ -4836,12 +4837,12 @@
 !      call def_var_pnetcdf(ncid,'rho',4,vdims,rho_varid,nf_float,
 !     $                     '(density-1000)/rhoref','dimensionless',
 !     $                     'east_e north_e zz',.true.)
-!      call def_var_pnetcdf(ncid,'kh',4,vdims,kh_varid,nf_float,
-!     $                     'vertical diffusivity','metre2/sec',
-!     $                     'east_e north_e zz',.true.)
-!      call def_var_pnetcdf(ncid,'km',4,vdims,km_varid,nf_float,
-!     $                     'vertical viscosity','metre2/sec',
-!     $                     'east_e north_e zz',.true.)
+      call def_var_pnetcdf(ncid,'drhox',4,vdims,kh_varid,nf_float,
+     $                     'vertical diffusivity','metre2/sec',
+     $                     -1,0.,'east_e north_e zz',.true.)
+      call def_var_pnetcdf(ncid,'drhoy',4,vdims,km_varid,nf_float,
+     $                     'vertical viscosity','metre2/sec',
+     $                     -1,0.,'east_e north_e zz',.true.)
 
 ! end definitions
       status=nfmpi_enddef(ncid)
@@ -4855,14 +4856,14 @@
      &                                                    ,real(time,4))
       call handle_error_pnetcdf('nf_put_vara_real:time',status)
 
-      start(1)=1
-      edge(1)=kb
-      status=nfmpi_put_vara_real_all(ncid,z_varid,start,edge
-     &                                                       ,real(z,4))
-      call handle_error_pnetcdf('nf_put_var_real: z',status)
-      status=nfmpi_put_vara_real_all(ncid,zz_varid,start,edge
-     &                                                      ,real(zz,4))
-      call handle_error_pnetcdf('nf_put_var_real: zz',status)
+!      start(1)=1
+!      edge(1)=kb
+!      status=nfmpi_put_vara_real_all(ncid,z_varid,start,edge
+!     &                                                       ,real(z,4))
+!      call handle_error_pnetcdf('nf_put_var_real: z',status)
+!      status=nfmpi_put_vara_real_all(ncid,zz_varid,start,edge
+!     &                                                      ,real(zz,4))
+!      call handle_error_pnetcdf('nf_put_var_real: zz',status)
 
 !alu:add elebc
 !--East
@@ -4984,14 +4985,14 @@
      $     'nf_put_vara_real: flxv',status)
 !
 !
-!      start(1)=i_global(1)
-!      start(2)=j_global(1)
-!      start(3)=1
-!      start(4)=1
-!      edge(1)=im
-!      edge(2)=jm
-!      edge(3)=kb
-!      edge(4)=1
+      start(1)=i_global(1)
+      start(2)=j_global(1)
+      start(3)=1
+      start(4)=1
+      edge(1)=im
+      edge(2)=jm
+      edge(3)=kb
+      edge(4)=1
 !      status=nfmpi_put_vara_real_all(ncid,t_varid,start,edge,real(tb,4))
 !      call handle_error_pnetcdf('nf_put_vara_real: t',status)
 !      status=nfmpi_put_vara_real_all(ncid,s_varid,start,edge,real(sb,4))
@@ -4999,12 +5000,12 @@
 !      status=nfmpi_put_vara_real_all(ncid,rho_varid,start,edge
 !     &                                                     ,real(rho,4))
 !      call handle_error_pnetcdf('nf_put_vara_real: rho',status)
-!      status=nfmpi_put_vara_real_all(ncid,kh_varid,start,edge
-!     &                                                      ,real(kh,4))
-!      call handle_error_pnetcdf('nf_put_vara_real: kh',status)
-!      status=nfmpi_put_vara_real_all(ncid,km_varid,start,edge
-!     &                                                      ,real(km,4))
-!      call handle_error_pnetcdf('nf_put_vara_real: km',status)
+      status=nfmpi_put_vara_real_all(ncid,kh_varid,start,edge
+     &                                                   ,real(drhox,4))
+      call handle_error_pnetcdf('nf_put_vara_real: kh',status)
+      status=nfmpi_put_vara_real_all(ncid,km_varid,start,edge
+     &                                                   ,real(drhoy,4))
+      call handle_error_pnetcdf('nf_put_vara_real: km',status)
 
 
 ! close file

@@ -106,7 +106,7 @@
 ! write restart
         call write_restart( dtime )
 
-!      call write_debug_pnetcdf("dbg."//date2str(dtime))
+!      call write_debug_pnetcdf("son.dbg."//date2str(dtime),ua,va)
 
       end do
 
