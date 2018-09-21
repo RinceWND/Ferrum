@@ -24,6 +24,7 @@ module io
       bc_path         & !  boundary condition file
   , clim_path         & !  climatology file
   , grid_path         & !  grid file
+  ,   ic_path         & !  ic file
   , mean_path         & !  mean ts file
   ,  out_path           ! Full path to output directory
 !______________________________________________________________________
@@ -32,7 +33,7 @@ module io
 !  If any path ends with `/` then the default filename will be
 ! appended to the path.
 
-  public :: check, initialize_io, out_init
+  public :: check, initialize_io, out_init, read_initial
 
   private
 
@@ -54,8 +55,8 @@ module io
 
       character(len=*), intent(in) :: config_nml
 
-      namelist/input_files_nml/                                &
-          bc_path, clim_path, grid_path, mean_path,  out_path
+      namelist/input_files_nml/                                        &
+          bc_path, clim_path, grid_path, ic_path, mean_path,  out_path
 
       integer pos
 
@@ -63,6 +64,7 @@ module io
       bc_path   = "in/bc/"
       clim_path = "in/clim/"
       grid_path = "in/grid/"
+      ic_path   = "in/init/"
       mean_path = "in/clim/"
       out_path  = "out/"
 
@@ -87,6 +89,11 @@ module io
         grid_path = trim(grid_path)//"grid."//FORMAT_EXT
       end if
 
+      pos = len(trim(ic_path))
+      if ( ic_path(pos:pos) == "/" ) then
+        ic_path = trim(ic_path)//"init."//FORMAT_EXT
+      end if
+
       pos = len(trim(mean_path))
       if ( mean_path(pos:pos) == "/" ) then
         mean_path = trim(mean_path)//"mean."//FORMAT_EXT
@@ -102,6 +109,7 @@ module io
         print *, "Grid          : ", trim(grid_path)
         print *, "Climatology   : ", trim(clim_path)
         print *, "Mean TS       : ", trim(mean_path)
+        print *, "Initial cond. : ", trim(ic_path)
         print *, "Boundary cond.: ", trim(bc_path)
         print *, "--------------|----------------------------"
         print *, "Output to     : ", trim(out_path)
@@ -109,7 +117,65 @@ module io
       end if
 
     end subroutine initialize_io
+!______________________________________________________________________
+!
+    subroutine read_initial
+!----------------------------------------------------------------------
+!  Reads initial fields (T,S,u,v,el).
+!______________________________________________________________________
 
+      use model_run , only: dtime
+      use glob_ocean, only: elb, rho, rmean, sb, sclim, tb, tclim
+
+      implicit none
+
+      logical fexist
+
+
+! Check if the climatology file exists and read it.
+      inquire ( file = trim(ic_path), exist = fexist )
+      if ( fexist ) then
+! TODO: Make it possible to read separate initial file, not just clim.
+        call msg_print("", 6, "Read initial conditions:")
+        call read_initial_ts_pnetcdf( tb, sb, elb, dtime%month )
+      else
+        call msg_print("", 2, "FAILED...")
+        tb = 15.
+        sb = 33.
+      end if
+
+! Calculate initial density.
+      call dens(sb,tb,rho)
+
+! Read z-horizontally averaged TS for background density field.
+      inquire ( file = trim(mean_path), exist = fexist )
+      if ( fexist ) then
+        call msg_print("", 6, "Read background TS:")
+        call read_mean_ts_pnetcdf( tclim, sclim, dtime%month )
+      else
+        call msg_print("", 2, "FAILED...")
+        tclim = 0.
+        sclim = 0.
+      end if
+
+! Calculate background density.
+!  Should use T and S horizontally averaged in z-coordinates and only
+! after that interpolated to sigma-coordinates.
+      call dens(sclim,tclim,rmean)
+
+! Read climatology.
+      inquire ( file = trim(clim_path), exist = fexist )
+      if ( fexist ) then
+        call msg_print("", 6, "Read climatology:")
+        call read_clim_ts_pnetcdf( tclim, sclim, dtime%month )
+      else
+        call msg_print("", 2, "FAILED...")
+        tclim = 15.
+        sclim = 33.
+      end if
+
+
+    end subroutine ! read_initial
 !______________________________________________________________________
 !
     subroutine out_init( out_file )
@@ -647,7 +713,102 @@ module io
       return
 
     end subroutine
+!______________________________________________________________________
+!
+    subroutine read_initial_ts_pnetcdf( temp, salt, ssh, n )
+!----------------------------------------------------------------------
+!  Reads initial temperature, salinity and elevation.
+! TODO: Add u and v. Add check for single record to read if not climatology.
+!______________________________________________________________________
 
+      use glob_const , only: rk
+      use glob_domain
+!      use glob_grid  , only: fsm
+      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
+      use pnetcdf
+
+      implicit none
+
+      integer, external :: get_var_real_2d &
+                         , get_var_real_3d
+
+      integer , intent(in)  :: n
+      real(rk), intent(out) :: temp(im,jm,kb),salt(im,jm,kb),ssh(im,jm)
+
+      integer                  ncid, status
+      integer                  el_varid, sb_varid, tb_varid
+      integer(MPI_OFFSET_KIND) start(4),edge(4)
+
+
+      start = 1
+      edge  = 1
+
+!  Open netcdf file.
+      if ( is_master )                                              &
+           print '(''reading file `'',a,''`''/)', trim(ic_path)
+      call check( nf90mpi_open(                        &
+                    POM_COMM, ic_path, NF_NOWRITE  &
+                  , MPI_INFO_NULL, ncid )              &
+                , "nfmpi_open: "//ic_path )
+
+!  Get variables. [ TODO: parameterize varnames ]
+      call check( nf90mpi_inq_varid( ncid, 'tclim', tb_varid )  &
+                , "nfmpi_inq_varid: t_init @ "//ic_path )
+      call check( nf90mpi_inq_varid( ncid, 'sclim', sb_varid )  &
+                , "nfmpi_inq_varid: s_init @ "//ic_path )
+
+      status = nf90mpi_inq_varid( ncid, 'eclim', el_varid )
+      if ( status == NF_NOERR ) then
+! Get elevation.
+        start(1) = i_global(1)
+        start(2) = j_global(1)
+        start(3) = n
+        edge(1) = im
+        edge(2) = jm
+        edge(3) = 1
+        call check( get_var_real_2d( ncid, el_varid, start,edge, ssh ) &
+                  , "nfmpi_get_vara_real_all"//ic_path )
+      else
+        if ( status == -49 ) then
+          if ( is_master ) then
+            call msg_print("", 2                                       &
+                        , "Missing elevation data - falling back to 0.")
+          end if
+          ssh = 0.
+        else
+          call check(status, 'nfmpi_inq_varid: el_init @ '//ic_path)
+        end if
+      end if
+
+      start(1) = i_global(1)
+      start(2) = j_global(1)
+      start(3) = 1
+      start(4) = n
+      edge(1) = im
+      edge(2) = jm
+      edge(3) = kb
+      edge(4) = 1
+      call check( get_var_real_3d(ncid,tb_varid,start,edge,temp)  &
+                , "nf_get_var : temp @ "//ic_path )
+      call check( get_var_real_3d(ncid,sb_varid,start,edge,salt)  &
+                , "nf_get_var : salt @ "//ic_path )
+
+!! TODO: move out
+!      do k=1,kb-1
+!        where (fsm==0.)
+!          temp(:,:,k) = 0.
+!          salt(:,:,k) = 0.
+!        end where
+!      end do
+!      temp(:,:,kb) = temp(:,:,kb-1)
+!      salt(:,:,kb) = salt(:,:,kb-1)
+!      elb = elb*fsm
+
+!  Close file.
+      call check( nf90mpi_close(ncid), "nf_close @ "//ic_path)
+
+
+    end subroutine
 
 !______________________________________________________________________
 !

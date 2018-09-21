@@ -112,9 +112,46 @@ module config
 
     subroutine parameters_init
 
+      use model_run, only: days, dte, isplit, time_start
+
       implicit none
 
 ! Input of filenames and constants
+
+! Title of model run:
+      title = "Numerical experiment"
+
+! Output filename: [ TODO: handle it in io module? ]
+      netcdf_file = "results"
+
+! Model calculation mode:
+!   0 : No calculation [ NOT IMPLEMENTED ]
+!   2 : Barotropic 2-D mode
+!   3 : Baroclinic 3-D mode (default)
+!   4 : Diagnostic mode with T and S held fixed
+      mode = 3
+
+! Advection scheme: [ TODO: Move to solver module (TODO: create solver module) ]
+!   1 : Simple upstream scheme (???)
+!   2 : Smolarkiewicz scheme
+      nadv = 2
+
+! Number of maximum iterations for Smolarkiewicz scheme.
+! Usual "safe" number is 4.
+!   In the current implementation the scheme convergence is checked
+!  against |eps|, so it may take fewer steps than the set maximum:
+      nitera = 10
+
+! Smoothing factor for Smolarkiewicz scheme [ TODO: move to a separate module? ]
+      sw = .75
+
+! Pressure gradient scheme:
+!   1 : Simple POM scheme
+!   2 : 4th order McCalpin (default)
+!   3 : Lin         [ TESTS NEEDED ]
+!   4 : Song        [ TESTS NEEDED ]
+!   5 : Shchepetkin [ TESTS NEEDED ]
+      npg = 2
 
 ! Logical for inertial ramp (.true. if inertial ramp to be applied
 ! to wind stress and baroclinic forcing, otherwise .false.)
@@ -122,43 +159,43 @@ module config
 
 ! Reference density (recommended values: 1025 for seawater,
 ! 1000 for freswater; S.I. units):
-      rhoref=1025.
+      rhoref = 1025.
 
 ! Temperature bias (deg. C)
-      tbias=0.
+      tbias = 0.
 
 ! Salinity bias
-      sbias=0.
+      sbias = 0.
 
 ! Bottom roughness (metres)
-      z0b=.01
+      z0b = .01
 
 ! Minimum bottom friction coeff.
-      cbcmin=.0025
+      cbcmin = .0025
 
 ! Maximum bottom friction coeff.
-      cbcmax=5. !1.e0   !lyo:20110315:botwavedrag:
+      cbcmax = 5. !1.e0   !lyo:20110315:botwavedrag:
 
 ! Smagorinsky diffusivity coeff.
-      horcon=0.2  !lyo:pac10:exp004: !=0.1e0
+      horcon = .2  !lyo:pac10:exp004: !=0.1e0
 
 ! Inverse horizontal turbulent Prandtl number (ah/am; dimensionless):
 ! NOTE that tprni=0.e0 yields zero horizontal diffusivity!
-      tprni=.2
+      tprni = .2
 
 ! Background viscosity used in subroutines profq, proft, profu and
 ! profv (S.I. units):
-      umol=2.e-5
+      umol = 2.e-5
 
 ! Maximum magnitude of vaf (used in check that essentially tests
 ! for CFL violation):
-      vmaxl=5. !lyo:debug:100.e0
+      vmaxl = 5. !lyo:debug:100.e0
 
 ! Maximum allowable value of:
 !   <difference of depths>/<sum of depths>
 ! for two adjacent cells (dimensionless). This is used in subroutine
 ! slpmax. If >= 1, then slpmax is not applied:
-      slmax=2.
+      slmax = 2.
 
 ! Water type, used in subroutine proft.
 !    ntp    Jerlov water type
@@ -167,7 +204,7 @@ module config
 !     3            ib
 !     4            ii
 !     5            iii
-      ntp=2
+      ntp = 2
 
 ! Surface temperature boundary condition, used in subroutine proft:
 !    nbct   prescribed    prescribed   short wave
@@ -176,7 +213,7 @@ module config
 !     2        no           yes           yes
 !     3        yes          no            no
 !     4        yes          no            yes
-      nbct=1
+      nbct = 1
 
 ! Surface salinity boundary condition, used in subroutine proft:
 !    nbcs   prescribed    prescribed
@@ -184,23 +221,35 @@ module config
 !     1        no           yes
 !     3        yes          no
 ! NOTE that only 1 and 3 are allowed for salinity.
-      nbcs=1
+      nbcs = 1
 
 ! Step interval during which external (2-D) mode advective terms are
 ! not updated (dimensionless):
-      ispadv=5
+      ispadv = 5
+
+! Default mode splitting step value:
+      isplit = 30
 
 ! Constant in temporal filter used to prevent solution splitting
 ! (dimensionless):
-      smoth=0.10
+      smoth = .10
+
+! Starting datetime string:
+      time_start = "0001-01-01 00:00:00"
+
+! Run duration (days):
+      days = 0.
+
+! External time step (sec):
+      dte = 60.
 
 ! Weight used for surface slope term in external (2-D) dynamic
 ! equation (a value of alpha = 0.e0 is perfectly acceptable, but the
 ! value, alpha=.225e0 permits a longer time step):
-      alpha=0.225
+      alpha = .225
 
 ! Initial value of aam:
-      aam_init=500.
+      aam_init = 500.
 
 ! Thresholds for temperature and salinity
       t_hi =  999.

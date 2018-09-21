@@ -20,7 +20,7 @@
 
       implicit none
 
-      integer, parameter :: TEST_CASE = 1
+      integer, parameter :: TEST_CASE = 0 !1
 
 
 ! Read domain distribution (TODO: get rid of hardcoded parameters)
@@ -389,6 +389,8 @@
       call exchange2d_mpi(dum,im,jm)
       call exchange2d_mpi(dvm,im,jm)
 
+      call check_cfl_min
+
       end subroutine ! initialize_grid
 
 !______________________________________________________________________
@@ -519,48 +521,16 @@
       use config     , only: restart_file
       use glob_const , only: rk
       use glob_domain
-      use glob_ocean , only: elb, rmean, rho, s, sb, sclim
-     &                     , t, tb, tclim
+      use io         , only: read_initial
+      use glob_ocean , only: s, sb, t, tb
 
       implicit none
 
-      integer i,j,k, n
-      character(len=120) netcdf_ic_file     !lyo:20110202:
-      logical :: fexist                !lyo:20110202:
-
-      read(restart_file, '(5x,i2)') n
+      integer i,j,k
 
 ! read initial temperature and salinity from ic file
 !      call read_initial_ts_pnetcdf(kb,tb,sb)
-      write(netcdf_ic_file,'(a)') "./in/tsclim/ts_clim.nc"
-      inquire(file=trim(netcdf_ic_file),exist=fexist)
-
-      if (fexist) then
-!        call read_clim_ts_pnetcdf(tb,sb,n)
-        call read_initial_ts_pnetcdf(tb,sb,elb,n)
-
-! read annual-mean, xy-ave t,sclim if avail !lyo:20110202:
-        write(netcdf_ic_file,'(a)') "./in/tsclim/ts_mean.nc"
-        inquire(file=trim(netcdf_ic_file),exist=fexist)
-        if(fexist) then  !annual-mean xy-ave t,sclim
-          call read_mean_ts_pnetcdf(tclim,sclim,n)
-        else             !annual-mean *clim* - dangerous for rmean
-!      call read_clim_ts_pnetcdf_obs(tclim,sclim,rmean,n)
-          call read_clim_ts_pnetcdf(tclim,sclim,n)
-        endif
-
-      else
-        call msg_print("", 2, "Failed reading clim...")
-        tb = 15.
-        sb = 33.
-        tclim = 15.
-        sclim = 33.
-      end if
-! calc. initial density
-      call dens(sb,tb,rho)
-
-! calc. rmean; should use xy-ave t,sclim; ok if tsforce is called later
-      call dens(sclim,tclim,rmean)
+      call read_initial
 
       do k=1,kbm1
         do j=1,jm
@@ -1414,6 +1384,56 @@
 
       end subroutine
 
+!______________________________________________________________________
+!
+      subroutine check_cfl_min
+!----------------------------------------------------------------------
+!  Estimates minimum barotropic timestep (sec)
+!______________________________________________________________________
+
+        use glob_const , only: grav, rk, SMALL
+        use glob_domain, only: im, jm, master_task, my_task, POM_COMM
+        use glob_grid  , only: dx, dy, fsm, h
+        use model_run  , only: dte
+        use mpi        , only: MPI_DOUBLE, MPI_MIN, MPI_REAL
+     &                       , mpi_reduce
+
+        implicit none
+
+        real(rk), dimension(im,jm) :: cfl
+        real(rk)                      cflmin, tmp
+        integer                       ierr, MPI_RK
+        character(len=128)            msg, desc
+
+
+        if ( rk == 8 ) then
+          MPI_RK = MPI_DOUBLE
+        else
+          MPI_RK = MPI_REAL
+        end if
+
+        cfl = 0.
+        cflmin = 1.d10
+
+        cfl = fsm*.5 / sqrt(1./dx**2+1./dy**2) / sqrt(grav*(h+SMALL))
+
+        cflmin = minval(cfl, cfl>0.)
+
+        call mpi_reduce( cflmin, tmp, 1, MPI_RK, mpi_min
+     &                 , master_task, POM_COMM, ierr     )
+
+        if ( my_task == master_task ) then
+          if ( cflmin < dte ) then
+            write(msg, '(a,f5.2,a)')
+     &                 "Timestep (", dte, ") is too large!"
+            write(desc, '(a,f5.2,a)')
+     &              "You are strongly advised to make dte smaller than "
+     &                                                       ,cflmin,"."
+            call msg_print(msg, 2, desc)
+          end if
+        end if
+
+      end subroutine check_cfl_min
 !______________________________________________________________________
 !
       subroutine modules_bc_init( dtime )

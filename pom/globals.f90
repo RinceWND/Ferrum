@@ -291,10 +291,10 @@ module model_run
       dti2 = dti*2
 
 ! Define number of steps and output intervals
-      iend    = max0( nint( days*24.*3600./dti), 2 )
-      iprint  = max ( nint(prtd1*24.*3600./dti), 1 )
-      irestart= nint(  write_rst*24.*3600./dti     )
-      iprints = nint(      prtd2*24.*3600./dti     ) !fhx:20110131:add 3hrly output
+      iend    = max( nint(       days*24.*3600./dti), 2 )
+      iprint  = max( nint(      prtd1*24.*3600./dti), 1 )
+      irestart= max( nint(  write_rst*24.*3600./dti), 1 )
+      iprints = max( nint(      prtd2*24.*3600./dti), 1 )
 
       ispi = 1./    float(isplit)
       isp2i= 1./(2.*float(isplit))

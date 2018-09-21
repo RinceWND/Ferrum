@@ -21,7 +21,10 @@
 
       implicit none
 
+      real(8), external :: realtime
+
       integer mb
+      real(8) tick0, tick1
 
 
 ! initialize model
@@ -43,6 +46,7 @@
       if ( .not.do_restart ) call out_init( trim(netcdf_file) )
 
       if ( is_master ) then
+        tick0 = realtime()
         call msg_print("BEGIN NUMERICAL EXPERIMENT", 1, "")
         print '(" = ",a)', date2str( dtime )
       end if
@@ -95,11 +99,15 @@
 
       end do
 
+      tick1 = realtime()
+      call msg_print("NUMERICAL EXPERIMENT FINISHED", 1, "")
+
 ! finalize mpi
       call finalize_mpi
 
-      stop
-      end
+      if (is_master) print '(a,f7.2,a)',"Done in ",(tick1-tick0)," sec."
+
+      end program
 
 !______________________________________________________________________
       real(kind=8) function realtime()
@@ -441,9 +449,17 @@
         integer         , intent(in) :: status
 
         integer, parameter :: line_len = 56
-        character, dimension(6), parameter :: chr =
-     &                          (/"O","!","X","?","*"," "/)
-
+        integer*2, dimension(6), parameter :: chr =
+!     &                          (/ 9675  ! 1: white circle
+     &                          (/ 79    ! 1: latin capital letter o
+     &                           , 33    ! 2: exclamation mark
+!     &                           , 10799 ! 3: vector or cross product "X"
+     &                           , 88    ! 3: latin capital letter x
+     &                           , 63    ! 4: question mark
+!     &                           , 8270  ! 5: low asterisk
+     &                           , 42    ! 5: asterisk
+     &                           , 32    ! 6: space
+     &                          /)
         integer                   i
         character(len=64)         fmt01!, fmt02
         character(len=line_len-4) line
@@ -454,7 +470,7 @@
 
 ! Print simple message if only `DESC` is present.
         if ( msg == '' .and. desc /= '' ) then
-          print '("[",a,"] ",a/)', chr(status), desc
+          print '("[",a,"] ",a)', char(chr(status)), desc
           return
         end if
 
@@ -465,7 +481,7 @@
         print '(/)'
         print fmt01, ("_",i=1,line_len)
 
-        print '("[",a,"] ",a/)', chr(status), line
+        print '("[",a,"] ",a/)', char(chr(status)), line
 
         if ( desc == "" ) return
 

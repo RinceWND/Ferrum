@@ -353,7 +353,6 @@ module air
       integer                          &
       , dimension(3)  :: record, year
       real               chunk
-      character(len=256) infile_prev, infile_next
 
 
 ! Quit if the module is not used.
@@ -598,10 +597,10 @@ module air
 !  Reads forcing fields during experiment.
 !______________________________________________________________________
 
-      use glob_const , only: SEC2DAY
+!      use glob_const , only: SEC2DAY
       use glob_domain, only: is_master
       use module_time
-      use glob_ocean , only: tb
+!      use glob_ocean , only: tb
       use model_run  , only: dti, iint
 
       implicit none
@@ -613,7 +612,6 @@ module air
       integer                          &
       , dimension(3)  :: record, year
       real               a, chunk
-      character(len=256) infile_prev, infile_next
 
 
 ! Quit if the module is not used.

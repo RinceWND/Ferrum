@@ -20,6 +20,7 @@
 
       implicit none
 
+
       real(rk), dimension(im,jm), intent(out) :: curv2d
 
       integer i,j

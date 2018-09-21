@@ -300,7 +300,7 @@
       use bry        , only: bc_vel_ext, bc_zeta
       use config     , only: alpha, ispadv, smoth
       use glob_const , only: grav
-      use glob_domain, only: im, imm1, jm, jmm1
+      use glob_domain, only: im, imm1, jm, jmm1, my_task
       use glob_grid  , only: art, aru, arv, cor, dx, dy, fsm, h
       use glob_ocean
       use model_run  , only: dte, dte2, iext, isp2i, ispi, isplit,iint
@@ -315,7 +315,7 @@
      $                 *(dy(i,j)+dy(i-1,j))*ua(i,j)
           fluxva(i,j)=.25*(d(i,j)+d(i,j-1))
      $                 *(dx(i,j)+dx(i,j-1))*va(i,j)
-          if (abs(fluxua(i,j))>1.e3) then
+          if (.false. .and. abs(fluxua(i,j))>1.e3) then
             print *, "FLUXUA", iint, iext
             print *, "d    : ", d(i,j)
             print *, "ua   : ", ua(i,j)
@@ -364,7 +364,7 @@
      $                         +elf(i,j)-elf(i-1,j))
      $                  +e_atmos(i,j)-e_atmos(i-1,j))
      $              +drx2d(i,j)+aru(i,j)*(wusurf(i,j)-wubot(i,j))
-          if (abs(uaf(i,j))>20.) then
+          if (.false. .and. abs(uaf(i,j))>20. .and. my_task==3) then
             print *, "!!UAF", uaf(i,j), iint, iext
             print *, "uab  : ", uab(i,j)
             print *, "adx2d: ", adx2d(i,j)
@@ -382,6 +382,8 @@
             print *, "dy-1 : ", dy(i-1,j)
             print *, "el   : ", el(i,j)
             print *, "el-1 : ", el(i-1,j)
+            print *, "elb  : ", elb(i,j)
+            print *, "elb-1: ", elb(i-1,j)
             print *, "elf  : ", elf(i,j)
             print *, "elf-1: ", elf(i-1,j)
             print *, "e_atm: ", e_atmos(i,j)
@@ -390,8 +392,19 @@
             print *, "wusrf: ", wusurf(i,j)
             print *, "wubot: ", wubot(i,j)
             print *, "aru  : ", aru(i,j)
-            print *, "(1)  : ", (h(i,j)+elb(i,j)+h(i-1,j)+elb(i-1,j))
-            print *, "(2)  : ", (h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
+            print *, "(1)  : ", adx2d(i,j)+advua(i,j)
+            print *, "(2)  : ", -aru(i,j)*.25
+     $                *(cor(i,j)*d(i,j)*(va(i,j+1)+va(i,j))
+     $                 +cor(i-1,j)*d(i-1,j)*(va(i-1,j+1)+va(i-1,j)))
+            print *, "(3)  : ", .25*grav*(dy(i,j)+dy(i-1,j))
+     $                *(d(i,j)+d(i-1,j))
+            print *, "(4)  : ", (1.-2.*alpha)
+     $                   *(el(i,j)-el(i-1,j))
+     $                  +alpha*(elb(i,j)-elb(i-1,j)
+     $                         +elf(i,j)-elf(i-1,j))
+     $                  +e_atmos(i,j)-e_atmos(i-1,j)
+            print *, "(5)  : ", drx2d(i,j)
+     $                  +aru(i,j)*(wusurf(i,j)-wubot(i,j))
             stop
           end if
 
