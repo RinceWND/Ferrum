@@ -134,9 +134,9 @@ module io
 
 ! Check if the climatology file exists and read it.
       inquire ( file = trim(ic_path), exist = fexist )
+      call msg_print("", 6, "Read initial conditions:")
       if ( fexist ) then
 ! TODO: Make it possible to read separate initial file, not just clim.
-        call msg_print("", 6, "Read initial conditions:")
         call read_initial_ts_pnetcdf( tb, sb, elb, dtime%month )
       else
         call msg_print("", 2, "FAILED...")
@@ -149,8 +149,8 @@ module io
 
 ! Read z-horizontally averaged TS for background density field.
       inquire ( file = trim(mean_path), exist = fexist )
+      call msg_print("", 6, "Read background TS:")
       if ( fexist ) then
-        call msg_print("", 6, "Read background TS:")
         call read_mean_ts_pnetcdf( tclim, sclim, dtime%month )
       else
         call msg_print("", 2, "FAILED...")
@@ -165,8 +165,8 @@ module io
 
 ! Read climatology.
       inquire ( file = trim(clim_path), exist = fexist )
+      call msg_print("", 6, "Read climatology:")
       if ( fexist ) then
-        call msg_print("", 6, "Read climatology:")
         call read_clim_ts_pnetcdf( tclim, sclim, dtime%month )
       else
         call msg_print("", 2, "FAILED...")
@@ -287,10 +287,10 @@ module io
                            , nf90mpi_open      , nf90mpi_put_att    &
                            , nfmpi_put_vara_all                     &
                            , nfmpi_put_vara_real_all                &
-                           , NF_64BIT_OFFSET, NF_CLOBBER            &
-                           , NF_FLOAT       , NF_GLOBAL             &
-                           , NF_NOERR       , NF_NOWRITE            &
-                           , NF_UNLIMITED   , NF_WRITE
+                           , NF_64BIT_DATA, NF_CLOBBER              &
+                           , NF_FLOAT     , NF_GLOBAL               &
+                           , NF_NOERR     , NF_NOWRITE              &
+                           , NF_UNLIMITED , NF_WRITE
 
       implicit none
 
@@ -327,10 +327,10 @@ module io
 
       call msg_print("", 6, "Writing file `"//trim(out_file)//"`")
 
-      call check( nf90mpi_create                  &
-                    ( POM_COMM, trim(out_file)    &
-                    , NF_CLOBBER+NF_64BIT_OFFSET  &
-                    , MPI_INFO_NULL, ncid )       &
+      call check( nf90mpi_create                &
+                    ( POM_COMM, trim(out_file)  &
+                    , NF_CLOBBER+NF_64BIT_DATA  &
+                    , MPI_INFO_NULL, ncid )     &
                 , 'nf_create: '//out_file )
 
 ! define global attributes

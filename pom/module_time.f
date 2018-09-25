@@ -238,6 +238,25 @@
 
 !______________________________________________________________________
 !
+      integer function seconds_of_year( d )
+!----------------------------------------------------------------------
+!  Counts seconds since the start of the year for date `d`.
+!______________________________________________________________________
+
+        implicit none
+
+        type(date), intent(in) :: d
+
+        type(date) d0
+
+        d0 = str2date("1979-01-01 00:00:00")
+        d0%year = d%year
+
+        seconds_of_year = d - d0
+
+      end function
+!______________________________________________________________________
+!
       integer function interval_of_year( d, i )
 !----------------------------------------------------------------------
 !  Counts the number of full time intervals `i` [sec] for date `d`

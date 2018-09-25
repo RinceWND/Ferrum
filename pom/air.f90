@@ -17,6 +17,11 @@ module air
   public
 
 !----------------------------------------------------------------------
+! Constants
+!----------------------------------------------------------------------
+  real(rk), parameter :: rhoa = 1.22
+
+!----------------------------------------------------------------------
 ! Configuration variables
 !----------------------------------------------------------------------
   logical, private :: DISABLED ! Is set according to the external flag `use_air`.
@@ -269,7 +274,16 @@ module air
        )
 
 ! Initialize mandatory arrays
-      e_atmos = 1013.
+      e_atmos= 1013.
+      swrad  = 0.
+      uwsrf  = 0.
+      vfluxb = 0.
+      vfluxf = 0.
+      vwsrf  = 0.
+      wssurf = 0.
+      wtsurf = 0.
+      wusurf = 0.
+      wvsurf = 0.
 
 ! Quit if the module is not used.
       if ( DISABLED ) return
@@ -282,6 +296,8 @@ module air
           uwnd(im,jm,N)   &
         , vwnd(im,jm,N)   &
          )
+        uwnd = 0.
+        vwnd = 0.
       end if
 
       if ( read_stress ) then
@@ -589,7 +605,7 @@ module air
 
       return
 
-      end subroutine air_init
+    end subroutine air_init
 !______________________________________________________________________
 !
     subroutine air_step( d_in )
@@ -598,9 +614,10 @@ module air
 !______________________________________________________________________
 
 !      use glob_const , only: SEC2DAY
-      use glob_domain, only: is_master
+      use config     , only: rhow => rhoref
+      use glob_domain, only: im, is_master, jm
       use module_time
-!      use glob_ocean , only: tb
+      use glob_ocean , only: u, v
       use model_run  , only: dti, iint
 
       implicit none
@@ -608,10 +625,10 @@ module air
       type(date), intent(in) :: d_in
 
       logical            ADVANCE_REC, ADVANCE_REC_INT
-      integer            max_in_prev, max_in_this, ncid
+      integer            i, j, max_in_prev, max_in_this, ncid, secs
       integer                          &
       , dimension(3)  :: record, year
-      real               a, chunk
+      real               a, cda, chunk, uvabs
 
 
 ! Quit if the module is not used.
@@ -628,13 +645,14 @@ module air
 ! Decide on the record to read
       chunk     = chunk_of_year( d_in, read_int )
       record(1) = int(chunk)
+      secs      = seconds_of_year(d_in) - (real(record(1))+.5)*read_int
 
       if ( chunk - record(1) < .5 ) then ! TODO: test (real - int) = ?
         record(2) = record(1)
-        a = chunk + .5
+        a = chunk - record(1) + .5
       else
         record(2) = record(1) + 1
-        a = chunk - .5
+        a = chunk - record(1) - .5
       end if
       record(3) = record(2) + 1
 
@@ -646,218 +664,271 @@ module air
         year(3) = d_in%year + 1
       end if
 
-      if ( is_master ) print *, "II", (chunk-record(1)) &
-                                    , (chunk-record(1)-.5) &
-                              , (chunk-record(1)-.5)*read_int &
-                              , int(dti)   
-      if ( iint == 1 .or.  &
-          ( chunk-record(1) > .5 .and.  & ! TODO: MAKE IT RIGHT! IT STILL SOMETIMES READS TWICE IN A ROW
-           (chunk-record(1)-.5)*read_int <= int(dti) ) ) then
+      if ( iint == 1 .or. ( secs >= 0 .and. secs < dti ) ) then
         ADVANCE_REC_INT = .true.
+        if ( interp_wind ) then
+          uwnd(:,:,2) = uwnd(:,:,3)
+          vwnd(:,:,2) = vwnd(:,:,3)
+        end if
       else
         ADVANCE_REC_INT = .false.
       end if
 
-      if ( (chunk-record(1))*read_int <= int(dti) ) then
+      if ( (chunk-record(1))*read_int <= int(dti) ) then ! TODO: test this one as well.
         ADVANCE_REC = .true.
-!        if ( chunk-record(1) > .5 ) ADVANCE_REC_INT = .true.
       else
         ADVANCE_REC = .false.
       end if
 
+!      if ( is_master ) print *, "II", (chunk-record(1)) &
+!                                    , (chunk-record(1)-.5) &
+!                              , secs, a  &
+!                              , ADVANCE_REC_INT, ADVANCE_REC
+
       call read_all( ADVANCE_REC_INT, 3, year, record )
       call read_all( ADVANCE_REC    , 1, year, record )
 
+      if ( interp_wind ) then
+        uwnd(:,:,1) = ( 1. - a ) * uwnd(:,:,2) + a * uwnd(:,:,3)
+        vwnd(:,:,1) = ( 1. - a ) * vwnd(:,:,2) + a * vwnd(:,:,3)
+      end if
 
-      return
+! Calculate wind stress (m^2/s^2)
+      do j=1,jm
+        do i=1,im
 
-      end subroutine air_step
+          uwsrf(i,j) = uwnd(i,j,1)
+          vwsrf(i,j) = vwnd(i,j,1)
+
+          uvabs = sqrt( (uwnd(i,j,1)-u(i,j,1))**2  &
+                      + (vwnd(i,j,1)-v(i,j,1))**2 )
+
+          if (     uvabs <= 11. ) then
+            cda = .0012
+          elseif ( uvabs <= 19. ) then
+            cda = .00049  + .000065 *uvabs
+          elseif ( uvabs <= 100. ) then
+            cda = .001364 + .0000234*uvabs - 2.31579e-7*uvabs**2
+          else
+            cda = .00138821
+          end if
+
+          wusurf(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j,1)-u(i,j,1))
+          wvsurf(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j,1)-v(i,j,1))
+
+        end do
+      end do
+
+
+    end subroutine air_step
 !______________________________________________________________________
 !
-      subroutine read_all( execute, n, year, record )
+    subroutine calculate_fluxes
+!----------------------------------------------------------------------
+!  Generates and interpolates all surface fluxes.
+!______________________________________________________________________
 
-        use glob_ocean, only: tb
-
-        implicit none
-
-        logical              , intent(in) :: execute
-        integer              , intent(in) :: n
-        integer, dimension(3), intent(in) :: record, year
-
-        integer ncid
+      implicit none
 
 
-        if ( .not. execute ) return
-
-        ncid = -1
-
-        if ( read_wind ) then
-
-          if ((     interp_wind .and. n==3) .or.       &
-              (.not.interp_wind .and. n==1)      ) then
-            call read_var_nc( wind_path, uwnd_name, uwnd(:,:,n)  &
-                            , year(n), record(n), ncid )
-            call read_var_nc( wind_path, vwnd_name, vwnd(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              uwnd(:,:,n) = 0.
-              vwnd(:,:,n) = 0.
-              call msg_print("", 2, "Wind is set to zero.")
-            end if
-          end if
-
-        end if
-
-        ncid = 0
-
-        if ( read_bulk ) then
-
-          if ((     interp_humid .and. n==3) .or.       &
-              (.not.interp_humid .and. n==1)      ) then
-            call read_var_nc( bulk_path,humid_name, humid(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              humid(:,:,n) = 1.
-              call msg_print("", 2, "Humidity is set to 100%")
-            end if
-          end if
-        
-          if ((     interp_rain .and. n==3) .or.       &
-              (.not.interp_rain .and. n==1)      ) then
-            call read_var_nc( bulk_path, rain_name,  rain(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              rain(:,:,n) = 0.
-              call msg_print("", 2, "Precip.rate is set to zero.")
-            end if
-          end if
-
-          if ((     interp_pres .and. n==3) .or.       &
-              (.not.interp_pres .and. n==1)      ) then
-            call read_var_nc( bulk_path, pres_name,  pres(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              pres(:,:,n) = 1013.
-              call msg_print("", 2, "Atm.pressure is set to 1013 hPa.")
-            end if
-          end if
-
-          if ((     interp_sst .and. n==3) .or.       &
-              (.not.interp_sst .and. n==1)      ) then
-            call read_var_nc( bulk_path,  sst_name,   sst(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              sst(:,:,n) = tb(:,:,1)
-              call msg_print("", 2, "SST is set to surf. level temp.")
-            end if
-          end if
-
-          if ((     interp_tair .and. n==3) .or.       &
-              (.not.interp_tair .and. n==1)      ) then
-            call read_var_nc( bulk_path, tair_name,  temp(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              temp(:,:,n) = tb(:,:,1)
-              call msg_print("", 2, "Tair is set to surf. level temp.")
-            end if
-          end if
-
-          if ((     interp_cloud .and. n==3) .or.       &
-              (.not.interp_cloud .and. n==1)      ) then
-            call read_var_nc( bulk_path, tcld_name, cloud(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              cloud(:,:,n) = 0.
-              call msg_print("", 2, "Cloud cover is set to zero.")
-            end if
-          end if
-
-        end if ! if READ_BULK
-
-        ncid = 0
-
-        if ( read_stress ) then
-
-          if ((     interp_stress .and. n==3) .or.       &
-              (.not.interp_stress .and. n==1)      ) then
-            call read_var_nc( flux_path, ustr_name, ustr(:,:,n)  &
-                            , year(n), record(n), ncid )
-            call read_var_nc( flux_path, vstr_name, vstr(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              ustr(:,:,n) = 0.
-              vstr(:,:,n) = 0.
-              call msg_print("", 2, "Wind stress is set to zero.")
-            end if
-          end if
-
-        end if
-
-        ncid = 0
-
-        if ( read_heat ) then
-
-          if ((     interp_heat .and. n==3) .or.       &
-              (.not.interp_heat .and. n==1)      ) then
-            call read_var_nc( flux_path, dlrad_name, dlrad(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              dlrad(:,:,n) = 370.
-              call msg_print("", 2, "Downlonrad. is set to 370 W/m^2.")
-            end if
-            call read_var_nc( flux_path, lheat_name, lheat(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              lheat(:,:,n) = 0.
-              call msg_print("", 2, "Latent heat is set to zero.")
-            end if
-            call read_var_nc( flux_path,  lrad_name,  lrad(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              lrad(:,:,n) = 0.
-              call msg_print("", 2, "Net longrad. is set to zero.")
-            end if
-            call read_var_nc( flux_path, sheat_name, sheat(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              sheat(:,:,n) = 0.
-              call msg_print("", 2, "Sensible heat is set to zero.")
-            end if
-            call read_var_nc( flux_path,  srad_name,  srad(:,:,n)  &
-                            , year(n), record(n), ncid )
-            if ( ncid == -1 ) then
-              srad(:,:,n) = 0.
-              call msg_print("", 2, "Net shortrad. is set to zero.")
-            end if
-          end if
-        end if ! if READ_HEAT
-
-
-      end subroutine
+    end subroutine
 !______________________________________________________________________
 !
-      pure character(len=256) function get_filename( path, year )
+    subroutine read_all( execute, n, year, record )
+
+      use glob_ocean, only: tb
+
+      implicit none
+
+      logical              , intent(in) :: execute
+      integer              , intent(in) :: n
+      integer, dimension(3), intent(in) :: record, year
+
+      integer            ncid
+      character(len=128) desc
+
+
+      if ( .not. execute ) return
+
+      if ( n == 3 ) then
+        write(desc,'("Reading interp. forcing record #",i4," @ ",i4)') &
+            record(3), year(3)
+      else
+        write(desc,'("Reading surface forcing record #",i4," @ ",i4)') &
+            record(1), year(1)
+      end if
+
+      call msg_print("", 1, desc)
+
+      ncid = -1
+
+      if ( read_wind ) then
+
+        if ((     interp_wind .and. n==3) .or.       &
+            (.not.interp_wind .and. n==1)      ) then
+          call read_var_nc( wind_path, uwnd_name, uwnd(:,:,n)  &
+                          , year(n), record(n), ncid )
+          call read_var_nc( wind_path, vwnd_name, vwnd(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            uwnd(:,:,n) = 0.
+            vwnd(:,:,n) = 0.
+            call msg_print("", 2, "Wind is set to zero.")
+          end if
+        end if
+
+      end if
+
+      ncid = 0
+
+      if ( read_bulk ) then
+
+        if ((     interp_humid .and. n==3) .or.       &
+            (.not.interp_humid .and. n==1)      ) then
+          call read_var_nc( bulk_path,humid_name, humid(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            humid(:,:,n) = 1.
+            call msg_print("", 2, "Humidity is set to 100%")
+          end if
+        end if
+
+        if ((     interp_rain .and. n==3) .or.       &
+            (.not.interp_rain .and. n==1)      ) then
+          call read_var_nc( bulk_path, rain_name,  rain(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            rain(:,:,n) = 0.
+            call msg_print("", 2, "Precip.rate is set to zero.")
+          end if
+        end if
+
+        if ((     interp_pres .and. n==3) .or.       &
+            (.not.interp_pres .and. n==1)      ) then
+          call read_var_nc( bulk_path, pres_name,  pres(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            pres(:,:,n) = 1013.
+            call msg_print("", 2, "Atm.pressure is set to 1013 hPa.")
+          end if
+        end if
+
+        if ((     interp_sst .and. n==3) .or.       &
+            (.not.interp_sst .and. n==1)      ) then
+          call read_var_nc( bulk_path,  sst_name,   sst(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            sst(:,:,n) = tb(:,:,1)
+            call msg_print("", 2, "SST is set to surf. level temp.")
+          end if
+        end if
+
+        if ((     interp_tair .and. n==3) .or.       &
+            (.not.interp_tair .and. n==1)      ) then
+          call read_var_nc( bulk_path, tair_name,  temp(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            temp(:,:,n) = tb(:,:,1)
+            call msg_print("", 2, "Tair is set to surf. level temp.")
+          end if
+        end if
+
+        if ((     interp_cloud .and. n==3) .or.       &
+            (.not.interp_cloud .and. n==1)      ) then
+          call read_var_nc( bulk_path, tcld_name, cloud(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            cloud(:,:,n) = 0.
+            call msg_print("", 2, "Cloud cover is set to zero.")
+          end if
+        end if
+
+      end if ! if READ_BULK
+
+      ncid = 0
+
+      if ( read_stress ) then
+
+        if ((     interp_stress .and. n==3) .or.       &
+            (.not.interp_stress .and. n==1)      ) then
+          call read_var_nc( flux_path, ustr_name, ustr(:,:,n)  &
+                          , year(n), record(n), ncid )
+          call read_var_nc( flux_path, vstr_name, vstr(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            ustr(:,:,n) = 0.
+            vstr(:,:,n) = 0.
+            call msg_print("", 2, "Wind stress is set to zero.")
+          end if
+        end if
+
+      end if
+
+      ncid = 0
+
+      if ( read_heat ) then
+
+        if ((     interp_heat .and. n==3) .or.       &
+            (.not.interp_heat .and. n==1)      ) then
+          call read_var_nc( flux_path, dlrad_name, dlrad(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            dlrad(:,:,n) = 370.
+            call msg_print("", 2, "Downlonrad. is set to 370 W/m^2.")
+          end if
+          call read_var_nc( flux_path, lheat_name, lheat(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            lheat(:,:,n) = 0.
+            call msg_print("", 2, "Latent heat is set to zero.")
+          end if
+          call read_var_nc( flux_path,  lrad_name,  lrad(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            lrad(:,:,n) = 0.
+            call msg_print("", 2, "Net longrad. is set to zero.")
+          end if
+          call read_var_nc( flux_path, sheat_name, sheat(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            sheat(:,:,n) = 0.
+            call msg_print("", 2, "Sensible heat is set to zero.")
+          end if
+          call read_var_nc( flux_path,  srad_name,  srad(:,:,n)  &
+                          , year(n), record(n), ncid )
+          if ( ncid == -1 ) then
+            srad(:,:,n) = 0.
+            call msg_print("", 2, "Net shortrad. is set to zero.")
+          end if
+        end if
+      end if ! if READ_HEAT
+
+
+    end subroutine
+!______________________________________________________________________
+!
+    pure character(len=256) function get_filename( path, year )
 !----------------------------------------------------------------------
 !  Costructs filename string in `<path>YYYY<FORMAT_EXT>` format.
 !______________________________________________________________________
 
-        implicit none
+      implicit none
 
-        character(len=*), intent(in) :: path
-        integer         , intent(in) :: year
+      character(len=*), intent(in) :: path
+      integer         , intent(in) :: year
 
 
-        write( get_filename, '( a, i4.4, a )' ) trim(path)      &
-                                              , year            &
-                                              , trim(FORMAT_EXT)
+      write( get_filename, '( a, i4.4, a )' ) trim(path)      &
+                                            , year            &
+                                            , trim(FORMAT_EXT)
 
-      end function
+    end function
 
 != I/O SECTION ========================================================
 !______________________________________________________________________
 !
-      subroutine read_var_nc( path, var_name, var   &
-                            , year, record  , ncid )
+    subroutine read_var_nc( path, var_name, var   &
+                          , year, record  , ncid )
 !----------------------------------------------------------------------
 !  Read a variable (NC format).
 !______________________________________________________________________
