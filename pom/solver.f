@@ -1594,8 +1594,7 @@
 ! TODO: fix and fill up the resource.
 !______________________________________________________________________
 
-      use config     , only: rhoref
-      use glob_const , only: grav, rk
+      use glob_const , only: grav, rhoref, rk
       use glob_domain, only: im, jm, kbm1
       use glob_grid  , only: dx, dy, dz, z, zz
       use glob_ocean , only: d, drhox, drhoy, dt, rho
@@ -1748,8 +1747,7 @@
 ! TODO: fix and fill up the resource.
 !______________________________________________________________________
 
-      use config     , only: rhoref
-      use glob_const , only: grav, rk
+      use glob_const , only: grav, rhoref, rk
       use glob_domain, only: im, imm1, jm, jmm1, kb
       use glob_grid  , only: dx, dy, dz, z, zz
       use glob_ocean , only: d, drhox, drhoy, dt, rho
@@ -3216,8 +3214,8 @@ C  !The most south sudomains
 ! subroutine profq must be changed (see note in subroutine profq.)
 !______________________________________________________________________
 
-      use config     , only: rhoref, sbias, tbias
-      use glob_const , only: grav, rk
+      use config     , only: sbias, tbias
+      use glob_const , only: grav, rhoref, rk
       use glob_domain, only: im, jm, kb, kbm1
       use glob_grid  , only: fsm, zz
       use glob_ocean , only: d
@@ -3282,8 +3280,8 @@ C  !The most south sudomains
 !______________________________________________________________________
 
       use air        , only: wusurf, wvsurf
-      use config     , only: rhoref, sbias, tbias, umol
-      use glob_const , only: grav, kappa, rk, small
+      use config     , only: sbias, tbias, umol
+      use glob_const , only: grav, kappa, rhoref, rk, small
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
      &                     , n_east, n_north, n_south, n_west
       use glob_grid  , only: dzz, dz, fsm, h, z, zz

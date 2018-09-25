@@ -14,6 +14,7 @@ module glob_const
   , kappa            & ! von Karman's constant
   , ohm              & ! Earth's rotation angular frequency 
   , pi               & ! pi
+  , rhoref           & ! reference density
   , sec2day          & ! 1./86400.
   , small              ! small value
 
@@ -27,6 +28,8 @@ module glob_const
       small   = 1.e-10       ! small value
       kappa   = 0.4          ! VonKarman's constant
       ohm     = 7.29e-5      ! angular frequency of Earth
+      rhoref  = 1025.        ! recommended values: 1025 for seawater,
+                             !                     1000 for freswater
       sec2day = 1./86400.    ! seconds to days conversion factor
 
     end subroutine

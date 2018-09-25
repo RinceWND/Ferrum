@@ -27,7 +27,6 @@ module config
 
   real(kind=rk)      &
     alpha            & ! weight for surface slope term in external eq
-  , rhoref           & ! reference density
   , sbias            & ! salinity bias
   , slmax            & 
   , tbias            & ! temperature bias
@@ -156,10 +155,6 @@ module config
 ! Logical for inertial ramp (.true. if inertial ramp to be applied
 ! to wind stress and baroclinic forcing, otherwise .false.)
 !      lramp=.false.
-
-! Reference density (recommended values: 1025 for seawater,
-! 1000 for freswater; S.I. units):
-      rhoref = 1025.
 
 ! Temperature bias (deg. C)
       tbias = 0.
@@ -294,9 +289,9 @@ module config
         aam_init, alpha , cbcmax, cbcmin      &
       , horcon  , ispadv, mode  , nadv        &
       , nbcs    , nbct  , nitera, npg         &
-      , ntp     , rhoref, sbias , smoth       &
-      , sw      , tbias , tprni , umol        &
-      , vmaxl   , z0b
+      , ntp     , sbias , smoth , sw          &
+      , tbias   , tprni , umol  , vmaxl       &
+      , z0b
 
       namelist/output_nml/                                   &
         monthly_flag, netcdf_file  , output_flag, prtd1      &

@@ -614,10 +614,8 @@ module air
 !______________________________________________________________________
 
 !      use glob_const , only: SEC2DAY
-      use config     , only: rhow => rhoref
-      use glob_domain, only: im, is_master, jm
+      use glob_domain, only: is_master
       use module_time
-      use glob_ocean , only: u, v
       use model_run  , only: dti, iint
 
       implicit none
@@ -693,34 +691,61 @@ module air
         vwnd(:,:,1) = ( 1. - a ) * vwnd(:,:,2) + a * vwnd(:,:,3)
       end if
 
-! Calculate wind stress (m^2/s^2)
-      do j=1,jm
-        do i=1,im
+! TODO: Are these surface arrays even needed?
+      uwsrf = uwnd(:,:,1)
+      vwsrf = vwnd(:,:,1)
 
-          uwsrf(i,j) = uwnd(i,j,1)
-          vwsrf(i,j) = vwnd(i,j,1)
+! Calculate wind stress
+      call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
 
-          uvabs = sqrt( (uwnd(i,j,1)-u(i,j,1))**2  &
-                      + (vwnd(i,j,1)-v(i,j,1))**2 )
+    end subroutine air_step
+!______________________________________________________________________
+!
+    subroutine wind_to_stress( uwnd, vwnd, ustr, vstr, mode )
+!----------------------------------------------------------------------
+!  Calculates momentum flux (m^2/s^2) from wind velocity (m/s).
+!______________________________________________________________________
 
-          if (     uvabs <= 11. ) then
-            cda = .0012
-          elseif ( uvabs <= 19. ) then
-            cda = .00049  + .000065 *uvabs
-          elseif ( uvabs <= 100. ) then
-            cda = .001364 + .0000234*uvabs - 2.31579e-7*uvabs**2
-          else
-            cda = .00138821
+      use glob_const , only: rhow => rhoref
+      use glob_domain, only: im, jm
+      use glob_ocean , only: u, v
+
+      implicit none
+
+      integer                   , intent(in   ) :: mode
+      real(rk), dimension(im,jm), intent(in   ) :: uwnd, vwnd
+      real(rk), dimension(im,jm), intent(  out) :: ustr, vstr
+
+      integer  i, j
+      real(rk) cda, uvabs
+
+      cda = .00125 ! Default value
+
+      do j = 1,jm
+        do i = 1,im
+
+          uvabs = sqrt( (uwnd(i,j)-u(i,j,1))**2  &
+                      + (vwnd(i,j)-v(i,j,1))**2 )
+
+          if ( mode == 1 ) then
+            if (     uvabs <= 11. ) then
+              cda = .0012
+            elseif ( uvabs <= 19. ) then
+              cda = .00049  + .000065 *uvabs
+            elseif ( uvabs <= 100. ) then
+              cda = .001364 + .0000234*uvabs - 2.31579e-7*uvabs**2
+            else
+              cda = .00138821
+            end if
           end if
 
-          wusurf(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j,1)-u(i,j,1))
-          wvsurf(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j,1)-v(i,j,1))
+          ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-u(i,j,1))
+          vstr(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j)-v(i,j,1))
 
         end do
       end do
 
-
-    end subroutine air_step
+    end subroutine ! wind_to_stress
 !______________________________________________________________________
 !
     subroutine calculate_fluxes

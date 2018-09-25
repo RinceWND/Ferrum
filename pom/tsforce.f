@@ -447,7 +447,8 @@
 !     surface heat/salt fluxes.
 
       use air        , only: e_atmos, swrad, wusurf, wvsurf
-      use config     , only: calc_bulk, rhoref, sbias, sf_hf, tbias
+      use config     , only: calc_bulk, sbias, sf_hf, tbias
+      use glob_const , only: rhoref
       use glob_domain, only: my_task
       use glob_grid  , only: east_e, north_e
       use glob_misc  , only: hi, ice
