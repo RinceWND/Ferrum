@@ -401,204 +401,10 @@ module air
         year(3) = d_in%year + 1
       end if
 
+      record(1) = record(1) + 1
+
 ! Read wind if momentum flux is derived from wind
-      if ( read_wind ) then
-        if ( interp_wind ) then
-          call read_var_nc( wind_path, uwnd_name, uwnd(:,:,2)  &
-                          , year(2), record(2), ncid )
-          call read_var_nc( wind_path, vwnd_name, vwnd(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) then
-            uwnd(:,:,2) = 0.
-            vwnd(:,:,2) = 0.
-          end if
-        else
-          call read_var_nc( wind_path, uwnd_name, uwnd(:,:,1)  &
-                          , year(1), record(1), ncid )
-          call read_var_nc( wind_path, vwnd_name, vwnd(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) then
-            uwnd(:,:,1) = 0.
-            vwnd(:,:,1) = 0.
-          end if
-        end if
-        if ( ncid == -1 ) then
-          call msg_print("", 2, "Wind is set to zero.")
-        end if
-      end if
-
-      ncid = 0
-
-      if ( read_bulk ) then
-        if ( interp_humid ) then
-          call read_var_nc( bulk_path,humid_name, humid(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) humid(:,:,2) = 1.
-        else
-          call read_var_nc( bulk_path,humid_name, humid(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) humid(:,:,1) = 1.
-        end if
-        if ( ncid == -1 ) then
-          call msg_print("", 2, "Humidity is set to 100%")
-        end if
-        if ( interp_rain ) then
-          call read_var_nc( bulk_path, rain_name,  rain(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) rain(:,:,2) = 0.
-        else
-          call read_var_nc( bulk_path, rain_name,  rain(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) rain(:,:,1) = 0.
-        end if
-        if ( ncid == -1 ) then
-          call msg_print("", 2, "Precip.rate is set to zero.")
-        end if
-        if ( interp_pres ) then
-          call read_var_nc( bulk_path, pres_name,  pres(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) pres(:,:,2) = 1013.
-        else
-          call read_var_nc( bulk_path, pres_name,  pres(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) pres(:,:,1) = 1013.
-        end if
-        if ( ncid == -1 ) then
-          call msg_print("", 2, "Atm.pressure is set to 1013 hPa.")
-        end if
-        if ( interp_sst ) then
-          call read_var_nc( bulk_path,  sst_name,   sst(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) sst(:,:,2) = tb(:,:,1)
-        else
-          call read_var_nc( bulk_path,  sst_name,   sst(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) sst(:,:,1) = tb(:,:,1)
-        end if
-        if ( ncid == -1 ) then
-          call msg_print("", 2, "SST is set to surface level temp.")
-        end if
-        if ( interp_tair ) then
-          call read_var_nc( bulk_path, tair_name,  temp(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) temp(:,:,2) = tb(:,:,1)
-        else
-          call read_var_nc( bulk_path, tair_name,  temp(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) temp(:,:,1) = tb(:,:,1)
-        end if
-        if ( ncid == -1 ) then
-          call msg_print("", 2, "Tair is set to surface level temp.")
-        end if
-        if ( interp_cloud ) then
-          call read_var_nc( bulk_path, tcld_name, cloud(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) cloud(:,:,2) = 0.
-        else
-          call read_var_nc( bulk_path, tcld_name, cloud(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) cloud(:,:,1) = 0.
-        end if
-        if ( ncid == -1 ) then
-          call msg_print("", 2, "Cloud cover is set to zero.")
-        end if
-      end if
-
-      ncid = 0
-
-      if ( read_stress ) then
-        if ( interp_stress ) then
-          call read_var_nc( flux_path, ustr_name, ustr(:,:,2)  &
-                          , year(2), record(2), ncid )
-          call read_var_nc( flux_path, vstr_name, vstr(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) then
-            ustr(:,:,2) = 0.
-            vstr(:,:,2) = 0.
-          end if
-        else
-          call read_var_nc( flux_path, ustr_name, ustr(:,:,1)  &
-                          , year(1), record(1), ncid )
-          call read_var_nc( flux_path, vstr_name, vstr(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) then
-            ustr(:,:,1) = 0.
-            vstr(:,:,1) = 0.
-          end if
-        end if
-        if ( ncid == -1 ) then
-          call msg_print("", 2, "Wind stress is set to zero.")
-        end if
-      end if
-
-      ncid = 0
-
-      if ( read_heat ) then
-        if ( interp_heat ) then
-          call read_var_nc( flux_path, dlrad_name, dlrad(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) then
-            dlrad(:,:,2) = 370.
-            call msg_print("", 2, "Downlongrad. is set to 370 W/m^2.")
-          end if
-          call read_var_nc( flux_path, lheat_name, lheat(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) then
-            lheat(:,:,2) = 0.
-            call msg_print("", 2, "Latent heat is set to zero.")
-          end if
-          call read_var_nc( flux_path,  lrad_name,  lrad(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) then
-            lrad(:,:,2) = 0.
-            call msg_print("", 2, "Net longrad. is set to zero.")
-          end if
-          call read_var_nc( flux_path, sheat_name, sheat(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) then
-            sheat(:,:,2) = 0.
-            call msg_print("", 2, "Sensible heat is set to zero.")
-          end if
-          call read_var_nc( flux_path,  srad_name,  srad(:,:,2)  &
-                          , year(2), record(2), ncid )
-          if ( ncid == -1 ) then
-            srad(:,:,2) = 0.
-            call msg_print("", 2, "Net shortrad. is set to zero.")
-          end if
-        else
-          call read_var_nc( flux_path, dlrad_name, dlrad(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) then
-            dlrad(:,:,1) = 0.
-            call msg_print("", 2, "Downlongrad. is set to 370 W/m^2.")
-          end if
-          call read_var_nc( flux_path, lheat_name, lheat(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) then
-            lheat(:,:,1) = 0.
-            call msg_print("", 2, "Latent heat is set to zero.")
-          end if
-          call read_var_nc( flux_path,  lrad_name,  lrad(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) then
-            lrad(:,:,1) = 0.
-            call msg_print("", 2, "Net longrad. is set to zero.")
-          end if
-          call read_var_nc( flux_path, sheat_name, sheat(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) then
-            sheat(:,:,1) = 0.
-            call msg_print("", 2, "Sensible heat is set to zero.")
-          end if
-          call read_var_nc( flux_path,  srad_name,  srad(:,:,1)  &
-                          , year(1), record(1), ncid )
-          if ( ncid == -1 ) then
-            srad(:,:,1) = 0.
-            call msg_print("", 2, "Net shortrad. is set to zero.")
-          end if
-        end if
-      end if
-
+      call read_all( .true., 1, year, record )
 
       call msg_print("AIR INITIALIZED", 2, "")
 
@@ -623,10 +429,10 @@ module air
       type(date), intent(in) :: d_in
 
       logical            ADVANCE_REC, ADVANCE_REC_INT
-      integer            i, j, max_in_prev, max_in_this, ncid, secs
+      integer            max_in_prev, max_in_this, ncid, secs
       integer                          &
       , dimension(3)  :: record, year
-      real               a, cda, chunk, uvabs
+      real               a, chunk
 
 
 ! Quit if the module is not used.
@@ -643,7 +449,7 @@ module air
 ! Decide on the record to read
       chunk     = chunk_of_year( d_in, read_int )
       record(1) = int(chunk)
-      secs      = seconds_of_year(d_in) - (real(record(1))+.5)*read_int
+      secs = seconds_of_year(d_in) - int((real(record(1))+.5)*read_int)
 
       if ( chunk - record(1) < .5 ) then ! TODO: test (real - int) = ?
         record(2) = record(1)
@@ -678,6 +484,8 @@ module air
         ADVANCE_REC = .false.
       end if
 
+      record(1) = record(1) + 1
+
 !      if ( is_master ) print *, "II", (chunk-record(1)) &
 !                                    , (chunk-record(1)-.5) &
 !                              , secs, a  &
@@ -686,17 +494,21 @@ module air
       call read_all( ADVANCE_REC_INT, 3, year, record )
       call read_all( ADVANCE_REC    , 1, year, record )
 
-      if ( interp_wind ) then
-        uwnd(:,:,1) = ( 1. - a ) * uwnd(:,:,2) + a * uwnd(:,:,3)
-        vwnd(:,:,1) = ( 1. - a ) * vwnd(:,:,2) + a * vwnd(:,:,3)
-      end if
+      if ( READ_WIND ) then
+
+        if ( interp_wind ) then
+          uwnd(:,:,1) = ( 1. - a ) * uwnd(:,:,2) + a * uwnd(:,:,3)
+          vwnd(:,:,1) = ( 1. - a ) * vwnd(:,:,2) + a * vwnd(:,:,3)
+        end if
 
 ! TODO: Are these surface arrays even needed?
-      uwsrf = uwnd(:,:,1)
-      vwsrf = vwnd(:,:,1)
+        uwsrf = uwnd(:,:,1)
+        vwsrf = vwnd(:,:,1)
 
 ! Calculate wind stress
-      call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+        call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+
+      end if
 
     end subroutine air_step
 !______________________________________________________________________
