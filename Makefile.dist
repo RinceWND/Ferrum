@@ -49,20 +49,23 @@ OUTDIR = out
 #-----------------------------------------------------------------------
 # Define objects
 #-----------------------------------------------------------------------
-OBJS = globals.o        \
+OBJS = module_time.o    \
+       globals.o        \
+       config.o         \
        bry.o            \
+       air.o            \
+       io.o             \
        parallel_mpi.o   \
-       module_time.o    \
        io_pnetcdf.o     \
        seaice.o         \
        advance.o        \
        river.o          \
        solver.o         \
        initialize.o     \
+       heat.o           \
        interp.o         \
        wind.o           \
        tsforce.o        \
-       heat.o           \
        assim.o          \
        assim_drf.o      \
        mcsst.o          \

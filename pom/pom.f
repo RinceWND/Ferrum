@@ -4,6 +4,7 @@
 
       program pom
 
+        use air, only:wusurf,wvsurf
       use config
       use glob_domain, only: is_master
       use io
@@ -95,7 +96,7 @@
 ! write restart
         call write_restart( dtime )
 
-!      call write_debug_pnetcdf("dbg."//date2str(dtime))
+      call write_debug_pnetcdf("mcc."//date2str(dtime),wusurf,wvsurf)
 
       end do
 
