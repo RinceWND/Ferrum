@@ -1536,9 +1536,9 @@
 !          phix(i) = phix(i) + fac*(e_atmos(i,j)-e_atmos(i-1,j))
           phix(i) = phix(i)+                                              &
      &            (fac2+fac1*(rho(i,j,1)+rho(i-1,j,1)))*
-     &            (z(1)*(d(i,j)-d(i-1,j)) - et(i,j)+et(i-1,j))
+     &            (z(1)*(d(i,j)-d(i-1,j)) ) !- et(i,j)+et(i-1,j))
           drhox(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i-1,j))*
-     &                      phix(i)*(dy(i,j)+dy(i-1,j))
+     &                      phix(i)*(dy(i,j)+dy(i-1,j))*dum(i,j)
          end do
 !
 !  Compute interior baroclinic pressure gradient.  Differentiate and
@@ -1549,7 +1549,7 @@
             cff1 = 1./(d(i  ,j)*(zz(k-1)-zz(k))*
      &                 d(i-1,j)*(zz(k-1)-zz(k)))
             cff2 = (d(i,j)-d(i-1,j))*(zz(k)+zz(k-1))
-     &         -2.*(et(i,j)-et(i-1,j))
+!     &         -2.*(et(i,j)-et(i-1,j))
             cff3 = (zz(k-1)-zz(k))*(d(i,j)-d(i-1,j))
             gamma = .125*cff1*cff2*cff3
 
@@ -1559,9 +1559,9 @@
      &             rho(i,j,k  )-rho(i-1,j,k  )
             cff3 = (d(i,j)+d(i-1,j))*(zz(k-1)-zz(k))
             cff4 = (1.+gamma)*
-     &               (zz(k-1)*(d(i,j)-d(i-1,j))-et(i,j)+et(i-1,j))+
+     &               (zz(k-1)*(d(i,j)-d(i-1,j)) )+ !-et(i,j)+et(i-1,j))+
      &             (1.-gamma)*
-     &               (zz(k  )*(d(i,j)-d(i-1,j))-et(i,j)+et(i-1,j))
+     &               (zz(k  )*(d(i,j)-d(i-1,j)) ) !-et(i,j)+et(i-1,j))
             phix(i) = phix(i)+                                            &
      &                fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1576,7 +1576,7 @@
 !            phix(i)=phix(i)+                                            &
 !     &              fac3*(cff1*cff3-cff2*cff4)
             drhox(i,j,k) = drhox(i,j,k-1)
-     &                     -.25*dz(k)*(d(i,j)+d(i-1,j))*
+     &                     -.25*dz(k)*(dt(i,j)+dt(i-1,j))*
      &                        phix(i)*(dy(i,j)+dy(i-1,j))*dum(i,j)
           end do
         end do
@@ -1594,9 +1594,9 @@
 !            phie(i) = phie(i) + fac*(e_atmos(i,j)-e_atmos(i,j-1))
             phie(i) = phie(i)+                                            &
      &              (fac2+fac1*(rho(i,j,1)+rho(i,j-1,1)))*
-     &              (z(1)*(d(i,j)-d(i,j-1)) - et(i,j)+et(i,j-1))
-            drhoy(i,j,1) = -.25*dz(1)*(d(i,j)+d(i,j-1))*
-     &                        phie(i)*(dy(i,j)+dy(i,j-1))
+     &              (z(1)*(d(i,j)-d(i,j-1)) ) ! - et(i,j)+et(i,j-1))
+            drhoy(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i,j-1))*
+     &                        phie(i)*(dy(i,j)+dy(i,j-1))*dvm(i,j)
           end do
 !
 !  Compute interior baroclinic pressure gradient.  Differentiate and
@@ -1607,7 +1607,7 @@
               cff1 = 1./(d(i,j  )*(z(k-1)-z(k))*
      &                   d(i,j-1)*(z(k-1)-z(k)))
               cff2 = (d(i,j)-d(i,j-1))*(zz(k)+zz(k-1))
-     &           -2.*(et(i,j)-et(i,j-1))
+!     &           -2.*(et(i,j)-et(i,j-1))
               cff3 = (zz(k-1)-zz(k))*(d(i,j)-d(i,j-1))
               gamma = .125*cff1*cff2*cff3
 
@@ -1617,9 +1617,9 @@
      &               rho(i,j,k  )-rho(i,j-1,k  )
               cff3 = (d(i,j)+d(i,j-1))*(zz(k-1)-zz(k))
               cff4 = (1.+gamma)*
-     &                (zz(k-1)*(d(i,j)-d(i,j-1))-et(i,j)+et(i,j-1))+
+     &                (zz(k-1)*(d(i,j)-d(i,j-1)) ) + !-et(i,j)+et(i,j-1))+
      &               (1.-gamma)*
-     &                (zz(k  )*(d(i,j)-d(i,j-1))-et(i,j)+et(i,j-1))
+     &                (zz(k  )*(d(i,j)-d(i,j-1)) ) !-et(i,j)+et(i,j-1))
               phie(i) = phie(i)+                                          &
      &                  fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1634,7 +1634,7 @@
 !              phie(i)=phie(i)+                                          &
 !     &                fac3*(cff1*cff3-cff2*cff4)
               drhoy(i,j,k) = drhoy(i,j,k-1)-
-     &                        .25*dz(k)*(d(i,j)+d(i,j-1))*
+     &                        .25*dz(k)*(dt(i,j)+dt(i,j-1))*
      &                          phie(i)*(dx(i,j)+dx(i,j-1))*dvm(i,j)
 !              if (isnan(drhoy(i,j,k))) write(*,*) my_task,"::",i,j,k
             end do
@@ -1733,7 +1733,7 @@
 !  Compute XI-component pressure gradient term.
 !-----------------------------------------------------------------------
 !
-      do k = 1,kb
+      do k = 1,kbm1
         do j = 1,jm
           do i = 2,im
             aux(i,j) = zz(k)*(d(i,j)-d(i-1,j))
@@ -1767,15 +1767,15 @@
               drhox(i,j,k) = drhox(i,j,k-1)
             end if
             drhox(i,j,k) =drhox(i,j,k)+.25*(dy(i,j)+dy(i-1,j))*
-     &                    (dz(k)*(d(i,j)+d(i-1,j)))*
+     &                    (dz(k)*(dt(i,j)+dt(i-1,j)))*
      &                    (p(i-1,j,k)-p(i,j,k)-
      &                     HalfGRho*
      &                     ((rho(i,j,k)+rho(i-1,j,k))*
-     &                      (zz(k)*(dt(i,j)-d(i-1,j)))
+     &                      (zz(k)*(dt(i,j)-dt(i-1,j)))
 !     &                             +et(i,j)-et(i-1,j))-
      &                      -OneFifth*
      &                       ((idRx(i,j)-idRx(i-1,j))*
-     &                        (zz(k)*(dt(i,j)-d(i-1,j))
+     &                        (zz(k)*(dt(i,j)-dt(i-1,j))
 !     &                               +et(i,j)-et(i-1,j)-
      &                        -OneTwelfth*
      &                         (idZx(i,j)+idZx(i-1,j)))-
@@ -1783,6 +1783,7 @@
      &                        (rho(i,j,k)-rho(i-1,j,k)-
      &                         OneTwelfth*
      &                         (idRx(i,j)+idRx(i-1,j))))))
+            drhox(i,j,k) = drhox(i,j,k)*dum(i,j)
           end do
         end do
       end do
@@ -1791,7 +1792,7 @@
 !  ETA-component pressure gradient term.
 !-----------------------------------------------------------------------
 !
-      do k = 1,kb
+      do k = 1,kbm1
         do j = 2,jm
           do i = 1,im
             aux(i,j) = zz(k)*(d(i,j)-d(i,j-1))
@@ -1824,16 +1825,16 @@
             else
               drhoy(i,j,k) = drhoy(i,j,k-1)
             end if
-            drhoy(i,j,k) =drhoy(i,j,k)+.25*(dx(i,j)+dy(i,j-1))*
-     &                    (dz(k)*(d(i,j)+d(i,j-1)))*
+            drhoy(i,j,k) =drhoy(i,j,k)+.25*(dx(i,j)+dx(i,j-1))*
+     &                    (dz(k)*(dt(i,j)+dt(i,j-1)))*
      &                    (p(i,j-1,k)-p(i,j,k)-
      &                     HalfGRho*
      &                     ((rho(i,j,k)+rho(i,j-1,k))*
-     &                      (zz(k)*(d(i,j)-d(i,j-1)))
+     &                      (zz(k)*(dt(i,j)-dt(i,j-1)))
 !     &                             +et(i,j)-et(i,j-1))-
      &                      -OneFifth*
      &                       ((idRx(i,j)-idRx(i,j-1))*
-     &                        (zz(k)*(d(i,j)-d(i,j-1))
+     &                        (zz(k)*(dt(i,j)-dt(i,j-1))
 !     &                               +et(i,j)-et(i,j-1)-
      &                        -OneTwelfth*
      &                         (idZx(i,j)+idZx(i,j-1)))-
@@ -1841,6 +1842,7 @@
      &                        (rho(i,j,k)-rho(i,j-1,k)-
      &                         OneTwelfth*
      &                         (idRx(i,j)+idRx(i,j-1))))))
+            drhoy(i,j,k) = drhoy(i,j,k)*dvm(i,j)
           end do
         end do
       end do
@@ -4081,7 +4083,7 @@ C  !The most south sudomains
             sr=si(i,j,k)+sbias
             if ( sr < 0. ) then
               print *, "Negative salinity @ ",my_task
-              print *, sr, "@", i_global(i), j_global(j)
+              print *, sr, "@", i_global(i), j_global(j), k
               sr = 0.
             end if
             tr2=tr*tr
