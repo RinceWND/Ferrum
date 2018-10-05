@@ -4,7 +4,7 @@
 
       program pom
 
-        use air, only:wusurf,wvsurf
+!        use air, only:wusurf,wvsurf
       use config
       use glob_domain, only: is_master
       use io
@@ -46,8 +46,8 @@
 
       if ( .not.do_restart ) call out_init( trim(netcdf_file) )
 
+      tick0 = realtime()
       if ( is_master ) then
-        tick0 = realtime()
         call msg_print("BEGIN NUMERICAL EXPERIMENT", 1, "")
         print '(" = ",a)', date2str( dtime )
       end if
@@ -96,7 +96,7 @@
 ! write restart
         call write_restart( dtime )
 
-      call write_debug_pnetcdf("mcc."//date2str(dtime),wusurf,wvsurf)
+!      call write_debug_pnetcdf("mcc."//date2str(dtime),wusurf,wvsurf)
 
       end do
 
@@ -452,14 +452,14 @@
         integer, parameter :: line_len = 56
         integer*2, dimension(6), parameter :: chr =
 !     &                          (/ 9675  ! 1: white circle
-     &                          (/ 79    ! 1: latin capital letter o
-     &                           , 33    ! 2: exclamation mark
+     &                          (/ 79_2    ! 1: latin capital letter o
+     &                           , 33_2    ! 2: exclamation mark
 !     &                           , 10799 ! 3: vector or cross product "X"
-     &                           , 88    ! 3: latin capital letter x
-     &                           , 63    ! 4: question mark
+     &                           , 88_2    ! 3: latin capital letter x
+     &                           , 63_2    ! 4: question mark
 !     &                           , 8270  ! 5: low asterisk
-     &                           , 42    ! 5: asterisk
-     &                           , 32    ! 6: space
+     &                           , 42_2    ! 5: asterisk
+     &                           , 32_2    ! 6: space
      &                          /)
         integer                   i
         character(len=64)         fmt01!, fmt02

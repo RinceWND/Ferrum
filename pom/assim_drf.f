@@ -81,6 +81,8 @@ c-------------------------------------------------------------------------
          read(73, nml=assimdrf_nml)
          close(73)
 
+      j1 = 1
+
       iassimdrf = max( int( nassimdrf * 24 * 3600 / dti ), 1 )
       if ( mod(iint-1, iassimdrf) /= 0 ) return
 

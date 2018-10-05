@@ -1596,7 +1596,7 @@
 
       use glob_const , only: grav, rhoref, rk
       use glob_domain, only: im, jm, kbm1
-      use glob_grid  , only: dx, dy, dz, z, zz
+      use glob_grid  , only: dum, dvm, dx, dy, dz, z, zz
       use glob_ocean , only: d, drhox, drhoy, dt, rho
       use model_run  , only: ramp
 
@@ -1622,7 +1622,7 @@
      &            (fac2+fac1*(rho(i,j,1)+rho(i-1,j,1)))*
      &            (z(1)*(d(i,j)-d(i-1,j)))! + el(i,j)-el(i-1,j))
           drhox(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i-1,j))*
-     &                      phix(i)*(dy(i,j)+dy(i-1,j))
+     &                      phix(i)*(dy(i,j)+dy(i-1,j))*dum(i,j)
          end do
 !
 !  Compute interior baroclinic pressure gradient.  Differentiate and
@@ -1660,8 +1660,8 @@
 !            phix(i)=phix(i)+                                            &
 !     &              fac3*(cff1*cff3-cff2*cff4)
             drhox(i,j,k) = drhox(i,j,k-1)
-     &                     -.25*dz(k)*(d(i,j)+d(i-1,j))*
-     &                        phix(i)*(dy(i,j)+dy(i-1,j))
+     &                     -.25*dz(k)*(dt(i,j)+dt(i-1,j))*
+     &                        phix(i)*(dy(i,j)+dy(i-1,j))*dum(i,j)
           end do
         end do
 !
@@ -1679,8 +1679,8 @@
             phie(i) = phie(i)+                                            &
      &              (fac2+fac1*(rho(i,j,1)+rho(i,j-1,1)))*
      &              (z(1)*(d(i,j)-d(i,j-1)))! + el(i,j)-el(i,j-1))
-            drhoy(i,j,1) = -.25*dz(1)*(d(i,j)+d(i,j-1))*
-     &                        phie(i)*(dy(i,j)+dy(i,j-1))
+            drhoy(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i,j-1))*
+     &                        phie(i)*(dy(i,j)+dy(i,j-1))*dvm(i,j)
           end do
 !
 !  Compute interior baroclinic pressure gradient.  Differentiate and
@@ -1718,8 +1718,8 @@
 !              phie(i)=phie(i)+                                          &
 !     &                fac3*(cff1*cff3-cff2*cff4)
               drhoy(i,j,k) = drhoy(i,j,k-1)-
-     &                        .25*dz(k)*(d(i,j)+d(i,j-1))*
-     &                          phie(i)*(dx(i,j)+dx(i,j-1))
+     &                        .25*dz(k)*(dt(i,j)+dt(i,j-1))*
+     &                          phie(i)*(dx(i,j)+dx(i,j-1))*dvm(i,j)
 !              if (isnan(drhoy(i,j,k))) write(*,*) my_task,"::",i,j,k
             end do
           end do

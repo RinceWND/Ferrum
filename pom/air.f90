@@ -359,7 +359,7 @@ module air
 !      use glob_domain, only: is_master
 !      use config     , only: calc_wind
       use module_time
-      use glob_ocean , only: tb
+!      use glob_ocean , only: tb
 
       implicit none
 
@@ -405,6 +405,7 @@ module air
 
 ! Read wind if momentum flux is derived from wind
       call read_all( .true., 1, year, record )
+      call read_all( .true., 2, year, record )
 
       call msg_print("AIR INITIALIZED", 2, "")
 
@@ -449,7 +450,16 @@ module air
 ! Decide on the record to read
       chunk     = chunk_of_year( d_in, read_int )
       record(1) = int(chunk)
-      secs = seconds_of_year(d_in) - int((real(record(1))+.5)*read_int)
+
+      secs = seconds_of_year(d_in)
+
+      if ( secs - int(real(record(1))*read_int) < dti ) then ! TODO: test this one as well.
+        ADVANCE_REC = .true.
+      else
+        ADVANCE_REC = .false.
+      end if
+
+      secs = secs - int((real(record(1))+.5)*read_int)
 
       if ( chunk - record(1) < .5 ) then ! TODO: test (real - int) = ?
         record(2) = record(1)
@@ -478,18 +488,10 @@ module air
         ADVANCE_REC_INT = .false.
       end if
 
-      if ( (chunk-record(1))*read_int <= int(dti) ) then ! TODO: test this one as well.
-        ADVANCE_REC = .true.
-      else
-        ADVANCE_REC = .false.
-      end if
-
       record(1) = record(1) + 1
 
-!      if ( is_master ) print *, "II", (chunk-record(1)) &
-!                                    , (chunk-record(1)-.5) &
-!                              , secs, a  &
-!                              , ADVANCE_REC_INT, ADVANCE_REC
+      if ( is_master ) print *, "II"&!, uwnd(50,50,2), uwnd(50,50,3) &
+                              , a, ADVANCE_REC_INT, ADVANCE_REC
 
       call read_all( ADVANCE_REC_INT, 3, year, record )
       call read_all( ADVANCE_REC    , 1, year, record )
@@ -587,9 +589,9 @@ module air
 
       if ( .not. execute ) return
 
-      if ( n == 3 ) then
+      if ( n >= 2 ) then
         write(desc,'("Reading interp. forcing record #",i4," @ ",i4)') &
-            record(3), year(3)
+            record(n), year(n)
       else
         write(desc,'("Reading surface forcing record #",i4," @ ",i4)') &
             record(1), year(1)
@@ -601,7 +603,7 @@ module air
 
       if ( read_wind ) then
 
-        if ((     interp_wind .and. n==3) .or.       &
+        if ((     interp_wind .and. n>=2) .or.       &
             (.not.interp_wind .and. n==1)      ) then
           call read_var_nc( wind_path, uwnd_name, uwnd(:,:,n)  &
                           , year(n), record(n), ncid )
@@ -620,7 +622,7 @@ module air
 
       if ( read_bulk ) then
 
-        if ((     interp_humid .and. n==3) .or.       &
+        if ((     interp_humid .and. n>=2) .or.       &
             (.not.interp_humid .and. n==1)      ) then
           call read_var_nc( bulk_path,humid_name, humid(:,:,n)  &
                           , year(n), record(n), ncid )
@@ -630,7 +632,7 @@ module air
           end if
         end if
 
-        if ((     interp_rain .and. n==3) .or.       &
+        if ((     interp_rain .and. n>=2) .or.       &
             (.not.interp_rain .and. n==1)      ) then
           call read_var_nc( bulk_path, rain_name,  rain(:,:,n)  &
                           , year(n), record(n), ncid )
@@ -640,7 +642,7 @@ module air
           end if
         end if
 
-        if ((     interp_pres .and. n==3) .or.       &
+        if ((     interp_pres .and. n>=2) .or.       &
             (.not.interp_pres .and. n==1)      ) then
           call read_var_nc( bulk_path, pres_name,  pres(:,:,n)  &
                           , year(n), record(n), ncid )
@@ -650,7 +652,7 @@ module air
           end if
         end if
 
-        if ((     interp_sst .and. n==3) .or.       &
+        if ((     interp_sst .and. n>=2) .or.       &
             (.not.interp_sst .and. n==1)      ) then
           call read_var_nc( bulk_path,  sst_name,   sst(:,:,n)  &
                           , year(n), record(n), ncid )
@@ -660,7 +662,7 @@ module air
           end if
         end if
 
-        if ((     interp_tair .and. n==3) .or.       &
+        if ((     interp_tair .and. n>=2) .or.       &
             (.not.interp_tair .and. n==1)      ) then
           call read_var_nc( bulk_path, tair_name,  temp(:,:,n)  &
                           , year(n), record(n), ncid )
@@ -670,7 +672,7 @@ module air
           end if
         end if
 
-        if ((     interp_cloud .and. n==3) .or.       &
+        if ((     interp_cloud .and. n>=2) .or.       &
             (.not.interp_cloud .and. n==1)      ) then
           call read_var_nc( bulk_path, tcld_name, cloud(:,:,n)  &
                           , year(n), record(n), ncid )
@@ -686,7 +688,7 @@ module air
 
       if ( read_stress ) then
 
-        if ((     interp_stress .and. n==3) .or.       &
+        if ((     interp_stress .and. n>=2) .or.       &
             (.not.interp_stress .and. n==1)      ) then
           call read_var_nc( flux_path, ustr_name, ustr(:,:,n)  &
                           , year(n), record(n), ncid )
@@ -705,7 +707,7 @@ module air
 
       if ( read_heat ) then
 
-        if ((     interp_heat .and. n==3) .or.       &
+        if ((     interp_heat .and. n>=2) .or.       &
             (.not.interp_heat .and. n==1)      ) then
           call read_var_nc( flux_path, dlrad_name, dlrad(:,:,n)  &
                           , year(n), record(n), ncid )
