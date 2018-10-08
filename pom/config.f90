@@ -73,7 +73,7 @@ module config
   , calc_ice         & ! use simple ice drag model [ TODO: TEST ]
   , spinup           & ! spinup flag - freeze initial forcing
   , use_air          & ! apply surface forcing
-  , use_bry          & ! apply lateral forcing
+  , use_bry          & ! apply active lateral forcing
   , use_ice          & ! use simple ice drag model [ TODO: TEST ]
   , use_river        & ! use river discharge
   , use_tide           ! use tides

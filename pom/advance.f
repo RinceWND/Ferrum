@@ -11,15 +11,16 @@
 
         use config   , only: calc_ice
         use model_run, only: iext, isplit
+     &                     , update_time
         use seaice
 ! advance POM 1 step in time
       implicit none
 
 ! get time
-      call get_time
+      call update_time
 
-! set time dependent surface boundary conditions
-      call surface_forcing
+! set time dependent boundary conditions
+      call update_bc
 
 ! set lateral viscosity
       call lateral_viscosity
@@ -85,75 +86,22 @@
 
 !______________________________________________________________________
 !
-      subroutine surface_forcing
+      subroutine update_bc
 !----------------------------------------------------------------------
-!  Set time dependent surface boundary conditions
-!____ DOES NOTHING ____________________________________________________
+!  Set time dependent boundary conditions
+!______________________________________________________________________
 
-      use air        , only: air_step, vfluxf
-      use config     , only: rk, tbias
-      use glob_domain, only: im, jm
-      use glob_ocean , only: t, w
-      use model_run  , only: dtime
+      use air      , only: air_step => step
+      use bry      , only: bry_step => step
+      use model_run, only: dtime
 
       implicit none
 
-      integer i,j
-      real(kind=rk) tatm,satm
-
 
       call air_step( dtime )
+      call bry_step( dtime )
 
-      do j=1,jm
-        do i=1,im
 
-! wind stress
-! value is negative for westerly or southerly winds. The wind stress
-! should be tapered along the boundary to suppress numerically induced
-! oscilations near the boundary (Jamart and Ozer, JGR, 91, 10621-10631)
-!          wusurf(i,j)=0.e0
-!     test ayumi 2010/5/8
-!          wusurf(i,j) = 2.e-4
-!     $     * cos( pi *( north_e(i,j) - 10.e0 ) / 40.e0 )
-
-!          wvsurf(i,j)=0.e0
-
-!          e_atmos(i,j)=0.
-!          vfluxf(i,j)=0.e0
-
-! set w(i,j,1)=vflux(i,j).ne.0 if one wishes non-zero flow across
-! the sea surface. See calculation of elf(i,j) below and subroutines
-! vertvl, advt1 (or advt2). If w(1,j,1)=0, and, additionally, there
-! is no net flow across lateral boundaries, the basin volume will be
-! constant; if also vflux(i,j).ne.0, then, for example, the average
-! salinity will change and, unrealistically, so will total salt
-          w(i,j,1)=vfluxf(i,j)
-
-! set wtsurf to the sensible heat, the latent heat (which involves
-! only the evaporative component of vflux) and the long wave
-! radiation
-
-! ayumi 2010/4/19
-! wtsurf & wssurf are calculated in tsclim_monthly
-!          wtsurf(i,j)=0.e0
-
-! set swrad to the short wave radiation
-!          swrad(i,j)=0.e0
-
-! to account for change in temperature of flow crossing the sea
-! surface (generally quite small compared to latent heat effect)
-          tatm=t(i,j,1)+tbias    ! an approximation
-!          wtsurf(i,j)=wtsurf(i,j)+vfluxf(i,j)*(tatm-t(i,j,1)-tbias)
-
-! set the salinity of water vapor/precipitation which enters/leaves
-! the atmosphere (or e.g., an ice cover)
-          satm=0.
-!          wssurf(i,j)=            vfluxf(i,j)*(satm-s(i,j,1)-sbias)
-
-        end do
-      end do
-
-      return
       end
 
 !______________________________________________________________________

@@ -1438,7 +1438,8 @@
 !
       subroutine modules_bc_init( dtime )
 
-        use air        , only: air_init
+        use air        , only: air_init => init
+        use bry        , only: bry_init => init
         use module_time
 
         implicit none
@@ -1447,5 +1448,6 @@
 
 
         call air_init( dtime )
+        call bry_init( dtime )
 
       end subroutine

@@ -21,14 +21,29 @@ module bry
 !----------------------------------------------------------------------
   logical           &
        , private :: &
-    hasEAST         & ! flag for eastern boundary
+    DISABLED        & ! flag for active (read from file) boundaries
+  , hasEAST         & ! flag for eastern boundary
   , hasNORTH        & ! flag for northern boundary
   , hasSOUTH        & ! flag for southern boundary
-  , hasWEST           ! flag for western boundary
+  , hasWEST         & ! flag for western boundary
+  , INTERP_BRY        ! flag for active boundary interpolation [ NOT IMPLEMENTED ]
 
   integer           &
        , private :: &
-    i, j, k           ! simple counters
+    i, j, k         & ! simple counters
+  , read_int          ! interval for reading (days) TODO: though should be months too
+
+  character(len=10)                       &
+       , parameter                        &
+       , private   :: FORMAT_EXT = ".nc"
+       
+       
+  integer                        &
+       , parameter               &
+       , private   :: bcNTH = 0  & ! id for northern boundary
+                    , bcEST = 1  & ! id for eastern boundary
+                    , bcSTH = 2  & ! id for southern boundary
+                    , bcWST = 3    ! id for western boundary
 
 !----------------------------------------------------------------------
 ! PUBLIC variables
@@ -142,6 +157,18 @@ module bry
     aamfrz      & ! sponge factor - increased aam at boundaries
   , frz           ! flow-relax-coefficient at boundaries
 
+!----------------------------------------------------------------------
+! Path and variable names configuration
+!----------------------------------------------------------------------
+  character(len=256)  & ! Full paths (with filenames) to:
+    bry_path            !  boundary file with t,s,el,u,v for each bry
+
+  character(len=64)   & ! BC file variable names:
+    el_name           & !  elevation
+  ,  s_name           & !  salinity
+  ,  t_name           & !  temperature
+  ,  u_name           & !  u-velocity (normal for east and west)
+  ,  v_name             !  v-velocity (tangential for east and west)
 
   contains
 
@@ -210,24 +237,36 @@ module bry
          )
       end if
 
+!      if ( DISABLED ) return
+!      
+!      allocate( bry_path )
+
     end subroutine allocate_boundary
 !______________________________________________________________________
 !
-    subroutine initialize_boundary( config )
+    subroutine initialize_boundary( conf )
 !----------------------------------------------------------------------
 !  Initialize arrays for boundary conditions.
 !______________________________________________________________________
 
-      use glob_domain, only: n_east, n_north, n_south, n_west
+      use config     , only: use_bry
+      use glob_domain, only: is_master, n_east, n_north, n_south, n_west
 
       implicit none
 
-      character(len=*), intent(in) :: config
+      character(len=*), intent(in) :: conf
 
       logical periodic_x, periodic_y
+      integer pos
 
-      namelist/bry_nml/                           &
-        Hmax, periodic_x, periodic_y, USE_SPONGE
+      namelist/bry_nml/                                                &
+        bry_path, el_name, Hmax  , interp_bry, periodic_x, periodic_y  &
+      , read_int, s_name , t_name, USE_SPONGE, u_name    , v_name
+
+! Do not read boundary fields by default
+      DISABLED = .true.
+! Check for active boundary
+      if ( use_bry ) DISABLED = .false.
 
 ! Set max depth
       hmax = 8000.
@@ -256,6 +295,20 @@ module bry
       periodic_x = .false.
       periodic_y = .false.
 
+! Default path to active boundary file
+      bry_path   = "in/bry/"
+! Default variable names
+      el_name= "zeta"
+      s_name = "salt"
+      t_name = "temp"
+      u_name = "u"
+      v_name = "v"
+      
+! [ NOT IMPLEMENTED ] Interpolate active boundary by default (ignored if DISABLED)
+      interp_bry = .true.
+
+! Default readint interval (daily)
+      read_int = 1.
 
 ! Default BC types
 !   elevation
@@ -277,10 +330,10 @@ module bry
       BC % vel3d % NORM % NORTH = bcRADIATION
       BC % vel3d % NORM % SOUTH = bcRADIATION
       BC % vel3d % NORM % WEST  = bcRADIATION
-      BC % vel3d % NORM % EAST  = bc3POINTSMOOTH
-      BC % vel3d % NORM % NORTH = bc3POINTSMOOTH
-      BC % vel3d % NORM % SOUTH = bc3POINTSMOOTH
-      BC % vel3d % NORM % WEST  = bc3POINTSMOOTH
+      BC % vel3d % TANG % EAST  = bc3POINTSMOOTH
+      BC % vel3d % TANG % NORTH = bc3POINTSMOOTH
+      BC % vel3d % TANG % SOUTH = bc3POINTSMOOTH
+      BC % vel3d % TANG % WEST  = bc3POINTSMOOTH
 !   temp and salt
       BC % ts % EAST  = bcINOUTFLOW
       BC % ts % NORTH = bcINOUTFLOW
@@ -298,17 +351,33 @@ module bry
       BC % ts % WEST  = bcINOUTFLOW
 
 ! Override configuration
-      open ( 73, file = config, status = 'old' )
+      open ( 73, file = conf, status = 'old' )
       read ( 73, nml = bry_nml )
       close( 73 )
 
 ! Manage derived type variables
       periodic_bc % x = periodic_x
       periodic_bc % y = periodic_y
+      
+      pos = len(trim(bry_path))
+      if ( bry_path(pos:pos) == "/" ) then
+        bry_path = trim(bry_path)//"bry."
+      end if
+
+! Print summary [ TODO: print all the BC settings ]
+      if ( is_master ) then
+        if ( DISABLED ) then
+          print *, "Active boundary: [ DISABLED ]"
+        else
+          print *, "Active boundary: "
+          print *, " Bry file path: ", trim(bry_path)
+        end if
+      end if
 
 ! Allocate arrays
       call allocate_boundary
 
+      call msg_print("BRY MODULE INITIALIZED", 1, "")
 
     end subroutine
 !______________________________________________________________________
@@ -445,7 +514,351 @@ module bry
 
 
     end subroutine initial_conditions_boundary
+!______________________________________________________________________
+!
+    subroutine init( d_in )
+!----------------------------------------------------------------------
+!  Reads initial lateral boundary conditions.
+!______________________________________________________________________
 
+      use module_time
+
+      type(date), intent(in) :: d_in
+
+      integer            max_in_prev, max_in_this
+      integer                          &
+      , dimension(3)  :: record, year
+      real               chunk
+
+
+! Quit if the module is not used.
+      if ( DISABLED ) return
+
+      year = d_in%year
+
+      max_in_this = max_chunks_in_year( d_in%year  , read_int )
+      max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
+
+! Decide on the record to read
+      chunk     = chunk_of_year( d_in, read_int )
+      record(1) = int(chunk)
+
+      if ( chunk - record(1) < .5 ) then
+        record(2) = record(1)
+      else
+        record(2) = record(1) + 1
+      end if
+      record(3) = record(2) + 1
+
+      if ( record(2) == 0 ) then
+        record(2) = max_in_prev + 1 ! TODO: [ NEEDS TESTING ]
+        year(2) = d_in%year - 1
+      elseif ( record(3) == max_in_this + 1 ) then
+        record(3) = 1
+        year(3) = d_in%year + 1
+      end if
+
+      record(1) = record(1) + 1
+
+! Read wind if momentum flux is derived from wind
+      call read_all( .true., 1, year, record )
+
+      call msg_print("BRY INITIALIZED", 2, "")
+
+
+      return
+
+    end subroutine init
+!______________________________________________________________________
+!
+    subroutine step( d_in )
+!----------------------------------------------------------------------
+!  Reads lateral boundary conditions.
+!______________________________________________________________________
+
+      use model_run  , only: dti, secs => sec_of_year
+      use module_time
+
+      implicit none
+
+      type(date), intent(in) :: d_in
+
+      logical            ADVANCE_REC
+      integer            max_in_prev, max_in_this
+      integer                          &
+      , dimension(3)  :: record, year
+      real               chunk
+
+
+! Quit if the module is not used.
+      if ( DISABLED ) return
+
+      year = d_in%year
+
+      max_in_this = max_chunks_in_year( d_in%year  , read_int )
+      max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
+
+! Decide on the record to read
+      chunk     = chunk_of_year( d_in, read_int )
+      record(1) = int(chunk)
+
+      if ( secs - int(real(record(1))*read_int) < dti ) then ! TODO: test this one as well.
+        ADVANCE_REC = .true.
+      else
+        ADVANCE_REC = .false.
+      end if
+
+      record(1) = record(1) + 1
+
+      call read_all( ADVANCE_REC, 1, year, record )
+
+
+    end subroutine step
+!______________________________________________________________________
+!
+    subroutine read_all( execute, n, year, record )
+
+      use glob_grid , only: fsm
+      use glob_ocean, only: sclim, tclim
+
+      implicit none
+
+      logical              , intent(in) :: execute
+      integer              , intent(in) :: n
+      integer, dimension(3), intent(in) :: record, year
+
+      integer            ii, ncid
+      character(len=128) desc
+
+
+      if ( .not. execute ) return
+
+      if ( n >= 2 ) then
+        write(desc,'("[interp_bry not implemented yet] #",i4," @ ",i4)') &
+            record(n), year(n)
+      else
+        write(desc,'("Reading BC record #",i4," @ ",i4)') &
+            record(1), year(1)
+      end if
+
+      call msg_print("", 1, desc)
+
+      ncid = -1
+
+! EAST
+      if ( hasEAST ) then
+! Temperature
+        call read_var_nc( bry_path, "east_"//t_name, T_bry%EST  &
+                        , year(n), record(n), bcEST, ncid )
+        if ( ncid == -1 ) then
+          do k=1,kb
+            do j=1,jm
+              do i=1,NFE
+                ii=im-i+1
+                T_bry%EST(i,j,k) = tclim(ii,j,k) * fsm(ii,j)
+              end do
+            end do
+          end do
+          call msg_print("", 2, "Temp@EAST defaulted to climatology")
+        end if
+! Salinity
+        call read_var_nc( bry_path, "east_"//s_name, S_bry%EST  &
+                        , year(n), record(n), bcEST, ncid )
+        if ( ncid == -1 ) then
+          do k=1,kb
+            do j=1,jm
+              do i=1,NFE
+                ii=im-i+1
+                S_bry%EST(i,j,k) = sclim(ii,j,k) * fsm(ii,j)
+              end do
+            end do
+          end do
+          call msg_print("", 2, "Salt@EAST defaulted to climatology")
+        end if
+! Elevation
+        call read_var_nc( bry_path, "east_"//el_name, EL_bry%EST  &
+                        , year(n), record(n), bcEST, ncid )
+        if ( ncid == -1 ) then
+          EL_bry%EST = 0.
+          call msg_print("", 2, "Elev@EAST defaulted to zero")
+        end if
+! Normal velocity
+        call read_var_nc( bry_path, "east_"//u_name, U_bry%EST  &
+                        , year(n), record(n), bcEST, ncid )
+        if ( ncid == -1 ) then
+          U_bry%EST = 0.
+          call msg_print("", 2, "Uvel@EAST defaulted to zero")
+        end if
+! Tangential velocity
+        call read_var_nc( bry_path, "east_"//v_name, V_bry%EST  &
+                        , year(n), record(n), bcEST, ncid )
+        if ( ncid == -1 ) then
+          V_bry%EST = 0.
+          call msg_print("", 2, "Vvel@EAST defaulted to zero")
+        end if
+
+      end if
+
+! NORTH
+      if ( hasNORTH ) then
+! Temperature
+        call read_var_nc( bry_path, "north_"//t_name, T_bry%NTH  &
+                        , year(n), record(n), bcNTH, ncid )
+        if ( ncid == -1 ) then
+          do k=1,kb
+            do j=1,NFN
+              do i=1,im
+                ii=jm-j+1
+                T_bry%NTH(i,j,k) = tclim(i,ii,k) * fsm(i,ii)
+              end do
+            end do
+          end do
+          call msg_print("", 2, "Temp@NORTH defaulted to climatology")
+        end if
+! Salinity
+        call read_var_nc( bry_path, "north_"//s_name, S_bry%NTH  &
+                        , year(n), record(n), bcNTH, ncid )
+        if ( ncid == -1 ) then
+          do k=1,kb
+            do j=1,NFN
+              do i=1,im
+                ii=jm-j+1
+                S_bry%NTH(i,j,k) = sclim(i,ii,k) * fsm(i,ii)
+              end do
+            end do
+          end do
+          call msg_print("", 2, "Salt@NORTH defaulted to climatology")
+        end if
+! Elevation
+        call read_var_nc( bry_path, "north_"//el_name, EL_bry%NTH  &
+                        , year(n), record(n), bcNTH, ncid )
+        if ( ncid == -1 ) then
+          EL_bry%NTH = 0.
+          call msg_print("", 2, "Elev@NORTH defaulted to zero")
+        end if
+! Normal velocity
+        call read_var_nc( bry_path, "north_"//u_name, U_bry%NTH  &
+                        , year(n), record(n), bcNTH, ncid )
+        if ( ncid == -1 ) then
+          U_bry%NTH = 0.
+          call msg_print("", 2, "Uvel@NORTH defaulted to zero")
+        end if
+! Tangential velocity
+        call read_var_nc( bry_path, "north_"//v_name, V_bry%NTH  &
+                        , year(n), record(n), bcNTH, ncid )
+        if ( ncid == -1 ) then
+          V_bry%NTH = 0.
+          call msg_print("", 2, "Vvel@NORTH defaulted to zero")
+        end if
+
+      end if
+
+! SOUTH
+      if ( hasSOUTH ) then
+! Temperature
+        call read_var_nc( bry_path, "south_"//t_name, T_bry%STH  &
+                        , year(n), record(n), bcSTH, ncid )
+        if ( ncid == -1 ) then
+          do k=1,kb
+            do j=1,NFS
+              do i=1,im
+                T_bry%STH(i,j,k) = tclim(i,j,k) * fsm(i,j)
+              end do
+            end do
+          end do
+          call msg_print("", 2, "Temp@SOUTH defaulted to climatology")
+        end if
+! Salinity
+        call read_var_nc( bry_path, "south_"//s_name, S_bry%STH  &
+                        , year(n), record(n), bcSTH, ncid )
+        if ( ncid == -1 ) then
+          do k=1,kb
+            do j=1,NFS
+              do i=1,im
+                S_bry%STH(i,j,k) = sclim(i,j,k) * fsm(i,j)
+              end do
+            end do
+          end do
+          call msg_print("", 2, "Salt@SOUTH defaulted to climatology")
+        end if
+! Elevation
+        call read_var_nc( bry_path, "south_"//el_name, EL_bry%STH  &
+                        , year(n), record(n), bcSTH, ncid )
+        if ( ncid == -1 ) then
+          EL_bry%STH = 0.
+          call msg_print("", 2, "Elev@SOUTH defaulted to zero")
+        end if
+! Normal velocity
+        call read_var_nc( bry_path, "south_"//u_name, U_bry%STH  &
+                        , year(n), record(n), bcSTH, ncid )
+        if ( ncid == -1 ) then
+          U_bry%STH = 0.
+          call msg_print("", 2, "Uvel@SOUTH defaulted to zero")
+        end if
+! Tangential velocity
+        call read_var_nc( bry_path, "south_"//v_name, V_bry%STH  &
+                        , year(n), record(n), bcSTH, ncid )
+        if ( ncid == -1 ) then
+          V_bry%STH = 0.
+          call msg_print("", 2, "Vvel@SOUTH defaulted to zero")
+        end if
+
+      end if
+
+! WEST
+      if ( hasWEST ) then
+! Temperature
+        call read_var_nc( bry_path, "west_"//t_name, T_bry%WST  &
+                        , year(n), record(n), bcWST, ncid )
+        if ( ncid == -1 ) then
+          do k=1,kb
+            do j=1,jm
+              do i=1,NFW
+                T_bry%WST(i,j,k) = tclim(i,j,k) * fsm(i,j)
+              end do
+            end do
+          end do
+          call msg_print("", 2, "Temp@WEST defaulted to climatology")
+        end if
+! Salinity
+        call read_var_nc( bry_path, "west_"//s_name, S_bry%WST  &
+                        , year(n), record(n), bcWST, ncid )
+        if ( ncid == -1 ) then
+          do k=1,kb
+            do j=1,jm
+              do i=1,NFW
+                S_bry%WST(i,j,k) = sclim(i,j,k) * fsm(i,j)
+              end do
+            end do
+          end do
+          call msg_print("", 2, "Salt@WEST defaulted to climatology")
+        end if
+! Elevation
+        call read_var_nc( bry_path, "west_"//el_name, EL_bry%WST  &
+                        , year(n), record(n), bcWST, ncid )
+        if ( ncid == -1 ) then
+          EL_bry%WST = 0.
+          call msg_print("", 2, "Elev@WEST defaulted to zero")
+        end if
+! Normal velocity
+        call read_var_nc( bry_path, "west_"//u_name, U_bry%WST  &
+                        , year(n), record(n), bcWST, ncid )
+        if ( ncid == -1 ) then
+          U_bry%WST = 0.
+          call msg_print("", 2, "Uvel@WEST defaulted to zero")
+        end if
+! Tangential velocity
+        call read_var_nc( bry_path, "west_"//v_name, V_bry%WST  &
+                        , year(n), record(n), bcWST, ncid )
+        if ( ncid == -1 ) then
+          V_bry%WST = 0.
+          call msg_print("", 2, "Vvel@WEST defaulted to zero")
+        end if
+
+      end if
+
+
+    end subroutine
 !______________________________________________________________________
 !
     subroutine bc_zeta
@@ -1597,6 +2010,194 @@ module bry
       return
 
     end subroutine bc_turb
+!______________________________________________________________________
+!
+    pure character(len=256) function get_filename( path, year )
+!----------------------------------------------------------------------
+!  Costructs filename string in `<path>YYYY<FORMAT_EXT>` format.
+!______________________________________________________________________
 
+      implicit none
+
+      character(len=*), intent(in) :: path
+      integer         , intent(in) :: year
+
+
+      write( get_filename, '( a, i4.4, a )' ) trim(path)      &
+                                            , year            &
+                                            , trim(FORMAT_EXT)
+
+    end function
+!
+!= I/O SECTION ========================================================
+!______________________________________________________________________
+!
+    subroutine read_var_nc( path, var_name, var        &
+                          , year, record  , bry, ncid )
+!----------------------------------------------------------------------
+!  Read a variable (NC format).
+!______________________________________________________________________
+
+      use glob_const , only: rk
+      use glob_domain
+      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
+      use pnetcdf
+
+      implicit none
+
+      integer, external :: get_var_real_3d
+
+      integer                   , intent(inout) :: ncid
+      integer                   , intent(in   ) :: bry, record, year
+      real(rk), dimension(im,jm), intent(  out) :: var
+      character(len=*)          , intent(in   ) :: path, var_name
+
+      integer                  varid, status
+      integer(MPI_OFFSET_KIND) start(4), edge(4)
+      character(len=256)       filename, netcdf_file
+
+
+      start = 1
+      edge  = 1
+
+      if ( ncid <= 0 ) then
+! open netcdf file
+        if ( ncid == 0 ) then
+          call check( nf90mpi_close( ncid )              &
+                    , 'nfmpi_close:'//trim(netcdf_file) )
+        end if
+
+        filename = get_filename( path, year )
+        netcdf_file = trim(filename)
+        status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE   &
+                             , MPI_INFO_NULL, ncid )
+        if ( status /= NF_NOERR ) then
+          call msg_print("", 2, "Failed reading `"//trim(var_name)  &
+                              //"` from `"//trim(filename)//"`")
+          ncid = -1
+          return
+        end if
+      end if
+
+! get variable
+      call check( nf90mpi_inq_varid( ncid, var_name, varid )  &
+                , 'nfmpi_inq_varid: '//trim(var_name) )
+
+! set reading area
+      select case ( bry )
+
+        case ( bcEST )
+          if ( NFE > 1 ) then
+            start(1) = i_global(1) + im-NFE
+            start(2) = j_global(1)
+            start(3) = 1
+            start(4) = record
+            edge(1) = NFE
+            edge(2) = jm
+            edge(3) = kb
+            edge(4) = 1
+          else
+            start(1) = j_global(1)
+            start(2) = 1
+            start(3) = record
+            edge(1) = jm
+            edge(2) = kb
+            edge(3) = 1
+          end if
+
+        case ( bcNTH )
+          if ( NFN > 1 ) then
+            start(1) = i_global(1)
+            start(2) = j_global(1) + jm-NFN
+            start(3) = 1
+            start(4) = record
+            edge(1) = im
+            edge(2) = NFN
+            edge(3) = kb
+            edge(4) = 1
+          else
+            start(1) = i_global(1)
+            start(2) = 1
+            start(3) = record
+            edge(1) = im
+            edge(2) = kb
+            edge(3) = 1
+          end if
+
+        case ( bcSTH )
+          if ( NFS > 1 ) then
+            start(1) = i_global(1)
+            start(2) = j_global(1)
+            start(3) = 1
+            edge(1) = im
+            edge(2) = NFS
+            edge(3) = kb
+          else
+            start(1) = i_global(1)
+            start(2) = 1
+            start(3) = record
+            edge(1) = im
+            edge(2) = kb
+            edge(3) = 1
+          end if
+
+        case ( bcWST )
+          if ( NFW > 1 ) then
+            start(1) = i_global(1)
+            start(2) = j_global(1)
+            start(3) = 1
+            edge(1) = NFW
+            edge(2) = jm
+            edge(3) = kb
+          else
+            start(1) = j_global(1)
+            start(2) = 1
+            start(3) = record
+            edge(1) = jm
+            edge(2) = kb
+            edge(3) = 1
+          end if
+
+      end select
+
+! get data
+      call check( get_var_real_3d                    &
+                  ( ncid, varid, start, edge, var )  &
+                , 'get_var_real: '//trim(var_name) )
+
+
+      return
+
+      end
+
+!______________________________________________________________________
+!
+    subroutine check(status, routine)
+!----------------------------------------------------------------------
+!  Checks for NetCDF I/O error and exits with an error message if hits.
+!______________________________________________________________________
+
+      use glob_domain, only: error_status, is_master
+      use pnetcdf    , only: nf90mpi_strerror, NF_NOERR
+
+      implicit none
+
+      integer         , intent(in) :: status
+      character(len=*), intent(in) :: routine
+
+
+      if ( status /= NF_NOERR ) then
+        error_status = 1
+        if ( is_master ) then
+          print '(/a,a)', 'IO error at module `AIR`: ', routine
+          print '("[",i4,"] ",a)', status, nf90mpi_strerror(status)
+          stop
+        end if
+      end if
+
+
+      return
+
+    end
 
 end module

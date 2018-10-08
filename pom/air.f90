@@ -26,7 +26,7 @@ module air
 !----------------------------------------------------------------------
   logical, private :: DISABLED ! Is set according to the external flag `use_air`.
 
-  integer read_int   ! Reading interval in days
+  integer, private :: read_int ! interval for reading (days)
 
   character(len=10)                       &
        , parameter                        &
@@ -351,7 +351,7 @@ module air
     end subroutine ! allocate_air
 !______________________________________________________________________
 !
-    subroutine air_init( d_in )
+    subroutine init( d_in )
 !----------------------------------------------------------------------
 !  Reads forcing fields before experiment's start.
 !______________________________________________________________________
@@ -412,10 +412,10 @@ module air
 
       return
 
-    end subroutine air_init
+    end subroutine init
 !______________________________________________________________________
 !
-    subroutine air_step( d_in )
+    subroutine step( d_in )
 !----------------------------------------------------------------------
 !  Reads forcing fields during experiment.
 !______________________________________________________________________
@@ -423,14 +423,14 @@ module air
 !      use glob_const , only: SEC2DAY
       use glob_domain, only: is_master
       use module_time
-      use model_run  , only: dti, iint
+      use model_run  , only: dti, iint, secs => sec_of_year
 
       implicit none
 
       type(date), intent(in) :: d_in
 
       logical            ADVANCE_REC, ADVANCE_REC_INT
-      integer            max_in_prev, max_in_this, ncid, secs
+      integer            max_in_prev, max_in_this, ncid
       integer                          &
       , dimension(3)  :: record, year
       real               a, chunk
@@ -450,8 +450,6 @@ module air
 ! Decide on the record to read
       chunk     = chunk_of_year( d_in, read_int )
       record(1) = int(chunk)
-
-      secs = seconds_of_year(d_in)
 
       if ( secs - int(real(record(1))*read_int) < dti ) then ! TODO: test this one as well.
         ADVANCE_REC = .true.
@@ -512,7 +510,7 @@ module air
 
       end if
 
-    end subroutine air_step
+    end subroutine step
 !______________________________________________________________________
 !
     subroutine wind_to_stress( uwnd, vwnd, ustr, vstr, mode )

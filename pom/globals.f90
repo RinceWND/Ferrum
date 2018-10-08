@@ -253,8 +253,8 @@ module model_run
     iint             & ! internal mode step counter
   , iend             & ! total internal mode time steps
   , iext             & ! external mode step counter
-  , isplit             ! dti/dte
-
+  , isplit           & ! dti/dte
+  , sec_of_year        ! seconds since the beginning of year
 
   real(kind=rk)      &
     days             & ! run duration in days
@@ -323,6 +323,24 @@ module model_run
 
 
     end subroutine
+
+    subroutine update_time
+
+      implicit none
+
+      sec_of_year = seconds_of_year(dtime)
+
+      time = dti*float(iint)/86400. + time0
+      ramp = 1.
+!      if(lramp) then
+!        ramp=time/period
+!        if(ramp.gt.1.e0) ramp=1.e0
+!      else
+!        ramp=1.e0
+!      endif
+
+    end subroutine
+
 
 end module model_run
 
