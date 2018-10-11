@@ -308,7 +308,7 @@ module bry
       interp_bry = .true.
 
 ! Default readint interval (daily)
-      read_int = 1.
+      read_int = 86400
 
 ! Default BC types
 !   elevation
@@ -576,6 +576,8 @@ module bry
 !  Reads lateral boundary conditions.
 !______________________________________________________________________
 
+      use glob_grid  , only: dz
+!      use glob_domain, only: is_master
       use model_run  , only: dti, secs => sec_of_year
       use module_time
 
@@ -602,24 +604,70 @@ module bry
       chunk     = chunk_of_year( d_in, read_int )
       record(1) = int(chunk)
 
-      if ( secs - int(real(record(1))*read_int) < dti ) then ! TODO: test this one as well.
+      ADVANCE_REC = .false.
+      if ( secs - record(1)*read_int < dti ) then ! TODO: test this one as well.
         ADVANCE_REC = .true.
-      else
-        ADVANCE_REC = .false.
       end if
+
+!      if ( is_master ) print *, "III", secs-record(1)*read_int, dti, ADVANCE_REC
 
       record(1) = record(1) + 1
 
       call read_all( ADVANCE_REC, 1, year, record )
 
+      if ( ADVANCE_REC ) then
+! Derive barotropic velocities
+        if ( hasEAST ) then
+          UA_bry % EST = 0.
+          VA_bry % EST = 0.
+          do k = 1, kb
+            UA_bry % EST = UA_bry % EST                &
+                         +  U_bry % EST(:,:,k) * dz(k)
+            VA_bry % EST = VA_bry % EST                &
+                         +  V_bry % EST(:,:,k) * dz(k)
+          end do
+        end if
+        if ( hasNORTH ) then
+          UA_bry % NTH = 0.
+          VA_bry % NTH = 0.
+          do k = 1, kb
+            UA_bry % NTH = UA_bry % NTH                &
+                         +  U_bry % NTH(:,:,k) * dz(k)
+            VA_bry % NTH = VA_bry % NTH                &
+                         +  V_bry % NTH(:,:,k) * dz(k)
+          end do
+        end if
+        if ( hasSOUTH ) then
+          UA_bry % STH = 0.
+          VA_bry % STH = 0.
+          do k = 1, kb
+            UA_bry % STH = UA_bry % STH                &
+                         +  U_bry % STH(:,:,k) * dz(k)
+            VA_bry % STH = VA_bry % STH                &
+                         +  V_bry % STH(:,:,k) * dz(k)
+          end do
+        end if
+        if ( hasWEST ) then
+          UA_bry % WST = 0.
+          VA_bry % WST = 0.
+          do k = 1, kb
+            UA_bry % WST = UA_bry % WST                &
+                         +  U_bry % WST(:,:,k) * dz(k)
+            VA_bry % WST = VA_bry % WST                &
+                         +  V_bry % WST(:,:,k) * dz(k)
+          end do
+        end if
+      end if
 
     end subroutine step
 !______________________________________________________________________
 !
     subroutine read_all( execute, n, year, record )
 
-      use glob_grid , only: fsm
-      use glob_ocean, only: sclim, tclim
+      use glob_domain, only: i_global, j_global
+      use glob_grid  , only: fsm
+      use glob_ocean , only: sclim, tclim
+      use mpi        , only: MPI_OFFSET_KIND
 
       implicit none
 
@@ -627,8 +675,9 @@ module bry
       integer              , intent(in) :: n
       integer, dimension(3), intent(in) :: record, year
 
-      integer            ii, ncid
-      character(len=128) desc
+      integer                  ii, ncid
+      integer(MPI_OFFSET_KIND) start(4), edge(4)
+      character(len=128)       desc
 
 
       if ( .not. execute ) return
@@ -647,9 +696,28 @@ module bry
 
 ! EAST
       if ( hasEAST ) then
+! set reading bounds for 3D vars
+        if ( NFE > 1 ) then
+          start(1) = i_global(1) + im-NFE
+          start(2) = j_global(1)
+          start(3) = 1
+          start(4) = record(n)
+          edge(1) = NFE
+          edge(2) = jm
+          edge(3) = kb
+          edge(4) = 1
+        else
+          start(1) = j_global(1)
+          start(2) = 1
+          start(3) = record(n)
+          start(4) = 1
+          edge(1)   = jm
+          edge(2)   = kb
+          edge(3:4) = 1
+        end if
 ! Temperature
-        call read_var_nc( bry_path, "east_"//t_name, T_bry%EST  &
-                        , year(n), record(n), bcEST, ncid )
+        call read_var_3d_nc( bry_path, "east_"//t_name, T_bry%EST  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           do k=1,kb
             do j=1,jm
@@ -662,8 +730,8 @@ module bry
           call msg_print("", 2, "Temp@EAST defaulted to climatology")
         end if
 ! Salinity
-        call read_var_nc( bry_path, "east_"//s_name, S_bry%EST  &
-                        , year(n), record(n), bcEST, ncid )
+        call read_var_3d_nc( bry_path, "east_"//s_name, S_bry%EST  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           do k=1,kb
             do j=1,jm
@@ -675,35 +743,70 @@ module bry
           end do
           call msg_print("", 2, "Salt@EAST defaulted to climatology")
         end if
-! Elevation
-        call read_var_nc( bry_path, "east_"//el_name, EL_bry%EST  &
-                        , year(n), record(n), bcEST, ncid )
-        if ( ncid == -1 ) then
-          EL_bry%EST = 0.
-          call msg_print("", 2, "Elev@EAST defaulted to zero")
-        end if
 ! Normal velocity
-        call read_var_nc( bry_path, "east_"//u_name, U_bry%EST  &
-                        , year(n), record(n), bcEST, ncid )
+        call read_var_3d_nc( bry_path, "east_"//u_name, U_bry%EST  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           U_bry%EST = 0.
           call msg_print("", 2, "Uvel@EAST defaulted to zero")
         end if
 ! Tangential velocity
-        call read_var_nc( bry_path, "east_"//v_name, V_bry%EST  &
-                        , year(n), record(n), bcEST, ncid )
+        call read_var_3d_nc( bry_path, "east_"//v_name, V_bry%EST  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           V_bry%EST = 0.
           call msg_print("", 2, "Vvel@EAST defaulted to zero")
+        end if
+! set reading bounds for 2D vars
+        if ( NFE > 1 ) then
+          start(1) = i_global(1) + im-NFE
+          start(2) = j_global(1)
+          start(3) = record(n)
+          start(4) = 1
+          edge(1)   = NFE
+          edge(2)   = jm
+          edge(3:4) = 1
+        else
+          start(1)   = j_global(1)
+          start(2)   = record(n)
+          start(3:4) = 1
+          edge(1)   = jm
+          edge(2:4) = 1
+        end if
+! Elevation
+        call read_var_2d_nc( bry_path, "east_"//el_name, EL_bry%EST  &
+                           , year(n), start, edge, ncid )
+        if ( ncid == -1 ) then
+          EL_bry%EST = 0.
+          call msg_print("", 2, "Elev@EAST defaulted to zero")
         end if
 
       end if
 
 ! NORTH
       if ( hasNORTH ) then
+! set reading bounds for 3D vars
+        if ( NFN > 1 ) then
+          start(1) = i_global(1)
+          start(2) = j_global(1) + jm-NFN
+          start(3) = 1
+          start(4) = record(n)
+          edge(1) = im
+          edge(2) = NFN
+          edge(3) = kb
+          edge(4) = 1
+        else
+          start(1) = i_global(1)
+          start(2) = 1
+          start(3) = record(n)
+          start(4) = 1
+          edge(1)   = im
+          edge(2)   = kb
+          edge(3:4) = 1
+        end if
 ! Temperature
-        call read_var_nc( bry_path, "north_"//t_name, T_bry%NTH  &
-                        , year(n), record(n), bcNTH, ncid )
+        call read_var_3d_nc( bry_path, "north_"//t_name, T_bry%NTH  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           do k=1,kb
             do j=1,NFN
@@ -716,8 +819,8 @@ module bry
           call msg_print("", 2, "Temp@NORTH defaulted to climatology")
         end if
 ! Salinity
-        call read_var_nc( bry_path, "north_"//s_name, S_bry%NTH  &
-                        , year(n), record(n), bcNTH, ncid )
+        call read_var_3d_nc( bry_path, "north_"//s_name, S_bry%NTH  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           do k=1,kb
             do j=1,NFN
@@ -729,35 +832,70 @@ module bry
           end do
           call msg_print("", 2, "Salt@NORTH defaulted to climatology")
         end if
-! Elevation
-        call read_var_nc( bry_path, "north_"//el_name, EL_bry%NTH  &
-                        , year(n), record(n), bcNTH, ncid )
-        if ( ncid == -1 ) then
-          EL_bry%NTH = 0.
-          call msg_print("", 2, "Elev@NORTH defaulted to zero")
-        end if
 ! Normal velocity
-        call read_var_nc( bry_path, "north_"//u_name, U_bry%NTH  &
-                        , year(n), record(n), bcNTH, ncid )
+        call read_var_3d_nc( bry_path, "north_"//u_name, U_bry%NTH  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           U_bry%NTH = 0.
           call msg_print("", 2, "Uvel@NORTH defaulted to zero")
         end if
 ! Tangential velocity
-        call read_var_nc( bry_path, "north_"//v_name, V_bry%NTH  &
-                        , year(n), record(n), bcNTH, ncid )
+        call read_var_3d_nc( bry_path, "north_"//v_name, V_bry%NTH  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           V_bry%NTH = 0.
           call msg_print("", 2, "Vvel@NORTH defaulted to zero")
+        end if
+! set reading bounds for 2D vars
+        if ( NFN > 1 ) then
+          start(1) = i_global(1)
+          start(2) = j_global(1) + jm-NFN
+          start(3) = record(n)
+          start(4) = 1
+          edge(1)   = im
+          edge(2)   = NFN
+          edge(3:4) = 1
+        else
+          start(1)   = i_global(1)
+          start(2)   = record(n)
+          start(3:4) = 1
+          edge(1)   = im
+          edge(2:4) = 1
+        end if
+! Elevation
+        call read_var_2d_nc( bry_path, "north_"//el_name, EL_bry%NTH  &
+                           , year(n), start, edge, ncid )
+        if ( ncid == -1 ) then
+          EL_bry%NTH = 0.
+          call msg_print("", 2, "Elev@NORTH defaulted to zero")
         end if
 
       end if
 
 ! SOUTH
       if ( hasSOUTH ) then
+! set reading bounds for 3D vars
+        if ( NFS > 1 ) then
+          start(1) = i_global(1)
+          start(2) = j_global(1)
+          start(3) = 1
+          start(4) = record(n)
+          edge(1) = im
+          edge(2) = NFS
+          edge(3) = kb
+          edge(4) = 1
+        else
+          start(1) = i_global(1)
+          start(2) = 1
+          start(3) = record(n)
+          start(4) = 1
+          edge(1)   = im
+          edge(2)   = kb
+          edge(3:4) = 1
+        end if
 ! Temperature
-        call read_var_nc( bry_path, "south_"//t_name, T_bry%STH  &
-                        , year(n), record(n), bcSTH, ncid )
+        call read_var_3d_nc( bry_path, "south_"//t_name, T_bry%STH  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           do k=1,kb
             do j=1,NFS
@@ -769,8 +907,8 @@ module bry
           call msg_print("", 2, "Temp@SOUTH defaulted to climatology")
         end if
 ! Salinity
-        call read_var_nc( bry_path, "south_"//s_name, S_bry%STH  &
-                        , year(n), record(n), bcSTH, ncid )
+        call read_var_3d_nc( bry_path, "south_"//s_name, S_bry%STH  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           do k=1,kb
             do j=1,NFS
@@ -781,35 +919,70 @@ module bry
           end do
           call msg_print("", 2, "Salt@SOUTH defaulted to climatology")
         end if
-! Elevation
-        call read_var_nc( bry_path, "south_"//el_name, EL_bry%STH  &
-                        , year(n), record(n), bcSTH, ncid )
-        if ( ncid == -1 ) then
-          EL_bry%STH = 0.
-          call msg_print("", 2, "Elev@SOUTH defaulted to zero")
-        end if
 ! Normal velocity
-        call read_var_nc( bry_path, "south_"//u_name, U_bry%STH  &
-                        , year(n), record(n), bcSTH, ncid )
+        call read_var_3d_nc( bry_path, "south_"//u_name, U_bry%STH  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           U_bry%STH = 0.
           call msg_print("", 2, "Uvel@SOUTH defaulted to zero")
         end if
 ! Tangential velocity
-        call read_var_nc( bry_path, "south_"//v_name, V_bry%STH  &
-                        , year(n), record(n), bcSTH, ncid )
+        call read_var_3d_nc( bry_path, "south_"//v_name, V_bry%STH  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           V_bry%STH = 0.
           call msg_print("", 2, "Vvel@SOUTH defaulted to zero")
+        end if
+! set reading bounds for 2D vars
+        if ( NFS > 1 ) then
+          start(1) = i_global(1)
+          start(2) = j_global(1)
+          start(3) = record(n)
+          start(4) = 1
+          edge(1)   = im
+          edge(2)   = NFS
+          edge(3:4) = 1
+        else
+          start(1)   = i_global(1)
+          start(2)   = record(n)
+          start(3:4) = 1
+          edge(1)   = im
+          edge(2:4) = 1
+        end if
+! Elevation
+        call read_var_2d_nc( bry_path, "south_"//el_name, EL_bry%STH  &
+                           , year(n), start, edge, ncid )
+        if ( ncid == -1 ) then
+          EL_bry%STH = 0.
+          call msg_print("", 2, "Elev@SOUTH defaulted to zero")
         end if
 
       end if
 
 ! WEST
       if ( hasWEST ) then
+! set reading bounds for 3D vars
+        if ( NFW > 1 ) then
+          start(1) = i_global(1)
+          start(2) = j_global(1)
+          start(3) = 1
+          start(4) = record(n)
+          edge(1) = NFW
+          edge(2) = jm
+          edge(3) = kb
+          edge(4) = 1
+        else
+          start(1) = j_global(1)
+          start(2) = 1
+          start(3) = record(n)
+          start(4) = 1
+          edge(1)   = jm
+          edge(2)   = kb
+          edge(3:4) = 1
+        end if
 ! Temperature
-        call read_var_nc( bry_path, "west_"//t_name, T_bry%WST  &
-                        , year(n), record(n), bcWST, ncid )
+        call read_var_3d_nc( bry_path, "west_"//t_name, T_bry%WST  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           do k=1,kb
             do j=1,jm
@@ -821,8 +994,8 @@ module bry
           call msg_print("", 2, "Temp@WEST defaulted to climatology")
         end if
 ! Salinity
-        call read_var_nc( bry_path, "west_"//s_name, S_bry%WST  &
-                        , year(n), record(n), bcWST, ncid )
+        call read_var_3d_nc( bry_path, "west_"//s_name, S_bry%WST  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           do k=1,kb
             do j=1,jm
@@ -833,26 +1006,42 @@ module bry
           end do
           call msg_print("", 2, "Salt@WEST defaulted to climatology")
         end if
-! Elevation
-        call read_var_nc( bry_path, "west_"//el_name, EL_bry%WST  &
-                        , year(n), record(n), bcWST, ncid )
-        if ( ncid == -1 ) then
-          EL_bry%WST = 0.
-          call msg_print("", 2, "Elev@WEST defaulted to zero")
-        end if
 ! Normal velocity
-        call read_var_nc( bry_path, "west_"//u_name, U_bry%WST  &
-                        , year(n), record(n), bcWST, ncid )
+        call read_var_3d_nc( bry_path, "west_"//u_name, U_bry%WST  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           U_bry%WST = 0.
           call msg_print("", 2, "Uvel@WEST defaulted to zero")
         end if
 ! Tangential velocity
-        call read_var_nc( bry_path, "west_"//v_name, V_bry%WST  &
-                        , year(n), record(n), bcWST, ncid )
+        call read_var_3d_nc( bry_path, "west_"//v_name, V_bry%WST  &
+                           , year(n), start, edge, ncid )
         if ( ncid == -1 ) then
           V_bry%WST = 0.
           call msg_print("", 2, "Vvel@WEST defaulted to zero")
+        end if
+! set reading bounds for 2D vars
+        if ( NFW > 1 ) then
+          start(1) = i_global(1)
+          start(2) = j_global(1)
+          start(3) = record(n)
+          start(4) = 1
+          edge(1)   = NFW
+          edge(2)   = jm
+          edge(3:4) = 1
+        else
+          start(1)   = j_global(1)
+          start(2)   = record(n)
+          start(3:4) = 1
+          edge(1)   = jm
+          edge(2:4) = 1
+        end if
+! Elevation
+        call read_var_2d_nc( bry_path, "west_"//el_name, EL_bry%WST  &
+                           , year(n), start, edge, ncid )
+        if ( ncid == -1 ) then
+          EL_bry%WST = 0.
+          call msg_print("", 2, "Elev@WEST defaulted to zero")
         end if
 
       end if
@@ -2032,8 +2221,8 @@ module bry
 != I/O SECTION ========================================================
 !______________________________________________________________________
 !
-    subroutine read_var_nc( path, var_name, var        &
-                          , year, record  , bry, ncid )
+    subroutine read_var_3d_nc( path, var_name, var          &
+                             , year, start   , edge, ncid )
 !----------------------------------------------------------------------
 !  Read a variable (NC format).
 !______________________________________________________________________
@@ -2048,17 +2237,15 @@ module bry
       integer, external :: get_var_real_3d
 
       integer                   , intent(inout) :: ncid
-      integer                   , intent(in   ) :: bry, record, year
-      real(rk), dimension(im,jm), intent(  out) :: var
+      integer                   , intent(in   ) :: year
+      integer(MPI_OFFSET_KIND)                                 &
+              , dimension(4)    , intent(in   ) :: start, edge
+      real(rk), dimension(:,:,:), intent(  out) :: var
       character(len=*)          , intent(in   ) :: path, var_name
 
       integer                  varid, status
-      integer(MPI_OFFSET_KIND) start(4), edge(4)
-      character(len=256)       filename, netcdf_file
+      character(len=256)       filename, netcdf_file, units
 
-
-      start = 1
-      edge  = 1
 
       if ( ncid <= 0 ) then
 ! open netcdf file
@@ -2083,88 +2270,91 @@ module bry
       call check( nf90mpi_inq_varid( ncid, var_name, varid )  &
                 , 'nfmpi_inq_varid: '//trim(var_name) )
 
-! set reading area
-      select case ( bry )
-
-        case ( bcEST )
-          if ( NFE > 1 ) then
-            start(1) = i_global(1) + im-NFE
-            start(2) = j_global(1)
-            start(3) = 1
-            start(4) = record
-            edge(1) = NFE
-            edge(2) = jm
-            edge(3) = kb
-            edge(4) = 1
-          else
-            start(1) = j_global(1)
-            start(2) = 1
-            start(3) = record
-            edge(1) = jm
-            edge(2) = kb
-            edge(3) = 1
-          end if
-
-        case ( bcNTH )
-          if ( NFN > 1 ) then
-            start(1) = i_global(1)
-            start(2) = j_global(1) + jm-NFN
-            start(3) = 1
-            start(4) = record
-            edge(1) = im
-            edge(2) = NFN
-            edge(3) = kb
-            edge(4) = 1
-          else
-            start(1) = i_global(1)
-            start(2) = 1
-            start(3) = record
-            edge(1) = im
-            edge(2) = kb
-            edge(3) = 1
-          end if
-
-        case ( bcSTH )
-          if ( NFS > 1 ) then
-            start(1) = i_global(1)
-            start(2) = j_global(1)
-            start(3) = 1
-            edge(1) = im
-            edge(2) = NFS
-            edge(3) = kb
-          else
-            start(1) = i_global(1)
-            start(2) = 1
-            start(3) = record
-            edge(1) = im
-            edge(2) = kb
-            edge(3) = 1
-          end if
-
-        case ( bcWST )
-          if ( NFW > 1 ) then
-            start(1) = i_global(1)
-            start(2) = j_global(1)
-            start(3) = 1
-            edge(1) = NFW
-            edge(2) = jm
-            edge(3) = kb
-          else
-            start(1) = j_global(1)
-            start(2) = 1
-            start(3) = record
-            edge(1) = jm
-            edge(2) = kb
-            edge(3) = 1
-          end if
-
-      end select
-
 ! get data
       call check( get_var_real_3d                    &
                   ( ncid, varid, start, edge, var )  &
                 , 'get_var_real: '//trim(var_name) )
 
+! convert data if necessary
+      status = nf90mpi_get_att( ncid, varid, "units", units )
+      if ( status == NF_NOERR ) then
+        select case ( trim(units) )
+          case ( "cm", "cm/s", "cm s^-1" )
+            var = var/100.
+          case ( "mm", "mm/s", "mm s^-1" )
+            var = var/1000.
+        end select
+      end if
+
+      return
+
+      end
+!______________________________________________________________________
+!
+    subroutine read_var_2d_nc( path, var_name, var         &
+                             , year, start   , edge, ncid )
+!----------------------------------------------------------------------
+!  Read a variable (NC format).
+!______________________________________________________________________
+
+      use glob_const , only: rk
+      use glob_domain
+      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
+      use pnetcdf
+
+      implicit none
+
+      integer, external :: get_var_real_2d
+
+      integer                   , intent(inout) :: ncid
+      integer                   , intent(in   ) :: year
+      integer(MPI_OFFSET_KIND)                                 &
+              , dimension(4)    , intent(in   ) :: start, edge
+      real(rk), dimension(:,:)  , intent(  out) :: var
+      character(len=*)          , intent(in   ) :: path, var_name
+
+      integer                  varid, status
+      character(len=256)       filename, netcdf_file, units
+
+
+      if ( ncid <= 0 ) then
+! open netcdf file
+        if ( ncid == 0 ) then
+          call check( nf90mpi_close( ncid )              &
+                    , 'nfmpi_close:'//trim(netcdf_file) )
+        end if
+
+        filename = get_filename( path, year )
+        netcdf_file = trim(filename)
+        status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE   &
+                             , MPI_INFO_NULL, ncid )
+        if ( status /= NF_NOERR ) then
+          call msg_print("", 2, "Failed reading `"//trim(var_name)  &
+                              //"` from `"//trim(filename)//"`")
+          ncid = -1
+          return
+        end if
+      end if
+
+! get variable
+      call check( nf90mpi_inq_varid( ncid, var_name, varid )  &
+                , 'nfmpi_inq_varid: '//trim(var_name) )
+
+! get data
+      call check( get_var_real_2d                    &
+                  ( ncid, varid, start, edge, var )  &
+                , 'get_var_real: '//trim(var_name) )
+
+! convert data if necessary
+      status = nf90mpi_get_att( ncid, varid, "units", units )
+      if ( status == NF_NOERR ) then
+        select case ( trim(units) )
+          case ( "cm", "cm/s", "cm s^-1" )
+            var = var/100.
+          case ( "mm", "mm/s", "mm s^-1" )
+            var = var/1000.
+        end select
+      end if
 
       return
 
@@ -2189,7 +2379,7 @@ module bry
       if ( status /= NF_NOERR ) then
         error_status = 1
         if ( is_master ) then
-          print '(/a,a)', 'IO error at module `AIR`: ', routine
+          print '(/a,a)', 'IO error at module `BRY`: ', routine
           print '("[",i4,"] ",a)', status, nf90mpi_strerror(status)
           stop
         end if

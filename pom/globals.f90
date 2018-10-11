@@ -9,12 +9,15 @@ module glob_const
                        ! or 4... 16 is not supported by NetCDF.
 
   real(kind=rk)      &
-    deg2rad          & ! pi/180.
+    c2k              & ! Celcius to Kelvin
+  , cpw              & ! seawater specific heat
+  , deg2rad          & ! pi/180.
   , grav             & ! gravitational acceleration
   , kappa            & ! von Karman's constant
   , ohm              & ! Earth's rotation angular frequency 
   , pi               & ! pi
   , rhoref           & ! reference density
+  , rho_cpw          & ! rho*Cpw
   , sec2day          & ! 1./86400.
   , small              ! small value
 
@@ -22,6 +25,8 @@ module glob_const
 
     subroutine initialize_constants !( constants_override_nml ) : TODO
 
+      c2k     = 273.16       ! Celcius to Kelvin offset
+      cpw     = 3986.        ! Specific heat of water (J/kg)
       pi      = atan(1.)*4.  ! PI
       deg2rad = pi/180.      ! degrees to radians conversion factor
       grav    = 9.806        ! gravity constant (m/s^2)
@@ -30,6 +35,7 @@ module glob_const
       ohm     = 7.29e-5      ! angular frequency of Earth
       rhoref  = 1025.        ! recommended values: 1025 for seawater,
                              !                     1000 for freswater
+      rho_cpw = rhoref*cpw   ! Seawater density times the specific heat of seawater
       sec2day = 1./86400.    ! seconds to days conversion factor
 
     end subroutine

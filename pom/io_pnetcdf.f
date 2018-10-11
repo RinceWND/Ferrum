@@ -4651,6 +4651,7 @@
 !______________________________________________________________________
 
         use glob_const , only: rk
+!        use glob_domain, only: my_task
         use mpi
         use pnetcdf
 
@@ -4717,14 +4718,19 @@
           var = real(r4)
           deallocate(r4)
         else if (vtype==NF_DOUBLE) then
-          allocate(r8(k,l))
-          status=nfmpi_get_vara_double_all(ncid,varid,start,edge,r8)
-          var = real(r8)
-          deallocate(r8)
+          if ( rk /= 8 ) then
+            allocate(r8(k,l))
+            status=nfmpi_get_vara_double_all(ncid,varid,start,edge,r8)
+            var = real(r8)
+            deallocate(r8)
+          else
+            status=nfmpi_get_vara_double_all(ncid,varid,start,edge,var)
+          end if
         end if
         get_var_real_2d = status
 
-        status = nfmpi_inq_atttype(ncid, varid, "_FillValue", vtype)
+        status = nf90mpi_inquire_attribute( ncid, varid
+     &                                    , "_FillValue", vtype )
         if (status==NF_NOERR) then
           status = nf90mpi_get_att(ncid,varid,"_FillValue",mv)
           call handle_error_pnetcdf( 'Failed reading `_FillValue`'
@@ -4798,7 +4804,7 @@
         else if (vtype==NF_SHORT) then
           allocate(i2(k,l,m))
           status=nfmpi_get_vara_int2_all(ncid,varid,start,edge,i2)
-          var = real(i2)
+          var = real(i2,rk)
           deallocate(i2)
         else if (vtype==NF_INT) then
           allocate(i4(k,l,m))
@@ -4824,7 +4830,8 @@
         get_var_real_3d = status
 
         ! the below code is optional
-        status = nfmpi_inq_atttype(ncid, varid, "_FillValue", vtype)
+        status = nf90mpi_inquire_attribute( ncid, varid
+     &                                    , "_FillValue", vtype )
         if (status==NF_NOERR) then
           status = nf90mpi_get_att(ncid,varid,"_FillValue",mv)
           call handle_error_pnetcdf( 'Failed reading `_FillValue`'

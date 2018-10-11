@@ -19,21 +19,41 @@ module air
 !----------------------------------------------------------------------
 ! Constants
 !----------------------------------------------------------------------
-  real(rk), parameter :: rhoa = 1.22
+  real(rk), parameter ::     & !
+    Cp     = 1005.           &  ! Specific heat capacity of air
+  , emiss  =     .97         &  ! Ocean emissivity
+  , expsi  =     .622        &  ! ???
+  , Ps     = 1013.           &  ! Surface air pressure
+  , Rd     =  287.           &  ! Dry air gas constant
+  , RHOa   =    1.22         &  ! Density of air
+  , sigma  =    5.670367e-8  &  ! Stefan-Boltzmann constant (kg s^-3 K^-4)
+  , solar  = 1350.              ! Solar constant (W/m^2)
+
+  integer(1)                &
+      , parameter           &
+      , private    ::       &
+    lwBERLIAND = 3          &
+  , lwBIGNAMI  = 0          &
+  , lwHERZFELD = 2          &
+  , lwMAY      = 1
+!
 
 !----------------------------------------------------------------------
 ! Configuration variables
 !----------------------------------------------------------------------
   logical, private :: DISABLED ! Is set according to the external flag `use_air`.
 
-  integer, private :: read_int ! interval for reading (days)
+  integer, private :: read_int  ! interval for reading (days)
+  real   , private :: a         ! time-interpolation factor
 
   character(len=10)                       &
        , parameter                        &
        , private   :: FORMAT_EXT = ".nc"
 
-  logical          & ! Interpolate between records:
-    INTERP_CLOUD   & !  total cloud cover
+  logical          &
+    CALC_SWR       & ! Calculate shortwave radiation internally (Reed)
+                     ! Interpolate between records:
+  , INTERP_CLOUD   & !  total cloud cover
   , INTERP_HEAT    & !  all heat fluxes
   , INTERP_HUMID   & !  humidity
   , INTERP_PRES    & !  atm. pressure
@@ -157,12 +177,12 @@ module air
       integer pos
 
       namelist/air_nml/                                         &
-        INTERP_CLOUD , INTERP_HEAT, INTERP_HUMID , INTERP_PRES  &
-      , INTERP_RAIN  , INTERP_SST , INTERP_STRESS, INTERP_TAIR  &
-      , INTERP_WIND  , READ_BULK  , READ_HEAT    , READ_STRESS  &
-      , READ_WIND    , USE_BULK   , USE_COARE    , USE_STRESS   &
-      , LWRAD_FORMULA, bulk_path  , flux_path    , wind_path    &
-      , read_int
+        CALC_SWR   , INTERP_CLOUD , INTERP_HEAT, INTERP_HUMID   &
+      , INTERP_PRES, INTERP_RAIN  , INTERP_SST , INTERP_STRESS  &
+      , INTERP_TAIR, INTERP_WIND  , READ_BULK  , READ_HEAT      &
+      , READ_STRESS, READ_WIND    , USE_BULK   , USE_COARE      &
+      , USE_STRESS , LWRAD_FORMULA, bulk_path  , flux_path      &
+      , wind_path  , read_int
 
       namelist/air_vars_nml/                           &
         dlrad_name, lheat_name,  lrad_name, rain_name  &
@@ -184,6 +204,14 @@ module air
 ! Initialize variables with their defaults
       read_int = 3600 * 6 ! 86400 / 4 (4xDaily)
 
+      CALC_SWR   = .true.
+      READ_HEAT  = .false.
+      READ_STRESS= .false.
+      READ_WIND  = .false.
+      USE_BULK   = .false.
+      USE_COARE  = .false.
+      USE_STRESS = .false.
+
       bulk_path = "in/surf/"
       flux_path = "in/surf/"
       wind_path = "in/surf/"
@@ -204,8 +232,6 @@ module air
       vstr_name  = "vflx"
       vwnd_name  = "vwnd"
       wgst_name  = "gust"
-
-      READ_WIND = .false.
 
 ! Override configuration
       open ( 73, file = config_file, status = 'old' )
@@ -325,6 +351,11 @@ module air
         else
           allocate( pres(im,jm,1) )
         end if
+        if ( interp_sst ) then
+          allocate( sst(im,jm,3) )
+        else
+          allocate( sst(im,jm,1) )
+        end if
         if ( interp_rain ) then
           allocate( rain(im,jm,3) )
         else
@@ -394,9 +425,9 @@ module air
       record(3) = record(2) + 1
 
       if ( record(2) == 0 ) then
-        record(2) = max_in_prev + 1 ! TODO: [ NEEDS TESTING ]
+        record(2) = max_in_prev ! TODO: [ NEEDS TESTING ]
         year(2) = d_in%year - 1
-      elseif ( record(3) == max_in_this + 1 ) then
+      elseif ( record(3) == max_in_this ) then
         record(3) = 1
         year(3) = d_in%year + 1
       end if
@@ -421,26 +452,25 @@ module air
 !______________________________________________________________________
 
 !      use glob_const , only: SEC2DAY
-      use glob_domain, only: is_master
+!      use glob_domain, only: is_master
       use module_time
-      use model_run  , only: dti, iint, secs => sec_of_year
+      use model_run  , only: dti, iint, sec_of_year
 
       implicit none
 
       type(date), intent(in) :: d_in
 
       logical            ADVANCE_REC, ADVANCE_REC_INT
-      integer            max_in_prev, max_in_this, ncid
+      integer            max_in_prev, max_in_this, secs
       integer                          &
       , dimension(3)  :: record, year
-      real               a, chunk
+      real               chunk
 
 
 ! Quit if the module is not used.
       if ( DISABLED ) return
 
-! Set ncid to -1 to open first file. Then set it to 0 to close previous file and open new one. TODO: Stupid, I know.
-      ncid = -1
+      secs = sec_of_year
 
       year = d_in%year
 
@@ -488,8 +518,8 @@ module air
 
       record(1) = record(1) + 1
 
-      if ( is_master ) print *, "II"&!, uwnd(50,50,2), uwnd(50,50,3) &
-                              , a, ADVANCE_REC_INT, ADVANCE_REC
+!      if ( is_master ) print *, "II"&!, uwnd(50,50,2), uwnd(50,50,3) &
+!                              , a, ADVANCE_REC_INT, ADVANCE_REC
 
       call read_all( ADVANCE_REC_INT, 3, year, record )
       call read_all( ADVANCE_REC    , 1, year, record )
@@ -507,6 +537,7 @@ module air
 
 ! Calculate wind stress
         call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+        call calculate_fluxes
 
       end if
 
@@ -567,8 +598,457 @@ module air
 
       implicit none
 
+      if ( interp_cloud ) then
+        cloud(:,:,1) = ( 1. - a ) * cloud(:,:,2) + a * cloud(:,:,3)
+      end if
+      if ( interp_humid ) then
+        humid(:,:,1) = ( 1. - a ) * humid(:,:,2) + a * humid(:,:,3)
+      end if
+      if ( interp_pres ) then
+        pres(:,:,1) = ( 1. - a ) * pres(:,:,2) + a * pres(:,:,3)
+      end if
+      if ( interp_tair ) then
+        temp(:,:,1) = ( 1. - a ) * temp(:,:,2) + a * temp(:,:,3)
+      end if
+
+      e_atmos = 0.01 * ( pres(:,:,1) - 1013. )
+
+! Calculate fluxes
+      if ( USE_BULK ) then
+        call bulk_fluxes
+      end if
 
     end subroutine
+!______________________________________________________________________
+!
+    subroutine bulk_fluxes
+!----------------------------------------------------------------------
+!  This subroutine provides surface boundary conditions for momentum,
+! heat and salt equations solved by the hydrodynamic model in cases
+! when the atmospheric model provides cloud cover data instead of the
+! net solar radiation flux and the downward longwave radiation flux as
+! it is assumed in the first version of bulk code. The net solar
+! radiation is calculated according to the Reed formula while the net
+! longwave radiation can be calculated according to Bigname, May,
+! Herzfeld or Berliand formula (see `LWRAD_FORMULA` flag below).
+!
+!  Momentum, heat and freshwater fluxes are calculated from the
+! atmospheric parametera (wind velocity, air temperature, relative
+! humidity, precipitation, cloud coverage) provided by the wather
+! prediction model and the model's sst using proper air-sea bulk
+! formulae (Castellari et al., 1998, Korres and Lascaratos 2003).
+! ( Castellari et al., 1998. Journal of Marine Systems, 18, 89-114 ;
+!   Korres and Lascaratos, 2003. Annales Geophysicae, 21, 205-220.)
+!
+!  All units are S.I. (M.K.S.)
+!
+!  The user has the option to calculate the net longwave radiation flux
+! according to Bignami, May, (pseudo)Herzfeld, and Berliand formula.
+! This is done through the `LWRAD_FORMULA` parameter (0 - 3)
+!
+!  This subroutine provides its output into the arrays:
+!
+! 1. WUSURF(): X-component of wind stress divided by (-1)*rho
+! 2. WVSURF(): Y-component of wind stress divided by (-1)*rho
+! 3. SWRAD() : Net solar radiation heat flux divided by (-1)*rho*Cpw
+! 4. WTSURF(): Net upward heat flux divided by rho*Cpw
+! 5. PME()   : precipitation minus evaporation rate
+! ( RHO: sea water density, Cpw: specific heat capacity of seawater )
+!
+!
+!  This subroutine needs the following input:
+!
+!
+! Model related data
+! 1. IM     : NUMBER OF GRID POINTS IN X
+! 2. JM     : NUMBER OF GRID POINTS IN Y
+! 3. TBIAS  : CONSTANT VALUE SUBTRACTED FROM MODEL'S TEMPERATURE FIELD
+! 4. FSM()  : THE MODEL MASK (1.:SEA GRID POINT, 0.:LAND GRID POINT)
+! 5. TSURF(): MODEL'S TEMPERATURE FIELD AT THE TOP VERTICAL LEVEL AND AT THE
+!             CENTRAL TIME LEVEL
+! 6. ALON() : LOGNITUDE OF GRID POINTS
+! 7. ALAT() : LATITUDE OF GRID POINTS
+! 9. IYR    : INTEGER VALUE CORRESPONDING TO CURRENT YEAR(for example iyr=2002)
+! 10. IMO   : INTEGER VALUE CORRESPONDING TO CURRENT MONTH (1-->12)
+! 11. IDAY  : INTEGER VALUE CORRESPONDING TO CURRENT DAY (1-->31)
+! 12. IHOUR : INTEGER VALUE CORRESPONDING TO CURRENT HOUR (0-->23)
+! 13: IMIN  : INEGER VALUE CORRESPONDING TO CURRENT MINUTES (0--59)
+!
+! ATMOSPHERIC DATA:
+! 6.  UAIR() : X-COMPONENT OF AIR VELOCITY (in m/s) AT 10m ABOVE SEA SURFACE
+! 7.  VAIR() : Y-COMPONENT OF AIR VELOCITY (in m/s) AT 10m ABOVE SEA SURFACE
+! 8.  TAIR() : AIR TEMPERATURE (in deg Kelvin) AT 2m ABOVE SEA SURFACE
+! 9.  RHUM() : RELATIVE HUMIDITY (%) AT 2m ABOVE SEA SURFACE
+! 10. RAIN() : PRECIPITATION RATE (in m/s)
+! 11. CLOUD()  : CLOUD COVERAGE IN TENTHS (0.-->1.)
+! 12. PRES() : ATMOSPHERIC PRESSURE AT SURFACE (hPa)
+!
+!
+! Important:
+! SUBROUTINE BULK REQUIRES THAT THE ATMOSPHERIC DATA ARE ALREADY
+! INTERPOLATED IN TIME AND SPACE (i.e. mapped onto the model grid and
+! interpolated to the current time step. The user has to write his/her own
+! subroutines in order to map the raw atmospheric data onto the model grid
+! and interpolate them to the current time step)
+!______________________________________________________________________
+
+      use glob_const , only: C2K, DEG2RAD, rhoref, Rho_Cpw, rk
+      use glob_domain, only: im, jm, my_task
+      use glob_grid  , only: east_e, fsm, north_e
+      use glob_ocean , only: rho, s, t, u, v
+      use config     , only: tbias, sbias
+      use model_run  , only: dtime
+
+      implicit none
+
+      real(rk) unow, vnow, tnow, pnow, precip, cld  &
+             , sst_model, QBW, lwrd
+
+!      real(kind=rk), external :: cd, heatlat, esk
+
+      integer  i, j
+      real(rk) ce2, ch2, const               &
+             , deltemp                       &
+             , ea12, esatair, esatoce, evap  &
+             , fe, fh, humnow                &
+             , Qe, Qh, Qu                    &
+             , rhom, rnow                    &
+             , sol_net, sp, ss, sstk, stp    &
+             , tnowk                         &
+             , usrf, vsrf                    &
+             , wair, wflux, wsatair, wsatoce
+      real(rk), dimension(im,jm) :: pme ! Precipitation minus evaporation [m/s]
+
+
+      const = expsi/Ps ! 0.622/1013.
+
+      do j = 1,jm
+        do i = 1,im
+          if (fsm(i,j) /= 0.) then
+            unow      = uwnd(i,j,1)
+            vnow      = vwnd(i,j,1)
+            tnow      = temp(i,j,1)
+            pnow      = pres(i,j,1)
+            rnow      =  rho(i,j,1)*rhoref + 1000.
+            humnow    = humid(i,j,1)
+            precip    = rain(i,j,1)/1000. ! rwnd: precipitation rate from kg/(m2*s) to m/s
+            cld       = cloud(i,j,1)/100. ! rwnd: total cloud cover from % to tenths
+            sst_model = t(i,j,1) + tbias
+
+            if ( i < im ) then
+              usrf = .5*(u(i+1,j,1)+u(i,j,1))
+            else
+              usrf = .5*(u(i-1,j,1)+u(i,j,1))
+            end if
+
+            if ( j < jm ) then
+              vsrf = .5*(v(i,j+1,1)+v(i,j,1))
+            else
+              vsrf = .5*(v(i,j-1,1)+v(i,j,1))
+            end if
+
+! SST_MODEL IS THE MODEL'S TEMPERATURE (in deg Celsius) AT THE TOP LEVEL
+!
+! --- compute wind speed magnitude for bulk coeff.
+!
+            SP = sqrt(unow*unow+vnow*vnow)
+
+!
+! --- SST data converted in Kelvin degrees
+! --- TNOW is already in Kelvin
+!
+            sstk  = sst_model + C2K
+            tnowk = tnow + C2K
+!
+!
+! ---calculates the Saturation Vapor Pressure at air temp. and at sea temp.
+! ---esat(Ta) , esat(Ts)
+!
+            esatair = esk(tnowk)
+            esatoce = esk(sstk)
+!
+! --- calculates the saturation mixing ratios at air temp. and sea temp.
+! --- wsat(Ta) , wsat(Ts)
+!
+            wsatair = (expsi/pnow) * esatair
+            wsatoce = (expsi/pnow) * esatoce
+!
+! --- calculates the mixing ratio of the air
+! --- w(Ta)
+!
+            wair = 0.01 * humnow * wsatair
+!
+! --- calculates the density of  moist air
+!
+            rhom = 100.*(pnow/Rd)*(expsi*(1.+wair)/(tnowk*(expsi+wair)))
+!
+!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+! Calculate the net longwave radiation flux at the sea surface (QBW)
+! according to Bignami (Bignami et al., 1995) or May formula (May,1986)
+!
+! Bignami et al., 1995: Longwave radiation budget in the Mediterranean
+! Sea, J.Geophys Res., 100, 2501-2514.
+!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+!
+
+            ea12 = 0.01*humnow*esatair
+
+            select case ( LWRAD_FORMULA )
+
+              case ( lwBIGNAMI )
+                QBW = 0.98*sigma*sstk**4 - sigma*tnowk**4  &
+                     *( 0.653 + 0.00535*ea12    )          &
+                     *( 1.    + 0.1762 *cld*cld )
+
+              case ( lwMAY )
+                if ( cld < 0. ) cld = 0.
+                QBW = ( 1. - 0.75*(cld**3.4) )                       &
+                     *( sigma*(tnowk**4.)*( 0.4 - 0.05*sqrt(ea12) )  &
+                      + 4.*sigma*(tnowk**3.)*(sstk-tnowk) )
+
+              case ( lwHERZFELD )
+                QBW = ( sigma*.96*( 1-(.92e-5*tnowk*tnowk) )*tnowk**4  &
+                    +4.*sigma*.96*( C2K+temp(i,j,1)**3 )*(sstk-tnowk) )  &
+                     *( 1 - .75*cos(north_e(i,j)*DEG2RAD)*cld) ! cos(phi) here is an improvised `beta` coefficient as a function of latitude from Herzfeld
+
+              case default  ! lwBERLIAND - Berliand (1952)
+                QBW = 0.97*sigma*                           &
+                     (     tnowk**4 * (.39-.05*sqrt(ea12))  &
+                      *( 1. - .6823*cld*cld )               &
+                      + 4.*tnowk**3 * (sstk-tnowk) )
+
+            end select
+
+! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
+! --- calculate the term : ( Ts - Ta )
+            deltemp = sstk - tnowk
+
+            sol_net = 0.
+            if ( CALC_SWR ) then
+! --- Calculate net solar radiation flux according to Reed (Reed,1977) formula
+!
+! Reed, R.K.,1977: On estimating insolation over the ocean, J.Phys.
+! Oceanogr. 17, 854-871.
+
+              call sol_rad( sol_net, cld, east_e(i,j), north_e(i,j)  &
+                          , dtime%year, dtime%month, dtime%day       &
+                          , dtime%hour, dtime%min )
+
+              swrad(i,j) = -sol_net/rho_cpw
+            end if
+! --- 1. Divide net solar radiation flux by rho*Cpw and reverse sign
+!
+
+          if ( use_coare ) then
+
+            call coare35vn( (sqrt((unow-usrf)**2+(vnow-vsrf)**2)),     &
+                            10._rk, temp(i,j,1), 2._rk, humnow, 2._rk, &
+                            pnow,sst_model,sol_net,lwrd,north_e(i,j),  &
+                            600._rk, (3.6e6*precip), 0._rk, 0._rk,     &
+                            QH, QE, Evap )
+!            Evap = Evap*rho/3.6e6
+!            if (my_task==1.and.i==50.and.j==50) then
+!!            print *, "3.5 EVAP: ", Evap
+!            write(61, '(6(f12.7,x),f12.7)') QE,QH,QBW,sol_net,
+!     &                           (qbw+qh+qe-sol_net),lwrd,3.6e6*precip
+!            end if
+
+!            call coare30((unow-usurf(i,j)),(vnow-vsurf(i,j)),
+!     &                    10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
+!     &                    pnow,sst_model,rnow,cld,precip*1000.,sol_net,
+!     &                   -QBW, QH, QE, Evap )
+
+!            if (my_task==1.and.i==50.and.j==50) then
+!!            print *, "3.5 EVAP: ", Evap
+!            write(62, '(6(f12.7,x),f12.7)') QE,QH,QBW,sol_net,
+!     &                           (qbw+qh+qe-sol_net),lwrd,precip*1000.
+!            end if
+!            if (i==50.and.j==50) then
+!            print *, "3.0 EVAP: ", Evap
+!            print *, "3.0 QE:   ", QE
+!            print *, "3.0 QH:   ", QH
+!            print *, "RAIN===   ", precip
+!            end if
+
+          else
+! Calculate turbulent exchange coefficients according to Kondo scheme
+! ( Kondo, J., 1975. Boundary Layer Meteorology, 9, 91-112)
+
+! ---- Kondo scheme
+            ss = 0.
+            fe = 0.
+            fh = 0.
+            if (sp > 0.0) ss = deltemp/(sp**2.)
+!
+! --- calculate the Stability Parameter :
+!
+            stp = ss*abs(ss)/(abs(ss)+0.01)
+!
+! --- for stable condition :
+            if (ss < 0.) then
+              if ((stp > -3.3).and.(stp < 0.)) then
+                fh = 0.1+0.03*stp+0.9*exp(4.8*stp)
+                fe = fh
+              else
+                if (stp <= -3.3) then
+                  fh = 0.
+                  fe = fh
+                end if
+              end if
+!
+! --- for unstable condition :
+            else
+              fh = 1.0+0.63*sqrt(stp)
+              fe = fh
+            end if
+!
+            ch2 = 1.3e-03*fh
+            ce2 = 1.5e-03*fe
+
+!---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+! Calculate the sensible (QH) latent (QE) heat flux
+!                    and the evaporation rate (EVAP)
+!---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+!
+            QH = rhom*cp*ch2*sp*deltemp
+!
+! --- calculates the term : esat(Ts)-r*esat(Ta)
+!
+            EVAP = esatoce - humnow*0.01*esatair
+!
+! --- calculate the term : Ce*|V|*[esat(Ts)-r*esat(Ta)]0.622/1013
+! --- Evaporation rate [kg/(m2*sec)]
+!
+            EVAP = rhom*ce2*sp*evap*const
+!
+! --- calculate the LATENT HEAT FLUX  QE in MKS ( watt/m*m )
+! --- QE = L*rhom*Ce*|V|*[esat(Ts)-r*esat(Ta)]0.622/1013
+!
+            QE = evap*heat_latent(sst_model)
+!
+          end if
+!
+!---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+! Calculate the water flux (WFLUX) in m/sec
+!---- -- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+!
+            WFLUX =  evap/rhoref - precip
+
+            pme(i,j)= -wflux
+            if ( isnan(pme(i,j)) ) then
+              print *, "[[[[[[]]]]]]"
+              print *, "pme: ", pme(i,j)
+              print *, "wflux: ", wflux
+            end if
+!
+! Important note for Princeton Ocean Model users:
+! THE SALT FLUX ( WSSURF() ) IN POM MAIN CODE (REQUIRED FOR PROFT) SHOULD
+! BE CALCULATED AS:
+!       do 3072 j = 1, jm
+!       do 3072 i = 1, im
+!  3072 WSSURF(I,J)=PME(I,J)*(VF(I,J,1)+SBIAS)
+
+!---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+! Calculate  the net upward flux (QU) at the sea surface
+!---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+!
+! --- calculates : Qu = Qb + QH + QE
+!
+            QU = qbw + qh + qe
+            if (isnan(QU).or.abs(QU).gt.1.e3) then
+            print *, "[ HEAT ]", i,j,qbw, qh, qe, "@", my_task
+            print *, "cloud:", cld
+            print *, "tnowk:", tnowk
+            print *, "ea12:", ea12
+            stop
+            end if
+!
+! --- 1. Divide upward heat flux by rho*Cpw
+!
+            wtsurf(i,j) = QU/rho_cpw
+!
+
+!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+! Calculate the wind stress components (TAUX, TAUY)
+!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+!
+! --- Calculate  the Drag Coefficient Cd accoriding to
+!                         Hellerman & Rosenstein (1983)
+!
+!            cd1 = cd(sp,deltemp)
+
+! --- Calculate  the wind stresses in MKS ( newton/m*m )
+! --- taux= rhom*Cd*|V|u     tauy= rhom*Cd*|V|v
+!
+!            TauX = rhom*cd1*sp*unow
+!            TauY = rhom*cd1*sp*vnow
+
+! --- Reverse Sign and divide by sea water density
+!            wusurf(i,j) = -taux/rho
+!            wvsurf(i,j) = -tauy/rho
+
+!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+! Multiply all fluxes by model mask
+!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+!
+            wusurf(i,j) = wusurf(i,j)*fsm(i,j)
+            wvsurf(i,j) = wvsurf(i,j)*fsm(i,j)
+            wtsurf(i,j) = wtsurf(i,j)*fsm(i,j)
+            wssurf(i,j) = pme(i,j)*(s(i,j,1)+sbias)*fsm(i,j) ! sb? vf?
+
+          end if
+
+        end do
+      end do
+!
+!
+! --------------------------------------------------
+
+    end subroutine bulk_fluxes
+!______________________________________________________________________
+!
+    real(rk) function ESK(t)
+!----------------------------------------------------------------------
+!  Computes the saturation water vapor pressure from temperature (K)
+! (Lowe,1977; JAM,16,100,1977)
+!______________________________________________________________________
+!
+      implicit none
+
+      real(rk), intent(in) :: t
+
+      real(rk), dimension(7) :: a
+
+      data  a / 6984.505294              &
+              , -188.9039310             &
+              ,    2.133357675           &
+              ,   -1.288580973e-2_rk     &
+              ,    4.393587233e-5_rk     &
+              ,   -8.023923082e-8_rk     &
+              ,    6.136820929e-11_rk /
+
+      esk = a(1) +t*(a(2)+t*(a(3)+t*(a(4)+t*(a(5)+t*(a(6)+t*a(7))))))
+
+    end function esk
+!______________________________________________________________________
+!
+    pure real(rk) function heat_latent(t)
+!----------------------------------------------------------------------
+!  Calculates the Latent Heat of Vaporization ( J/kg ) as function of
+! the temperature ( Celsius degrees )
+! ( A. Gill  pag. 607 )
+!
+! --- Constant Latent Heat of Vaporization
+!     L = 2.501e+6  (MKS)
+!
+      implicit none
+
+      real(rk), intent(in)  :: t
+
+      heat_latent = 2.5008e+6_rk - 2.3e+3_rk * t
+
+    end function heat_latent
 !______________________________________________________________________
 !
     subroutine read_all( execute, n, year, record )
@@ -597,16 +1077,14 @@ module air
 
       call msg_print("", 1, desc)
 
-      ncid = -1
+      ncid = file_open_nc( wind_path, year(n) )
 
       if ( read_wind ) then
 
         if ((     interp_wind .and. n>=2) .or.       &
             (.not.interp_wind .and. n==1)      ) then
-          call read_var_nc( wind_path, uwnd_name, uwnd(:,:,n)  &
-                          , year(n), record(n), ncid )
-          call read_var_nc( wind_path, vwnd_name, vwnd(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc( uwnd_name, uwnd(:,:,n), record(n), ncid )
+          call read_var_nc( vwnd_name, vwnd(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             uwnd(:,:,n) = 0.
             vwnd(:,:,n) = 0.
@@ -616,14 +1094,14 @@ module air
 
       end if
 
-      ncid = 0
+      call check( file_close_nc( ncid ), "nf_close" )
+      ncid = file_open_nc( bulk_path, year(n) )
 
       if ( read_bulk ) then
 
         if ((     interp_humid .and. n>=2) .or.       &
             (.not.interp_humid .and. n==1)      ) then
-          call read_var_nc( bulk_path,humid_name, humid(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc( humid_name, humid(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             humid(:,:,n) = 1.
             call msg_print("", 2, "Humidity is set to 100%")
@@ -632,8 +1110,7 @@ module air
 
         if ((     interp_rain .and. n>=2) .or.       &
             (.not.interp_rain .and. n==1)      ) then
-          call read_var_nc( bulk_path, rain_name,  rain(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc( rain_name,  rain(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             rain(:,:,n) = 0.
             call msg_print("", 2, "Precip.rate is set to zero.")
@@ -642,8 +1119,7 @@ module air
 
         if ((     interp_pres .and. n>=2) .or.       &
             (.not.interp_pres .and. n==1)      ) then
-          call read_var_nc( bulk_path, pres_name,  pres(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc( pres_name,  pres(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             pres(:,:,n) = 1013.
             call msg_print("", 2, "Atm.pressure is set to 1013 hPa.")
@@ -652,8 +1128,7 @@ module air
 
         if ((     interp_sst .and. n>=2) .or.       &
             (.not.interp_sst .and. n==1)      ) then
-          call read_var_nc( bulk_path,  sst_name,   sst(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc( sst_name,   sst(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             sst(:,:,n) = tb(:,:,1)
             call msg_print("", 2, "SST is set to surf. level temp.")
@@ -662,8 +1137,7 @@ module air
 
         if ((     interp_tair .and. n>=2) .or.       &
             (.not.interp_tair .and. n==1)      ) then
-          call read_var_nc( bulk_path, tair_name,  temp(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc( tair_name,  temp(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             temp(:,:,n) = tb(:,:,1)
             call msg_print("", 2, "Tair is set to surf. level temp.")
@@ -672,8 +1146,7 @@ module air
 
         if ((     interp_cloud .and. n>=2) .or.       &
             (.not.interp_cloud .and. n==1)      ) then
-          call read_var_nc( bulk_path, tcld_name, cloud(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc( tcld_name, cloud(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             cloud(:,:,n) = 0.
             call msg_print("", 2, "Cloud cover is set to zero.")
@@ -682,16 +1155,15 @@ module air
 
       end if ! if READ_BULK
 
-      ncid = 0
+      call check( file_close_nc( ncid ), "nf_close" )
+      ncid = file_open_nc( flux_path, year(n) )
 
       if ( read_stress ) then
 
         if ((     interp_stress .and. n>=2) .or.       &
             (.not.interp_stress .and. n==1)      ) then
-          call read_var_nc( flux_path, ustr_name, ustr(:,:,n)  &
-                          , year(n), record(n), ncid )
-          call read_var_nc( flux_path, vstr_name, vstr(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc( ustr_name, ustr(:,:,n), record(n), ncid )
+          call read_var_nc( vstr_name, vstr(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             ustr(:,:,n) = 0.
             vstr(:,:,n) = 0.
@@ -701,38 +1173,31 @@ module air
 
       end if
 
-      ncid = 0
-
       if ( read_heat ) then
 
         if ((     interp_heat .and. n>=2) .or.       &
             (.not.interp_heat .and. n==1)      ) then
-          call read_var_nc( flux_path, dlrad_name, dlrad(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc( dlrad_name, dlrad(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             dlrad(:,:,n) = 370.
             call msg_print("", 2, "Downlonrad. is set to 370 W/m^2.")
           end if
-          call read_var_nc( flux_path, lheat_name, lheat(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc( lheat_name, lheat(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             lheat(:,:,n) = 0.
             call msg_print("", 2, "Latent heat is set to zero.")
           end if
-          call read_var_nc( flux_path,  lrad_name,  lrad(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc(  lrad_name,  lrad(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             lrad(:,:,n) = 0.
             call msg_print("", 2, "Net longrad. is set to zero.")
           end if
-          call read_var_nc( flux_path, sheat_name, sheat(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc( sheat_name, sheat(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             sheat(:,:,n) = 0.
             call msg_print("", 2, "Sensible heat is set to zero.")
           end if
-          call read_var_nc( flux_path,  srad_name,  srad(:,:,n)  &
-                          , year(n), record(n), ncid )
+          call read_var_nc(  srad_name,  srad(:,:,n), record(n), ncid )
           if ( ncid == -1 ) then
             srad(:,:,n) = 0.
             call msg_print("", 2, "Net shortrad. is set to zero.")
@@ -764,13 +1229,12 @@ module air
 != I/O SECTION ========================================================
 !______________________________________________________________________
 !
-    subroutine read_var_nc( path, var_name, var   &
-                          , year, record  , ncid )
+    subroutine read_var_nc( var_name, var, record, ncid )
 !----------------------------------------------------------------------
 !  Read a variable (NC format).
 !______________________________________________________________________
 
-      use glob_const , only: rk
+      use glob_const , only: C2K, rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -780,36 +1244,17 @@ module air
       integer, external :: get_var_real_3d
 
       integer                   , intent(inout) :: ncid
-      integer                   , intent(in   ) :: record, year
+      integer                   , intent(in   ) :: record
       real(rk), dimension(im,jm), intent(  out) :: var
-      character(len=*)          , intent(in   ) :: path, var_name
+      character(len=*)          , intent(in   ) :: var_name
 
-      integer                  varid, status
+      integer                  status, varid
       integer(MPI_OFFSET_KIND) start(4), edge(4)
-      character(len=256)       filename, netcdf_file
+      character(len=64)        units
 
 
       start = 1
       edge  = 1
-
-      if ( ncid <= 0 ) then
-! open netcdf file
-        if ( ncid == 0 ) then
-          call check( nf90mpi_close( ncid )              &
-                    , 'nfmpi_close:'//trim(netcdf_file) )
-        end if
-
-        filename = get_filename( path, year )
-        netcdf_file = trim(filename)
-        status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE   &
-                             , MPI_INFO_NULL, ncid )
-        if ( status /= NF_NOERR ) then
-          call msg_print("", 2, "Failed reading `"//trim(var_name)  &
-                              //"` from `"//trim(filename)//"`")
-          ncid = -1
-          return
-        end if
-      end if
 
 ! get variable
       call check( nf90mpi_inq_varid( ncid, var_name, varid )  &
@@ -828,18 +1273,74 @@ module air
                   ( ncid, varid, start, edge, var )  &
                 , 'get_var_real: '//trim(var_name) )
 
+! convert data if necessary
+      status = nf90mpi_get_att( ncid, varid, "units", units )
+      if ( status == NF_NOERR ) then
+        select case ( trim(units) )
+          case ( "K" )
+            var = var - C2K
+          case ( "Pa" )
+            var = var/100.
+        end select
+      end if
 
       return
 
       end
+!___________________________________________________________________
+!
+    integer function file_open_nc( path, year )
+!-------------------------------------------------------------------
+!  Opens netcdf file for reading.
+!___________________________________________________________________
 
+      use glob_domain, only: POM_COMM
+      use mpi        , only: MPI_INFO_NULL
+      use pnetcdf    , only: nf90mpi_open, NF_NOERR, NF_NOWRITE
+
+      implicit none
+
+      integer         , intent(in) :: year
+      character(len=*), intent(in) :: path
+
+      integer            status
+      character(len=256) filename, netcdf_file
+
+
+      filename = get_filename( path, year )
+      netcdf_file = trim(filename)
+      status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE   &
+                           , MPI_INFO_NULL, file_open_nc )
+      if ( status /= NF_NOERR ) then
+        call msg_print("", 2, "Failed to open `"//trim(filename)//"`")
+        file_open_nc = -1
+      end if
+
+    end function
+!___________________________________________________________________
+!
+    integer function file_close_nc( ncid )
+!-------------------------------------------------------------------
+!  Opens netcdf file for reading.
+!___________________________________________________________________
+!
+      use pnetcdf, only: nf90mpi_close
+
+      implicit none
+
+      integer, intent(in) :: ncid
+
+
+      file_close_nc = nf90mpi_close( ncid )
+
+    end function
 !______________________________________________________________________
 !
     subroutine check(status, routine)
 !----------------------------------------------------------------------
 !  Checks for NetCDF I/O error and exits with an error message if hits.
 !______________________________________________________________________
-
+!
       use glob_domain, only: error_status, is_master
       use pnetcdf    , only: nf90mpi_strerror, NF_NOERR
 

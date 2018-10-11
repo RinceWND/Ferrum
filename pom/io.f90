@@ -271,7 +271,7 @@ module io
 !  Write initial state output file.
 !______________________________________________________________________
 
-      use air
+      use air        , only: wssurf, wtsurf, wusurf, wvsurf
       use bry
       use config     , only: mode, title, use_air
       use glob_const , only: rk
