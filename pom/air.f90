@@ -233,6 +233,8 @@ module air
       vwnd_name  = "vwnd"
       wgst_name  = "gust"
 
+      interp_pres = .false.
+
 ! Override configuration
       open ( 73, file = config_file, status = 'old' )
       read ( 73, nml = air_nml )
@@ -300,7 +302,7 @@ module air
        )
 
 ! Initialize mandatory arrays
-      e_atmos= 1013.
+      e_atmos= Ps
       swrad  = 0.
       uwsrf  = 0.
       vfluxb = 0.
@@ -351,6 +353,7 @@ module air
         else
           allocate( pres(im,jm,1) )
         end if
+        pres = Ps
         if ( interp_sst ) then
           allocate( sst(im,jm,3) )
         else
@@ -598,24 +601,28 @@ module air
 
       implicit none
 
-      if ( interp_cloud ) then
-        cloud(:,:,1) = ( 1. - a ) * cloud(:,:,2) + a * cloud(:,:,3)
-      end if
-      if ( interp_humid ) then
-        humid(:,:,1) = ( 1. - a ) * humid(:,:,2) + a * humid(:,:,3)
-      end if
-      if ( interp_pres ) then
-        pres(:,:,1) = ( 1. - a ) * pres(:,:,2) + a * pres(:,:,3)
-      end if
-      if ( interp_tair ) then
-        temp(:,:,1) = ( 1. - a ) * temp(:,:,2) + a * temp(:,:,3)
-      end if
+      if ( READ_BULK ) then
 
-      e_atmos = 0.01 * ( pres(:,:,1) - 1013. )
+        if ( interp_cloud ) then
+          cloud(:,:,1) = ( 1. - a ) * cloud(:,:,2) + a * cloud(:,:,3)
+        end if
+        if ( interp_humid ) then
+          humid(:,:,1) = ( 1. - a ) * humid(:,:,2) + a * humid(:,:,3)
+        end if
+        if ( interp_pres ) then
+          pres(:,:,1) = ( 1. - a ) * pres(:,:,2) + a * pres(:,:,3)
+        end if
+        if ( interp_tair ) then
+          temp(:,:,1) = ( 1. - a ) * temp(:,:,2) + a * temp(:,:,3)
+        end if
+
+        e_atmos = 0.01 * ( pres(:,:,1) - 1013. )
 
 ! Calculate fluxes
-      if ( USE_BULK ) then
-        call bulk_fluxes
+        if ( USE_BULK ) then
+          call bulk_fluxes
+        end if
+
       end if
 
     end subroutine
@@ -777,10 +784,27 @@ module air
 ! --- w(Ta)
 !
             wair = 0.01 * humnow * wsatair
+!            if ( isnan(wair) ) then
+!              print *, "[ WAIR ]"
+!              print *, "humnow", humnow
+!              print *, "wsatair", wsatair
+!              print *, "pnow", pnow
+!              print *, "esatair", esatair
+!              stop
+!            end if
 !
 ! --- calculates the density of  moist air
 !
             rhom = 100.*(pnow/Rd)*(expsi*(1.+wair)/(tnowk*(expsi+wair)))
+!            if ( isnan(rhom) ) then
+!              print *, "[ RHOM ]"
+!              print *, "pnow", pnow
+!              print *, "Rd", Rd
+!              print *, "expsi", expsi
+!              print *, "wair", wair
+!              print *, "tnowk", tnowk
+!              stop
+!            end if
 !
 !---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 ! Calculate the net longwave radiation flux at the sea surface (QBW)
@@ -936,11 +960,14 @@ module air
             WFLUX =  evap/rhoref - precip
 
             pme(i,j)= -wflux
-            if ( isnan(pme(i,j)) ) then
-              print *, "[[[[[[]]]]]]"
-              print *, "pme: ", pme(i,j)
-              print *, "wflux: ", wflux
-            end if
+!            if ( isnan(pme(i,j)) ) then
+!              print *, "[[[[[[]]]]]]"
+!              print *, "pme: ", pme(i,j)
+!              print *, "wflux: ", wflux
+!              print *, "evap: ", evap
+!              print *, "precip: ", precip
+!              stop
+!            end if
 !
 ! Important note for Princeton Ocean Model users:
 ! THE SALT FLUX ( WSSURF() ) IN POM MAIN CODE (REQUIRED FOR PROFT) SHOULD
@@ -956,13 +983,19 @@ module air
 ! --- calculates : Qu = Qb + QH + QE
 !
             QU = qbw + qh + qe
-            if (isnan(QU).or.abs(QU).gt.1.e3) then
-            print *, "[ HEAT ]", i,j,qbw, qh, qe, "@", my_task
-            print *, "cloud:", cld
-            print *, "tnowk:", tnowk
-            print *, "ea12:", ea12
-            stop
-            end if
+!            if (isnan(QU).or.abs(QU).gt.2.e3) then
+!            print *, "[ HEAT ]", i,j,qbw, qh, qe, "@", my_task
+!            print *, "cloud:", cld
+!            print *, "tnowk:", tnowk
+!            print *, "ea12:", ea12
+!            print *, "evap: ", evap
+!            print *, "rhom: ", rhom
+!            print *, "cp: ", cp
+!            print *, "ch2: ", ch2
+!            print *, "sp: ", sp
+!            print *, "deltemp: ", deltemp
+!            stop
+!            end if
 !
 ! --- 1. Divide upward heat flux by rho*Cpw
 !
@@ -1077,9 +1110,10 @@ module air
 
       call msg_print("", 1, desc)
 
+! Read wind file
       ncid = file_open_nc( wind_path, year(n) )
 
-      if ( read_wind ) then
+      if ( read_wind .and. ncid /= -1 ) then
 
         if ((     interp_wind .and. n>=2) .or.       &
             (.not.interp_wind .and. n==1)      ) then
@@ -1092,12 +1126,14 @@ module air
           end if
         end if
 
+        call check( file_close_nc( ncid ), "nf_close" )
+
       end if
 
-      call check( file_close_nc( ncid ), "nf_close" )
+! Read bulk file
       ncid = file_open_nc( bulk_path, year(n) )
 
-      if ( read_bulk ) then
+      if ( read_bulk .and. ncid /= -1 ) then
 
         if ((     interp_humid .and. n>=2) .or.       &
             (.not.interp_humid .and. n==1)      ) then
@@ -1153,12 +1189,14 @@ module air
           end if
         end if
 
+        call check( file_close_nc( ncid ), "nf_close" )
+
       end if ! if READ_BULK
 
-      call check( file_close_nc( ncid ), "nf_close" )
+! Read flux file
       ncid = file_open_nc( flux_path, year(n) )
 
-      if ( read_stress ) then
+      if ( read_stress .and. ncid /= -1 ) then
 
         if ((     interp_stress .and. n>=2) .or.       &
             (.not.interp_stress .and. n==1)      ) then
@@ -1173,7 +1211,7 @@ module air
 
       end if
 
-      if ( read_heat ) then
+      if ( read_heat .and. ncid /= -1 ) then
 
         if ((     interp_heat .and. n>=2) .or.       &
             (.not.interp_heat .and. n==1)      ) then
@@ -1203,8 +1241,10 @@ module air
             call msg_print("", 2, "Net shortrad. is set to zero.")
           end if
         end if
-      end if ! if READ_HEAT
 
+        call check( file_close_nc( ncid ), "nf_close" )
+
+        end if ! if READ_FLUX
 
     end subroutine
 !______________________________________________________________________
