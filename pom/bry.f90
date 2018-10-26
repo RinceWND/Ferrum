@@ -241,7 +241,7 @@ module bry
 !      
 !      allocate( bry_path )
 
-    end subroutine allocate_boundary
+    end subroutine ! allocate_boundary
 !______________________________________________________________________
 !
     subroutine initialize_boundary( conf )
@@ -513,7 +513,7 @@ module bry
       end if
 
 
-    end subroutine initial_conditions_boundary
+    end subroutine ! initial_conditions_boundary
 !______________________________________________________________________
 !
     subroutine init( d_in )
@@ -568,7 +568,7 @@ module bry
 
       return
 
-    end subroutine init
+    end subroutine ! init
 !______________________________________________________________________
 !
     subroutine step( d_in )
@@ -659,7 +659,7 @@ module bry
         end if
       end if
 
-    end subroutine step
+    end subroutine ! step
 !______________________________________________________________________
 !
     subroutine read_all( execute, n, year, record )
@@ -677,6 +677,7 @@ module bry
 
       integer                  ii, ncid
       integer(MPI_OFFSET_KIND) start(4), edge(4)
+      real(rk)                 dummy(1,1,1)
       character(len=128)       desc
 
 
@@ -781,6 +782,26 @@ module bry
           call msg_print("", 2, "Elev@EAST defaulted to zero")
         end if
 
+      else
+
+        start = 1
+        edge = 0
+! Temperature
+        call read_var_3d_nc( bry_path, "east_"//t_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Salinity
+        call read_var_3d_nc( bry_path, "east_"//s_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Normal velocity
+        call read_var_3d_nc( bry_path, "east_"//u_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Tangential velocity
+        call read_var_3d_nc( bry_path, "east_"//v_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Elevation
+        call read_var_2d_nc( bry_path, "east_"//el_name, dummy(1,:,:)  &
+                           , year(n), start, edge, ncid )
+
       end if
 
 ! NORTH
@@ -870,6 +891,26 @@ module bry
           call msg_print("", 2, "Elev@NORTH defaulted to zero")
         end if
 
+      else
+
+        start = 1
+        edge = 0
+! Temperature
+        call read_var_3d_nc( bry_path, "north_"//t_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Salinity
+        call read_var_3d_nc( bry_path, "north_"//s_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Normal velocity
+        call read_var_3d_nc( bry_path, "north_"//u_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Tangential velocity
+        call read_var_3d_nc( bry_path, "north_"//v_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Elevation
+        call read_var_2d_nc( bry_path, "north_"//el_name, dummy(1,:,:)  &
+                           , year(n), start, edge, ncid )
+
       end if
 
 ! SOUTH
@@ -956,6 +997,26 @@ module bry
           EL_bry%STH = 0.
           call msg_print("", 2, "Elev@SOUTH defaulted to zero")
         end if
+
+      else
+
+        start = 1
+        edge = 0
+! Temperature
+        call read_var_3d_nc( bry_path, "south_"//t_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Salinity
+        call read_var_3d_nc( bry_path, "south_"//s_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Normal velocity
+        call read_var_3d_nc( bry_path, "south_"//u_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Tangential velocity
+        call read_var_3d_nc( bry_path, "south_"//v_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Elevation
+        call read_var_2d_nc( bry_path, "south_"//el_name, dummy(1,:,:)  &
+                           , year(n), start, edge, ncid )
 
       end if
 
@@ -1044,6 +1105,26 @@ module bry
           call msg_print("", 2, "Elev@WEST defaulted to zero")
         end if
 
+      else
+
+        start = 1
+        edge = 0
+! Temperature
+        call read_var_3d_nc( bry_path, "west_"//t_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Salinity
+        call read_var_3d_nc( bry_path, "west_"//s_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Normal velocity
+        call read_var_3d_nc( bry_path, "west_"//u_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Tangential velocity
+        call read_var_3d_nc( bry_path, "west_"//v_name, dummy  &
+                           , year(n), start, edge, ncid )
+! Elevation
+        call read_var_2d_nc( bry_path, "west_"//el_name, dummy(1,:,:)  &
+                           , year(n), start, edge, ncid )
+
       end if
 
 
@@ -1130,7 +1211,7 @@ module bry
 
       return
 
-    end subroutine bc_zeta
+    end subroutine ! bc_zeta
 
 !______________________________________________________________________
 !
@@ -1388,7 +1469,7 @@ module bry
 
       return
 
-    end subroutine bc_vel_ext
+    end subroutine ! bc_vel_ext
 
 !______________________________________________________________________
 !
@@ -1700,7 +1781,7 @@ module bry
 
       return
 
-    end subroutine bc_vel_int
+    end subroutine ! bc_vel_int
 
 
 !______________________________________________________________________
@@ -2040,7 +2121,7 @@ module bry
 
       return
 
-    end subroutine bc_ts
+    end subroutine ! bc_ts
 
 
 !______________________________________________________________________
@@ -2063,7 +2144,7 @@ module bry
 
       return
 
-    end subroutine bc_vel_vert
+    end subroutine ! bc_vel_vert
 
 !______________________________________________________________________
 !
@@ -2198,7 +2279,7 @@ module bry
 
       return
 
-    end subroutine bc_turb
+    end subroutine ! bc_turb
 !______________________________________________________________________
 !
     pure character(len=256) function get_filename( path, year )
