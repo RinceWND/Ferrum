@@ -4,6 +4,7 @@
       use glob_const , only: rk
       use glob_domain, only: im, jm, kb
       use glob_grid  , only: fsm
+      use io         , only: clim_path
       use glob_ocean , only: rho, s, sb, sclim, t, tb, tclim, u, v
       use wind
 
@@ -174,10 +175,10 @@
 
 !     data open.
          call read_tsclim_monthly_pnetcdf
-     $        ( tm_a, sm_a, tc_a, sc_a, el_a, "ts_clim.nc", mon_a )
+     $        ( tm_a, sm_a, tc_a, sc_a, el_a, clim_path, mon_a )
 
          call read_tsclim_monthly_pnetcdf
-     $        ( tm_b, sm_b, tc_b, sc_b, el_b, "ts_clim.nc", mon_b )
+     $        ( tm_b, sm_b, tc_b, sc_b, el_b, clim_path, mon_b )
 
       if ( corr_surface ) then
         call read_surf_corr_pnetcdf( dt_a, ds_a, "dt.nc", mon_a )
@@ -359,7 +360,7 @@
 
 !         write( infile_b, '( "tsclimib",i2.2,".nc" )' ) mon_b
          call read_tsclim_monthly_pnetcdf
-     $        ( tm_b, sm_b, tc_b, sc_b, el_b, "ts_clim.nc", mon_b )
+     $        ( tm_b, sm_b, tc_b, sc_b, el_b, clim_path, mon_b )
          if ( corr_surface ) then
            call read_surf_corr_pnetcdf( dt_b, ds_b, "dt.nc", mon_b)
          end if

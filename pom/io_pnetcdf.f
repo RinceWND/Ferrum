@@ -1256,7 +1256,7 @@
 
 !______________________________________________________________________
 !
-      subroutine read_clim_ts_pnetcdf(temp,salt,n)
+      subroutine read_clim_ts_pnetcdf(temp,salt,filepath,n)
 !----------------------------------------------------------------------
 !  Read montly climatology of temperature and salinity
 !______________________________________________________________________
@@ -1271,8 +1271,9 @@
 
       integer, external :: get_var_real_3d
 
-      integer , intent(in)  :: n
-      real(rk), intent(out) :: temp(im,jm,kb),salt(im,jm,kb)
+      integer , intent(in)         :: n
+      real(rk), intent(out)        :: temp(im,jm,kb),salt(im,jm,kb)
+      character(len=*), intent(in) :: filepath
 
       character(len=120) netcdf_file
       integer k, ncid, status
@@ -1280,7 +1281,7 @@
       integer(MPI_OFFSET_KIND) start(4),edge(4)
 
 ! open netcdf ic file
-      write(netcdf_file,'(a)') "./in/tsclim/ts_clim.nc"
+      write(netcdf_file,'(a)') filepath
 
       if ( is_master )
      &     print '(/''reading file '',a)', trim(netcdf_file)
@@ -1329,7 +1330,7 @@
 
 !______________________________________________________________________
 !
-      subroutine read_mean_ts_pnetcdf(temp,salt,n)
+      subroutine read_mean_ts_pnetcdf(temp,salt,filepath,n)
 !----------------------------------------------------------------------
 !  Read xy-averaged, monthly-mean temp & salt
 !______________________________________________________________________
@@ -1343,8 +1344,9 @@
 
       integer, external :: get_var_real_3d
 
-      integer , intent(in)  :: n
-      real(rk), intent(out) :: temp(im,jm,kb),salt(im,jm,kb)
+      integer , intent(in)        :: n
+      real(rk), intent(out)       :: temp(im,jm,kb),salt(im,jm,kb)
+      character(len=*),intent(in) :: filepath
 
       character(len=120) netcdf_file
       integer ncid,status
@@ -1355,7 +1357,7 @@
       edge  = 1
 !
 ! open netcdf file
-      write(netcdf_file,'(a)') "./in/tsclim/ts_mean.nc"
+      write(netcdf_file,'(a)') filepath
 
       if ( is_master )
      &     print '(/''reading file '',a)', trim(netcdf_file)
@@ -1570,7 +1572,7 @@
         integer(MPI_OFFSET_KIND) start(4),edge(4)
 
 ! open netcdf ic file
-        write(netcdf_file,'(''in/tsclim/'',a)') trim(in_file)
+        write(netcdf_file,'(a)') trim(in_file)
         if ( is_master )
      &       print '(/''reading file '',a)', trim(netcdf_file)
         status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE

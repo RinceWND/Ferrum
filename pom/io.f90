@@ -37,7 +37,7 @@ module io
 
   public :: check            , initialize_io            &
           , read_grid_pnetcdf, read_initial , out_init  &
-          , grid_path
+          , clim_path, grid_path
 
   private
 
@@ -155,7 +155,7 @@ module io
       inquire ( file = trim(mean_path), exist = fexist )
       call msg_print("", 6, "Read background TS:")
       if ( fexist ) then
-        call read_mean_ts_pnetcdf( tclim, sclim, dtime%month )
+        call read_mean_ts_pnetcdf( tclim, sclim, clim_path, dtime%month )
       else
         call msg_print("", 2, "FAILED...")
         tclim = 0.
@@ -171,7 +171,7 @@ module io
       inquire ( file = trim(clim_path), exist = fexist )
       call msg_print("", 6, "Read climatology:")
       if ( fexist ) then
-        call read_clim_ts_pnetcdf( tclim, sclim, dtime%month )
+        call read_clim_ts_pnetcdf( tclim, sclim, clim_path, dtime%month )
       else
         call msg_print("", 2, "FAILED...")
         tclim = 15.
