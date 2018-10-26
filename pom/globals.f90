@@ -8,6 +8,9 @@ module glob_const
   include 'realkind'   ! integer, parameter :: rk = 8
                        ! or 4... 16 is not supported by NetCDF.
 
+  integer, parameter :: PATH_LEN = 120  &
+                      ,  VAR_LEN =  40
+
   real(kind=rk)      &
     c2k              & ! Celcius to Kelvin
   , cpw              & ! seawater specific heat

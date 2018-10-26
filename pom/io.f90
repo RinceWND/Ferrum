@@ -15,12 +15,14 @@
 
 module io
 
+  use glob_const, only: PATH_LEN
+
   implicit none
 
 !----------------------------------------------------------------------
 ! Paths configuration
 !----------------------------------------------------------------------
-  character(len=256)  & ! Full paths (with filenames) to:
+  character(len=PATH_LEN)  & ! Full paths (with filenames) to:
       bc_path         & !  boundary condition file
   , clim_path         & !  climatology file
   , grid_path         & !  grid file
@@ -33,7 +35,9 @@ module io
 !  If any path ends with `/` then the default filename will be
 ! appended to the path.
 
-  public :: check, initialize_io, out_init, read_initial
+  public :: check            , initialize_io            &
+          , read_grid_pnetcdf, read_initial , out_init  &
+          , grid_path
 
   private
 
@@ -116,7 +120,7 @@ module io
         call msg_print("CORE I/O MODULE INITIALIZED", 1, "")
       end if
 
-    end subroutine initialize_io
+    end subroutine ! initialize_io
 !______________________________________________________________________
 !
     subroutine read_initial
@@ -195,7 +199,7 @@ module io
                                     //     trim(out_file)    &
                                     //"."//trim(FORMAT_EXT) )
 
-    end subroutine out_init
+    end subroutine ! out_init
 
 
 !______________________________________________________________________
@@ -263,7 +267,147 @@ module io
 
       return
 
-    end function def_var_pnetcdf
+    end function ! def_var_pnetcdf
+!______________________________________________________________________
+!
+      subroutine read_grid_pnetcdf( filepath )
+!----------------------------------------------------------------------
+!  Read grid data.
+!______________________________________________________________________
+
+      use glob_const , only: rk
+      use glob_domain
+      use glob_grid
+      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
+      use pnetcdf
+
+      implicit none
+
+      integer, external :: get_var_real_1d  &
+                         , get_var_real_2d  &
+                         , get_var_real_3d
+
+      character(len=120), intent(in) :: filepath
+
+      integer                                                       &
+             dx_varid,      dy_varid,  east_c_varid,  east_e_varid  &
+      ,  east_u_varid,  east_v_varid,     fsm_varid,       h_varid  &
+      , north_c_varid, north_e_varid, north_u_varid, north_v_varid  &
+      ,     rot_varid,       z_varid,      zz_varid
+      integer dimn, ncid
+
+      integer(MPI_OFFSET_KIND) start(4),edge(4)
+
+
+      start = 1
+      edge  = 1
+
+! open netcdf file
+      if ( is_master ) print '(/''Reading file '',a)', trim(filepath)
+      call check( nf90mpi_open                                       &
+                  (POM_COMM,filepath,NF_NOWRITE,MPI_INFO_NULL,ncid)  &
+                , "nf_open: "//trim(filepath) )
+
+! get variables
+      call check( nf90mpi_inq_varid(ncid,'z',z_varid)  &
+                , 'nf_inq_varid: z' )
+      call check( nfmpi_inq_varid(ncid,'zz',zz_varid)  &
+                , 'nfmpi_inq_varid: zz' )
+      call check( nfmpi_inq_varid(ncid,'dx',dx_varid)  &
+                , 'nfmpi_inq_varid: dx' )
+      call check( nfmpi_inq_varid(ncid,'dy',dy_varid)  &
+                , 'nfmpi_inq_varid: dy' )
+      call check( nfmpi_inq_varid(ncid,'lon_u',east_u_varid)  &
+                , 'nfmpi_inq_varid: east_u' )
+      call check( nfmpi_inq_varid(ncid,'lon_v',east_v_varid)  &
+                , 'nfmpi_inq_varid: east_v' )
+      call check( nfmpi_inq_varid(ncid,'lon_e',east_e_varid)  &
+                , 'nfmpi_inq_varid: east_e' )
+      call check( nfmpi_inq_varid(ncid,'lon_c',east_c_varid)  &
+                , 'nfmpi_inq_varid: east_c' )
+      call check( nfmpi_inq_varid(ncid,'lat_u',north_u_varid)  &
+                , 'nfmpi_inq_varid: north_u' )
+      call check( nfmpi_inq_varid(ncid,'lat_v',north_v_varid)  &
+                , 'nfmpi_inq_varid: north_v' )
+      call check( nfmpi_inq_varid(ncid,'lat_e',north_e_varid)  &
+                , 'nfmpi_inq_varid: north_e' )
+      call check( nfmpi_inq_varid(ncid,'lat_c',north_c_varid)  &
+                , 'nfmpi_inq_varid: north_c' )
+      call check( nfmpi_inq_varid(ncid,'rot',rot_varid)  &
+                , 'nfmpi_inq_varid: rot' )
+      call check( nfmpi_inq_varid(ncid,'h',h_varid)  &
+                , 'nfmpi_inq_varid: h' )
+      call check( nfmpi_inq_varid(ncid,'fsm',fsm_varid)  &
+                , 'nfmpi_inq_varid: fsm' )
+!      call check( nfmpi_inq_varid(ncid,'dum',dum_varid)  &
+!                , 'nfmpi_inq_varid: dum' )
+!      call check( nfmpi_inq_varid(ncid,'dvm',dvm_varid)  &
+!                , 'nfmpi_inq_varid: dvm' )
+! get data
+      call check( nfmpi_inq_varndims(ncid, z_varid, dimn)  &
+                , 'inq_vardimn: z' )
+
+      if (dimn==1) then
+        start(1)=1
+        edge(1)=kb
+        call check( get_var_real_1d(ncid, z_varid,start,edge, z)  &
+                  , 'get_var_real: z' )
+        call check( get_var_real_1d(ncid,zz_varid,start,edge,zz)  &
+                  , 'get_var_real: zz' )
+      else if (dimn==3) then
+! If z and zz are 3-dimensional get just the (1,1) cell distribution
+        start(1)=1
+        start(2)=1
+        start(3)=1
+        edge(1)=1
+        edge(2)=1
+        edge(3)=kb
+        call check( get_var_real_3d(ncid, z_varid,start,edge, z)  &
+                  , 'get_var_real: z' )
+        call check( get_var_real_3d(ncid,zz_varid,start,edge,zz)  &
+                  , 'get_var_real: zz' )
+      end if
+
+      start(1)=i_global(1)
+      start(2)=j_global(1)
+      edge(1)=im
+      edge(2)=jm
+      call check( get_var_real_2d(ncid,dx_varid,start,edge,dx)  &
+                , 'get_var_real: dx' )
+      call check( get_var_real_2d(ncid,dy_varid,start,edge,dy)  &
+                , 'get_var_real: dy' )
+      call check( get_var_real_2d(ncid,east_u_varid,start,edge,east_u) &
+                , 'get_var_real: east_u' )
+      call check( get_var_real_2d(ncid,east_v_varid,start,edge,east_v) &
+                , 'get_var_real: east_v' )
+      call check( get_var_real_2d(ncid,east_e_varid,start,edge,east_e) &
+                , 'get_var_real: east_e' )
+      call check( get_var_real_2d(ncid,east_c_varid,start,edge,east_c) &
+                , 'get_var_real: east_c' )
+      call check( get_var_real_2d                          &
+                  (ncid,north_u_varid,start,edge,north_u)  &
+                , 'get_var_real: north_u' )
+      call check( get_var_real_2d                          &
+                  (ncid,north_v_varid,start,edge,north_v)  &
+                , 'get_var_real: north_v' )
+      call check( get_var_real_2d                          &
+                  (ncid,north_e_varid,start,edge,north_e)  &
+                , 'get_var_real: north_e' )
+      call check( get_var_real_2d                          &
+                  (ncid,north_c_varid,start,edge,north_c)  &
+                , 'get_var_real: north_c' )
+      call check( get_var_real_2d(ncid,rot_varid,start,edge,rot)  &
+                , 'get_var_real: rot' )
+      call check( get_var_real_2d(ncid,h_varid,start,edge,h)  &
+                , 'get_var_real: h' )
+      call check( get_var_real_2d(ncid,fsm_varid,start,edge,fsm)  &
+                , 'get_var_real: fsm' )
+
+! close file:
+      call check( nf90mpi_close(ncid), 'nf_close: '//trim(filepath) )
+
+      return
+      end
 !______________________________________________________________________
 !
     subroutine write_output_init_pnetcdf( out_file )
@@ -287,10 +431,10 @@ module io
                            , nf90mpi_open      , nf90mpi_put_att    &
                            , nfmpi_put_vara_all                     &
                            , nfmpi_put_vara_real_all                &
-                           , NF_64BIT_DATA, NF_CLOBBER              &
-                           , NF_FLOAT     , NF_GLOBAL               &
-                           , NF_NOERR     , NF_NOWRITE              &
-                           , NF_UNLIMITED , NF_WRITE
+                           , NF_64BIT_OFFSET, NF_CLOBBER            &
+                           , NF_FLOAT       , NF_GLOBAL             &
+                           , NF_NOERR       , NF_NOWRITE            &
+                           , NF_UNLIMITED   , NF_WRITE
 
       implicit none
 
@@ -307,9 +451,9 @@ module io
             ,  wtsurf_varid, wusurf_varid, wvsurf_varid,      z_varid &
             ,      zz_varid
 
-      integer, dimension(4)    :: vdims
-      integer(MPI_OFFSET_KIND)                      &
-             , dimension(4)    :: start(4),edge(4)
+      integer, dimension(4)      :: vdims
+      integer(MPI_OFFSET_KIND)                       &
+             , dimension(4)      :: start(4),edge(4)
 
       integer ncid
 
@@ -327,10 +471,10 @@ module io
 
       call msg_print("", 6, "Writing file `"//trim(out_file)//"`")
 
-      call check( nf90mpi_create                &
-                    ( POM_COMM, trim(out_file)  &
-                    , NF_CLOBBER+NF_64BIT_DATA  &
-                    , MPI_INFO_NULL, ncid )     &
+      call check( nf90mpi_create                  &
+                    ( POM_COMM, trim(out_file)    &
+                    , NF_CLOBBER+NF_64BIT_OFFSET  &
+                    , MPI_INFO_NULL, ncid )       &
                 , 'nf_create: '//out_file )
 
 ! define global attributes
@@ -518,7 +662,7 @@ module io
       edge(1) = 1
       out1z = real(time,4)
       call check( nfmpi_put_vara_real_all                  &
-                  ( ncid,time_varid,start,edge,out1z )      &
+                  ( ncid,time_varid,start,edge,out1z )     &
                 , 'nf_put_vara_real:time @ '//out_file )
 
 ! Skip baroclinic output...
@@ -536,36 +680,68 @@ module io
       end if
 
 ! East
-      start(1) = j_global(1)
-      edge(1) = jm
       if ( n_east == -1 ) then
+        start(1) = j_global(1)
+        edge(1) = jm
         out1y = real(el_bry%est(1,:),4)
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,ele_varid,start,edge,out1y )  &
                   , 'nf_put_var_real: ele @ '//out_file )
+      else
+        start(1) = 1
+        edge(1) = 0
+        out1y = 0.
+        call check( nfmpi_put_vara_real_all              &
+                    ( ncid,ele_varid,start,edge,out1y )  &
+                  , 'nf_put_var_real: ele (dummy) @ '//out_file )
       end if
 ! West
       if ( n_west == -1 ) then
+        start(1) = j_global(1)
+        edge(1) = jm
         out1y = real(el_bry%wst(1,:),4)
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,elw_varid,start,edge,out1y )  &
                   , 'nf_put_var_real: elw @ '//out_file )
+      else
+        start(1) = 1
+        edge(1) = 0
+        out1y = 0.
+        call check( nfmpi_put_vara_real_all              &
+                    ( ncid,elw_varid,start,edge,out1y )  &
+                  , 'nf_put_var_real: elw (dummy) @ '//out_file )
       end if
 ! South
-      start(1) = i_global(1)
-      edge(1) = im
       if ( n_south == -1 ) then
+        start(1) = i_global(1)
+        edge(1) = im
         out1x = real(el_bry%sth(:,1),4)
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,els_varid,start,edge,out1x )  &
                   , 'nf_put_var_real: els @ '//out_file )
+      else
+        start(1) = 1
+        edge(1) = 0
+        out1x = 0.
+        call check( nfmpi_put_vara_real_all              &
+                    ( ncid,els_varid,start,edge,out1x )  &
+                  , 'nf_put_var_real: els (dummy) @ '//out_file )
       end if
 ! North
       if ( n_north == -1 ) then
+        start(1) = i_global(1)
+        edge(1) = im
         out1x = real(el_bry%nth(:,1),4)
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,eln_varid,start,edge,out1x )  &
                   , 'nf_put_var_real: eln @ '//out_file )
+      else
+        start(1) = 1
+        edge(1) = 0
+        out1x = 0.
+        call check( nfmpi_put_vara_real_all              &
+                    ( ncid,eln_varid,start,edge,out1x )  &
+                  , 'nf_put_var_real: eln @ (dummy)'//out_file )
       end if
 
 
@@ -704,6 +880,7 @@ module io
         call check( nfmpi_put_vara_real_all                &
                     ( ncid,km_varid,start,edge,out3 )      &
                   , 'nf_put_vara_real: km @ '//out_file )
+
       end if
 
 ! close file

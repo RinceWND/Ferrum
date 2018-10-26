@@ -1,6 +1,6 @@
 module config
 
-  use glob_const, only: rk
+  use glob_const, only: PATH_LEN, RK, VAR_LEN
 
   implicit none
 
@@ -44,13 +44,13 @@ module config
   , xs,ys,fak          ! set lono or lato=999.     to skip !lyo:pac10:
 ! , period           & ! inertial period
 
-  character(len=40)  &
-    source           & ! TODO: Remove; unused var
+  character(len=VAR_LEN)  &
+    source                & ! TODO: Remove; unused var
   , title
 
-  character(len=120) &
-    netcdf_file      & ! output netcdf filename
-  , restart_file       ! restart filename to read from
+  character(len=PATH_LEN) &
+    netcdf_file           & ! output netcdf filename
+  , restart_file            ! restart filename to read from
 
 
   parameter( lono=999.0,lato=999.0, xs=1.5,ys=1.5, fak=0.5)

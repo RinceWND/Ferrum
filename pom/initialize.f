@@ -14,6 +14,7 @@
       use glob_const , only: initialize_constants
       use glob_domain
       use glob_grid  , only: east_e, north_e, h
+      use io         , only: initialize_io
       use glob_misc  , only: aamfac
       use glob_ocean , only: d, dt, el, et
       use model_run  , only: dtime, initialize_time, time, time0
@@ -51,6 +52,9 @@
 ! Allocate and initialize arrays
 !  (TODO: allocate them before or after initializing MPI?)
       call initialize_arrays
+
+! Initialize general IO and config
+      call initialize_io( 'config.nml' )
 
 ! Initialize time
       call initialize_time( restart_file )
@@ -404,6 +408,7 @@
       use glob_const , only: DEG2RAD, Ohm, rk, SMALL
       use glob_domain, only: im, jm, kb, n_south, n_west
       use glob_grid
+      use io         , only: grid_path, read_grid_pnetcdf
       use glob_ocean , only: d, dt, el, et
 
       implicit none
@@ -411,7 +416,7 @@
       integer i,j,k
 
 ! read grid
-      call read_grid_pnetcdf
+      call read_grid_pnetcdf( grid_path )
 !______________________________________________________________________
 !      The followings are read in read_grid_pnetcdf:
 !     z,zz,dx,dy
@@ -855,14 +860,12 @@
 
       use air, only: initialize_air
       use bry, only: initialize_boundary
-      use io , only: initialize_io
 
       implicit none
 
 
       call initialize_boundary( 'config.nml' )
       call initialize_air( 'config.nml' )
-      call initialize_io( 'config.nml' )
 
       end subroutine initialize_modules
 !______________________________________________________________________
