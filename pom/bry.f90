@@ -258,10 +258,29 @@ module bry
 
       logical periodic_x, periodic_y
       integer pos
+      integer(1)                                                             &
+                el_east,         el_north,         el_south,         el_west &
+      ,         ts_east,         ts_north,         ts_south,         ts_west &
+      ,       turb_east,       turb_north,       turb_south,       turb_west &
+      , vel2d_norm_east, vel2d_norm_north, vel2d_norm_south, vel2d_norm_west &
+      , vel2d_tang_east, vel2d_tang_north, vel2d_tang_south, vel2d_tang_west &
+      , vel3d_norm_east, vel3d_norm_north, vel3d_norm_south, vel3d_norm_west &
+      , vel3d_tang_east, vel3d_tang_north, vel3d_tang_south, vel3d_tang_west &
+      ,    velvert_east,    velvert_north,    velvert_south,    velvert_west
 
       namelist/bry_nml/                                                &
         bry_path, el_name, Hmax  , interp_bry, periodic_x, periodic_y  &
       , read_int, s_name , t_name, USE_SPONGE, u_name    , v_name
+
+      namelist/bry_cond/                                                     &
+                el_east,         el_north,         el_south,         el_west &
+      ,         ts_east,         ts_north,         ts_south,         ts_west &
+      ,       turb_east,       turb_north,       turb_south,       turb_west &
+      , vel2d_norm_east, vel2d_norm_north, vel2d_norm_south, vel2d_norm_west &
+      , vel2d_tang_east, vel2d_tang_north, vel2d_tang_south, vel2d_tang_west &
+      , vel3d_norm_east, vel3d_norm_north, vel3d_norm_south, vel3d_norm_west &
+      , vel3d_tang_east, vel3d_tang_north, vel3d_tang_south, vel3d_tang_west &
+      ,    velvert_east,    velvert_north,    velvert_south,    velvert_west
 
 ! Do not read boundary fields by default
       DISABLED = .true.
@@ -312,52 +331,91 @@ module bry
 
 ! Default BC types
 !   elevation
-      BC % zeta % EAST  = bc0GRADIENT
-      BC % zeta % NORTH = bc0GRADIENT
-      BC % zeta % SOUTH = bc0GRADIENT
-      BC % zeta % WEST  = bc0GRADIENT
+      el_east  = bc0GRADIENT
+      el_north = bc0GRADIENT
+      el_south = bc0GRADIENT
+      el_west  = bc0GRADIENT
 !   external velocity
-      BC % vel2d % NORM % EAST  = bcFLATHER ! bcCLAMPED if RFE is 0 in old way
-      BC % vel2d % NORM % NORTH = bcFLATHER
-      BC % vel2d % NORM % SOUTH = bcFLATHER
-      BC % vel2d % NORM % WEST  = bcFLATHER
-      BC % vel2d % TANG % EAST  = bcCLAMPED
-      BC % vel2d % TANG % NORTH = bcCLAMPED
-      BC % vel2d % TANG % SOUTH = bcCLAMPED
-      BC % vel2d % TANG % WEST  = bcCLAMPED
+      vel2d_norm_east  = bcFLATHER ! bcCLAMPED if RFE is 0 in old way
+      vel2d_norm_north = bcFLATHER
+      vel2d_norm_west  = bcFLATHER
+      vel2d_tang_east  = bcCLAMPED
+      vel2d_tang_north = bcCLAMPED
+      vel2d_tang_south = bcCLAMPED
+      vel2d_tang_west  = bcCLAMPED
 !   internal velocity
-      BC % vel3d % NORM % EAST  = bcRADIATION
-      BC % vel3d % NORM % NORTH = bcRADIATION
-      BC % vel3d % NORM % SOUTH = bcRADIATION
-      BC % vel3d % NORM % WEST  = bcRADIATION
-      BC % vel3d % TANG % EAST  = bc3POINTSMOOTH
-      BC % vel3d % TANG % NORTH = bc3POINTSMOOTH
-      BC % vel3d % TANG % SOUTH = bc3POINTSMOOTH
-      BC % vel3d % TANG % WEST  = bc3POINTSMOOTH
+      vel3d_norm_east  = bcRADIATION
+      vel3d_norm_north = bcRADIATION
+      vel3d_norm_south = bcRADIATION
+      vel3d_norm_west  = bcRADIATION
+      vel3d_tang_east  = bc3POINTSMOOTH
+      vel3d_tang_north = bc3POINTSMOOTH
+      vel3d_tang_south = bc3POINTSMOOTH
+      vel3d_tang_west  = bc3POINTSMOOTH
 !   temp and salt
-      BC % ts % EAST  = bcINOUTFLOW
-      BC % ts % NORTH = bcINOUTFLOW
-      BC % ts % SOUTH = bcINOUTFLOW
-      BC % ts % WEST  = bcINOUTFLOW
+      ts_east  = bcINOUTFLOW
+      ts_north = bcINOUTFLOW
+      ts_south = bcINOUTFLOW
+      ts_west  = bcINOUTFLOW
 !   vertical velocity (IGNORED anyway)
-      BC % ts % EAST  = bcCLAMPED
-      BC % ts % NORTH = bcCLAMPED
-      BC % ts % SOUTH = bcCLAMPED
-      BC % ts % WEST  = bcCLAMPED
+      velvert_east  = bcCLAMPED
+      velvert_north = bcCLAMPED
+      velvert_south = bcCLAMPED
+      velvert_west  = bcCLAMPED
 !   turbulent parameters
-      BC % ts % EAST  = bcINOUTFLOW
-      BC % ts % NORTH = bcINOUTFLOW
-      BC % ts % SOUTH = bcINOUTFLOW
-      BC % ts % WEST  = bcINOUTFLOW
+      turb_east  = bcINOUTFLOW
+      turb_north = bcINOUTFLOW
+      turb_south = bcINOUTFLOW
+      turb_west  = bcINOUTFLOW
 
 ! Override configuration
       open ( 73, file = conf, status = 'old' )
       read ( 73, nml = bry_nml )
+      read ( 73, nml = bry_cond )
       close( 73 )
 
 ! Manage derived type variables
       periodic_bc % x = periodic_x
       periodic_bc % y = periodic_y
+
+!   elevation
+      BC % zeta % EAST  = el_east
+      BC % zeta % NORTH = el_north
+      BC % zeta % SOUTH = el_south
+      BC % zeta % WEST  = el_west
+!   external velocity
+      BC % vel2d % NORM % EAST  = vel2d_norm_east
+      BC % vel2d % NORM % NORTH = vel2d_norm_north
+      BC % vel2d % NORM % SOUTH = vel2d_norm_south
+      BC % vel2d % NORM % WEST  = vel2d_norm_west
+      BC % vel2d % TANG % EAST  = vel2d_tang_east
+      BC % vel2d % TANG % NORTH = vel2d_tang_north
+      BC % vel2d % TANG % SOUTH = vel2d_tang_south
+      BC % vel2d % TANG % WEST  = vel2d_tang_west
+!   internal velocity
+      BC % vel3d % NORM % EAST  = vel3d_norm_east
+      BC % vel3d % NORM % NORTH = vel3d_norm_north
+      BC % vel3d % NORM % SOUTH = vel3d_norm_south
+      BC % vel3d % NORM % WEST  = vel3d_norm_west
+      BC % vel3d % TANG % EAST  = vel3d_tang_east
+      BC % vel3d % TANG % NORTH = vel3d_tang_north
+      BC % vel3d % TANG % SOUTH = vel3d_tang_south
+      BC % vel3d % TANG % WEST  = vel3d_tang_east
+!   temp and salt
+      BC % ts % EAST  = ts_east
+      BC % ts % NORTH = ts_north
+      BC % ts % SOUTH = ts_south
+      BC % ts % WEST  = ts_west
+!   vertical velocity (IGNORED anyway)
+      BC % velvert % EAST  = velvert_east
+      BC % velvert % NORTH = velvert_north
+      BC % velvert % SOUTH = velvert_south
+      BC % velvert % WEST  = velvert_west
+!   turbulent parameters
+      BC % turb % EAST  = turb_east
+      BC % turb % NORTH = turb_north
+      BC % turb % SOUTH = turb_south
+      BC % turb % WEST  = turb_west
       
       pos = len(trim(bry_path))
       if ( bry_path(pos:pos) == "/" ) then
