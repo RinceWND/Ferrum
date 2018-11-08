@@ -8,47 +8,48 @@
 !----------------------------------------------------------------------
 !  Advance model a step
 !______________________________________________________________________
-
+!
         use config   , only: calc_ice
         use model_run, only: iext, isplit
      &                     , update_time
         use seaice
+
 ! advance POM 1 step in time
-      implicit none
+        implicit none
 
 ! get time
-      call update_time
+        call update_time
 
 ! set time dependent boundary conditions
-      call update_bc
+        call update_bc
 
 ! set lateral viscosity
-      call lateral_viscosity
+        call lateral_viscosity
 
 ! form vertical averages of 3-D fields for use in external (2-D) mode
-      call mode_interaction
+        call mode_interaction
 
 ! external (2-D) mode calculation
-      do iext=1,isplit
-        call mode_external
-        call check_nan_2d  !fhx:tide:debug
-        if (calc_ice) call ice_advance
-      end do
+        do iext=1,isplit
+          call mode_external
+          call check_nan_2d  !fhx:tide:debug
+          if (calc_ice) call ice_advance
+        end do
 
 ! internal (3-D) mode calculation
-      call mode_internal
+        call mode_internal
 
 ! print section
-      call print_section
+        call print_section
 
 ! check nan
-      call check_nan
+        call check_nan
 
 ! store mean 2010/4/26
-      call store_mean
+        call store_mean
 
 ! store SURF mean
-      call store_surf_mean  !fhx:20110131:
+        call store_surf_mean  !fhx:20110131:
 
 ! write output
 !      call write_output( dtime )
@@ -57,10 +58,10 @@
 !      if(mod(iint,irestart).eq.0) call write_restart_pnetcdf
 
 ! check CFL condition
-      call check_velocity
+        call check_velocity
 
-      return
-      end
+
+      end ! subroutine advance
 
 !______________________________________________________________________
 !
@@ -68,10 +69,11 @@
 !----------------------------------------------------------------------
 !  Return the model time
 !______________________________________________________________________
-
+!
       use model_run, only: dti, iint, ramp, time, time0
 
       implicit none
+
 
       time=dti*float(iint)/86400.+time0
       ramp=1.
@@ -81,8 +83,9 @@
 !      else
 !        ramp=1.e0
 !      endif
-      return
-      end
+
+
+      end ! subroutine get_time
 
 !______________________________________________________________________
 !
@@ -90,7 +93,7 @@
 !----------------------------------------------------------------------
 !  Set time dependent boundary conditions
 !______________________________________________________________________
-
+!
       use air      , only: air_step => step
       use bry      , only: bry_step => step
       use model_run, only: dtime
@@ -102,7 +105,7 @@
       call bry_step( dtime )
 
 
-      end
+      end ! subroutine update_bc
 
 !______________________________________________________________________
 !
@@ -110,7 +113,7 @@
 !----------------------------------------------------------------------
 !  Set the lateral viscosity
 !______________________________________________________________________
-
+!
       use config     , only: aam_init, horcon, mode, n1d, npg
       use glob_domain, only: im, imm1, jm, jmm1, kbm1
       use glob_grid  , only: dx, dy
@@ -172,9 +175,8 @@
 
       end if
 
-      return
 
-      end
+      end ! subroutine lateral_viscosity
 
 !______________________________________________________________________
 !
@@ -182,7 +184,7 @@
 !----------------------------------------------------------------------
 !  Form vertical averages of 3-D fields for use in external (2-D) mode
 !______________________________________________________________________
-
+!
       use config     , only: mode
       use glob_domain, only: im, jm, kbm1
       use glob_grid  , only: dz
@@ -192,6 +194,7 @@
       implicit none
 
       integer i,j,k
+
 
       if ( mode /= 2 ) then
 
@@ -233,9 +236,8 @@
         end do
       end do
 
-      return
 
-      end
+      end ! subroutine mode_interaction
 
 !______________________________________________________________________
 !
@@ -243,7 +245,7 @@
 !----------------------------------------------------------------------
 !  Calculate the external (2-D) mode
 !______________________________________________________________________
-
+!
       use air        , only: e_atmos, vfluxf, wusurf, wvsurf
       use bry        , only: bc_vel_ext, bc_zeta
       use config     , only: alpha, ispadv, smoth
@@ -256,6 +258,7 @@
       implicit none
 
       integer i,j
+
 
       do j=2,jm
         do i=2,im
@@ -488,17 +491,15 @@
 
       end if
 
-      return
 
-      end
-
+      end ! subroutine mode_external
 !______________________________________________________________________
 !
       subroutine mode_internal
 !----------------------------------------------------------------------
 !  Calculate the internal (3-D) mode
 !______________________________________________________________________
-
+!
       use air        , only: vfluxb, vfluxf, wssurf, wtsurf
       use bry        , only: bc_ts, bc_turb, bc_vel_int, bc_vel_vert
       use glob_const , only: rk, small
@@ -769,16 +770,15 @@
         end do
       end do
 
-      return
-      end
 
+      end ! subroutine mode_internal
 !______________________________________________________________________
 !
       subroutine print_section
 !----------------------------------------------------------------------
 !  Print output
 !______________________________________________________________________
-
+!
       use config     , only: sbias, tbias
       use glob_const , only: rk
       use glob_domain
@@ -792,6 +792,7 @@
       real(rk) area_tot, vol_tot, d_vol
       real(rk) elev_ave, temp_ave, salt_ave
       integer i,j,k
+
 
       if ( mod(iint,iprint) == 0 ) then
 
@@ -857,17 +858,15 @@
 
       end if
 
-      return
 
-      end
-
+      end ! subroutine print_section
 !______________________________________________________________________
 !
       subroutine check_velocity
 !----------------------------------------------------------------------
 !  Check if velocity condition is violated
 !______________________________________________________________________
-
+!
       use config     , only: vmaxl
       use glob_const , only: rk
       use glob_domain
@@ -880,6 +879,7 @@
       real(rk) vamax
       integer  i,j
       integer  imax,jmax
+
 
       vamax = 0.
 
@@ -903,17 +903,15 @@
         error_status = 1
       end if
 
-      return
 
-      end
-
+      end ! subroutine check_velocity
 !______________________________________________________________________
 !
       subroutine store_mean
 !----------------------------------------------------------------------
 !  Store averages for further output (if enabled)
 !______________________________________________________________________
-
+!
       use air        , only: wssurf, wtsurf, wusurf, wvsurf
       use glob_domain, only: kb
       use glob_ocean , only: aam, cbc, elb, kh, rho, s, t, u, uab
@@ -921,6 +919,7 @@
       use glob_out
 
       implicit none
+
 
       uab_mean    = uab_mean    + uab
       vab_mean    = vab_mean    + vab
@@ -943,21 +942,21 @@
 
       num = num + 1
 
-      return
-      end
 
+      end ! subroutine store_mean
 !______________________________________________________________________
 !
       subroutine store_surf_mean
 !----------------------------------------------------------------------
 !  Store avrages for surface output
 !______________________________________________________________________
-
+!
       use air       , only: uwsrf, vwsrf
       use glob_ocean, only: elb, u, v
       use glob_out
 
       implicit none
+
 
       usrf_mean  = usrf_mean  + u(:,:,1)
       vsrf_mean  = vsrf_mean  + v(:,:,1)
@@ -967,8 +966,8 @@
 
       nums = nums + 1
 
-      return
-      end
+
+      end ! subroutine store_surf_mean
 !_______________________________________________________________________
 !      subroutine write_output( d_in )
 !
@@ -1084,29 +1083,28 @@
 !
       subroutine check_nan
 !----------------------------------------------------------------------
-!  Check for NaNs present
+!  Check if NaNs present
 !______________________________________________________________________
-
+!
       use glob_ocean, only: s, t, u, v
 
       implicit none
+
 
       call detect_nan( u, "u" )
       call detect_nan( v, "v" )
       call detect_nan( t, "t" )
       call detect_nan( s, "s" )
 
-      return
 
-      end
-
+      end ! subroutine check_nan
 !______________________________________________________________________
 !
       subroutine detect_nan( var, varname )
 !----------------------------------------------------------------------
 !  Check an array for NaNs
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
       use glob_domain, only: i_global, im, j_global, jm, kb
       use glob_grid  , only: h
@@ -1116,6 +1114,7 @@
       integer i, j, k, num_nan
       real(kind=rk), intent(in) :: var(im,jm,kb)
       character(len=*),intent(in)  :: varname
+
 
       num_nan = 0
 
@@ -1142,37 +1141,33 @@
         stop
       end if
 
-      return
 
-      end
-
+      end ! subroutine detect_nan
 !______________________________________________________________________
 !fhx:tide:debug
       subroutine check_nan_2d
 !----------------------------------------------------------------------
 !  Check for NaNs present in 2D
 !______________________________________________________________________
-
+!
       use glob_ocean, only: elf, uaf, vaf
 
       implicit none
+
 
       call detect_nan_2d( uaf, "uaf" )
       call detect_nan_2d( vaf, "vaf" )
       call detect_nan_2d( elf, "elf" )
 
 
-      return
-
-      end
-
+      end ! subroutine check_nan_2d
 !______________________________________________________________________
 !fhx:tide;debug
       subroutine detect_nan_2d( var, varname )
 !----------------------------------------------------------------------
 !  Check a 2D array for NaNs
 !______________________________________________________________________
-
+!
       use air
       use glob_const , only: rk
       use glob_domain, only: i_global, im, j_global, jm
@@ -1186,6 +1181,7 @@
       real(kind=rk), intent(in) :: var(im,jm)
       character(len=*),intent(in)  :: varname
 !      logical isnanf
+
 
       num_nan = 0
 
@@ -1210,19 +1206,20 @@
          stop
       endif
 
-      return
-      end
+
+      end ! subroutine detect_nan_2d
 
 !______________________________________________________________________
 !
       subroutine pgscheme(npg)
 !----------------------------------------------------------------------
-!  Redirect to a proper PGF scheme
+!  Redirects to a proper PGF scheme
 !______________________________________________________________________
-
+!
         implicit none
 
         integer, intent(in) :: npg
+
 
         select case (npg)
           case (1)
@@ -1239,4 +1236,5 @@
             call baropg_mcc
         end select
 
-      end subroutine
+
+      end ! subroutine pgscheme

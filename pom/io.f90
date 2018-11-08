@@ -120,7 +120,7 @@ module io
         call msg_print("CORE I/O MODULE INITIALIZED", 1, "")
       end if
 
-    end subroutine ! initialize_io
+    end ! subroutine initialize_io
 !______________________________________________________________________
 !
     subroutine read_initial
@@ -179,7 +179,7 @@ module io
       end if
 
 
-    end subroutine ! read_initial
+    end ! subroutine read_initial
 !______________________________________________________________________
 !
     subroutine out_init( out_file )
@@ -199,7 +199,7 @@ module io
                                     //     trim(out_file)    &
                                     //"."//trim(FORMAT_EXT) )
 
-    end subroutine ! out_init
+    end ! subroutine out_init
 
 
 !______________________________________________________________________
@@ -267,10 +267,10 @@ module io
 
       return
 
-    end function ! def_var_pnetcdf
+    end ! function def_var_pnetcdf
 !______________________________________________________________________
 !
-      subroutine read_grid_pnetcdf( filepath )
+    subroutine read_grid_pnetcdf( filepath )
 !----------------------------------------------------------------------
 !  Read grid data.
 !______________________________________________________________________
@@ -406,8 +406,7 @@ module io
 ! close file:
       call check( nf90mpi_close(ncid), 'nf_close: '//trim(filepath) )
 
-      return
-      end
+    end ! subroutine read_grid_pnetcdf
 !______________________________________________________________________
 !
     subroutine write_output_init_pnetcdf( out_file )
@@ -889,7 +888,7 @@ module io
 
       return
 
-    end subroutine
+    end ! subroutine write_output_init_pnetcdf
 !______________________________________________________________________
 !
     subroutine read_initial_ts_pnetcdf( temp, salt, ssh, n )
@@ -985,7 +984,7 @@ module io
       call check( nf90mpi_close(ncid), "nf_close @ "//ic_path)
 
 
-    end subroutine
+    end ! subroutine read_initial_ts_pnetcdf
 
 !______________________________________________________________________
 !
@@ -1015,7 +1014,7 @@ module io
 
       return
 
-    end
+    end ! subroutine check
 
 
 end module io
