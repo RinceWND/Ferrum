@@ -338,7 +338,7 @@ module bry
 !   external velocity
       vel2d_norm_east  = bcFLATHER ! bcCLAMPED if RFE is 0 in old way
       vel2d_norm_north = bcFLATHER
-	  vel2d_norm_south = bcFLATHER
+      vel2d_norm_south = bcFLATHER
       vel2d_norm_west  = bcFLATHER
       vel2d_tang_east  = bcCLAMPED
       vel2d_tang_north = bcCLAMPED
