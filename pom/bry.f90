@@ -8,7 +8,7 @@
 !  Author  : RinceWND
 !  Created : 2018-09-02
 !______________________________________________________________________
-
+!
 module bry
 
   use config     , only: rk ! SO... If a module uses some other module's variable, another module can access the variable through this "medium" module?
@@ -171,15 +171,15 @@ module bry
   ,  v_name             !  v-velocity (tangential for east and west)
 
   contains
-
 !______________________________________________________________________
 !
     subroutine allocate_boundary
 !----------------------------------------------------------------------
 !  Allocates boundary arrays.
 !______________________________________________________________________
-
+!
       implicit none
+
 
 ! Allocate arrays
       if ( hasEAST ) then
@@ -241,14 +241,14 @@ module bry
 !      
 !      allocate( bry_path )
 
-    end subroutine ! allocate_boundary
+    end ! subroutine allocate_boundary
 !______________________________________________________________________
 !
     subroutine initialize_boundary( conf )
 !----------------------------------------------------------------------
 !  Initialize arrays for boundary conditions.
 !______________________________________________________________________
-
+!
       use config     , only: use_bry
       use glob_domain, only: is_master, n_east, n_north, n_south, n_west
 
@@ -281,6 +281,7 @@ module bry
       , vel3d_norm_east, vel3d_norm_north, vel3d_norm_south, vel3d_norm_west &
       , vel3d_tang_east, vel3d_tang_north, vel3d_tang_south, vel3d_tang_west &
       ,    velvert_east,    velvert_north,    velvert_south,    velvert_west
+
 
 ! Do not read boundary fields by default
       DISABLED = .true.
@@ -438,14 +439,15 @@ module bry
 
       call msg_print("BRY MODULE INITIALIZED", 1, "")
 
-    end subroutine
+
+    end ! subroutine initialize_boundary
 !______________________________________________________________________
 !
     subroutine initial_conditions_boundary
 !----------------------------------------------------------------------
 !  Sets up initial conditions for boundary arrays.
 !______________________________________________________________________
-
+!
       use glob_const , only: SEC2DAY
       use glob_domain, only: im, jm, n_east, n_north, n_south, n_west
       use glob_grid  , only: fsm
@@ -456,7 +458,8 @@ module bry
 
       integer  ii, jj
       real(rk) rdisp
-    
+
+
 ! Initial conditions ! TODO: Move to a separate subroutine?
       if ( hasEAST ) then
 
@@ -572,14 +575,14 @@ module bry
       end if
 
 
-    end subroutine ! initial_conditions_boundary
+    end ! subroutine initial_conditions_boundary
 !______________________________________________________________________
 !
     subroutine init( d_in )
 !----------------------------------------------------------------------
 !  Reads initial lateral boundary conditions.
 !______________________________________________________________________
-
+!
       use module_time
 
       type(date), intent(in) :: d_in
@@ -625,16 +628,14 @@ module bry
       call msg_print("BRY INITIALIZED", 2, "")
 
 
-      return
-
-    end subroutine ! init
+    end ! subroutine init
 !______________________________________________________________________
 !
     subroutine step( d_in )
 !----------------------------------------------------------------------
 !  Reads lateral boundary conditions.
 !______________________________________________________________________
-
+!
       use glob_grid  , only: dz
 !      use glob_domain, only: is_master
       use model_run  , only: dti, secs => sec_of_year
@@ -718,7 +719,7 @@ module bry
         end if
       end if
 
-    end subroutine ! step
+    end ! subroutine step
 !______________________________________________________________________
 !
     subroutine read_all( execute, n, year, record )
@@ -1187,14 +1188,14 @@ module bry
       end if
 
 
-    end subroutine
+    end ! subroutine read_all
 !______________________________________________________________________
 !
     subroutine bc_zeta
 !----------------------------------------------------------------------
 !  Apply external (2D) elevation boundary conditions.
 !______________________________________________________________________
-
+!
       use glob_grid , only: fsm
       use glob_ocean, only: elf
 
@@ -1268,17 +1269,14 @@ module bry
       elf = elf*fsm
 
 
-      return
-
-    end subroutine ! bc_zeta
-
+    end ! subroutine bc_zeta
 !______________________________________________________________________
 !
     subroutine bc_vel_ext
 !----------------------------------------------------------------------
 !  Apply external (2D) velocity boundary conditions.
 !______________________________________________________________________
-
+!
       use glob_const , only: GRAV
       use glob_grid  , only: dum, dvm, h
       use glob_ocean , only: el, uaf, vaf
@@ -1382,18 +1380,18 @@ module bry
           select case ( BC % VEL2D % TANG % WEST )
 
             case ( bc0GRADIENT )
-              vaf(2,2:jmm1) = vaf(3,2:jmm1)
+              vaf(1,2:jmm1) = vaf(2,2:jmm1)
 
             case ( bc3POINTSMOOTH )
-              vaf(2,2:jmm1) = ( vaf(3,1:jmm2)       &
-                              + vaf(3,2:jmm1)       &
-                              + vaf(3,3:jm  ) )/3.
+              vaf(1,2:jmm1) = ( vaf(2,1:jmm2)       &
+                              + vaf(2,2:jmm1)       &
+                              + vaf(2,3:jm  ) )/3.
 
             case ( bcCLAMPED )
-              vaf(2,2:jmm1) = VA_bry%WST(1,2:jmm1)
+              vaf(1,2:jmm1) = VA_bry%WST(1,2:jmm1)
 
             case ( bcFLATHER ) ! NOT CORRECT!
-              vaf(2,2:jmm1) = VA_bry%WST(1,2:jmm1)              &
+              vaf(1,2:jmm1) = VA_bry%WST(1,2:jmm1)              &
                            + sqrt(GRAV/h(2,2:jmm1))             &
                             *(el(2,2:jmm1)-EL_bry%WST(1,2:jmm1))
 
@@ -1499,18 +1497,18 @@ module bry
           select case ( BC % VEL2D % TANG % SOUTH )
 
             case ( bc0GRADIENT )
-              uaf(2:imm1,2) = uaf(2:imm1,3)
+              uaf(2:imm1,1) = uaf(2:imm1,2)
 
             case ( bc3POINTSMOOTH )
-              uaf(2:imm1,2) = ( uaf(1:imm2,3)       &
-                              + uaf(2:imm1,3)       &
-                              + uaf(3:im  ,3) )/3.
+              uaf(2:imm1,1) = ( uaf(1:imm2,2)       &
+                              + uaf(2:imm1,2)       &
+                              + uaf(3:im  ,2) )/3.
 
             case ( bcCLAMPED )
-              uaf(2:imm1,2) = UA_bry%STH(2:imm1,1)
+              uaf(2:imm1,1) = UA_bry%STH(2:imm1,1)
 
             case ( bcFLATHER ) ! NOT CORRECT!
-              uaf(2:imm1,2) = UA_bry%STH(2:imm1,1)              &
+              uaf(2:imm1,1) = UA_bry%STH(2:imm1,1)              &
                            + sqrt(GRAV/h(2:imm1,2))             &
                             *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))
 
@@ -1526,17 +1524,14 @@ module bry
       vaf = vaf*dvm
 
 
-      return
-
-    end subroutine ! bc_vel_ext
-
+    end ! subroutine bc_vel_ext
 !______________________________________________________________________
 !
     subroutine bc_vel_int
 !----------------------------------------------------------------------
 !  Apply internal (3D) velocity boundary conditions.
 !______________________________________________________________________
-
+!
       use glob_grid  , only: dum, dvm, h
       use glob_ocean , only: u, uf, v, vf, wubot, wvbot
 
@@ -1838,11 +1833,7 @@ module bry
       end do
 
 
-      return
-
-    end subroutine ! bc_vel_int
-
-
+    end ! subroutine bc_vel_int
 !______________________________________________________________________
 !
     subroutine bc_ts
@@ -1852,7 +1843,7 @@ module bry
 !   uf : temperature
 !   vf : salinity
 !______________________________________________________________________
-
+!
       use glob_grid  , only: dx, dy, fsm, zz
       use glob_ocean , only: dt, s, t, u, uf, v, vf, w
       use model_run  , only: dti
@@ -2178,11 +2169,7 @@ module bry
       end do
 
 
-      return
-
-    end subroutine ! bc_ts
-
-
+    end subroutine bc_ts
 !______________________________________________________________________
 !
     subroutine bc_vel_vert
@@ -2195,16 +2182,14 @@ module bry
 
       implicit none
 
+
 ! Apply rho-mask
       do k = 1,kbm1
         w(:,:,k) = w(:,:,k)*fsm
       end do
 
 
-      return
-
-    end subroutine ! bc_vel_vert
-
+    end ! subroutine bc_vel_vert
 !______________________________________________________________________
 !
     subroutine bc_turb
@@ -2214,7 +2199,7 @@ module bry
 !   uf : q2
 !   vf : q2l
 !______________________________________________________________________
-
+!
       use glob_const , only: SMALL
       use glob_grid  , only: dx, dy, fsm
       use glob_ocean , only: kh, km, kq, l, q2, q2l, u, uf, v, vf
@@ -2336,16 +2321,14 @@ module bry
       end do
 
 
-      return
-
-    end subroutine ! bc_turb
+    end ! subroutine bc_turb
 !______________________________________________________________________
 !
     pure character(len=256) function get_filename( path, year )
 !----------------------------------------------------------------------
 !  Costructs filename string in `<path>YYYY<FORMAT_EXT>` format.
 !______________________________________________________________________
-
+!
       implicit none
 
       character(len=*), intent(in) :: path
@@ -2366,7 +2349,7 @@ module bry
 !----------------------------------------------------------------------
 !  Read a variable (NC format).
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
@@ -2426,9 +2409,8 @@ module bry
         end select
       end if
 
-      return
 
-      end
+    end ! subroutine read_var_3d_nc
 !______________________________________________________________________
 !
     subroutine read_var_2d_nc( path, var_name, var         &
@@ -2436,7 +2418,7 @@ module bry
 !----------------------------------------------------------------------
 !  Read a variable (NC format).
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
@@ -2496,17 +2478,15 @@ module bry
         end select
       end if
 
-      return
 
-      end
-
+    end ! subroutine read_var_2d_nc
 !______________________________________________________________________
 !
     subroutine check(status, routine)
 !----------------------------------------------------------------------
 !  Checks for NetCDF I/O error and exits with an error message if hits.
 !______________________________________________________________________
-
+!
       use glob_domain, only: error_status, is_master
       use pnetcdf    , only: nf90mpi_strerror, NF_NOERR
 
@@ -2526,8 +2506,7 @@ module bry
       end if
 
 
-      return
+    end ! subroutine check
 
-    end
 
 end module
