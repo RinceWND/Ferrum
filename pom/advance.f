@@ -426,6 +426,7 @@
 
       if (maxval(abs(uaf))>10.) then
         print *, "[ UAF BEFORE EXCHANGE ]"
+        print *, maxval(abs(uaf))
         stop
       end if
 

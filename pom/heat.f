@@ -1346,7 +1346,7 @@
         Cd    = ( von / log(zu/zo10) )**2
         Ct    =   von / log(zt/zot10)
         CC    =   von * Ct/Cd
-        Ribcu = -zu/(zi*.004*Beta**3)
+        Ribcu = -250.*zu/(zi*Beta**3) ! 1./.004 = 250. I just like multiplication better
         Ribu  = -grav*zu/ta*( (dt-dter*jcool)+.61*ta*dq )/ut**2
         if ( Ribu < 0. ) then
           zetu = CC*Ribu/( 1. + Ribu/Ribcu )
@@ -1368,9 +1368,9 @@
 !----------------------------------------------------------
 
         charnC = 0.011
-        umax   = 19.
-        a1     =   .0017
-        a2     =-  .0050
+        umax   = 22.     ! 19.
+        a1     =   .0016 !   .0017
+        a2     =-  .0035 !-  .0050
 
         charnC = a1*u10 + a2
         if ( u10 > umax ) charnC = a1*umax+a2

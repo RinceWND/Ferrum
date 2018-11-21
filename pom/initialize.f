@@ -332,6 +332,7 @@
      & )
 
 ! 2-D and 3-D arrays
+      elb    = 0.
       elf    = 0.
       cor    = 0.
       tauiwu = 0.
