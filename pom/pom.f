@@ -32,14 +32,14 @@
 
       mb = dtime%month
 
-      if ( calc_uvforce ) call uvforce_init(dtime)
-      call tsforce_init( dtime )
-      if ( calc_tsurf_mc ) call mcsst_init(dtime) !fhx:mcsst
-      if ( calc_interp ) call interp_init !fhx:interp_flag
-      call wind_init( dtime )
-      call river_init( dtime )
-      call assim_init( dtime )
-      if ( calc_ice ) call ice_init( dtime )
+!      if ( calc_uvforce ) call uvforce_init(dtime)
+!      call tsforce_init( dtime )
+!      if ( calc_tsurf_mc ) call mcsst_init(dtime) !fhx:mcsst
+!      if ( calc_interp ) call interp_init !fhx:interp_flag
+!      call wind_init( dtime )
+!      call river_init( dtime )
+!      call assim_init( dtime )
+!      if ( calc_ice ) call ice_init( dtime )
 ! TODO: Move all of these to initialize?
       call msg_print("INITIALIZATION COMPLETE", 1, "")
 
@@ -56,17 +56,17 @@
 
 
 !     external forcings
-        if ( iint==1 .or. .not.spinup ) then  ! when spinup, do only once
-
-          if ( calc_uvforce ) call uvforce_main(dtime)  !eda:uvforce
-          call tsforce_main( dtime )
-          if ( calc_tsurf_mc )call mcsst_main(dtime)  !fhx:mcsst
-          if ( calc_tsforce ) call tsforce_tsflx( dtime )
-          if ( calc_wind )    call wind_main( dtime )
-          if ( calc_river )   call river_main( dtime, .false. )
-          if ( calc_ice )     call ice_main( dtime )
-
-        end if
+!        if ( iint==1 .or. .not.spinup ) then  ! when spinup, do only once
+!
+!          if ( calc_uvforce ) call uvforce_main(dtime)  !eda:uvforce
+!          call tsforce_main( dtime )
+!          if ( calc_tsurf_mc )call mcsst_main(dtime)  !fhx:mcsst
+!          if ( calc_tsforce ) call tsforce_tsflx( dtime )
+!          if ( calc_wind )    call wind_main( dtime )
+!          if ( calc_river )   call river_main( dtime, .false. )
+!          if ( calc_ice )     call ice_main( dtime )
+!
+!        end if
 
 
 !     advance model
