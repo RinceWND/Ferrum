@@ -313,7 +313,7 @@
      $                   *(el(i,j)-el(i-1,j))
      $                  +alpha*(elb(i,j)-elb(i-1,j)
      $                         +elf(i,j)-elf(i-1,j))
-     $                  +e_atmos(i,j)-e_atmos(i-1,j))
+     $                  +(e_atmos(i,j)-e_atmos(i-1,j)))
      $              +drx2d(i,j)+aru(i,j)*(wusurf(i,j)-wubot(i,j))
           if (.false. .and. abs(uaf(i,j))>20. .and. my_task==3) then
             print *, "!!UAF", uaf(i,j), iint, iext
@@ -402,7 +402,7 @@
      $                *((1.-2.*alpha)*(el(i,j)-el(i,j-1))
      $                  +alpha*(elb(i,j)-elb(i,j-1)
      $                         +elf(i,j)-elf(i,j-1))
-     $                  +e_atmos(i,j)-e_atmos(i,j-1))
+     $                  +(e_atmos(i,j)-e_atmos(i,j-1)))
      $              +dry2d(i,j)+arv(i,j)*(wvsurf(i,j)-wvbot(i,j))
         end do
       end do
