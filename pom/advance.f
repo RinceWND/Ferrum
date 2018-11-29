@@ -6,7 +6,23 @@
 !
       subroutine advance
 !----------------------------------------------------------------------
-!  Advance model a step
+!  Advances model a step
+!----------------------------------------------------------------------
+! called by: pom               [pom.f]
+!
+! calls    : check_nan         [advance.f]
+!            check_nan_2d      [advance.f]
+!            check_velocity    [advance.f]
+!            ice_advance       [seaice.f]
+!            lateral_viscosity [advance.f]
+!            mode_interaction  [advance.f]
+!            mode_external     [advance.f]
+!            mode_internal     [advance.f]
+!            print_section     [advance.f]
+!            store_mean        [advance.f]
+!            store_surf_mean   [advance.f]
+!            update_bc         [advance.f]
+!            update_time       [globals.f90]
 !______________________________________________________________________
 !
         use config   , only: calc_ice
@@ -16,6 +32,7 @@
 
 ! advance POM 1 step in time
         implicit none
+
 
 ! get time
         call update_time
@@ -62,12 +79,14 @@
 
 
       end ! subroutine advance
-
+!
 !______________________________________________________________________
 !
       subroutine get_time
 !----------------------------------------------------------------------
-!  Return the model time
+!  Returns the model time
+!----------------------------------------------------------------------
+! called by: [NO CALLS]
 !______________________________________________________________________
 !
       use model_run, only: dti, iint, ramp, time, time0
@@ -86,12 +105,17 @@
 
 
       end ! subroutine get_time
-
+!
 !______________________________________________________________________
 !
       subroutine update_bc
 !----------------------------------------------------------------------
-!  Set time dependent boundary conditions
+!  Sets time-dependent boundary conditions
+!----------------------------------------------------------------------
+! called by: advance [advance.f]
+!
+! calls    : step    [air]
+!            step    [bry]
 !______________________________________________________________________
 !
       use air      , only: air_step => step
@@ -106,12 +130,18 @@
 
 
       end ! subroutine update_bc
-
+!
 !______________________________________________________________________
 !
       subroutine lateral_viscosity
 !----------------------------------------------------------------------
-!  Set the lateral viscosity
+!  Sets the lateral viscosity
+!----------------------------------------------------------------------
+! called by: advance        [advance.f]
+!
+! calls    : advct          [solver.f]
+!            exchange3d_mpi [parallel_mpi.f]
+!            pgscheme       [advance.f]
 !______________________________________________________________________
 !
       use config     , only: aam_init, horcon, mode, n1d, npg
@@ -123,6 +153,7 @@
       implicit none
 
       integer i,j,k
+
 
 ! if mode=2 then initial values of aam2d are used. If one wishes
 ! to use Smagorinsky lateral viscosity and diffusion for an
@@ -177,12 +208,16 @@
 
 
       end ! subroutine lateral_viscosity
-
+!
 !______________________________________________________________________
 !
       subroutine mode_interaction
 !----------------------------------------------------------------------
-!  Form vertical averages of 3-D fields for use in external (2-D) mode
+!  Forms vertical averages of 3-D fields for use in external (2-D) mode
+!----------------------------------------------------------------------
+! called by: advance [advance.f]
+!
+! calls    : advave  [solver.f]
 !______________________________________________________________________
 !
       use config     , only: mode
@@ -238,12 +273,19 @@
 
 
       end ! subroutine mode_interaction
-
+!
 !______________________________________________________________________
 !
       subroutine mode_external
 !----------------------------------------------------------------------
-!  Calculate the external (2-D) mode
+!  Calculates the external (2-D) mode
+!----------------------------------------------------------------------
+! called by: advance        [advance.f]
+!
+! calls    : advave         [solver.f]
+!            exchange2d_mpi [solver.f]
+!            bc_vel_ext     [bry.f90]
+!            bc_zeta        [bry.f90]
 !______________________________________________________________________
 !
       use air        , only: e_atmos, vfluxf, wusurf, wvsurf
@@ -498,7 +540,24 @@
 !
       subroutine mode_internal
 !----------------------------------------------------------------------
-!  Calculate the internal (3-D) mode
+!  Calculates the internal (3-D) mode
+!----------------------------------------------------------------------
+! called by: advance        [advance.f]
+!
+! calls    : advq           [solver.f]
+!            advt1          [solver.f]
+!            advt2          [solver.f]
+!            advu           [solver.f]
+!            advv           [solver.f]
+!            bc_turb        [bry.f90]
+!            bc_vel_int     [bry.f90]
+!            bc_vel_vert    [bry.f90]
+!            dens           [solver.f]
+!            exchange3d_mpi [parallel_mpi.f]
+!            profq          [solver.f]
+!            proft          [solver.f]
+!            profu          [solver.f]
+!            profv          [solver.f]
 !______________________________________________________________________
 !
       use air        , only: vfluxb, vfluxf, wssurf, wtsurf
@@ -773,11 +832,19 @@
 
 
       end ! subroutine mode_internal
+!
 !______________________________________________________________________
 !
       subroutine print_section
 !----------------------------------------------------------------------
-!  Print output
+!  Prints output
+!----------------------------------------------------------------------
+! called by: advance      [advance.f]
+!
+! calls    : bcast0i_mpi  [parallel_mpi.f]
+!            finalize_mpi [mpi]
+!            sum0d_mpi    [parallel_mpi.f]
+!            sum0i_mpi    [parallel_mpi.f]
 !______________________________________________________________________
 !
       use config     , only: sbias, tbias
@@ -861,11 +928,14 @@
 
 
       end ! subroutine print_section
+!
 !______________________________________________________________________
 !
       subroutine check_velocity
 !----------------------------------------------------------------------
-!  Check if velocity condition is violated
+!  Checks if velocity condition is violated
+!----------------------------------------------------------------------
+! called by: advance [advance.f]
 !______________________________________________________________________
 !
       use config     , only: vmaxl
@@ -877,9 +947,8 @@
 
       implicit none
 
+      integer  i,j,imax,jmax
       real(rk) vamax
-      integer  i,j
-      integer  imax,jmax
 
 
       vamax = 0.
@@ -906,11 +975,14 @@
 
 
       end ! subroutine check_velocity
+!
 !______________________________________________________________________
 !
       subroutine store_mean
 !----------------------------------------------------------------------
-!  Store averages for further output (if enabled)
+!  Stores averages for further output (if enabled)
+!----------------------------------------------------------------------
+! called by: advance [advance.f]
 !______________________________________________________________________
 !
       use air        , only: wssurf, wtsurf, wusurf, wvsurf
@@ -945,11 +1017,14 @@
 
 
       end ! subroutine store_mean
+!
 !______________________________________________________________________
 !
       subroutine store_surf_mean
 !----------------------------------------------------------------------
-!  Store avrages for surface output
+!  Stores averages for surface output
+!----------------------------------------------------------------------
+! called by: advance [advance.f]
 !______________________________________________________________________
 !
       use air       , only: uwsrf, vwsrf
@@ -969,6 +1044,7 @@
 
 
       end ! subroutine store_surf_mean
+!
 !_______________________________________________________________________
 !      subroutine write_output( d_in )
 !
@@ -1084,7 +1160,11 @@
 !
       subroutine check_nan
 !----------------------------------------------------------------------
-!  Check if NaNs present
+!  Checks if NaNs present
+!----------------------------------------------------------------------
+! called by: advance    [advance.f]
+!
+! calls    : detect_nan [advance.f]
 !______________________________________________________________________
 !
       use glob_ocean, only: s, t, u, v
@@ -1103,7 +1183,9 @@
 !
       subroutine detect_nan( var, varname )
 !----------------------------------------------------------------------
-!  Check an array for NaNs
+!  Checks an array for NaNs
+!----------------------------------------------------------------------
+! called by: check_nan [advance.f]
 !______________________________________________________________________
 !
       use glob_const , only: rk
@@ -1112,9 +1194,10 @@
 
       implicit none
 
+      real(rk)        , intent(in) :: var(im,jm,kb)
+      character(len=*), intent(in) :: varname
+
       integer i, j, k, num_nan
-      real(kind=rk), intent(in) :: var(im,jm,kb)
-      character(len=*),intent(in)  :: varname
 
 
       num_nan = 0
@@ -1144,11 +1227,16 @@
 
 
       end ! subroutine detect_nan
+!
 !______________________________________________________________________
 !fhx:tide:debug
       subroutine check_nan_2d
 !----------------------------------------------------------------------
-!  Check for NaNs present in 2D
+!  Checks for NaNs present in 2D
+!----------------------------------------------------------------------
+! called by: advance       [advance.f]
+!
+! calls    : detect_nan_2d [advance.f]
 !______________________________________________________________________
 !
       use glob_ocean, only: elf, uaf, vaf
@@ -1162,11 +1250,14 @@
 
 
       end ! subroutine check_nan_2d
+!
 !______________________________________________________________________
 !fhx:tide;debug
       subroutine detect_nan_2d( var, varname )
 !----------------------------------------------------------------------
-!  Check a 2D array for NaNs
+!  Checks a 2D array for NaNs
+!----------------------------------------------------------------------
+! called by: check_nan_2d [advance.f]
 !______________________________________________________________________
 !
       use air
@@ -1209,12 +1300,21 @@
 
 
       end ! subroutine detect_nan_2d
-
+!
 !______________________________________________________________________
 !
       subroutine pgscheme(npg)
 !----------------------------------------------------------------------
 !  Redirects to a proper PGF scheme
+!----------------------------------------------------------------------
+! called by: lateral_viscosity [advance.f]
+!            update_initial    [initialize.f]
+!
+! calls    : baropg            [solver.f]
+!            baropg_lin        [solver.f]
+!            baropg_mcc        [solver.f]
+!            baropg_shch       [solver.f]
+!            baropg_song_std   [solver.f]
 !______________________________________________________________________
 !
         implicit none
