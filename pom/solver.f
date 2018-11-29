@@ -7,8 +7,13 @@
       subroutine advave(curv2d)
 !----------------------------------------------------------------------
 !  Calculate horizontal advection and diffusion.
+!----------------------------------------------------------------------
+! called by: mode_interaction [advance.f]
+!            mode_external    [advande.f]
+!
+! calls    : exchange2d_mpi   [parallel_mpi.f]
 !______________________________________________________________________
-
+!
       use config     , only: mode
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1
@@ -79,11 +84,7 @@
       end do
 
 ! v-advection and diffusion
-      do j=1,jm
-        do i=1,im
-          advva(i,j)=0.
-        end do
-      end do
+      advva = 0.
 
 ! advective fluxes
       do j=2,jm
@@ -203,9 +204,9 @@
 
       endif
 
-      return
-      end
 
+      end ! subroutine advave
+!
 !______________________________________________________________________
 !
       subroutine advct(xflux,yflux,curv)
@@ -214,8 +215,12 @@
 ! advance of their use in advu and advv so that their vertical
 ! integrals (created in the main program) may be used in the
 ! external (2-D) mode calculation.
+!----------------------------------------------------------------------
+! called by: lateral_viscosity [advance.f]
+!
+! calls    : exchange3d_mpi
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
      &                     , n_south, n_west
@@ -226,8 +231,9 @@
 
       real(rk), dimension(im,jm,kb), intent(out) :: xflux, yflux, curv
 
+      integer  i,j,k
       real(rk) dtaam
-      integer i,j,k
+
 
       curv  = 0.
       advx  = 0.
@@ -237,11 +243,11 @@
       do k=1,kbm1
         do j=2,jmm1
           do i=2,imm1
-            curv(i,j,k)=.25*((v(i,j+1,k)+v(i,j,k))
-     $                         *(dy(i+1,j)-dy(i-1,j))
-     $                         -(u(i+1,j,k)+u(i,j,k))
-     $                         *(dx(i,j+1)-dx(i,j-1)))
-     $                       /(dx(i,j)*dy(i,j))
+            curv(i,j,k)=.25*( (v(i,j+1,k)+v(i,j,k))
+     $                        *(dy(i+1,j)-dy(i-1,j))
+     $                       -(u(i+1,j,k)+u(i,j,k))
+     $                        *(dx(i,j+1)-dx(i,j-1)) )
+     $                      /( dx(i,j)*dy(i,j) ) ! TODO: use `art` maybe
           end do
         end do
       end do
@@ -253,9 +259,9 @@
       do k=1,kbm1
         do j=1,jm
           do i=2,imm1
-            xflux(i,j,k)=.125*((dt(i+1,j)+dt(i,j))*u(i+1,j,k)
-     $                           +(dt(i,j)+dt(i-1,j))*u(i,j,k))
-     $                         *(u(i+1,j,k)+u(i,j,k))
+            xflux(i,j,k)=.125*( (dt(i+1,j)+dt(i  ,j))*u(i+1,j,k)
+     $                         +(dt(i  ,j)+dt(i-1,j))*u(i  ,j,k) )
+     $                        *( u(i+1,j,k)+u(i,j,k) )
           end do
         end do
       end do
@@ -263,9 +269,9 @@
       do k=1,kbm1
         do j=2,jm
           do i=2,im
-            yflux(i,j,k)=.125*((dt(i,j)+dt(i,j-1))*v(i,j,k)
-     $                           +(dt(i-1,j)+dt(i-1,j-1))*v(i-1,j,k))
-     $                         *(u(i,j,k)+u(i,j-1,k))
+            yflux(i,j,k)=.125*( (dt(i  ,j)+dt(i  ,j-1))*v(i  ,j,k)
+     $                         +(dt(i-1,j)+dt(i-1,j-1))*v(i-1,j,k) )
+     $                        *( u(i,j,k)+u(i,j-1,k) )
           end do
         end do
       end do
@@ -274,23 +280,23 @@
       do k=1,kbm1
         do j=2,jm
           do i=2,imm1
-            xflux(i,j,k)=xflux(i,j,k)
+            xflux(i,j,k) = xflux(i,j,k)
      $                    -dt(i,j)*aam(i,j,k)*2.
      $                    *(ub(i+1,j,k)-ub(i,j,k))/dx(i,j)
-            dtaam=.25*(dt(i,j)+dt(i-1,j)+dt(i,j-1)+dt(i-1,j-1))
-     $             *(aam(i,j,k)+aam(i-1,j,k)
-     $               +aam(i,j-1,k)+aam(i-1,j-1,k))
-            yflux(i,j,k)=yflux(i,j,k)
-     $                    -dtaam*((ub(i,j,k)-ub(i,j-1,k))
-     $                            /(dy(i,j)+dy(i-1,j)
-     $                              +dy(i,j-1)+dy(i-1,j-1))
+            dtaam = .25*(dt(i,j)+dt(i-1,j)+dt(i,j-1)+dt(i-1,j-1))
+     $                 *( aam(i,j  ,k)+aam(i-1,j  ,k)
+     $                   +aam(i,j-1,k)+aam(i-1,j-1,k) )
+            yflux(i,j,k) = yflux(i,j,k)
+     $                    -dtaam*( (ub(i,j,k)-ub(i,j-1,k))
+     $                             /( dy(i,j  )+dy(i-1,j)
+     $                               +dy(i,j-1)+dy(i-1,j-1) )
      $                            +(vb(i,j,k)-vb(i-1,j,k))
-     $                            /(dx(i,j)+dx(i-1,j)
-     $                              +dx(i,j-1)+dx(i-1,j-1)))
+     $                             /( dx(i,j  )+dx(i-1,j  )
+     $                               +dx(i,j-1)+dx(i-1,j-1) ) )
 
-            xflux(i,j,k)=dy(i,j)*xflux(i,j,k)
-            yflux(i,j,k)=.25*(dx(i,j)+dx(i-1,j)
-     $                          +dx(i,j-1)+dx(i-1,j-1))*yflux(i,j,k)
+            xflux(i,j,k) = dy(i,j)*xflux(i,j,k)
+            yflux(i,j,k) = .25*( dx(i,j  )+dx(i-1,j  )
+     $                          +dx(i,j-1)+dx(i-1,j-1) )*yflux(i,j,k)
           end do
         end do
       end do
@@ -300,8 +306,8 @@
       do k=1,kbm1
         do j=2,jmm1
           do i=2,imm1
-            advx(i,j,k)=xflux(i,j,k)-xflux(i-1,j,k)
-     $                   +yflux(i,j+1,k)-yflux(i,j,k)
+            advx(i,j,k) = xflux(i,j  ,k)-xflux(i-1,j,k)
+     $                   +yflux(i,j+1,k)-yflux(i  ,j,k)
           end do
         end do
       end do
@@ -309,23 +315,23 @@
       do k=1,kbm1
         do j=2,jmm1
           if(n_west.eq.-1) then
-          do i=3,imm1
-            advx(i,j,k)=advx(i,j,k)
-     $                   -aru(i,j)*.25
-     $                     *(curv(i,j,k)*dt(i,j)
-     $                        *(v(i,j+1,k)+v(i,j,k))
-     $                       +curv(i-1,j,k)*dt(i-1,j)
-     $                        *(v(i-1,j+1,k)+v(i-1,j,k)))
-          end do
+            do i=3,imm1
+              advx(i,j,k) = advx(i,j,k)
+     $                     -aru(i,j)*.25
+     $                      *( curv(i  ,j,k)*dt(i  ,j)
+     $                         *(v(i  ,j+1,k)+v(i  ,j,k))
+     $                        +curv(i-1,j,k)*dt(i-1,j)
+     $                         *(v(i-1,j+1,k)+v(i-1,j,k)) )
+            end do
           else
-          do i=2,imm1
-            advx(i,j,k)=advx(i,j,k)
-     $                   -aru(i,j)*.25
-     $                     *(curv(i,j,k)*dt(i,j)
-     $                        *(v(i,j+1,k)+v(i,j,k))
-     $                       +curv(i-1,j,k)*dt(i-1,j)
-     $                        *(v(i-1,j+1,k)+v(i-1,j,k)))
-          end do
+            do i=2,imm1
+              advx(i,j,k) = advx(i,j,k)
+     $                     -aru(i,j)*.25
+     $                      *( curv(i  ,j,k)*dt(i  ,j)
+     $                         *(v(i  ,j+1,k)+v(i  ,j,k))
+     $                        +curv(i-1,j,k)*dt(i-1,j)
+     $                         *(v(i-1,j+1,k)+v(i-1,j,k)) )
+            end do
           end if
         end do
       end do
@@ -340,9 +346,9 @@
       do k=1,kbm1
         do j=2,jm
           do i=2,im
-            xflux(i,j,k)=.125*((dt(i,j)+dt(i-1,j))*u(i,j,k)
-     $                           +(dt(i,j-1)+dt(i-1,j-1))*u(i,j-1,k))
-     $                         *(v(i,j,k)+v(i-1,j,k))
+            xflux(i,j,k) = .125*( (dt(i,j  )+dt(i-1,j  ))*u(i,j,k)
+     $                           +(dt(i,j-1)+dt(i-1,j-1))*u(i,j-1,k) )
+     $                          *( v(i,j,k)+v(i-1,j,k) )
           end do
         end do
       end do
@@ -350,9 +356,9 @@
       do k=1,kbm1
         do j=2,jmm1
           do i=1,im
-            yflux(i,j,k)=.125*((dt(i,j+1)+dt(i,j))*v(i,j+1,k)
-     $                           +(dt(i,j)+dt(i,j-1))*v(i,j,k))
-     $                         *(v(i,j+1,k)+v(i,j,k))
+            yflux(i,j,k) = .125*( (dt(i,j+1)+dt(i,j  ))*v(i,j+1,k)
+     $                           +(dt(i,j  )+dt(i,j-1))*v(i,j  ,k) )
+     $                          *( v(i,j+1,k)+v(i,j,k) )
           end do
         end do
       end do
@@ -361,23 +367,23 @@
       do k=1,kbm1
         do j=2,jmm1
           do i=2,im
-            dtaam=.25*(dt(i,j)+dt(i-1,j)+dt(i,j-1)+dt(i-1,j-1))
-     $             *(aam(i,j,k)+aam(i-1,j,k)
-     $               +aam(i,j-1,k)+aam(i-1,j-1,k))
-            xflux(i,j,k)=xflux(i,j,k)
-     $                    -dtaam*((ub(i,j,k)-ub(i,j-1,k))
-     $                            /(dy(i,j)+dy(i-1,j)
-     $                              +dy(i,j-1)+dy(i-1,j-1))
+            dtaam = .25*(dt(i,j)+dt(i-1,j)+dt(i,j-1)+dt(i-1,j-1))
+     $                 *( aam(i,j  ,k)+aam(i-1,j  ,k)
+     $                   +aam(i,j-1,k)+aam(i-1,j-1,k) )
+            xflux(i,j,k) = xflux(i,j,k)
+     $                    -dtaam*( (ub(i,j,k)-ub(i,j-1,k))
+     $                             /( dy(i,j  )+dy(i-1,j  )
+     $                               +dy(i,j-1)+dy(i-1,j-1) )
      $                            +(vb(i,j,k)-vb(i-1,j,k))
-     $                            /(dx(i,j)+dx(i-1,j)
-     $                              +dx(i,j-1)+dx(i-1,j-1)))
-            yflux(i,j,k)=yflux(i,j,k)
+     $                             /( dx(i,j  )+dx(i-1,j  )
+     $                               +dx(i,j-1)+dx(i-1,j-1) ) )
+            yflux(i,j,k) = yflux(i,j,k)
      $                    -dt(i,j)*aam(i,j,k)*2.
      $                    *(vb(i,j+1,k)-vb(i,j,k))/dy(i,j)
 
-            xflux(i,j,k)=.25*(dy(i,j)+dy(i-1,j)
-     $                          +dy(i,j-1)+dy(i-1,j-1))*xflux(i,j,k)
-            yflux(i,j,k)=dx(i,j)*yflux(i,j,k)
+            xflux(i,j,k) = .25*( dy(i,j  )+dy(i-1,j  )
+     $                          +dy(i,j-1)+dy(i-1,j-1) )*xflux(i,j,k)
+            yflux(i,j,k) = dx(i,j)*yflux(i,j,k)
           end do
         end do
       end do
@@ -387,8 +393,8 @@
       do k=1,kbm1
         do j=2,jmm1
           do i=2,imm1
-            advy(i,j,k)=xflux(i+1,j,k)-xflux(i,j,k)
-     $                   +yflux(i,j,k)-yflux(i,j-1,k)
+            advy(i,j,k) = xflux(i+1,j,k)-xflux(i,j  ,k)
+     $                   +yflux(i  ,j,k)-yflux(i,j-1,k)
           end do
         end do
       end do
@@ -396,39 +402,40 @@
       do k=1,kbm1
         do i=2,imm1
           if(n_south.eq.-1) then
-          do j=3,jmm1
-            advy(i,j,k)=advy(i,j,k)
-     $                   +arv(i,j)*.25
-     $                     *(curv(i,j,k)*dt(i,j)
-     $                        *(u(i+1,j,k)+u(i,j,k))
-     $                       +curv(i,j-1,k)*dt(i,j-1)
-     $                        *(u(i+1,j-1,k)+u(i,j-1,k)))
-          end do
+            do j=3,jmm1
+              advy(i,j,k) = advy(i,j,k)
+     $                     +arv(i,j)*.25
+     $                      *( curv(i,j  ,k)*dt(i,j  )
+     $                         *(u(i+1,j  ,k)+u(i,j  ,k))
+     $                        +curv(i,j-1,k)*dt(i,j-1)
+     $                         *(u(i+1,j-1,k)+u(i,j-1,k)) )
+            end do
           else
-          do j=2,jmm1
-            advy(i,j,k)=advy(i,j,k)
-     $                   +arv(i,j)*.25
-     $                     *(curv(i,j,k)*dt(i,j)
-     $                        *(u(i+1,j,k)+u(i,j,k))
-     $                       +curv(i,j-1,k)*dt(i,j-1)
-     $                        *(u(i+1,j-1,k)+u(i,j-1,k)))
-          end do
+            do j=2,jmm1
+              advy(i,j,k) = advy(i,j,k)
+     $                     +arv(i,j)*.25
+     $                      *( curv(i,j  ,k)*dt(i,j  )
+     $                         *(u(i+1,j  ,k)+u(i,j  ,k))
+     $                        +curv(i,j-1,k)*dt(i,j-1)
+     $                         *(u(i+1,j-1,k)+u(i,j-1,k)) )
+            end do
           end if
         end do
       end do
 
-      return
 
-      end
-
+      end ! subroutine advct
+!
 !______________________________________________________________________
 !
       subroutine advq(qb,q,qf,xflux,yflux)
 !----------------------------------------------------------------------
 !  Calculates horizontal advection and diffusion, and vertical
 ! advection for turbulent quantities.
+!----------------------------------------------------------------------
+! called by: mode_internal [advance.f] (x2)
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
       use glob_grid  , only: art, dum, dvm, dx, dy, dz, h
@@ -441,6 +448,7 @@
       real(rk), dimension(im,jm,kb), intent(out) :: qf, xflux, yflux
 
       integer i,j,k
+
 
 ! do horizontal advection
       do k=2,kbm1
@@ -491,9 +499,9 @@
         end do
       end do
 
-      return
-      end
 
+      end ! subroutine advq
+!
 !______________________________________________________________________
 !
       subroutine advt1(fb,f,fclim,ff,xflux,yflux, var)
@@ -501,8 +509,10 @@
 !  Integrate conservative scalar equations.
 !  This is centred scheme, as originally provided in POM (previously
 ! called advt.)
+!----------------------------------------------------------------------
+! called by: mode_internal [advance.f] (x2)
 !______________________________________________________________________
-
+!
       use config     , only: tprni
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
@@ -517,13 +527,14 @@
       real(rk), dimension(im,jm,kb), intent(  out) :: ff,xflux,yflux
       character(len=1)             , intent(in   ) :: var
 
-      integer i,j,k
+      integer       i,j,k
       real(kind=rk) relax !lyo:relax
+
 
       do j=1,jm
         do i=1,im
-           f(i,j,kb)=f(i,j,kbm1)
-           fb(i,j,kb)=fb(i,j,kbm1)
+          f(i,j,kb)=f(i,j,kbm1)
+          fb(i,j,kb)=fb(i,j,kbm1)
         end do
       end do
 
@@ -540,13 +551,7 @@
       end do
 
 ! add diffusive fluxes
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            fb(i,j,k)=fb(i,j,k)-fclim(i,j,k)
-          end do
-        end do
-      end do
+      fb = fb - fclim
 
       do k=1,kbm1
         do j=2,jm
@@ -567,13 +572,7 @@
         end do
       end do
 
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            fb(i,j,k)=fb(i,j,k)+fclim(i,j,k)
-          end do
-        end do
-      end do
+      fb = fb + fclim
 
 ! do vertical advection
       do j=2,jmm1
@@ -617,9 +616,9 @@
         end do
       end do
 
-      return
-      end
 
+      end ! subroutine advt1
+!
 !______________________________________________________________________
 !
       subroutine advt2(fb,fclim,ff,xflux,yflux,var)
@@ -632,8 +631,15 @@
 ! (Inter-university Computing Consortium, Rome, Italy) and
 ! Vincenzo Artale (Italian National Agency for New Technology
 ! and Environment, Rome, Italy)
+!----------------------------------------------------------------------
+! called_by: mode_internal  [advance.f]
+!
+! calls    : bcast0d_mpi    [parallel_mpi.f]
+!            exchange3d_mpi [parallel_mpi.f]
+!            max0d_mpi      [parallel_mpi.f]
+!            smol_adif      [solver.f]
 !______________________________________________________________________
-
+!
       use config     , only: nitera, tprni
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1, master_task
@@ -648,10 +654,11 @@
       real(rk), dimension(im,jm,kb), intent(  out) :: ff,xflux,yflux
       character(len=1)             , intent(in   ) :: var
 
+      integer                          i,j,k,itera
       real(rk), dimension(im,jm,kb) :: fbmem,xmassflux,ymassflux,zwflux
       real(rk), dimension(im,jm)    :: eta
-      real(rk) eps, epsval  ! rwnd: iteration check
-      integer i,j,k,itera
+      real(rk)                         eps, epsval  ! rwnd: iteration check
+
 
       select case ( var )
         case ('T')
@@ -726,11 +733,11 @@
 !            if(itera.eq.1) zflux(i,j,1)=w(i,j,1)*f(i,j,1)*art(i,j)
 !     for rivers 2010/5/08 ayumi
             if (itera == 1 ) then
-               if ( var == 'T' )
+              if ( var == 'T' )
      $              zflux(i,j,1)=tsurf(i,j)*w(i,j,1)*art(i,j)
-               if ( var == 'S' )
+              if ( var == 'S' )
      $              zflux(i,j,1)=0.
-            endif
+            end if
             zflux(i,j,kb)=0.
           end do
         end do
@@ -788,13 +795,7 @@
 !      write(*,*) my_task, ": ", var, ": nitera = ", itera  ! rwnd: iteration check
 
 ! add horizontal diffusive fluxes
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            fb(i,j,k)=fb(i,j,k)-fclim(i,j,k)
-          end do
-        end do
-      end do
+      fb = fb - fclim
 
       do k=1,kbm1
         do j=2,jm
@@ -818,13 +819,7 @@
         end do
       end do
 
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            fb(i,j,k)=fb(i,j,k)+fclim(i,j,k)
-          end do
-        end do
-      end do
+      fb = fb + fclim
 
 ! add net horizontal fluxes and step forward in time
       do k=1,kbm1
@@ -837,17 +832,22 @@
         end do
       end do
 
-      return
-      end
 
+      end ! subroutine advt2
+!
 !______________________________________________________________________
 !
       subroutine advtC(cbm,cf)
 !----------------------------------------------------------------------
 !  Integrate conservative scalar equations.
 !  This is the 2-D modifiction of `advt2` for sea-ice concentration.
+!----------------------------------------------------------------------
+! called_by: ice_advance    [seaice.f]
+!
+! calls    : exchange2d_mpi [parallel_mpi.f]
+!            smol_adifC     [solver.f]
 !______________________________________________________________________
-
+!
       use config     , only: nitera
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1
@@ -865,6 +865,7 @@
      &                            , xmassflux , ymassflux
 !      real(kind=rk) eps, epsval  ! rwnd: iteration check
       integer i,j,itera
+
 
 ! calculate horizontal mass fluxes
       xmassflux = 0.
@@ -976,18 +977,19 @@
 !        end do
 !      end do
 
-      return
 
-      end
-
+      end ! subroutine advtC
+!
 !______________________________________________________________________
 !
       subroutine advu
 !----------------------------------------------------------------------
 !  Do horizontal and vertical advection of u-momentum, and includes
 ! coriolis, surface slope and baroclinic terms.
+!----------------------------------------------------------------------
+! called by: mode_internal [advance.f]
 !______________________________________________________________________
-
+!
       use air        , only: e_atmos
       use glob_const , only: grav, rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
@@ -999,6 +1001,7 @@
       implicit none
 
       integer i,j,k
+
 
 ! do vertical advection
       uf = 0.
@@ -1046,17 +1049,19 @@
         end do
       end do
 
-      return
-      end
 
+      end ! subroutine advu
+!
 !______________________________________________________________________
 !
       subroutine advv
 !----------------------------------------------------------------------
 !  Do horizontal and vertical advection of v-momentum, and includes
 ! coriolis, surface slope and baroclinic terms.
+!----------------------------------------------------------------------
+! called by: mode_internal [advance.f]
 !______________________________________________________________________
-
+!
       use air        , only: e_atmos
       use glob_const , only: grav, rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
@@ -1068,6 +1073,7 @@
       implicit none
 
       integer i,j,k
+
 
 ! do vertical advection
       vf = 0.
@@ -1115,16 +1121,18 @@
         end do
       end do
 
-      return
-      end
 
+      end ! subroutine advv
+!
 !______________________________________________________________________
 !
       subroutine baropg
 !----------------------------------------------------------------------
 !  Calculate  baroclinic pressure gradient.
+!----------------------------------------------------------------------
+! called by: pgscheme [advance.f]
 !______________________________________________________________________
-
+!
       use glob_const , only: grav, rk
       use glob_domain, only: imm1, jmm1, kb, kbm1
       use glob_grid  , only: dum, dvm, dx, dy, zz
@@ -1134,6 +1142,7 @@
       implicit none
 
       integer i,j,k
+
 
       rho = rho - rmean
 
@@ -1216,17 +1225,19 @@
 
       rho = rho + rmean
 
-      return
 
-      end
+      end ! subroutine baropg
+!
 !______________________________________________________________________
 !fhx:Toni:npg
       subroutine baropg_mcc
 !----------------------------------------------------------------------
 !  Calculate baroclinic pressure gradient.
 !  4th order correction terms, following McCalpin.
+!----------------------------------------------------------------------
+! called by: pgscheme [advance.f]
 !______________________________________________________________________
-
+!
       use glob_const , only: grav, rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
      &                     , n_south, n_west
@@ -1236,9 +1247,10 @@
 
       implicit none
 
-      integer i,j,k
+      integer       i,j,k
       real(kind=rk) d4(im,jm),ddx(im,jm),drho(im,jm,kb),rhou(im,jm,kb)
       real(kind=rk) rho4th(0:im,0:jm,kb),d4th(0:im,0:jm)
+
 
       rho = rho - rmean
 
@@ -1461,17 +1473,19 @@
         end do
       end do
 
-      return
-      end
 
+      end ! subroutine baropg_mcc
+!
 !______________________________________________________________________
 !
       subroutine baropg_lin
 !----------------------------------------------------------------------
 !  Finite volume baroclinic pressure gradient scheme following Lin(*).
 ! TODO: fix and fill up the resource.
+!----------------------------------------------------------------------
+! called by: pgscheme [advance.f]
 !______________________________________________________________________
-
+!
       use glob_const , only: grav, rk
       use glob_domain, only: im, jm, kb, kbm1
       use glob_grid  , only: dum, dvm, dx, dy, dz, z
@@ -1480,9 +1494,10 @@
 
       implicit none
 
-      integer i,j,k
+      integer       i,j,k
       real(kind=rk) p(im,jm,kb),fx(im,jm,kb),fc(im,jm,kb)
       real(kind=rk) dh,cff,cff1
+
 
 !      rho = rho-rmean
 
@@ -1584,16 +1599,19 @@
 
 !      rho = rho+rmean
 
-      end subroutine
 
+      end ! subroutine baropg_lin
+!
 !______________________________________________________________________
 !
       subroutine baropg_song_std
 !----------------------------------------------------------------------
 !  Baroclinic pressure gradient scheme following Song(*).
 ! TODO: fix and fill up the resource.
+!----------------------------------------------------------------------
+! called by: pgscheme [advance.f]
 !______________________________________________________________________
-
+!
       use glob_const , only: grav, rhoref, rk
       use glob_domain, only: im, jm, kbm1
       use glob_grid  , only: dum, dvm, dx, dy, dz, z, zz
@@ -1602,9 +1620,10 @@
 
       implicit none
 
-      integer i,j,k
+      integer       i,j,k
       real(kind=rk) phix(2:im),phie(im)
       real(kind=rk) fac,fac1,fac2,fac3,cff1,cff2,cff3,cff4,gamma
+
 
 !      rho = rho-rmean
 
@@ -1737,16 +1756,19 @@
 
 !      rho = rho+rmean
 
-      end subroutine
 
+      end ! subroutine baropg_song_std
+!
 !______________________________________________________________________
 !
       subroutine baropg_shch
 !----------------------------------------------------------------------
 !  Baroclinic pressure gradient scheme following Shchepetkin(*).
 ! TODO: fix and fill up the resource.
+!----------------------------------------------------------------------
+! called by: pgscheme [advance.f]
 !______________________________________________________________________
-
+!
       use glob_const , only: grav, rhoref, rk
       use glob_domain, only: im, imm1, jm, jmm1, kb
       use glob_grid  , only: dx, dy, dz, z, zz
@@ -1755,15 +1777,16 @@
 
       implicit none
 
-      integer i,j,k
+      integer                     i,j,k
       real(kind=rk), parameter :: OneFifth   = .2
      &                           ,OneTwelfth = 1./12.
      &                           ,eps        = 1.e-10
-      real(kind=rk) GRho, GRho0, HalfGRho
-      real(kind=rk) fac,cff,cff1,cff2
+      real(kind=rk)               GRho, GRho0, HalfGRho
+      real(kind=rk)               fac,cff,cff1,cff2
       real(kind=rk), dimension(im,jm,kb):: p
       real(kind=rk), dimension(im,kb+1) :: idR, idZ
       real(kind=rk), dimension(im,jm)   :: fc, aux, idRx, idZx
+
 
 !      rho = rho-rmean
 
@@ -1947,16 +1970,25 @@
 
 !      rho = rho+rmean
 
-      end subroutine
 
+      end ! subroutine baropg_shch
+!
 !______________________________________________________________________
 !
       subroutine xperi2d_mpi(wrk,nx,ny) !lyo:20110224:alu:stcc:
 !----------------------------------------------------------------------
 !  Doing periodic bc in x.
 !  Pass from east to west and also pass from west to east.
+!----------------------------------------------------------------------
+! called by: bc_vel_ext [bry.f90] (x2)
+!            bc_vel_int [bry.f90] (x2)
+!            bc_zeta    [bry.f90]
+!
+! calls    : mpi_recv   [mpi]
+!            mpi_send   [mpi]
+! TODO: move to `parallel_mpi.f`
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
       use glob_domain, only: im_global, im_local, my_task
      &                     , n_east, n_west, POM_COMM
@@ -1967,10 +1999,11 @@
       integer , intent(in   ) :: nx,ny
       real(rk), intent(inout) :: wrk(nx,ny)
 
-      integer j,ierr,nproc_x
-      integer dest_task,sour_task
-      integer istatus(mpi_status_size)
+      integer  j,ierr,nproc_x
+      integer  dest_task,sour_task
+      integer  istatus(mpi_status_size)
       real(rk) sendbuf(ny),recvbuf(ny)
+
 
 ! determine the number of processors in x
       if(mod(im_global-2,im_local-2).eq.0) then
@@ -2050,17 +2083,26 @@
 
       endif !if (nproc_x.eq.1) then !lyo:scs1d:
 
-      return
-      end
 
+      end ! subroutine xperi2d_mpi
+!
 !______________________________________________________________________
 !
       subroutine xperi3d_mpi(wrk,nx,ny,nz) !lyo:20110224:alu:stcc:
 !----------------------------------------------------------------------
 !  Doing periodic bc in x.
 !  Pass from east to west and also pass from west to east.
+!----------------------------------------------------------------------
+! called by: bc_ts      [bry.f90] (x2)
+!            bc_turb    [bry.f90] (x6)
+!            bc_vel_int [bry.f90] (x2)
+!            bc_zeta    [bry.f90]
+!
+! calls    : mpi_recv   [mpi]
+!            mpi_send   [mpi]
+! TODO: move to `parallel_mpi.f`
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
       use glob_domain, only: im_global, im_local, my_task
      &                     , n_east, n_west, POM_COMM
@@ -2071,12 +2113,11 @@
       integer , intent(in   ) :: nx,ny,nz
       real(rk), intent(inout) :: wrk(nx,ny,nz)
 
-      integer i,j,k
-      integer ierr,nproc_x
-      integer dest_task,sour_task
-      integer istatus(mpi_status_size)
+      integer  i,j,k
+      integer  ierr,nproc_x
+      integer  dest_task,sour_task
+      integer  istatus(mpi_status_size)
       real(rk) sendbuf(ny*nz),recvbuf(ny*nz)
-
 
 
 ! determine the number of processors in x
@@ -2094,7 +2135,7 @@
         enddo; enddo
       else
 !
-C  !The most east sudomains
+!The most east sudomains
       if(n_east.eq.-1) then
         dest_task=my_task-nproc_x+1
         sour_task=my_task-nproc_x+1
@@ -2131,7 +2172,7 @@ C  !The most east sudomains
 
       endif!if(n_east.eq.-1)
 
-C  !The most west sudomains
+!The most west sudomains
       if(n_west.eq.-1) then
        sour_task=my_task+nproc_x-1
        dest_task=my_task+nproc_x-1
@@ -2171,13 +2212,25 @@ C  !The most west sudomains
 
       endif !if (nproc_x.eq.1) then !lyo:scs1d:
 
-      return
-      end
+
+      end ! subroutine xperi3d_mpi
+!
 !_______________________________________________________________________
 !lyo:scs1d:add yperi*:ipery:beg:
       subroutine yperi2d_mpi(wrk,nx,ny)
-! doing periodic bc in y
-! pass from north to south and also pass from south to north
+!----------------------------------------------------------------------
+!  Doing periodic bc in y.
+!  Pass from north to south and also pass from south to north.
+!----------------------------------------------------------------------
+! called by: bc_vel_ext [bry.f90] (x2)
+!            bc_vel_int [bry.f90] (x2)
+!            bc_zeta    [bry.f90]
+!
+! calls    : mpi_recv   [mpi]
+!            mpi_send   [mpi]
+! TODO: move to `parallel_mpi.f`
+!______________________________________________________________________
+!
       use glob_const , only: rk
       use glob_domain, only: jm_global, jm_local, my_task
      &                     , n_north, n_south, POM_COMM
@@ -2185,12 +2238,14 @@ C  !The most west sudomains
 
       implicit none
 
-      integer nx,ny
-      real(kind=rk) wrk(nx,ny)
-      integer i,ierr,nproc_y
-      integer dest_task,sour_task
-      integer istatus(mpi_status_size)
-      real(kind=rk) sendbuf(nx),recvbuf(nx) !lyo:scs1d:
+      integer , intent(in   ) :: nx, ny
+      real(rk), intent(inout) :: wrk(nx,ny)
+
+      integer  i,ierr,nproc_y
+      integer  dest_task,sour_task
+      integer  istatus(mpi_status_size)
+      real(rk) sendbuf(nx),recvbuf(nx) !lyo:scs1d:
+
 
 ! determine the number of processors in y
       if(mod(jm_global-2,jm_local-2).eq.0) then
@@ -2206,7 +2261,7 @@ C  !The most west sudomains
         enddo
       else
 !
-C  !The most north sudomains
+!The most north sudomains
       if(n_north.eq.-1) then
         dest_task=my_task-nproc_y+1
         sour_task=my_task-nproc_y+1
@@ -2235,7 +2290,7 @@ C  !The most north sudomains
 
       endif !if(n_north.eq.-1)
 
-C  !The most south sudomains
+!The most south sudomains
       if(n_south.eq.-1) then
         sour_task=my_task+nproc_y-1
         dest_task=my_task+nproc_y-1
@@ -2268,12 +2323,26 @@ C  !The most south sudomains
 
       endif !if (nproc_y.eq.1) then !lyo:scs1d:
 
-      return
-      end
-!_______________________________________________________________________
+
+      end ! subroutine yperi2d_mpi
+!
+!______________________________________________________________________
+!
       subroutine yperi3d_mpi(wrk,nx,ny,nz)
-! doing periodic bc in y
-! pass from north to south and also pass from south to north
+!----------------------------------------------------------------------
+!  Doing periodic bc in y.
+!  Pass from north to south and also pass from south to north.
+!----------------------------------------------------------------------
+! called by: bc_ts      [bry.f90] (x2)
+!            bc_turb    [bry.f90] (x6)
+!            bc_vel_int [bry.f90] (x2)
+!            bc_zeta    [bry.f90]
+!
+! calls    : mpi_recv   [mpi]
+!            mpi_send   [mpi]
+! TODO: move to `parallel_mpi.f`
+!______________________________________________________________________
+!
       use glob_const , only: rk
       use glob_domain, only: jm_global, jm_local, my_task
      &                     , n_north, n_south, POM_COMM
@@ -2281,14 +2350,14 @@ C  !The most south sudomains
 
       implicit none
 
-      integer nx,ny,nz
-      real(kind=rk) wrk(nx,ny,nz)
-      integer i,j,k
-      integer ierr,nproc_y
-      integer dest_task,sour_task
-      integer istatus(mpi_status_size)
-      real(kind=rk) sendbuf(nx*nz),recvbuf(nx*nz)
+      integer , intent(in   ) :: nx,ny,nz
+      real(rk), intent(inout) :: wrk(nx,ny,nz)
 
+      integer  i,j,k
+      integer  ierr,nproc_y
+      integer  dest_task,sour_task
+      integer  istatus(mpi_status_size)
+      real(rk) sendbuf(nx*nz),recvbuf(nx*nz)
 
 
 ! determine the number of processors in y
@@ -2306,7 +2375,7 @@ C  !The most south sudomains
         enddo; enddo
       else
 !
-C  !The most north sudomains
+!The most north sudomains
       if(n_north.eq.-1) then
         dest_task=my_task-nproc_y+1
         sour_task=my_task-nproc_y+1
@@ -2343,7 +2412,7 @@ C  !The most north sudomains
 
       endif!if(n_north.eq.-1)
 
-C  !The most south sudomains
+!The most south sudomains
       if(n_south.eq.-1) then
        sour_task=my_task+nproc_y-1
        dest_task=my_task+nproc_y-1
@@ -2383,8 +2452,9 @@ C  !The most south sudomains
 
       endif !if (nproc_y.eq.1) then !lyo:scs1d:
 
-      return
-      end
+
+      end ! subroutine yperi3d_mpi
+!
 !______________________________________________________________________
 !lyo:scs1d:add yperi*:ipery:end:
 !lyo:pac10:beg:
@@ -2396,8 +2466,13 @@ C  !The most south sudomains
 ! only the eastern boundary is open.
 ! annual mean uabe is specified (2-d velocity b.c.).
 ! radiation b.c. for 3-d uv,and advection b.c. for 3-d ts.
+!----------------------------------------------------------------------
+! called by: [NO CALLS]
+!
+! calls    : bcast0d_mpi [parallel_mpi.f]
+!            psum_mpi    [parallel_mpi.f]
 !______________________________________________________________________
-
+!
       use bry
       use glob_bry
       use config     , only: calc_tide, ntide
@@ -2417,6 +2492,7 @@ C  !The most south sudomains
       real(kind=rk) dum_area(jm), dum_flow(jm)
       real(kind=rk) sum_area, sum_flow, mean_uabe, uriv
       real(kind=rk) rdisp,rad_param,ome(6),ramt(6),phi0(6)   !fhx:tide
+
 
       if(idx.eq.1) then
 
@@ -2668,7 +2744,8 @@ C  !The most south sudomains
 
       endif
 
-      end
+      end ! subroutine bcond_nwatl
+!
 !______________________________________________________________________
 !
       subroutine bcond0(idx)
@@ -2677,8 +2754,10 @@ C  !The most south sudomains
 !  Closed boundary conditions are automatically enabled through
 ! specification of the masks, dum, dvm and fsm, in which case the open
 ! boundary conditions, included below, will be overwritten.
+!----------------------------------------------------------------------
+! called by: [NO CALLS]
 !______________________________________________________________________
-
+!
       use bry
       use glob_bry
       use glob_const , only: grav, pi, rk, small
@@ -2974,8 +3053,9 @@ C  !The most south sudomains
 
       endif
 
-      end
 
+      end ! subroutine bcond0
+!
 !______________________________________________________________________
 !
       subroutine bcondorl(idx)
@@ -2983,8 +3063,10 @@ C  !The most south sudomains
 !  This is an optional subroutine replacing  bcond and using Orlanski's
 ! scheme (J. Comp. Phys. 21, 251-269, 1976), specialized for the
 ! seamount problem.
+!----------------------------------------------------------------------
+! called by: [NO CALLS]
 !______________________________________________________________________
-
+!
       use bry
       use glob_const , only: rk
       use glob_domain
@@ -2997,6 +3079,7 @@ C  !The most south sudomains
       integer idx
       real(kind=rk) cl,denom
       integer i,j,k
+
 
       if(idx.eq.1) then
 
@@ -3202,8 +3285,9 @@ C  !The most south sudomains
 
       endif
 
-      end
 
+      end ! subroutine bcondorl
+!
 !______________________________________________________________________
 !
       subroutine dens(si,ti,rhoo)
@@ -3212,8 +3296,11 @@ C  !The most south sudomains
 ! see: Mellor, G.L., 1991, J. Atmos. Oceanic Tech., 609-611
 !  NOTE: if pressure is not used in dens, buoyancy term (boygr) in
 ! subroutine profq must be changed (see note in subroutine profq.)
+!----------------------------------------------------------------------
+! called by: mode_internal [advance.f]
+!            read_initial  [io.f90]    (x2)
 !______________________________________________________________________
-
+!
       use config     , only: sbias, tbias
       use glob_const , only: grav, rhoref, rk
       use glob_domain, only: im, jm, kb, kbm1
@@ -3222,9 +3309,12 @@ C  !The most south sudomains
 
       implicit none
 
-      real(kind=rk) si(im,jm,kb),ti(im,jm,kb),rhoo(im,jm,kb)
-      integer i,j,k
-      real(kind=rk) cr,p,rhor,sr,tr,tr2,tr3,tr4
+      real(rk), dimension(im,jm,kb), intent(in)  :: si, ti
+      real(rk), dimension(im,jm,kb), intent(out) :: rhoo
+
+      integer  i,j,k
+      real(rk) cr,p,rhor,sr,tr,tr2,tr3,tr4
+
 
       do k=1,kbm1
         do j=1,jm
@@ -3260,10 +3350,9 @@ C  !The most south sudomains
         end do
       end do
 
-      return
 
-      end
-
+      end ! subroutine dens
+!
 !______________________________________________________________________
 !
       subroutine profq(sm,sh,dh,cc)
@@ -3277,12 +3366,17 @@ C  !The most south sudomains
 ! analytical solution to the near surface tke equation to solve for q2
 ! at the surface giving the same result as C-B diffusion. The new
 ! scheme is simpler and more robust than the latter scheme.
+!----------------------------------------------------------------------
+! called by: mode_internal  [advance.f]
+!
+! calls    : exchange2d_mpi [parallel_mpi.f]
+!            exchange3d_mpi [parallel_mpi.f]
 !______________________________________________________________________
-
+!
       use air        , only: wusurf, wvsurf
       use config     , only: sbias, tbias, umol
       use glob_const , only: grav, kappa, rhoref, rk, small
-      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1, kbm2
      &                     , n_east, n_north, n_south, n_west
       use glob_grid  , only: dzz, dz, fsm, h, z, zz
       use glob_ocean , only: a, c, dtef, ee, etf, gg, kh, km, kq, l
@@ -3309,6 +3403,7 @@ C  !The most south sudomains
       data e1/1.8/,e2/1.33/
       data sef/1./
       data cbcnst/100./surfl/2.e5/shiw/0.0/
+
 
       dh = h + etf
 
@@ -3422,7 +3517,7 @@ C  !The most south sudomains
         end do
       end do
 
-      ! calculate production of turbulent kinetic energy:
+! calculate production of turbulent kinetic energy:
       do k=2,kbm1
         do j=2,jmm1
           do i=2,imm1
@@ -3437,9 +3532,9 @@ C  !The most south sudomains
         end do
       end do
 
-      ! note: Richardson # dep. dissipation correction (Mellor, 2001;
-      ! Ezer, 2000), depends on ghc the critical number (empirical -6 to
-      !  -2) to increase mixing
+!   NOTE: Richardson # dep. dissipation correction (Mellor, 2001;
+! Ezer, 2000), depends on ghc the critical number (empirical -6 to -2)
+! to increase mixing.
       ghc=-6.0
       do k=1,kb
         do j=1,jm
@@ -3596,9 +3691,9 @@ C  !The most south sudomains
         end do
       end do
 
-      return
-      end
 
+      end ! subroutine profq
+!
 !______________________________________________________________________
 !
       subroutine proft(f,wfsurf,fsurf,nbc,dh)
@@ -3607,8 +3702,10 @@ C  !The most south sudomains
 ! method described by Richmeyer and Morton (1967).
 !  NOTE: wfsurf and swrad are negative values when water column is
 ! warming or salt is being added.
+!----------------------------------------------------------------------
+! called by: mode_internal [advance.f] (x2)
 !______________________________________________________________________
-
+!
       use air        , only: swrad
       use config     , only: ntp, umol
       use glob_const , only: rk
@@ -3624,8 +3721,8 @@ C  !The most south sudomains
       real(rk), dimension(im,jm   ), intent(  out) :: dh
       integer                      , intent(in   ) :: nbc
 
+      integer  i, j, k, ki
       real(rk) rad(im,jm,kb), r(5), ad1(5), ad2(5)
-      integer i, j, k, ki
 
 ! irradiance parameters after Paulson and Simpson (1977)
 !       ntp               1      2       3       4       5
@@ -3633,6 +3730,7 @@ C  !The most south sudomains
       data r   /         .58,    .62,    .67,    .77,    .78 /
       data ad1 /         .35,    .60,   1.  ,   1.5 ,   1.4  /
       data ad2 /       23.  ,  20.  ,  17.  ,  14.  ,   7.9  /
+
 
 ! surface boundary condition:
 !       nbc   prescribed    prescribed   short wave
@@ -3752,10 +3850,8 @@ C  !The most south sudomains
       end do
 
 
-      return
-
-      end
-
+      end ! subroutine proft
+!
 !______________________________________________________________________
 !
       subroutine profu
@@ -3763,8 +3859,12 @@ C  !The most south sudomains
 !  Solves for vertical diffusion of x-momentum using method described
 ! by Richmeyer and Morton (1967).
 !  NOTE: wusurf has the opposite sign to the wind speed.
+!----------------------------------------------------------------------
+! called by: mode_internal  [advance.f]
+!
+! calls    : exchange2d_mpi [parallel_mpi.f]
 !______________________________________________________________________
-
+!
       use air        , only: wusurf
       use config     , only: umol
       use glob_const , only: rk
@@ -3776,16 +3876,13 @@ C  !The most south sudomains
 
       implicit none
 
-      real(kind=rk) dh(im,jm)
-      integer i,j,k,ki
+      integer  i,j,k,ki
+      real(rk) dh(im,jm)
+
 
 ! the following section solves the equation
 !   dti2*(km*u')'-u=-ub
-      do j=1,jm
-        do i=1,im
-          dh(i,j)=1.
-        end do
-      end do
+      dh = 1.
 
       do j=2,jm
         do i=2,im
@@ -3860,9 +3957,9 @@ C  !The most south sudomains
       end do
       call exchange2d_mpi(wubot,im,jm)
 
-      return
-      end
 
+      end ! subroutine profu
+!
 !______________________________________________________________________
 !
       subroutine profv
@@ -3870,8 +3967,12 @@ C  !The most south sudomains
 !  Solves for vertical diffusion of x-momentum using method described
 ! by Richmeyer and Morton (1967).
 !  NOTE: wvsurf has the opposite sign to the wind speed.
+!----------------------------------------------------------------------
+! called by: mode_internal  [advance.f]
+!
+! calls    : exchange2d_mpi [parallel_mpi.f]
 !______________________________________________________________________
-
+!
       use air        , only: wvsurf
       use config     , only: umol
       use glob_const , only: rk
@@ -3883,17 +3984,13 @@ C  !The most south sudomains
 
       implicit none
 
-      real(kind=rk) dh(im,jm)
-      integer i,j,k,ki
+      integer  i,j,k,ki
+      real(rk) dh(im,jm)
+
 
 ! the following section solves the equation
 !     dti2*(km*u')'-u=-ub
-
-      do j=1,jm
-        do i=1,im
-          dh(i,j)=1.
-        end do
-      end do
+      dh = 1.
 
       do j=2,jm
         do i=2,im
@@ -3967,9 +4064,9 @@ C  !The most south sudomains
       end do
       call exchange2d_mpi(wvbot,im,jm)
 
-      return
-      end
 
+      end ! subroutine profv
+!
 !______________________________________________________________________
 !
       subroutine smol_adif(xmassflux,ymassflux,zwflux,ff)
@@ -3979,8 +4076,10 @@ C  !The most south sudomains
 !  This is based on a subroutine of Gianmaria Sannino (Inter-university
 ! Computing Consortium, Rome, Italy) and Vincenzo Artale (Italian
 ! National Agency for New Technology and Environment, Rome, Italy).
+!----------------------------------------------------------------------
+! called by: advt2 [solver.f]
 !______________________________________________________________________
-
+!
       use config     , only: sw
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
@@ -3993,19 +4092,16 @@ C  !The most south sudomains
       real(rk), dimension(im,jm,kb), intent(inout) :: ff, xmassflux,
      &                                                ymassflux, zwflux
 
-      real(kind=rk) mol,abs_1,abs_2
-      real(kind=rk) value_min,epsilon
-      real(kind=rk) udx,u2dt,vdy,v2dt,wdz,w2dt
-      integer i,j,k
-      parameter (value_min=1.e-9,epsilon=1.0e-14)
+      integer                i,j,k
+      real(rk)               mol,abs_1,abs_2
+      real(rk)               udx,u2dt,vdy,v2dt,wdz,w2dt
+      real(rk), parameter :: value_min = 1.e-9
+     &                     , epsilon   = 1.e-14
+
 
 ! apply temperature and salinity mask
       do k=1,kb
-        do i=1,im
-          do j=1,jm
-            ff(i,j,k)=ff(i,j,k)*fsm(i,j)
-          end do
-        end do
+        ff(:,:,k) = ff(:,:,k)*fsm
       end do
 
 ! recalculate mass fluxes with antidiffusion velocity
@@ -4091,16 +4187,18 @@ C  !The most south sudomains
         end do
       end do
 
-      return
-      end
 
+      end ! subroutine smol_adif
+!
 !______________________________________________________________________
 !
       subroutine smol_adifC(xmassflux,ymassflux,cf)
 !----------------------------------------------------------------------
 ! This is a 2D modification of `smol_adif` for sea-ice concentration.
+!----------------------------------------------------------------------
+! called by: advtC [solver.f]
 !______________________________________________________________________
-
+!
       use config     , only: sw
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb
@@ -4112,11 +4210,12 @@ C  !The most south sudomains
       real(rk), dimension(im,jm), intent(inout) :: cf
      &                                           , xmassflux, ymassflux
 
-      real(kind=rk) mol,abs_1,abs_2
-      real(kind=rk) value_min,epsilon
-      real(kind=rk) udx,u2dt,vdy,v2dt
-      integer i,j
-      parameter (value_min=1.e-9,epsilon=1.0e-14)
+      integer                i,j
+      real(rk)               mol,abs_1,abs_2
+      real(rk)               udx,u2dt,vdy,v2dt
+      real(rk), parameter :: value_min = 1.e-9
+     &                     , epsilon   = 1.e-14
+
 
 ! apply temperature and salinity mask
       cf = cf*fsm
@@ -4160,15 +4259,18 @@ C  !The most south sudomains
         end do
       end do
 
-      return
-      end
+
+      end ! subroutine smol_adifC
+!
 !______________________________________________________________________
 !
       subroutine vertvl(xflux,yflux)
 !----------------------------------------------------------------------
 !  Calculates vertical velocity.
+!----------------------------------------------------------------------
+! called by: mode_internal [advance.f]
 !______________________________________________________________________
-
+!
       use air        , only: vfluxb, vfluxf
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
@@ -4181,6 +4283,7 @@ C  !The most south sudomains
       real(rk), dimension(im,jm,kb), intent(out) :: xflux, yflux
 
       integer i,j,k
+
 
 ! reestablish boundary conditions
       do k=1,kbm1
@@ -4222,11 +4325,12 @@ C  !The most south sudomains
         end do
       end do
 
-      return
-      end
 
+      end ! subroutine vertvl
+!
 !lyo:20110315:botwavedrag:add subr.botwavedrag & function fsinhinv
-!_______________________________________________________________________
+!______________________________________________________________________
+!
        subroutine botwavedrag (im,jm,fsm,wusrf,wvsrf,kp,
      &                      wubot,wvbot,d,zzkbm1,z0b,cbcmin,cbcmax,cbc)
 !----------------------------------------------------------------------!
@@ -4284,46 +4388,58 @@ C  !The most south sudomains
 !
 !  Locals:
 !    ts      = significant wave period (s), from kp via dispers relatn.
-!----------------------------------------------------------------------!
-      implicit none
-      include 'realkind'
-      integer i,j,im,jm
-      real(kind=rk), intent(in) :: kp
-      real(kind=rk) kappa,grav,fsm(im,jm),d(im,jm)
-      real(kind=rk) z0b,z0a,zzkbm1,cbcmin,cbcmax,cbc(im,jm)
-      real(kind=rk) uboscil,utau2,fsinhinv,utau2min
-      real(kind=rk) pi,btoba,utauwind,const
-      real(kind=rk), intent(in) :: wusrf(im,jm),wvsrf(im,jm)
-     &                            ,wubot(im,jm),wvbot(im,jm)
-      data kappa/0.4/,grav/9.807/
-      data btoba/0.062/,pi/3.1415927/
-      data utau2min/1.e-5/
+!----------------------------------------------------------------------
+! called by: wind_main [wind.f]
+!______________________________________________________________________
 !
-      const=1.004849  !=btoba*sqrt(grav)*((pi/1.05)**(3/2))
+      use config    , only: rk
+      use glob_const, only: KAPPA, GRAV, PI
+
+      implicit none
+
+      integer                   , intent(in   ) :: im, jm
+      real(rk)                  , intent(in   ) :: cbcmax, cbcmin
+     &                                           , kp    , z0b
+     &                                           , zzkbm1
+      real(rk), dimension(im,jm), intent(in   ) :: d    , fsm
+     &                                           , wubot, wvbot
+     &                                           , wusrf, wvsrf
+      real(rk), dimension(im,jm), intent(  out) :: cbc
+
+      real(rk)               const   , uboscil , utau2
+     &                     , utauwind, fsinhinv, z0a
+
+      integer                i, j
+      real(rk), parameter :: btoba    =  .062
+     &                     , utau2min = 1.e-5
+
+
+      const = 1.004849  !=btoba*sqrt(grav)*((pi/1.05)**(3/2))
+
       do j=1,jm
         do i=1,im
-          if (fsm(i,j).eq.1.) then
+          if (fsm(i,j)==1.) then
 !           uboscil=cp(i,j)*kp(i,j)*sqrt(2.*ent(i,j)/grav) !glm's orig
 !    &               *fsinhinv(kp(i,j)*d(i,j))             !Nielson-fml
-            utauwind=( (wusrf(i,j)**2+wvsrf(i,j)**2)
-     &                 /(grav*kp*tanh(kp*d(i,j)))   )**0.25
-            uboscil=const*utauwind*fsinhinv(kp*d(i,j))
-            utau2=sqrt(wubot(i,j)**2+wvbot(i,j)**2)+utau2min
-            z0a=z0b*(1.+0.05*uboscil**2/utau2)
-            cbc(i,j)=(kappa/log(1.+(1.0+zzkbm1)*d(i,j)/z0a))**2
+            utauwind = ( (wusrf(i,j)**2+wvsrf(i,j)**2)
+     &                  /(grav*kp*tanh(kp*d(i,j)))    )**0.25
+            uboscil  = const*utauwind*fsinhinv(kp*d(i,j))
+            utau2    = sqrt(wubot(i,j)**2+wvbot(i,j)**2)+utau2min
+            z0a      = z0b*(1.+0.05*uboscil**2/utau2)
+            cbc(i,j) = ( kappa / log( 1.+(1.0+zzkbm1)*d(i,j)/z0a ) )**2
 !     WRITE(10,'(''(1+zzkbm1)*d(i,j)='',1p1e13.5)')(1.0+zzkbm1)*d(i,j)
 !     WRITE(10,'('' cbc = '',1p1e13.5)') cbc(i,j)
 !     WRITE(10,'('' log = '',1p1e13.5)')log(1.+(1.0+zzkbm1)*d(i,j)/z0a)
-            cbc(i,j)=max(cbcmin,cbc(i,j))
+            cbc(i,j) = max(cbcmin,cbc(i,j))
 !     WRITE(10,'('' cbc = '',1p1e13.5)') cbc(i,j)
 !
 !     If the following is invoked, then it is probable that the wrong
 !     choice of z0b or vertical spacing has been made:
 !
-            cbc(i,j)=min(cbcmax,cbc(i,j))
-          endif
-        enddo
-      enddo
+            cbc(i,j) = min(cbcmax,cbc(i,j))
+          end if
+        end do
+      end do
 
 !
 !     stop
@@ -4332,23 +4448,37 @@ C  !The most south sudomains
 !
 !     call exchange2d_mpi(cbc,im,jm) !lyo:don;t need?
 
-      return
-      end
-!----------------------------------------------------------------------!
+
+      end ! subroutine botwavedrag
+!
 !lyo:20110315:botwavedrag:add function fsinhinv
+!______________________________________________________________________
+!
       function fsinhinv(x)
-      include 'realkind'
-      real(kind=rk) fsinhinv
-      real(kind=rk), intent(in) :: x
-      dimension xd(15),fdat(15)
+!----------------------------------------------------------------------
+! called by: botwavedrag [solver.f]
+!----------------------------------------------------------------------
+      use config, only: rk
+
+      implicit none
+
+      real(rk) fsinhinv
+
+      real(rk), intent(in) :: x
+
+      integer                    ixd
+      real(rk), dimension(15) :: fdat, xd
+
       data xd/0.,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7./
       data fdat/1.919,1.919,0.851,0.470,0.276,0.165,0.100,0.060,
-     &         0.037,0.022,0.013,0.008,0.005,0.003,0.002/
-      fsinhinv=0.0
-      if(x.lt.7.0) then
-        ixd=int(2.0*x)+1
-        fsinhinv=fdat(ixd)+(fdat(ixd+1)-fdat(ixd))*(x-xd(ixd))*2.0
-      endif
-      return
-      end
-!_______________________________________________________________________
+     &          0.037,0.022,0.013,0.008,0.005,0.003,0.002/
+
+
+      fsinhinv = 0.
+      if (x < 7.) then
+        ixd = int(2.*x)+1
+        fsinhinv = fdat(ixd)+(fdat(ixd+1)-fdat(ixd))*(x-xd(ixd))*2.
+      end if
+
+
+      end ! function fsinhinv
