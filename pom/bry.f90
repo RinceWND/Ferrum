@@ -3,7 +3,8 @@
 ! Module `BRY` (bry.f90)
 !----------------------------------------------------------------------
 !  Module for applying boundary conditions.
-!  Adopted from original POM `bcond` subroutine.
+!  Adopted from original POM `bcond` subroutine plus I/O routines and
+! interpolation in time.
 !
 !  Author  : RinceWND
 !  Created : 2018-09-02
@@ -59,7 +60,9 @@ module bry
   , bcCLAMPED         = 2  & !  forced value condition
   , bcFLATHER         = 3  & !  Flather (tidal) condition
   , bcINOUTFLOW       = 4  & !  in-, outflow condition
-  , bcRADIATION       = 5    !  radiation condition
+  , bcRADIATION       = 5  & !  radiation condition
+  , bcORLANSKI        = 6  & !  Orlanski internal normal velocity condition
+  , bcRADIATION_ENH   = 7    !  enhanced radiation condition
 
 !----------------------------------------------------------------------
 ! Configuration
@@ -573,6 +576,23 @@ module bry
         aamfrz = aamfrz*rdisp
 !lyo:pac10:end:
       end if
+
+!      if ( hasEAST ) then
+!        do j=2,jmm1
+!          UA_bry%EST(1,j) = uab(imm1,j)
+!          EL_bry%EST(1,j) = EL_bry%EST(1,j-1)-cor(imm1,j)*uab(imm1,j)/grav*dy(imm1,j-1)
+!        end do
+!        EL_bry%EST(1,:) = (EL_bry%EST(1,:)-EL_bry%EST(1,jmm1/2))*fsm(im,:)
+!      end if
+!      if ( hasWEST ) then
+!        dum(1,:) = 0.
+!        do j=2,jmm1
+!          UA_bry%WST(1,j) = uab(2,j)
+!! set geostrophically conditioned elevations at the boundaries
+!          EL_bry%WST(1,j) = EL_bry%WST(1,j-1)-cor(2,j)*uab(2,j)/grav*dy(2,j-1)
+!        end do
+!        EL_bry%WST(1,:) = (EL_bry%WST(1,:)-EL_bry%WST(1,jmm1/2))*fsm(2,:)
+!      end if
 
 
     end ! subroutine initial_conditions_boundary
@@ -1224,7 +1244,7 @@ module bry
 
           select case ( BC % zeta % west )
 
-            case ( bc0GRADIENT )
+            case default
               elf( 1,:) = elf(2   ,:)
 
           end select
@@ -1245,7 +1265,7 @@ module bry
 
           select case ( BC % zeta % north )
 
-            case ( bc0GRADIENT )
+            case default
               elf(:,jm) = elf(:,jmm1)
 
           end select
@@ -1256,7 +1276,7 @@ module bry
 
           select case ( BC % zeta % south )
 
-            case ( bc0GRADIENT )
+            case default
               elf(:, 1) = elf(:,   2)
 
           end select
@@ -1325,6 +1345,9 @@ module bry
                          + sqrt(GRAV/h(imm1,2:jmm1))             &
                           *(el(imm1,2:jmm1)-EL_bry%EST(1,2:jmm1))
 
+            case default
+              uaf(im,2:jmm1) = 0.
+
           end select
 
           uaf(im,2:jmm1) = ramp*uaf(im,2:jmm1)
@@ -1346,6 +1369,9 @@ module bry
               vaf(im,2:jmm1) = VA_bry%EST(1,2:jmm1)              &
                          - sqrt(GRAV/h(imm1,2:jmm1))             &
                           *(el(imm1,2:jmm1)-EL_bry%EST(1,2:jmm1))
+
+            case default
+              vaf(im,2:jmm1) = 0.
 
           end select
 
@@ -1372,6 +1398,9 @@ module bry
                            - sqrt(GRAV/h(2,2:jmm1))             &
                             *(el(2,2:jmm1)-EL_bry%WST(1,2:jmm1))
 
+            case default
+              uaf(2,2:jmm1) = 0.
+
           end select
 
           uaf(2,2:jmm1) = ramp*uaf(2,2:jmm1)
@@ -1394,6 +1423,9 @@ module bry
               vaf(1,2:jmm1) = VA_bry%WST(1,2:jmm1)              &
                            + sqrt(GRAV/h(2,2:jmm1))             &
                             *(el(2,2:jmm1)-EL_bry%WST(1,2:jmm1))
+
+            case default
+              vaf(1,2:jmm1) = 0.
 
           end select
 
@@ -1442,6 +1474,9 @@ module bry
                          + sqrt(GRAV/h(2:imm1,jmm1))             &
                           *(el(2:imm1,jmm1)-EL_bry%NTH(2:imm1,1))
 
+            case default
+              vaf(2:imm1,jm) = 0.
+
           end select
 
           vaf(2:imm1,jm) = ramp*vaf(2:imm1,jm)
@@ -1463,6 +1498,9 @@ module bry
               uaf(2:imm1,jm) = UA_bry%NTH(2:imm1,1)              &
                          - sqrt(GRAV/h(2:imm1,jmm1))             &
                           *(el(2:imm1,jmm1)-EL_bry%NTH(2:imm1,1))
+
+            case default
+              uaf(2:imm1,jm) = 0.
 
           end select
 
@@ -1489,6 +1527,9 @@ module bry
                            - sqrt(GRAV/h(2:imm1,2))             &
                             *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))
 
+            case default
+              vaf(2:imm1,2) = 0.
+
           end select
 
           vaf(2:imm1,2) = ramp*vaf(2:imm1,2)
@@ -1512,6 +1553,9 @@ module bry
                            + sqrt(GRAV/h(2:imm1,2))             &
                             *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))
 
+            case default
+              uaf(2:imm1,1) = 0.
+
           end select
 
         end if
@@ -1532,12 +1576,15 @@ module bry
 !  Apply internal (3D) velocity boundary conditions.
 !______________________________________________________________________
 !
+      use glob_const , only: SMALL
       use glob_grid  , only: dum, dvm, h
-      use glob_ocean , only: u, uf, v, vf, wubot, wvbot
+      use glob_ocean , only: u, ub, uf, v, vb, vf, wubot, wvbot
 
       implicit none
 
-      real(rk) ga
+      real(rk), dimension(im,2) :: grdx
+      real(rk), dimension(2,jm) :: grdy
+      real(rk)                  :: cff, cx, cy, dvdt, dvdx, dvdy
 
 
 ! Apply periodic BC in x-dimension
@@ -1585,13 +1632,55 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do j = 2,jmm1
-                  ga = sqrt( h(im,j) / hmax )
-                  uf(im,j,k) = .25 * (     ga  * ( u(imm1,j-1,k)     &
-                                + 2.*u(imm1,j,k) + u(imm1,j+1,k) )   &
-                                     + (1.-ga) * ( u(im  ,j-1,k)     &
-                                + 2.*u(im  ,j,k) + u(im  ,j+1,k) ) )
+                  cff = sqrt( h(im,j) / hmax )
+                  uf(im,j,k) = .25 * (     cff  * ( u(imm1,j-1,k)     &
+                                 + 2.*u(imm1,j,k) + u(imm1,j+1,k) )   &
+                                     + (1.-cff) * ( u(im  ,j-1,k)     &
+                                 + 2.*u(im  ,j,k) + u(im  ,j+1,k) ) )
                 end do
               end do
+
+            case ( bcORLANSKI )
+              do k = 1,kbm1
+                do j = 2,jmm1
+                  cff = uf(im-1,j,k) + ub(im-1,j,k) - 2.*u(im-2,j,k)
+                  if ( abs(cff) < .01 ) cff = sign(.01_rk,cff)
+                  cff = ( ub(im-1,j,k)-uf(im-1,j,k) )/cff
+                  if ( cff > 1. ) cff = 1.
+                  if ( cff < 0. ) cff = 0.
+                  uf(im,j,k) = ( (1.-cff)*ub(im  ,j,k)    &
+                                + 2.*cff * u(im-1,j,k) )  &
+                               / (1.+cff)
+                end do
+              end do
+
+              case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do j = 1,jmm1
+                  grdy(1,j) = u(imm1,j+1,k)-u(imm1,j,k)
+                  grdy(2,j) = u(im  ,j+1,k)-u(im  ,j,k)
+                end do
+                do j = 2,jmm1
+                  dvdt =  u(imm1,j,k)-uf(imm1,j,k)
+                  dvdx = uf(imm1,j,k)-uf(imm2,j,k)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
+                  if ( dvdt*(grdy(1,j-1)+grdy(1,j)) > 0. ) then
+                    dvdy = grdy(1,j-1)
+                  else
+                    dvdy = grdy(1,j  )
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  uf(im,j,k) = ( cff*u(im,j,k) + cx*uf(imm1,j,k)      &
+                                - max(cy,0.)*grdy(2,j-1)              &
+                                - min(cy,0.)*grdy(2,j  ) )            &
+                               / (cff+cx)
+                end do
+              end do
+
+            case default
+              uf(im,:,:) = 0.
 
           end select
 
@@ -1611,13 +1700,16 @@ module bry
             case ( bcRADIATION ) ! NOT CORRECT!
               do k = 1,kbm1
                 do j = 2,jmm1
-                  ga = sqrt( h(im,j) / hmax )
-                  vf(im,j,k) = .25 * (     ga  * ( v(imm1,j-1,k)     &
-                                - 2.*v(imm1,j,k) + v(imm1,j+1,k) )   &
-                                     + (1.-ga) * ( v(im  ,j-1,k)     &
-                                - 2.*v(im  ,j,k) + v(im  ,j+1,k) ) )
+                  cff = sqrt( h(im,j) / hmax )
+                  vf(im,j,k) = .25 * (     cff  * ( v(imm1,j-1,k)     &
+                                 - 2.*v(imm1,j,k) + v(imm1,j+1,k) )   &
+                                     + (1.-cff) * ( v(im  ,j-1,k)     &
+                                 - 2.*v(im  ,j,k) + v(im  ,j+1,k) ) )
                 end do
               end do
+
+            case default
+              vf(im,:,:) = 0.
 
           end select
 
@@ -1642,14 +1734,58 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do j = 2,jmm1
-                  ga = sqrt( h(1,j) / hmax )
-                  uf(2,j,k) = .25 * (     ga  * ( u(3,j-1,k)     &
-                                  + 2.*u(3,j,k) + u(3,j+1,k) )   &
-                                    + (1.-ga) * ( u(2,j-1,k)     &
-                                  + 2.*u(2,j,k) + u(2,j+1,k) ) )
+                  cff = sqrt( h(1,j) / hmax )
+                  uf(2,j,k) = .25 * (     cff  * ( u(3,j-1,k)     &
+                                   + 2.*u(3,j,k) + u(3,j+1,k) )   &
+                                    + (1.-cff) * ( u(2,j-1,k)     &
+                                   + 2.*u(2,j,k) + u(2,j+1,k) ) )
                   uf(1,j,k) = uf(2,j,k)
                 end do
               end do
+
+            case ( bcORLANSKI )
+              do k = 1,kbm1
+                do j = 2,jmm1
+                  cff = uf(3,j,k) + ub(3,j,k) - 2.*u(4,j,k)
+                  if ( abs(cff) < .01 ) cff = sign(.01_rk,cff)
+                  cff = ( ub(3,j,k)-uf(3,j,k) )/cff
+                  if ( cff > 1. ) cff = 1.
+                  if ( cff < 0. ) cff = 0.
+                  uf(2,j,k) = ( (1.-cff)*ub(2,j,k)    &
+                               + 2.*cff * u(3,j,k) )  &
+                              / (1.+cff)
+                  uf(1,j,k) = uf(2,j,k)
+                end do
+              end do
+
+            case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do j = 1,jmm1
+                  grdy(1,j) = u(2,j+1,k)-u(2,j,k)
+                  grdy(2,j) = u(3,j+1,k)-u(3,j,k)
+                end do
+                do j = 2,jmm1
+                  dvdt =  u(2,j,k)-uf(2,j,k)
+                  dvdx = uf(2,j,k)-uf(3,j,k)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
+                  if ( dvdt*(grdy(2,j-1)+grdy(2,j)) > 0. ) then
+                    dvdy = grdy(2,j-1)
+                  else
+                    dvdy = grdy(2,j  )
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  uf(2,j,k) = ( cff*u(2,j,k) + cx*uf(3,j,k)           &
+                               - max(cy,0.)*grdy(1,j-1)               &
+                               - min(cy,0.)*grdy(1,j  ) )             &
+                              / (cff+cx)
+                  uf(1,j,k) = uf(2,j,k)
+                end do
+              end do
+
+            case default
+              uf(1:2,:,:) = 0.
 
           end select
 
@@ -1669,13 +1805,16 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do j = 2,jmm1
-                  ga = sqrt( h(1,j) / hmax )
-                  vf(1,j,k) = .25 * (     ga  * ( v(2,j-1,k)     &
-                                  + 2.*u(2,j,k) + v(2,j+1,k) )   &
-                                    + (1.-ga) * ( v(1,j-1,k)     &
-                                  + 2.*u(1,j,k) + v(1,j+1,k) ) )
+                  cff = sqrt( h(1,j) / hmax )
+                  vf(1,j,k) = .25 * (     cff  * ( v(2,j-1,k)     &
+                                   + 2.*u(2,j,k) + v(2,j+1,k) )   &
+                                    + (1.-cff) * ( v(1,j-1,k)     &
+                                   + 2.*u(1,j,k) + v(1,j+1,k) ) )
                 end do
               end do
+
+            case default
+              vf(1,:,:) = 0.
 
           end select
 
@@ -1728,13 +1867,55 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do i = 2,imm1
-                  ga = sqrt( h(i,jm) / hmax )
-                  vf(i,jm,k) = .25 * (     ga  * ( v(i-1,jmm1,k)     &
-                                + 2.*v(i,jmm1,k) + v(i+1,jmm1,k) )   &
-                                     + (1.-ga) * ( v(i-1,jm  ,k)     &
-                                + 2.*v(i,jm  ,k) + v(i+1,jm  ,k) ) )
+                  cff = sqrt( h(i,jm) / hmax )
+                  vf(i,jm,k) = .25 * (     cff  * ( v(i-1,jmm1,k)     &
+                                 + 2.*v(i,jmm1,k) + v(i+1,jmm1,k) )   &
+                                     + (1.-cff) * ( v(i-1,jm  ,k)     &
+                                 + 2.*v(i,jm  ,k) + v(i+1,jm  ,k) ) )
                 end do
               end do
+
+            case ( bcORLANSKI )
+              do k = 1,kbm1
+                do i = 2,imm1
+                  cff = vf(i,jm-1,k) + vb(i,jm-1,k) - 2.*v(i,jm-2,k)
+                  if ( abs(cff) < .01 ) cff = sign(.01_rk,cff)
+                  cff = ( vb(i,jm-1,k)-vf(i,jm-1,k) )/cff
+                  if ( cff > 1. ) cff = 1.
+                  if ( cff < 0. ) cff = 0.
+                  vf(i,jm,k) = ( (1.-cff)*vb(i,jm  ,k)    &
+                                + 2.*cff * v(i,jm-1,k) )  &
+                               / (1.+cff)
+                end do
+              end do
+
+            case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do i = 2,im
+                  grdx(i,1) = v(i,jmm1,k)-v(i-1,jmm1,k)
+                  grdx(i,2) = v(i,jm  ,k)-v(i-1,jm  ,k)
+                end do
+                do i = 2,imm1
+                  dvdt =  v(i,jmm1,k)-vf(i,jmm1,k)
+                  dvdy = vf(i,jmm1,k)-vf(i,jmm2,k)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
+                  if ( dvdt*(grdx(i,jmm1)+grdx(i+1,jmm1)) > 0. ) then
+                    dvdx = grdx(i  ,jmm1)
+                  else
+                    dvdx = grdx(i+1,jmm1)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  cx  = min(cff,max(dvdt*dvdx,-cff))
+                  cy  = dvdt*dvdy
+                  vf(i,jm,k) = ( cff*v(i,jm,k) + cy*vf(i,jmm1,k)      &
+                                - max(cx,0.)*grdx(i  ,2)              &
+                                - min(cx,0.)*grdx(i+1,2) )            &
+                               / (cff+cy)
+                end do
+              end do
+
+            case default
+              vf(:,jm,:) = 0.
 
           end select
 
@@ -1754,13 +1935,16 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do i = 2,imm1
-                  ga = sqrt( h(i,jm) / hmax )
-                  uf(i,jm,k) = .25 * (     ga  * ( u(i-1,jmm1,k)     &
-                                + 2.*u(i,jmm1,k) + u(i+1,jmm1,k) )   &
-                                     + (1.-ga) * ( u(i-1,jm  ,k)     &
-                                + 2.*u(i,jm  ,k) + u(i+1,jm  ,k) ) )
+                  cff = sqrt( h(i,jm) / hmax )
+                  uf(i,jm,k) = .25 * (     cff  * ( u(i-1,jmm1,k)     &
+                                 + 2.*u(i,jmm1,k) + u(i+1,jmm1,k) )   &
+                                     + (1.-cff) * ( u(i-1,jm  ,k)     &
+                                 + 2.*u(i,jm  ,k) + u(i+1,jm  ,k) ) )
                 end do
               end do
+
+            case default
+              uf(:,jm,:) = 0.
 
           end select
 
@@ -1785,13 +1969,57 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do i = 2,imm1
-                  ga = sqrt( h(i,1) / hmax )
-                  vf(i,2,k) = .25 * (     ga  * ( v(i-1,3,k)     &
-                                  + 2.*v(i,3,k) + v(i+1,3,k) )   &
-                                    + (1.-ga) * ( v(i-1,2,k)     &
-                                  + 2.*v(i,2,k) + v(i+1,2,k) ) )
+                  cff = sqrt( h(i,1) / hmax )
+                  vf(i,2,k) = .25 * (     cff  * ( v(i-1,3,k)     &
+                                   + 2.*v(i,3,k) + v(i+1,3,k) )   &
+                                    + (1.-cff) * ( v(i-1,2,k)     &
+                                   + 2.*v(i,2,k) + v(i+1,2,k) ) )
                 end do
               end do
+
+            case ( bcORLANSKI )
+              do k = 1,kbm1
+                do i = 2,imm1
+                  cff = vf(i,3,k) + vb(i,3,k) - 2.*v(i,4,k)
+                  if ( abs(cff) < 0. ) cff = sign(.01_rk,cff)
+                  cff = ( vb(i,3,k)-vf(i,3,k) )/cff
+                  if ( cff > 1. ) cff = 1.
+                  if ( cff < 0. ) cff = 0.
+                  vf(i,2,k) = ( (1.-cff)*vb(i,2,k)    &
+                               + 2.*cff * v(i,3,k) )  &
+                              / (1.+cff)
+                  vf(i,1,k) = vf(i,2,k)
+                end do
+              end do
+
+            case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do i = 2,im
+                  grdx(i,1) = v(i,2,k)-v(i-1,2,k)
+                  grdx(i,2) = v(i,3,k)-v(i-1,3,k)
+                end do
+                do i = 2,imm1
+                  dvdt =  v(i,3,k)-vf(i,3,k)
+                  dvdy = vf(i,3,k)-vf(i,4,k)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
+                  if ( dvdt*(grdx(i,2)+grdx(i+1,2)) > 0. ) then
+                    dvdx = grdx(i  ,2)
+                  else
+                    dvdx = grdx(i+1,2)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  cx  = min(cff,max(dvdt*dvdx,-cff))
+                  cy  = dvdt*dvdy
+                  vf(i,2,k) = ( cff*v(i,2,k) + cy*vf(i,3,k)           &
+                               - max(cx,0.)*grdx(i  ,1)               &
+                               - min(cx,0.)*grdx(i+1,1) )             &
+                              / (cff+cy)
+                  vf(i,1,k) = vf(i,2,k)
+                end do
+              end do
+
+            case default
+              vf(:,1:2,:) = 0.
 
           end select
 
@@ -1811,13 +2039,16 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do i = 2,imm1
-                  ga = sqrt( h(i,1) / hmax )
-                  uf(i,1,k) = .25 * (     ga  * ( u(i-1,2,k)     &
-                                  + 2.*u(i,2,k) + u(i+1,2,k) )   &
-                                    + (1.-ga) * ( u(i-1,1,k)     &
-                                  + 2.*u(i,1,k) + u(i+1,1,k) ) )
+                  cff = sqrt( h(i,1) / hmax )
+                  uf(i,1,k) = .25 * (     cff  * ( u(i-1,2,k)     &
+                                   + 2.*u(i,2,k) + u(i+1,2,k) )   &
+                                    + (1.-cff) * ( u(i-1,1,k)     &
+                                   + 2.*u(i,1,k) + u(i+1,1,k) ) )
                 end do
               end do
+
+            case default
+              uf(:,1,:) = 0.
 
           end select
 
@@ -2169,7 +2400,7 @@ module bry
       end do
 
 
-    end subroutine bc_ts
+    end ! subroutine bc_ts
 !______________________________________________________________________
 !
     subroutine bc_vel_vert
@@ -2316,8 +2547,8 @@ module bry
 
 ! Apply rho-mask
       do k=1,kb
-        uf(:,:,k) = uf(:,:,k)*fsm
-        vf(:,:,k) = vf(:,:,k)*fsm
+        uf(:,:,k) = uf(:,:,k)*fsm + 1.e-10
+        vf(:,:,k) = vf(:,:,k)*fsm + 1.e-10
       end do
 
 
@@ -2339,7 +2570,7 @@ module bry
                                             , year            &
                                             , trim(FORMAT_EXT)
 
-    end function
+    end ! function get_filename
 !
 != I/O SECTION ========================================================
 !______________________________________________________________________
