@@ -308,13 +308,6 @@
      $                 *(dy(i,j)+dy(i-1,j))*ua(i,j)
           fluxva(i,j)=.25*(d(i,j)+d(i,j-1))
      $                 *(dx(i,j)+dx(i,j-1))*va(i,j)
-          if (.false. .and. abs(fluxua(i,j))>1.e3) then
-            print *, "FLUXUA", iint, iext
-            print *, "d    : ", d(i,j)
-            print *, "ua   : ", ua(i,j)
-            print *, "va   : ", va(i,j)
-            stop
-          end if
         end do
       end do
 
@@ -326,14 +319,6 @@
      $              +dte2*(-(fluxua(i+1,j)-fluxua(i,j)
      $                      +fluxva(i,j+1)-fluxva(i,j))/art(i,j)
      $                      -vfluxf(i,j))
-          if (isnan(elf(i,j))) then
-            print *, "ELF", iint, iext
-            print *, "elb  : ", elb(i,j)
-            print *, "flxua: ", fluxua(i,j)
-            print *, "flxva: ", fluxva(i,j)
-            print *, "vflux: ", vfluxf(i,j)
-            stop
-          end if
         end do
       end do
 
@@ -357,50 +342,6 @@
      $                         +elf(i,j)-elf(i-1,j))
      $                  +(e_atmos(i,j)-e_atmos(i-1,j)))
      $              +drx2d(i,j)+aru(i,j)*(wusurf(i,j)-wubot(i,j))
-          if (.false. .and. abs(uaf(i,j))>20. .and. my_task==3) then
-            print *, "!!UAF", uaf(i,j), iint, iext
-            print *, "uab  : ", uab(i,j)
-            print *, "adx2d: ", adx2d(i,j)
-            print *, "advua: ", advua(i,j)
-            print *, "cor  : ", cor(i,j)
-            print *, "d    : ", d(i,j)
-            print *, "v+1  : ", va(i,j+1)
-            print *, "va   : ", va(i,j)
-            print *, "cor-1: ", cor(i-1,j)
-            print *, "d-1  : ", d(i-1,j)
-            print *, "va-+ : ", va(i-1,j+1)
-            print *, "va-1 : ", va(i-1,j)
-            print *, "grav : ", grav
-            print *, "dy   : ", dy(i,j)
-            print *, "dy-1 : ", dy(i-1,j)
-            print *, "el   : ", el(i,j)
-            print *, "el-1 : ", el(i-1,j)
-            print *, "elb  : ", elb(i,j)
-            print *, "elb-1: ", elb(i-1,j)
-            print *, "elf  : ", elf(i,j)
-            print *, "elf-1: ", elf(i-1,j)
-            print *, "e_atm: ", e_atmos(i,j)
-            print *, "e_at-: ", e_atmos(i-1,j)
-            print *, "drx2d: ", drx2d(i,j)
-            print *, "wusrf: ", wusurf(i,j)
-            print *, "wubot: ", wubot(i,j)
-            print *, "aru  : ", aru(i,j)
-            print *, "(1)  : ", adx2d(i,j)+advua(i,j)
-            print *, "(2)  : ", -aru(i,j)*.25
-     $                *(cor(i,j)*d(i,j)*(va(i,j+1)+va(i,j))
-     $                 +cor(i-1,j)*d(i-1,j)*(va(i-1,j+1)+va(i-1,j)))
-            print *, "(3)  : ", .25*grav*(dy(i,j)+dy(i-1,j))
-     $                *(d(i,j)+d(i-1,j))
-            print *, "(4)  : ", (1.-2.*alpha)
-     $                   *(el(i,j)-el(i-1,j))
-     $                  +alpha*(elb(i,j)-elb(i-1,j)
-     $                         +elf(i,j)-elf(i-1,j))
-     $                  +e_atmos(i,j)-e_atmos(i-1,j)
-            print *, "(5)  : ", drx2d(i,j)
-     $                  +aru(i,j)*(wusurf(i,j)-wubot(i,j))
-            stop
-          end if
-
         end do
       end do
 
@@ -411,25 +352,6 @@
      $              -4.*dte*uaf(i,j))
      $             /((h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
      $                 *aru(i,j))
-          if (abs(uaf(i,j))>20.) then
-            print *, "UAF", uaf(i,j), iint, iext
-            print *, "uab  : ", uab(i,j)
-            print *, "d    : ", d(i,j)
-            print *, "va   : ", va(i,j)
-            print *, "v+1  : ", va(i,j+1)
-            print *, "elb  : ", elb(i,j)
-            print *, "elf  : ", elf(i,j)
-            print *, "e_atm: ", e_atmos(i,j)
-            print *, "wusrf: ", wusurf(i,j)
-            print *, "wubot: ", wubot(i,j)
-            print *, "drx2d: ", drx2d(i,j)
-            print *, "advua: ", advua(i,j)
-            print *, "adx2d: ", adx2d(i,j)
-            print *, "aru  : ", aru(i,j)
-            print *, "(1)  : ", (h(i,j)+elb(i,j)+h(i-1,j)+elb(i-1,j))
-            print *, "(2)  : ", (h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
-            stop
-          end if
         end do
       end do
 
@@ -459,26 +381,10 @@
         end do
       end do
 
-      if (maxval(abs(uaf))>10.) then
-        print *, "[ UAF BEFORE BCOND ]"
-        stop
-      end if
-
       call bc_vel_ext ! bcond(2)
-
-      if (maxval(abs(uaf))>10.) then
-        print *, "[ UAF BEFORE EXCHANGE ]"
-        print *, maxval(abs(uaf))
-        stop
-      end if
 
       call exchange2d_mpi(uaf,im,jm)
       call exchange2d_mpi(vaf,im,jm)
-
-      if (maxval(abs(uaf))>10.) then
-        print *, "[ UAF AFTER EXCHANGE ]"
-        stop
-      end if
 
       if     ( iext == (isplit-2) ) then
 
@@ -495,19 +401,9 @@
       end if
 
 ! apply filter to remove time split
-      ua = ua + .5*smoth*( uab - 2.*ua + uaf )
-      va = va + .5*smoth*( vab - 2.*va + vaf )
-      el = el + .5*smoth*( elb - 2.*el + elf )
-      do j=1,jm
-        do i=1,im
-          if (abs(ua(i,j))>10.) then
-            print *, "UA", iint, iext
-            print *, "uab  : ", uab(i,j)
-            print *, "uaf  : ", uaf(i,j)
-            stop
-          end if
-        end do
-      end do
+      ua = ua + .5*smoth*( uab + uaf - 2.*ua )
+      va = va + .5*smoth*( vab + vaf - 2.*va )
+      el = el + .5*smoth*( elb + elf - 2.*el )
 
       elb = el
       el  = elf
@@ -667,7 +563,8 @@
 
 
 ! calculate tf and sf using uf, vf, a and c as temporary variables
-        if( mode /= 4 .and. ( iint > 2 .or. do_restart ) ) then
+!        if( mode /= 4 .and. ( iint > 2 .or. do_restart ) ) then
+        if( mode /= 4 ) then
 
           if     ( nadv == 1 ) then
 
@@ -703,8 +600,8 @@
           call exchange3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
           call exchange3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
 
-          t = t + .5*smoth*( tb -2.*t + uf )
-          s = s + .5*smoth*( sb -2.*s + vf )
+          t = t + .5*smoth*( tb + uf -2.*t )
+          s = s + .5*smoth*( sb + vf -2.*s )
           tb = t
           t  = uf
           sb = s
