@@ -9,7 +9,7 @@
 !----------------------------------------------------------------------
 !  Initializes POM.
 !______________________________________________________________________
-
+!
       use config
       use glob_const , only: initialize_constants
       use glob_domain
@@ -139,19 +139,15 @@
       call msg_print("MODEL STATE UPDATED", 1, "")
 
 
-      return
-
-      end
-
+      end ! subroutine initialize
+!
 !______________________________________________________________________
 !
       subroutine initialize_arrays
 !----------------------------------------------------------------------
 !  Allocate arrays and initialize them for safety.
 !______________________________________________________________________
-
-!     ayumi 2010/5/14
-!      use river, only : totq
+!
       use air        , only: initialize_air
       use bry        , only: initialize_boundary
       use config     , only: ntide
@@ -164,10 +160,7 @@
 
       implicit none
 
-!     ayumi 2010/5/14
-!      totq = 0.e0
 
-!     ayumi 2010/6/13
       iout = 0
 
       iouts = 0 !fhx:20110131:
@@ -348,22 +341,22 @@
       vb(:,:,1:kbm1) = 0.
 
 
-      return
-      end
-
+      end ! subroutine initialize_arrays
+!
 !______________________________________________________________________
 !
       subroutine initialize_grid( TEST_CASE )
 !----------------------------------------------------------------------
 !  Reads of generates grid.
 !______________________________________________________________________
-
+!
       use glob_domain, only: im, imm1, jm, jmm1
       use glob_grid
 
       implicit none
 
       integer, intent(in) :: TEST_CASE
+
 
       if ( TEST_CASE == 0 ) then
 ! read in grid data
@@ -396,15 +389,16 @@
 
       call check_cfl_min
 
-      end subroutine ! initialize_grid
 
+      end ! subroutine initialize_grid
+!
 !______________________________________________________________________
 !
       subroutine read_grid
 !----------------------------------------------------------------------
 !  Set up vertical and horizontal grid, topography, areas and masks.
 !______________________________________________________________________
-
+!
       use config     , only: n1d
       use glob_const , only: DEG2RAD, Ohm, rk, SMALL
       use glob_domain, only: im, jm, kb, n_south, n_west
@@ -511,17 +505,16 @@
       d  = h+el
       dt = h+et
 
-      return
 
       end
-
+!
 !______________________________________________________________________
 !
       subroutine initial_conditions
 !----------------------------------------------------------------------
 !  Set up initial and lateral boundary conditions.
 !______________________________________________________________________
-
+!
       use bry
       use glob_bry
       use config     , only: restart_file
@@ -533,6 +526,7 @@
       implicit none
 
       integer i,j,k
+
 
 ! read initial temperature and salinity from ic file
 !      call read_initial_ts_pnetcdf(kb,tb,sb)
@@ -575,9 +569,9 @@
 ! Set initial conditions for modules.
       call initial_conditions_boundary
 
-      return
-      end
 
+      end
+!
 !______________________________________________________________________
 !lyo:pac10:beg:Here thro *end: replaced subr.lateral_boundary_conditions
       subroutine lateral_boundary_conditions
@@ -586,7 +580,7 @@
 !  Transport at eastern boundary for PROFS in GOM.
 ! ayumi 2010/4/7
 !______________________________________________________________________
-
+!
       use bry        , only: periodic_bc
       use glob_const , only: rk
       use glob_domain, only: i_global, im, im_global
@@ -629,9 +623,9 @@
             enddo; enddo
          endif !if (iperx.eq.1 .and. ipery.eq.1) then
 
-      return
-      end
 
+      end
+!
 !______________________________________________________________________
 !
       subroutine bfrz(mw,me,ms,mn,nw,ne,ns,nn,im,jm,nu,frz)
@@ -672,7 +666,8 @@
       integer :: mmid,i,j,ii,jj
       integer, parameter :: my_task=0
       real(kind=rk) :: c,tanhm
-!
+
+
       frz(:,:)=0.0       !Initialize interior
 
 !     West:
@@ -750,30 +745,31 @@
         stop
        endif
       endif
-!
-      return
+
+
       end
 !lyo:pac10:end:
-
+!
 !______________________________________________________________________
 !
       subroutine read_tide
 !----------------------------------------------------------------------
 !fhx:tide:read tidal amplitude & phase at the eastern boundary for PROFS
 !______________________________________________________________________
-
+!
         use glob_const , only: rk
+
 
 !      call read_tide_east_pnetcdf(ampe,phae)
         call read_tide_east_pnetcdf(ampe,phae,amue,phue)
 
 !      if(my_task.eq.0)print*,ampe(10,1),phae(10,1),amue(10,1),phue(10,1)
 !      if(my_task.eq.0)print*,ampe(10,2),phae(10,2),amue(10,2),phue(10,2)
-        return
+
 
       end
 !fhx:tide:read_tide end
-
+!
 !______________________________________________________________________
 !
       subroutine update_initial
@@ -781,7 +777,7 @@
 !  Updates the initial conditions and sets the remaining
 ! initial conditions.
 !______________________________________________________________________
-
+!
       use air        , only: vfluxf
       use config     , only: aam_init, npg
       use glob_const , only: rk, SMALL
@@ -796,6 +792,7 @@
       implicit none
 
       integer i,j,k
+
 
       ua = uab
       va = vab
@@ -849,8 +846,6 @@
       end do
 
 
-      return
-
       end
 !______________________________________________________________________
 !
@@ -858,7 +853,7 @@
 !----------------------------------------------------------------------
 !  Initialize all neccessary modules.
 !______________________________________________________________________
-
+!
       use air, only: initialize_air
       use bry, only: initialize_boundary
 
@@ -868,14 +863,16 @@
       call initialize_boundary( 'config.nml' )
       call initialize_air( 'config.nml' )
 
+
       end subroutine initialize_modules
+!
 !______________________________________________________________________
 !
       subroutine bottom_friction
 !----------------------------------------------------------------------
 !  Calculates the bottom friction coefficient.
 !______________________________________________________________________
-
+!
       use config     , only: cbcmax, cbcmin, z0b
       use glob_const , only: Kappa, rk
       use glob_domain, only: im, jm, kbm1
@@ -885,9 +882,11 @@
       implicit none
 
       integer i,j
+
+
 ! calculate bottom friction
-      do i=1,im
-        do j=1,jm
+      do j=1,jm
+        do i=1,im
 !lyo:correct:cbc(i,j)=(Kappa/log((1.+zz(kbm1))*h(i,j)/z0b))**2 !lyo:bug:
           cbc(i,j)=(Kappa/log(1.+(1.0+zz(kbm1))*h(i,j)/z0b))**2
           cbc(i,j)=max(cbcmin,cbc(i,j))
@@ -896,17 +895,18 @@
           cbc(i,j)=min(cbcmax,cbc(i,j))
         end do
       end do
-      return
-      end
 
+
+      end
+!
 !______________________________________________________________________
 !
       subroutine ztosig(zs,tb,zz,h,t,im,jm,ks,kb,
      $                                   n_west,n_east,n_south,n_north)
 !----------------------------------------------------------------------
-!  Interpolate vertically.
+!  Interpolates vertically from z- to sigma-coordinates.
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
 
       implicit none
@@ -917,8 +917,9 @@
       real(rk), intent(out) :: t(im,jm,kb)
       integer , intent(in ) :: n_west,n_east,n_south,n_north
 
-      real(rk) tmax, tin(ks), tout(kb), zzh(kb)
       integer  i,j,k
+      real(rk) tmax, tin(ks), tout(kb), zzh(kb)
+
 
       do j=2,jm-1
         do i=2,im-1
@@ -962,17 +963,16 @@
         end do
       end do
 
-      return
 
       end
-
+!
 !______________________________________________________________________
 !
       subroutine splinc(x,y,n,yp1,ypn,xnew,ynew,m)
 !----------------------------------------------------------------------
 !  Interpolate using splines.
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
 
       implicit none
@@ -984,9 +984,10 @@
       real(rk), dimension(n), intent(in ) :: x,y
       real(rk), dimension(m), intent(out) :: xnew,ynew
 
-      integer  i, k
+      integer                      i, k
+      real(rk)                     p, qn, sig, un
       real(rk), dimension(nmax) :: y2,u
-      real(rk) p, qn, sig, un
+
 
       if ( yp1 > .99e30 ) then
         y2(1) = 0.
@@ -1021,17 +1022,16 @@
         call splint(x,y,y2,n,xnew(i),ynew(i))
       end do
 
-      return
 
       end
-
+!
 !______________________________________________________________________
 !
       subroutine splint(xa,ya,y2a,n,x,y)
 !----------------------------------------------------------------------
 !  Spline interpolation? [ DESCRIPTION NOT PROVIDED ]
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
       use glob_domain, only: error_status
 
@@ -1043,6 +1043,7 @@
 
       integer k, khi, klo
       real(rk) a, b, h
+
 
       klo = 1
       khi = n
@@ -1063,10 +1064,10 @@
       b = (x-xa(klo))/h
       y = a*ya(klo)+b*ya(khi)+
      &       ((a**3-a)*y2a(klo)+(b**3-b)*y2a(khi))*(h**2)/6.
-      return
 
-      end
 
+      end ! subroutine splint
+!
 !______________________________________________________________________
 !fhx:incmix:add subroutine incmix
       subroutine incmix(aam,im,jm,kb,lono,lato,x,y,xs,ys,fac)
@@ -1077,7 +1078,7 @@
 !     Inputs: aam,x,y,xs,ys & fac
 !     Output: aam is modified
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
 
       implicit none
@@ -1090,6 +1091,7 @@
 
       integer  i,j,k
       real(rk) factor,expon
+
 
 !      print*,'incmix:', lono,lato
       do k=1,kb
@@ -1106,7 +1108,6 @@
         end do
       end do
 
-      return
 
       end
 !lyo:pac10:exp013:
@@ -1118,12 +1119,13 @@
 !----------------------------------------------------------------------
 !  If the processor has ( i_in, j_in ) in its local domain.
 !______________________________________________________________________
-
+!
       implicit none
 
       integer, intent(in) ::    i_in,    j_in
      &                     , imin_in, imax_in
      &                     , jmin_in, jmax_in
+
 
       if (       ( i_in >= imin_in .and. i_in <= imax_in )
      &     .and. ( j_in >= jmin_in .and. j_in <= jmax_in ) ) then
@@ -1136,15 +1138,16 @@
 
       endif
 
-      end function judge_inout
 
+      end ! function judge_inout
+!
 !______________________________________________________________________
 !
       subroutine make_grid( TEST_CASE )
 !----------------------------------------------------------------------
 !  Generate vertical and horizontal grid, topography, areas and masks.
 !______________________________________________________________________
-
+!
       use glob_const , only: DEG2RAD, rk
       use glob_domain
       use glob_grid
