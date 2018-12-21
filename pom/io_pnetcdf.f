@@ -556,9 +556,9 @@
       integer(MPI_OFFSET_KIND) length
       integer(MPI_OFFSET_KIND) start(3),edge(3)
 
-      real(rk), dimension(       1) :: out1
-      real(rk), dimension(im,jm   ) :: out2
-      real(rk), dimension(im,jm,kb) :: out3
+      real(8), dimension(       1) :: out1
+      real(8), dimension(im,jm   ) :: out2
+      real(8), dimension(im,jm,kb) :: out3
 
       out1 = 0.
       out2 = 0.
