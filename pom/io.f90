@@ -12,10 +12,10 @@
 !  Author  : RinceWND
 !  Created : 2018-09-07
 !______________________________________________________________________
-
+!
 module io
 
-  use glob_const, only: PATH_LEN
+  use glob_const, only: PATH_LEN, VAR_LEN
 
   implicit none
 
@@ -35,6 +35,26 @@ module io
 !  If any path ends with `/` then the default filename will be
 ! appended to the path.
 
+!----------------------------------------------------------------------
+! Varnames configuration
+!----------------------------------------------------------------------
+  character(len=VAR_LEN)  & ! Input variables names:
+      dx_name         & !  grid's x-spacing (m)
+  ,   dy_name         & !  grid's y-spacing (m)
+  ,   ec_name         & !  grid's easting for cell corners (deg)
+  ,   ee_name         & !  grid's easting for cell centers (deg)
+  ,   eu_name         & !  grid's easting for u-points (deg)
+  ,   ev_name         & !  grid's easting for v-points (deg)
+  ,  fsm_name         & !  free surface mask ({0,1})
+  ,    h_name         & !  bathymetry (m)
+  ,   nc_name         & !  grid's northing for cell corners (deg)
+  ,   ne_name         & !  grid's northing for cell centers (deg)
+  ,   nu_name         & !  grid's northing for u-points (deg)
+  ,   nv_name         & !  grid's northing for v-points (deg)
+  ,  rot_name         & !  cell's angle (rad)
+  ,    z_name         & !  vertical grid's cell faces positions (0..-1)
+  ,   zz_name           !  vertical grid's cell centers positions (0..-1-eps)
+
   public :: check            , initialize_io            &
           , read_grid_pnetcdf, read_initial , out_init  &
           , clim_path, grid_path, out_debug
@@ -52,17 +72,22 @@ module io
 !----------------------------------------------------------------------
 !  Initialize IO module.
 !______________________________________________________________________
-
+!
       use glob_domain, only: is_master
 
       implicit none
 
       character(len=*), intent(in) :: config_nml
 
-      namelist/input_files_nml/                                        &
+      namelist/input_files_nml/                                       &
           bc_path, clim_path, grid_path, ic_path, mean_path,  out_path
+      namelist/input_vars_nml/                                        &
+           dx_name, dy_name, ec_name, ee_name, eu_name, ev_name       &
+        , fsm_name,  h_name, nc_name, ne_name, nu_name, nv_name       &
+        , rot_name,  z_name, zz_name
 
       integer pos
+
 
 ! Initialize with default values
       bc_path   = "in/bc/"
@@ -72,9 +97,26 @@ module io
       mean_path = "in/clim/"
       out_path  = "out/"
 
+      h_name  = "h"
+      z_name  = "z"
+      zz_name = "zz"
+      dx_name = "dx"
+      dy_name = "dy"
+      ec_name = "lon_c"
+      ee_name = "lon_e"
+      eu_name = "lon_u"
+      ev_name = "lon_v"
+      nc_name = "lat_c"
+      ne_name = "lat_e"
+      nu_name = "lat_u"
+      nv_name = "lat_v"
+      fsm_name= "fsm"
+      rot_name= "rot"
+
 ! Override configuration
       open ( 73, file = config_nml, status = 'old' )
       read ( 73, nml = input_files_nml )
+      read ( 73, nml = input_vars_nml )
       close( 73 )
 
 ! Manage inmput_files values
@@ -120,20 +162,25 @@ module io
         call msg_print("CORE I/O MODULE INITIALIZED", 1, "")
       end if
 
+
     end ! subroutine initialize_io
+!
 !______________________________________________________________________
 !
     subroutine read_initial
 !----------------------------------------------------------------------
 !  Reads initial fields (T,S,u,v,el).
 !______________________________________________________________________
-
+!
       use model_run , only: dtime
-      use glob_ocean, only: elb, rho, rmean, sb, sclim, tb, tclim
+      use glob_domain, only: n_south, im, jm
+      use glob_grid , only: dum,dvm
+      use glob_ocean, only: elb, rho, rmean, sb, sclim, tb, tclim, uab, aam2d
 
       implicit none
 
       logical fexist
+      integer i,j
 
 
 ! Check if the climatology file exists and read it.
@@ -142,6 +189,7 @@ module io
       if ( fexist ) then
 ! TODO: Make it possible to read separate initial file, not just clim.
         call read_initial_ts_pnetcdf( tb, sb, elb, dtime%month )
+!        call read_ts_z_pnetcdf( tb, sb, 40, dtime%month, ic_path )
       else
         call msg_print("", 2, "FAILED...")
         tb = 15.
@@ -156,6 +204,9 @@ module io
       call msg_print("", 6, "Read background TS:")
       if ( fexist ) then
         call read_mean_ts_pnetcdf( tclim, sclim, clim_path, dtime%month )
+!        call read_ts_z_pnetcdf( tclim, sclim, 40, dtime%month, clim_path )
+!        tclim = tb
+!        sclim = sb
       else
         call msg_print("", 2, "FAILED...")
         tclim = 0.
@@ -172,21 +223,38 @@ module io
       call msg_print("", 6, "Read climatology:")
       if ( fexist ) then
         call read_clim_ts_pnetcdf( tclim, sclim, clim_path, dtime%month )
+!        tclim = tb
+!        sclim = sb
       else
         call msg_print("", 2, "FAILED...")
         tclim = 15.
         sclim = 33.
       end if
 
+!      uab = .6*dum
+!      if (n_south==-1) then
+!        dvm(:,1)=0.
+!        dum(:,1)=0.
+!      end if
+
+!      if(n_east.eq.-1) then
+!        do j=1,jm
+!          do i=1,im
+!           aam2d(i,j)=100.e0*(1.+10.e0*exp(-(im-i)/10.e0))
+!          end do
+!        end do
+!      end if
+
 
     end ! subroutine read_initial
+!
 !______________________________________________________________________
 !
     subroutine out_init( out_file )
 !----------------------------------------------------------------------
 !  Wrapper for output procedure.
 !______________________________________________________________________
-
+!
       implicit none
 
       character(len=*), intent(in) :: out_file
@@ -200,13 +268,14 @@ module io
                                     //"."//trim(FORMAT_EXT) )
 
     end ! subroutine out_init
+!
 !______________________________________________________________________
 !
     subroutine out_debug( out_file )
 !----------------------------------------------------------------------
 !  Wrapper for debug output procedure.
 !______________________________________________________________________
-
+!
       implicit none
 
       character(len=*), intent(in) :: out_file
@@ -219,8 +288,9 @@ module io
                               //     trim(out_file)    &
                               //"."//trim(FORMAT_EXT) )
 
-    end ! subroutine out_debug
 
+    end ! subroutine out_debug
+!
 !______________________________________________________________________
 !
     integer function def_var_pnetcdf(                                &
@@ -230,7 +300,7 @@ module io
 !----------------------------------------------------------------------
 !  Defines variable in NetCDF file.
 !______________________________________________________________________
-
+!
       use pnetcdf, only: nf90mpi_def_var, nf90mpi_def_var_fill  &
                        , nf90mpi_put_att                        &
                        , NF_NOERR
@@ -284,16 +354,16 @@ module io
 
       def_var_pnetcdf = varid
 
-      return
 
     end ! function def_var_pnetcdf
+!
 !______________________________________________________________________
 !
     subroutine read_grid_pnetcdf( filepath )
 !----------------------------------------------------------------------
 !  Read grid data.
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
       use glob_domain
       use glob_grid
@@ -328,35 +398,35 @@ module io
                 , "nf_open: "//trim(filepath) )
 
 ! get variables
-      call check( nf90mpi_inq_varid(ncid,'z',z_varid)  &
+      call check( nf90mpi_inq_varid(ncid,z_name,z_varid)  &
                 , 'nf_inq_varid: z' )
-      call check( nfmpi_inq_varid(ncid,'zz',zz_varid)  &
+      call check( nfmpi_inq_varid(ncid,zz_name,zz_varid)  &
                 , 'nfmpi_inq_varid: zz' )
-      call check( nfmpi_inq_varid(ncid,'dx',dx_varid)  &
+      call check( nfmpi_inq_varid(ncid,dx_name,dx_varid)  &
                 , 'nfmpi_inq_varid: dx' )
-      call check( nfmpi_inq_varid(ncid,'dy',dy_varid)  &
+      call check( nfmpi_inq_varid(ncid,dy_name,dy_varid)  &
                 , 'nfmpi_inq_varid: dy' )
-      call check( nfmpi_inq_varid(ncid,'lon_u',east_u_varid)  &
+      call check( nfmpi_inq_varid(ncid,eu_name,east_u_varid)  &
                 , 'nfmpi_inq_varid: east_u' )
-      call check( nfmpi_inq_varid(ncid,'lon_v',east_v_varid)  &
+      call check( nfmpi_inq_varid(ncid,ev_name,east_v_varid)  &
                 , 'nfmpi_inq_varid: east_v' )
-      call check( nfmpi_inq_varid(ncid,'lon_e',east_e_varid)  &
+      call check( nfmpi_inq_varid(ncid,ee_name,east_e_varid)  &
                 , 'nfmpi_inq_varid: east_e' )
-      call check( nfmpi_inq_varid(ncid,'lon_c',east_c_varid)  &
+      call check( nfmpi_inq_varid(ncid,ec_name,east_c_varid)  &
                 , 'nfmpi_inq_varid: east_c' )
-      call check( nfmpi_inq_varid(ncid,'lat_u',north_u_varid)  &
+      call check( nfmpi_inq_varid(ncid,nu_name,north_u_varid)  &
                 , 'nfmpi_inq_varid: north_u' )
-      call check( nfmpi_inq_varid(ncid,'lat_v',north_v_varid)  &
+      call check( nfmpi_inq_varid(ncid,nv_name,north_v_varid)  &
                 , 'nfmpi_inq_varid: north_v' )
-      call check( nfmpi_inq_varid(ncid,'lat_e',north_e_varid)  &
+      call check( nfmpi_inq_varid(ncid,ne_name,north_e_varid)  &
                 , 'nfmpi_inq_varid: north_e' )
-      call check( nfmpi_inq_varid(ncid,'lat_c',north_c_varid)  &
+      call check( nfmpi_inq_varid(ncid,nc_name,north_c_varid)  &
                 , 'nfmpi_inq_varid: north_c' )
-      call check( nfmpi_inq_varid(ncid,'rot',rot_varid)  &
+      call check( nfmpi_inq_varid(ncid,rot_name,rot_varid)  &
                 , 'nfmpi_inq_varid: rot' )
-      call check( nfmpi_inq_varid(ncid,'h',h_varid)  &
+      call check( nfmpi_inq_varid(ncid,h_name,h_varid)  &
                 , 'nfmpi_inq_varid: h' )
-      call check( nfmpi_inq_varid(ncid,'fsm',fsm_varid)  &
+      call check( nfmpi_inq_varid(ncid,fsm_name,fsm_varid)  &
                 , 'nfmpi_inq_varid: fsm' )
 !      call check( nfmpi_inq_varid(ncid,'dum',dum_varid)  &
 !                , 'nfmpi_inq_varid: dum' )
@@ -425,14 +495,16 @@ module io
 ! close file:
       call check( nf90mpi_close(ncid), 'nf_close: '//trim(filepath) )
 
+
     end ! subroutine read_grid_pnetcdf
+!
 !______________________________________________________________________
 !
     subroutine write_output_init_pnetcdf( out_file )
 !----------------------------------------------------------------------
 !  Write initial state output file.
 !______________________________________________________________________
-
+!
       use air        , only: wssurf, wtsurf, wusurf, wvsurf
       use bry
       use config     , only: mode, title, use_air
@@ -480,6 +552,7 @@ module io
       real(kind=4), dimension(      kb) :: out1z
       real(kind=4), dimension(im,jm   ) :: out2
       real(kind=4), dimension(im,jm,kb) :: out3
+
 
       out1x = 0.
       out1y = 0.
@@ -905,16 +978,16 @@ module io
       call check( nf90mpi_close(ncid)                   &
                 , 'nf_close: output:  @ '//out_file )
 
-      return
 
     end ! subroutine write_output_init_pnetcdf
+!
 !______________________________________________________________________
 !
     subroutine write_debug_pnetcdf( out_file )
 !----------------------------------------------------------------------
 !  Write initial state output file.
 !______________________________________________________________________
-
+!
       use air        , only: wssurf, wtsurf, wusurf, wvsurf
       use bry
       use config     , only: mode, title, use_air
@@ -941,21 +1014,21 @@ module io
       character(len=*), intent(in) :: out_file  ! Output filename
 
       integer time_dimid, x_dimid, y_dimid, z_dimid
-      integer  aam2d_varid,    aam_varid,    advua_varid,     advva_varid &
-            ,      advx_varid, advy_varid, adx2d_varid, ady2d_varid &
-            ,  drhox_varid,    drhoy_varid,    drx2d_varid,    dry2d_varid &
-            ,     e_atmos_varid,    egb_varid,    egf_varid,      el_varid &
-            ,      elb_varid,  ele_varid, eln_varid,   elf_varid  &
-            , els_varid, elw_varid, et_varid, etb_varid &
-            , etf_varid, fluxua_varid,    fluxva_varid,  kh_varid  &
-            , km_varid, kq_varid &
-            ,       l_varid,      q2_varid,   q2b_varid, q2l_varid &
-            ,  q2lb_varid, rho_varid, s_varid, sb_varid  &
-            ,  t_varid, time_varid, tb_varid, u_varid  &
-            ,  ua_varid, uab_varid, uaf_varid, ub_varid, uf_varid  &
-            ,  v_varid, va_varid, vb_varid, vab_varid, vaf_varid  &
-            ,  vf_varid, w_varid, wr_varid, z_varid &
-            ,      zz_varid
+      integer  aam2d_varid,    aam_varid,  advua_varid, advva_varid  &
+            ,   advx_varid,   advy_varid,  adx2d_varid, ady2d_varid  &
+            ,  drhox_varid,  drhoy_varid,  drx2d_varid, dry2d_varid  &
+            ,e_atmos_varid,    egb_varid,    egf_varid,    el_varid  &
+            ,    elb_varid,    ele_varid,    eln_varid,   elf_varid  &
+            ,    els_varid,    elw_varid,     et_varid,   etb_varid  &
+            ,    etf_varid, fluxua_varid, fluxva_varid,    kh_varid  &
+            ,     km_varid,     kq_varid,      l_varid,    q2_varid  &
+            ,    q2b_varid,    q2l_varid,   q2lb_varid,   rho_varid  &
+            ,      s_varid,     sb_varid,      t_varid,  time_varid  &
+            ,     tb_varid,      u_varid,     ua_varid,   uab_varid  &
+            ,    uaf_varid,     ub_varid,     uf_varid,     v_varid  &
+            ,     va_varid,     vb_varid,    vab_varid,   vaf_varid  &
+            ,     vf_varid,      w_varid,     wr_varid,     z_varid  &
+            ,     zz_varid
 
       integer, dimension(4)      :: vdims
       integer(MPI_OFFSET_KIND)                       &
@@ -968,6 +1041,7 @@ module io
       real(kind=4), dimension(      kb) :: out1z
       real(kind=4), dimension(im,jm   ) :: out2
       real(kind=4), dimension(im,jm,kb) :: out3
+
 
       out1x = 0.
       out1y = 0.
@@ -1301,6 +1375,57 @@ module io
                   , 'nf_put_var_real: eln @ (dummy)'//out_file )
       end if
 
+      call exchange2d_mpi(aam2d,im,jm)
+      call exchange2d_mpi(advua,im,jm)
+      call exchange2d_mpi(advva,im,jm)
+      call exchange2d_mpi(adx2d,im,jm)
+      call exchange2d_mpi(ady2d,im,jm)
+      call exchange2d_mpi(drx2d,im,jm)
+      call exchange2d_mpi(dry2d,im,jm)
+      call exchange2d_mpi(egb,im,jm)
+      call exchange2d_mpi(egf,im,jm)
+      call exchange2d_mpi(el,im,jm)
+      call exchange2d_mpi(elb,im,jm)
+      call exchange2d_mpi(elf,im,jm)
+      call exchange2d_mpi(et,im,jm)
+      call exchange2d_mpi(etb,im,jm)
+      call exchange2d_mpi(etb,im,jm)
+      call exchange2d_mpi(fluxua,im,jm)
+      call exchange2d_mpi(fluxva,im,jm)
+      call exchange2d_mpi(ua,im,jm)
+      call exchange2d_mpi(uab,im,jm)
+      call exchange2d_mpi(uaf,im,jm)
+      call exchange2d_mpi(va,im,jm)
+      call exchange2d_mpi(vab,im,jm)
+      call exchange2d_mpi(vaf,im,jm)
+
+      call exchange3d_mpi(aam,im,jm,kb)
+      call exchange3d_mpi(advx,im,jm,kb)
+      call exchange3d_mpi(advy,im,jm,kb)
+      call exchange3d_mpi(drhox,im,jm,kb)
+      call exchange3d_mpi(drhoy,im,jm,kb)
+      call exchange3d_mpi(kq,im,jm,kb)
+      call exchange3d_mpi(l,im,jm,kb)
+      call exchange3d_mpi(q2b,im,jm,kb)
+      call exchange3d_mpi(q2,im,jm,kb)
+      call exchange3d_mpi(q2l,im,jm,kb)
+      call exchange3d_mpi(q2lb,im,jm,kb)
+      call exchange3d_mpi(t,im,jm,kb)
+      call exchange3d_mpi(tb,im,jm,kb)
+      call exchange3d_mpi(s,im,jm,kb)
+      call exchange3d_mpi(sb,im,jm,kb)
+      call exchange3d_mpi(rho,im,jm,kb)
+      call exchange3d_mpi(kh,im,jm,kb)
+      call exchange3d_mpi(km,im,jm,kb)
+      call exchange3d_mpi(u,im,jm,kb)
+      call exchange3d_mpi(ub,im,jm,kb)
+      call exchange3d_mpi(uf,im,jm,kb)
+      call exchange3d_mpi(v,im,jm,kb)
+      call exchange3d_mpi(vb,im,jm,kb)
+      call exchange3d_mpi(vf,im,jm,kb)
+      call exchange3d_mpi(w,im,jm,kb)
+      call exchange3d_mpi(wr,im,jm,kb)
+
 
       start(1) = i_global(1)
       start(2) = j_global(1)
@@ -1516,9 +1641,9 @@ module io
       call check( nf90mpi_close(ncid)                   &
                 , 'nf_close: output:  @ '//out_file )
 
-      return
 
     end ! subroutine write_debug_pnetcdf
+!
 !______________________________________________________________________
 !
     subroutine read_initial_ts_pnetcdf( temp, salt, ssh, n )
@@ -1526,7 +1651,7 @@ module io
 !  Reads initial temperature, salinity and elevation.
 ! TODO: Add u and v. Add check for single record to read if not climatology.
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
       use glob_domain
 !      use glob_grid  , only: fsm
@@ -1615,14 +1740,89 @@ module io
 
 
     end ! subroutine read_initial_ts_pnetcdf
+!
+!______________________________________________________________________
+!
+    subroutine read_ts_z_pnetcdf( temp, salt, ks, n, path )
+!----------------------------------------------------------------------
+!  Reads initial temperature, salinity and elevation.
+! TODO: Add u and v. Add check for single record to read if not climatology.
+!______________________________________________________________________
+!
+      use glob_const , only: rk
+      use glob_domain
+      use glob_grid  , only: fsm, zz, h
+      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
+      use pnetcdf
 
+      implicit none
+
+      integer, external :: get_var_real_2d &
+                         , get_var_real_3d
+
+      integer                      , intent(in   ) :: ks, n
+      character(len=*)             , intent(in   ) :: path
+      real(rk), dimension(im,jm,kb), intent(  out) :: temp,salt
+
+      integer                  ncid, status
+      integer                  z_varid, sb_varid, tb_varid
+      integer(MPI_OFFSET_KIND) start(4),edge(4)
+      real(rk)                 tz(im,jm,ks),sz(im,jm,ks),z_z(ks)
+
+
+      start = 1
+      edge  = 1
+
+!  Open netcdf file.
+      if ( is_master )                                              &
+           print '(''reading file `'',a,''`''/)', trim(ic_path)
+      call check( nf90mpi_open(                        &
+                    POM_COMM, path, NF_NOWRITE  &
+                  , MPI_INFO_NULL, ncid )              &
+                , "nfmpi_open: "//path )
+
+!  Get variables. [ TODO: parameterize varnames ]
+      call check( nf90mpi_inq_varid( ncid, 't', tb_varid )  &
+                , "nfmpi_inq_varid: t_init @ "//ic_path )
+      call check( nf90mpi_inq_varid( ncid, 's', sb_varid )  &
+                , "nfmpi_inq_varid: s_init @ "//ic_path )
+      call check( nf90mpi_inq_varid( ncid, 'z', z_varid )  &
+                , "nfmpi_inq_varid: z_init @ "//ic_path )
+
+      start(1) = 1
+      edge(1) = ks
+      call check( nf90mpi_get_var_all(ncid,z_varid,z_z,start,edge)  &
+                , "nf_get_var : z @ "//ic_path )
+
+      start(1) = i_global(1)
+      start(2) = j_global(1)
+      start(3) = 1
+      start(4) = 1
+      edge(1) = im
+      edge(2) = jm
+      edge(3) = ks
+      edge(4) = 1
+      call check( get_var_real_3d(ncid,tb_varid,start,edge,tz)  &
+                , "nf_get_var : temp @ "//ic_path )
+      call check( get_var_real_3d(ncid,sb_varid,start,edge,sz)  &
+                , "nf_get_var : salt @ "//ic_path )
+
+!  Close file.
+      call check( nf90mpi_close(ncid), "nf_close @ "//ic_path)
+
+      call ztosig(z_z,tz,zz,h,temp,im,jm,ks,kb,n_west,n_east,n_south,n_north)
+      call ztosig(z_z,sz,zz,h,salt,im,jm,ks,kb,n_west,n_east,n_south,n_north)
+
+
+    end ! subroutine read_ts_z_pnetcdf
+!
 !______________________________________________________________________
 !
     subroutine check(status, routine)
 !----------------------------------------------------------------------
 !  Checks for NetCDF I/O error and exits with an error message if hits.
 !______________________________________________________________________
-
+!
       use glob_domain, only: error_status, is_master
       use pnetcdf    , only: nf90mpi_strerror, NF_NOERR
 
@@ -1642,9 +1842,7 @@ module io
       end if
 
 
-      return
-
     end ! subroutine check
-
+!
 
 end module io
