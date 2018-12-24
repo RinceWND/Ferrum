@@ -827,9 +827,9 @@
      &              , rhow, Ri, Ribcu, Rr, scff, SHeat, shflx, SRad
      &              , StefBo, stflx, TairC, TairK, Taur, Taux, Tauy
      &              , Tcff, Tpsi, TseaC, TseaK, Tstar, twopi_inv, u10
-     &              , upvel, Uwind, vap_p, VisAir, vonKar, Vwind
-     &              , wet_bulb, Wgus, Wmag, Wpsi, Wspeed, Wstar
-     &              , Zetu, Zo10, ZoL, ZoQ, ZoT, ZoT10, ZoW
+     &              , upvel, vap_p, VisAir, vonKar, wet_bulb, Wgus
+     &              , Wmag, Wpsi, Wspeed, Wstar, Zetu, Zo10, ZoL, ZoQ
+     &              , ZoT, ZoT10, ZoW
         real(kind=rk), external :: bulk_psiu, bulk_psit
         integer Iter
 
@@ -1181,8 +1181,8 @@
 !  Compute wind stress components (N/m2), Tau.
 !
         cff  = rhoAir*Cd*Wspeed
-        Taux = (cff*Uwind + Taur*sign(1._rk,Uwind))
-        Tauy = (cff*Vwind + Taur*sign(1._rk,Vwind))
+        Taux = (cff*uw + Taur*sign(1._rk,uw))
+        Tauy = (cff*vw + Taur*sign(1._rk,vw))
 
 !=======================================================================
 !  Compute surface net heat flux and surface wind stress.

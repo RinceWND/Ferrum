@@ -3376,7 +3376,7 @@
       use air        , only: wusurf, wvsurf
       use config     , only: sbias, tbias, umol
       use glob_const , only: grav, kappa, rhoref, rk, small
-      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1, kbm2
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1!, kbm2
      &                     , n_east, n_north, n_south, n_west
       use glob_grid  , only: dzz, dz, fsm, h, z, zz
       use glob_ocean , only: a, c, dtef, ee, etf, gg, kh, km, kq, l
@@ -4393,7 +4393,7 @@
 !______________________________________________________________________
 !
       use config    , only: rk
-      use glob_const, only: KAPPA, GRAV, PI
+      use glob_const, only: KAPPA, GRAV!, PI
 
       implicit none
 

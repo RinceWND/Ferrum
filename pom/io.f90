@@ -173,14 +173,14 @@ module io
 !______________________________________________________________________
 !
       use model_run , only: dtime
-      use glob_domain, only: n_south, im, jm
-      use glob_grid , only: dum,dvm
-      use glob_ocean, only: elb, rho, rmean, sb, sclim, tb, tclim, uab, aam2d
+!      use glob_domain, only: n_south, im, jm
+!      use glob_grid , only: dum,dvm
+      use glob_ocean, only: elb, rho, rmean, sb, sclim, tb, tclim
 
       implicit none
 
       logical fexist
-      integer i,j
+!      integer i,j
 
 
 ! Check if the climatology file exists and read it.
@@ -988,7 +988,7 @@ module io
 !  Write initial state output file.
 !______________________________________________________________________
 !
-      use air        , only: wssurf, wtsurf, wusurf, wvsurf
+!      use air        , only: wssurf, wtsurf, wusurf, wvsurf
       use bry
       use config     , only: mode, title, use_air
       use glob_const , only: rk
@@ -1751,7 +1751,7 @@ module io
 !
       use glob_const , only: rk
       use glob_domain
-      use glob_grid  , only: fsm, zz, h
+      use glob_grid  , only: zz, h
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
 
@@ -1764,7 +1764,7 @@ module io
       character(len=*)             , intent(in   ) :: path
       real(rk), dimension(im,jm,kb), intent(  out) :: temp,salt
 
-      integer                  ncid, status
+      integer                  ncid
       integer                  z_varid, sb_varid, tb_varid
       integer(MPI_OFFSET_KIND) start(4),edge(4)
       real(rk)                 tz(im,jm,ks),sz(im,jm,ks),z_z(ks)

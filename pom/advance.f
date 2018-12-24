@@ -292,10 +292,10 @@
       use bry        , only: bc_vel_ext, bc_zeta
       use config     , only: alpha, ispadv, smoth
       use glob_const , only: grav
-      use glob_domain, only: im, imm1, jm, jmm1, my_task
+      use glob_domain, only: im, imm1, jm, jmm1!, my_task
       use glob_grid  , only: art, aru, arv, cor, dx, dy, fsm, h
       use glob_ocean
-      use model_run  , only: dte, dte2, iext, isp2i, ispi, isplit,iint
+      use model_run  , only: dte, dte2, iext, isp2i, ispi, isplit!,iint
 
       implicit none
 

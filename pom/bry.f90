@@ -1899,10 +1899,10 @@ module bry
                   dvdt =  v(i,jmm1,k)-vf(i,jmm1,k)
                   dvdy = vf(i,jmm1,k)-vf(i,jmm2,k)
                   if ( dvdt*dvdy < 0. ) dvdt = 0.
-                  if ( dvdt*(grdx(i,jmm1)+grdx(i+1,jmm1)) > 0. ) then
-                    dvdx = grdx(i  ,jmm1)
+                  if ( dvdt*(grdx(i,1)+grdx(i+1,1)) > 0. ) then
+                    dvdx = grdx(i  ,1)
                   else
-                    dvdx = grdx(i+1,jmm1)
+                    dvdx = grdx(i+1,1)
                   end if
                   cff = max(dvdx*dvdx + dvdy*dvdy, small)
                   cx  = min(cff,max(dvdt*dvdx,-cff))
