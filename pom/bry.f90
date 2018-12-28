@@ -1216,8 +1216,9 @@ module bry
 !  Apply external (2D) elevation boundary conditions.
 !______________________________________________________________________
 !
-      use glob_grid , only: fsm
-      use glob_ocean, only: elf
+      use glob_const, only: g => GRAV
+      use glob_grid , only: fsm, h
+      use glob_ocean, only: elf, uaf, vaf
 
       implicit none
 
@@ -1233,6 +1234,14 @@ module bry
 
           select case ( BC % zeta % east )
 
+            case ( bcFLATHER ) ! Complementary BCs for 2d vel should be bcFLATHER for tangential velocities.
+                               ! TODO: Normal, however, should be deduced from continuity equation...
+                               ! TODO: CHECK if these boundaries have any effect on interior at all...
+              elf(im,2:jmm1) = EL_bry % EST(1,2:jmm1)       &
+                              + ( uaf(imm1,2:jmm1)          &
+                                 -UA_bry % EST(1,2:jmm1) )  &
+                                /sqrt(g*h(im,2:jmm1))
+
             case default
               elf(im,:) = elf(imm1,:)
 
@@ -1243,6 +1252,12 @@ module bry
         if ( hasWEST ) then
 
           select case ( BC % zeta % west )
+
+            case ( bcFLATHER )
+              elf( 1,2:jmm1) = EL_bry % WST(1,2:jmm1)       &
+                              - ( uaf(2,2:jmm1)             &
+                                 -UA_bry % WST(1,2:jmm1) )  &
+                                /sqrt(g*h(1,2:jmm1))
 
             case default
               elf( 1,:) = elf(2   ,:)
@@ -1265,6 +1280,12 @@ module bry
 
           select case ( BC % zeta % north )
 
+            case ( bcFLATHER )
+              elf(2:imm1,jm) = EL_bry % NTH(2:imm1,1)       &
+                              + ( vaf(2:imm1,jmm1)          &
+                                 -VA_bry % NTH(2:imm1,1) )  &
+                                /sqrt(g*h(2:imm1,jm))
+
             case default
               elf(:,jm) = elf(:,jmm1)
 
@@ -1275,6 +1296,12 @@ module bry
         if ( hasSOUTH ) then
 
           select case ( BC % zeta % south )
+
+            case ( bcFLATHER )
+              elf(2:imm1, 1) = EL_bry % STH(2:imm1,1)       &
+                              - ( vaf(2:imm1,2)          &
+                                 -VA_bry % STH(2:imm1,1) )  &
+                                /sqrt(g*h(2:imm1,1))
 
             case default
               elf(:, 1) = elf(:,   2)
@@ -1365,10 +1392,9 @@ module bry
             case ( bcCLAMPED )
               vaf(im,2:jmm1) = VA_bry%EST(1,2:jmm1)
 
-            case ( bcFLATHER ) ! NOT CORRECT!
-              vaf(im,2:jmm1) = VA_bry%EST(1,2:jmm1)              &
-                         - sqrt(GRAV/h(imm1,2:jmm1))             &
-                          *(el(imm1,2:jmm1)-EL_bry%EST(1,2:jmm1))
+            case ( bcFLATHER ) ! ??? Zero out tangential velocity gradient at imm1 point
+                               ! (So we assume {partial U^T} over {partial n} = {partial U^T_exterior) over {partial n} = 0)
+              vaf(im,2:jmm1) = vaf(imm2,2:jmm1)
 
             case default
               vaf(im,2:jmm1) = 0.
@@ -1419,10 +1445,8 @@ module bry
             case ( bcCLAMPED )
               vaf(1,2:jmm1) = VA_bry%WST(1,2:jmm1)
 
-            case ( bcFLATHER ) ! NOT CORRECT!
-              vaf(1,2:jmm1) = VA_bry%WST(1,2:jmm1)              &
-                           + sqrt(GRAV/h(2,2:jmm1))             &
-                            *(el(2,2:jmm1)-EL_bry%WST(1,2:jmm1))
+            case ( bcFLATHER ) ! ??? (See east boundary)
+              vaf(1,2:jmm1) = vaf(3,2:jmm1)
 
             case default
               vaf(1,2:jmm1) = 0.
@@ -1494,10 +1518,8 @@ module bry
             case ( bcCLAMPED )
               uaf(2:imm1,jm) = UA_bry%NTH(2:imm1,1)
 
-            case ( bcFLATHER ) ! NOT CORRECT!
-              uaf(2:imm1,jm) = UA_bry%NTH(2:imm1,1)              &
-                         - sqrt(GRAV/h(2:imm1,jmm1))             &
-                          *(el(2:imm1,jmm1)-EL_bry%NTH(2:imm1,1))
+            case ( bcFLATHER ) ! ??? (See east boundary)
+              uaf(2:imm1,jm) = uaf(2:imm1,jmm2)
 
             case default
               uaf(2:imm1,jm) = 0.
@@ -1548,10 +1570,8 @@ module bry
             case ( bcCLAMPED )
               uaf(2:imm1,1) = UA_bry%STH(2:imm1,1)
 
-            case ( bcFLATHER ) ! NOT CORRECT!
-              uaf(2:imm1,1) = UA_bry%STH(2:imm1,1)              &
-                           + sqrt(GRAV/h(2:imm1,2))             &
-                            *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))
+            case ( bcFLATHER ) ! ??? (See east boundary)
+              uaf(2:imm1,1) = uaf(2:imm1,3)
 
             case default
               uaf(2:imm1,1) = 0.
