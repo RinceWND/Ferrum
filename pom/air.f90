@@ -7,7 +7,7 @@
 !  Author  : RinceWND
 !  Created : 2018-09-06
 !______________________________________________________________________
-
+!
 module air
 
   use glob_const, only: rk
@@ -166,7 +166,7 @@ module air
 !----------------------------------------------------------------------
 !  Initialize air module.
 !______________________________________________________________________
-
+!
       use config     , only: use_air
       use glob_domain, only: is_master
 
@@ -189,6 +189,7 @@ module air
       ,  pres_name, humid_name, sheat_name,  sst_name  &
       ,  srad_name,  tair_name,  tcld_name, ustr_name  &
       ,  uwnd_name,  vstr_name,  vwnd_name, wgst_name
+
 
       DISABLED = .false.
 
@@ -268,7 +269,8 @@ module air
 
       call msg_print("AIR MODULE INITIALIZED", 1, "")
 
-    end subroutine
+    end ! subroutine initialize_air
+!
 !______________________________________________________________________
 !
     subroutine allocate_air
@@ -286,6 +288,7 @@ module air
                   !   var at n   step: var(:,:,1)
                   !   var at n-1 step: var(:,:,2)
                   !   var at n+1 step: var(:,:,3)
+
 
 ! Allocate core arrays
       allocate(         &
@@ -382,14 +385,15 @@ module air
          )
       end if
 
-    end subroutine ! allocate_air
+    end ! subroutine allocate_air
+!
 !______________________________________________________________________
 !
     subroutine init( d_in )
 !----------------------------------------------------------------------
 !  Reads forcing fields before experiment's start.
 !______________________________________________________________________
-
+!
 !      use glob_domain, only: is_master
 !      use config     , only: calc_wind
       use module_time
@@ -444,16 +448,15 @@ module air
       call msg_print("AIR INITIALIZED", 2, "")
 
 
-      return
-
-    end subroutine init
+    end ! subroutine init
+!
 !______________________________________________________________________
 !
     subroutine step( d_in )
 !----------------------------------------------------------------------
 !  Reads forcing fields during experiment.
 !______________________________________________________________________
-
+!
 !      use glob_const , only: SEC2DAY
 !      use glob_domain, only: is_master
       use module_time
@@ -544,14 +547,15 @@ module air
 
       end if
 
-    end subroutine step
+    end ! subroutine step
+!
 !______________________________________________________________________
 !
     subroutine wind_to_stress( uwnd, vwnd, ustr, vstr, mode )
 !----------------------------------------------------------------------
 !  Calculates momentum flux (m^2/s^2) from wind velocity (m/s).
 !______________________________________________________________________
-
+!
       use glob_const , only: rhow => rhoref
       use glob_domain, only: im, jm
       use glob_ocean , only: u, v
@@ -564,6 +568,7 @@ module air
 
       integer  i, j
       real(rk) cda, uvabs
+
 
       cda = .00125 ! Default value
 
@@ -591,15 +596,18 @@ module air
         end do
       end do
 
-    end subroutine ! wind_to_stress
+
+    end ! subroutine wind_to_stress
+!
 !______________________________________________________________________
 !
     subroutine calculate_fluxes
 !----------------------------------------------------------------------
 !  Generates and interpolates all surface fluxes.
 !______________________________________________________________________
-
+!
       implicit none
+
 
       if ( READ_BULK ) then
 
@@ -625,7 +633,9 @@ module air
 
       end if
 
-    end subroutine
+
+    end ! subroutine calculate_fluxs
+!
 !______________________________________________________________________
 !
     subroutine bulk_fluxes
@@ -698,7 +708,7 @@ module air
 ! subroutines in order to map the raw atmospheric data onto the model grid
 ! and interpolate them to the current time step)
 !______________________________________________________________________
-
+!
       use glob_const , only: C2K, DEG2RAD, rhoref, Rho_Cpw, rk
       use glob_domain, only: im, jm, my_task
       use glob_grid  , only: east_e, fsm, north_e
@@ -1034,11 +1044,10 @@ module air
 
         end do
       end do
-!
-!
-! --------------------------------------------------
 
-    end subroutine bulk_fluxes
+
+    end ! subroutine bulk_fluxes
+!
 !______________________________________________________________________
 !
     real(rk) function ESK(t)
@@ -1063,7 +1072,8 @@ module air
 
       esk = a(1) +t*(a(2)+t*(a(3)+t*(a(4)+t*(a(5)+t*(a(6)+t*a(7))))))
 
-    end function esk
+    end ! function esk
+!
 !______________________________________________________________________
 !
     pure real(rk) function heat_latent(t)
@@ -1079,9 +1089,12 @@ module air
 
       real(rk), intent(in)  :: t
 
+
       heat_latent = 2.5008e+6_rk - 2.3e+3_rk * t
 
-    end function heat_latent
+
+    end ! function heat_latent
+!
 !______________________________________________________________________
 !
     subroutine read_all( execute, n, year, record )
@@ -1246,14 +1259,16 @@ module air
 
         end if ! if READ_FLUX
 
-    end subroutine
+
+    end ! subroutine read_all
+!
 !______________________________________________________________________
 !
     pure character(len=256) function get_filename( path, year )
 !----------------------------------------------------------------------
 !  Costructs filename string in `<path>YYYY<FORMAT_EXT>` format.
 !______________________________________________________________________
-
+!
       implicit none
 
       character(len=*), intent(in) :: path
@@ -1264,8 +1279,9 @@ module air
                                             , year            &
                                             , trim(FORMAT_EXT)
 
-    end function
-
+    end ! function get_filemname
+!
+!
 != I/O SECTION ========================================================
 !______________________________________________________________________
 !
@@ -1273,7 +1289,7 @@ module air
 !----------------------------------------------------------------------
 !  Read a variable (NC format).
 !______________________________________________________________________
-
+!
       use glob_const , only: C2K, rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
@@ -1324,16 +1340,16 @@ module air
         end select
       end if
 
-      return
 
-      end
+      end ! subroutine read_var_nc
+!
 !___________________________________________________________________
 !
     integer function file_open_nc( path, year )
 !-------------------------------------------------------------------
 !  Opens netcdf file for reading.
 !___________________________________________________________________
-
+!
       use glob_domain, only: POM_COMM
       use mpi        , only: MPI_INFO_NULL
       use pnetcdf    , only: nf90mpi_open, NF_NOERR, NF_NOWRITE
@@ -1356,7 +1372,8 @@ module air
         file_open_nc = -1
       end if
 
-    end function
+    end ! function file_open_nc
+!
 !___________________________________________________________________
 !
     integer function file_close_nc( ncid )
@@ -1373,7 +1390,9 @@ module air
 
       file_close_nc = nf90mpi_close( ncid )
 
-    end function
+
+    end ! function file_close_nc
+!
 !______________________________________________________________________
 !
     subroutine check(status, routine)
@@ -1400,10 +1419,7 @@ module air
       end if
 
 
-      return
-
-    end
-
+    end ! subroutine check
 
 
 end module air
