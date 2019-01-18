@@ -62,7 +62,8 @@ module bry
   , bcINOUTFLOW       = 4  & !  in-, outflow condition
   , bcRADIATION       = 5  & !  radiation condition
   , bcORLANSKI        = 6  & !  Orlanski internal normal velocity condition
-  , bcRADIATION_ENH   = 7    !  enhanced radiation condition
+  , bcRADIATION_ENH   = 7  & !  enhanced radiation condition
+  , bcGENFLATHER      = 8    !  generalized Flather (Oddo, Pinardi, 2010)
 
 !----------------------------------------------------------------------
 ! Configuration
@@ -1217,8 +1218,9 @@ module bry
 !______________________________________________________________________
 !
       use glob_const, only: g => GRAV
-      use glob_grid , only: fsm, h
-      use glob_ocean, only: elf, uaf, vaf
+      use glob_grid , only: dx, dy, fsm, h
+      use glob_ocean, only: elb, elf, ua, uab, uaf, va, vab, vaf
+      use model_run , only: dti2
 
       implicit none
 
@@ -1237,13 +1239,15 @@ module bry
             case ( bcFLATHER ) ! Complementary BCs for 2d vel should be bcFLATHER for tangential velocities.
                                ! TODO: Normal, however, should be deduced from continuity equation...
                                ! TODO: CHECK if these boundaries have any effect on interior at all...
-              elf(im,2:jmm1) = EL_bry % EST(1,2:jmm1)       &
-                              + ( uaf(imm1,2:jmm1)          &
-                                 -UA_bry % EST(1,2:jmm1) )  &
-                                /sqrt(g*h(im,2:jmm1))
+                               ! [ DO NOT USE ]
+              elf(imm1,2:jmm1) = ( elb(imm1,2:jmm1)                 &
+                                  *(uab(imm1,2:jmm1)-sqrt(g*h(imm1,2:jmm1)))     &
+                                  +uab(imm1,2:jmm1)*h(imm1,2:jmm1)  &
+                                  -uab(imm1,2:jmm1)*h(im,2:jmm1) ) &
+                                 /(uab(imm1,2:jmm1)-sqrt(g*h(imm1,2:jmm1)))
 
-            case default
-              elf(im,:) = elf(imm1,:)
+
+            elf(im,:) = elf(imm1,:)
 
           end select
 
@@ -1254,13 +1258,15 @@ module bry
           select case ( BC % zeta % west )
 
             case ( bcFLATHER )
-              elf( 1,2:jmm1) = EL_bry % WST(1,2:jmm1)       &
-                              - ( uaf(2,2:jmm1)             &
+              elf( 2,2:jmm1) = EL_bry % WST(1,2:jmm1)       &
+                              - ( uaf(3,2:jmm1)             &
                                  -UA_bry % WST(1,2:jmm1) )  &
-                                /sqrt(g*h(1,2:jmm1))
+                                /sqrt(g*h(2,2:jmm1))        &
+                              + elb(2,2:jmm1)               &
+                              + dti2*(uab(2,2:jmm1)-uab(3,2:jmm1)) &
+                               /dx(2,2:jmm1)
 
-            case default
-              elf( 1,:) = elf(2   ,:)
+            elf( 1,:) = elf(2   ,:)
 
           end select
 
@@ -1281,13 +1287,15 @@ module bry
           select case ( BC % zeta % north )
 
             case ( bcFLATHER )
-              elf(2:imm1,jm) = EL_bry % NTH(2:imm1,1)       &
+              elf(2:imm1,jmm1) = EL_bry % NTH(2:imm1,1)     &
                               + ( vaf(2:imm1,jmm1)          &
                                  -VA_bry % NTH(2:imm1,1) )  &
-                                /sqrt(g*h(2:imm1,jm))
+                                /sqrt(g*h(2:imm1,jmm1))     &
+                              + elb(2:imm1,jmm1)            &
+                              + dti2*(vab(2:imm1,jmm1)-vab(2:imm1,jmm2)) &
+                               /dy(2:imm1,jmm1)
 
-            case default
-              elf(:,jm) = elf(:,jmm1)
+            elf(:,jm) = elf(:,jmm1)
 
           end select
 
@@ -1298,13 +1306,15 @@ module bry
           select case ( BC % zeta % south )
 
             case ( bcFLATHER )
-              elf(2:imm1, 1) = EL_bry % STH(2:imm1,1)       &
-                              - ( vaf(2:imm1,2)          &
+              elf(2:imm1, 2) = EL_bry % STH(2:imm1,1)       &
+                              - ( vaf(2:imm1,3)             &
                                  -VA_bry % STH(2:imm1,1) )  &
-                                /sqrt(g*h(2:imm1,1))
+                                /sqrt(g*h(2:imm1,2))        &
+                              + elb(2:imm1,2)               &
+                              + dti2*(vab(2:imm1,2)-vab(2:imm1,3)) &
+                               /dy(2:imm1,2)
 
-            case default
-              elf(:, 1) = elf(:,   2)
+            elf(:, 1) = elf(:,   2)
 
           end select
 
@@ -1325,7 +1335,7 @@ module bry
 !______________________________________________________________________
 !
       use glob_const , only: GRAV
-      use glob_grid  , only: dum, dvm, h
+      use glob_grid  , only: dum, dvm, h, dx, dy
       use glob_ocean , only: el, uaf, vaf
       use model_run  , only: ramp
 
@@ -1372,6 +1382,13 @@ module bry
                          + sqrt(GRAV/h(imm1,2:jmm1))             &
                           *(el(imm1,2:jmm1)-EL_bry%EST(1,2:jmm1))
 
+            case ( bcGENFLATHER )
+              uaf(im,2:jmm1) = ( UA_bry%EST(1,2:jmm1)                   &
+                                *(h(imm1,2:jmm1)+el(imm1,2:jmm1))       &
+                                +sqrt(GRAV/h(imm1,2:jmm1))              &
+                                *(el(imm1,2:jmm1)-EL_bry%EST(1,2:jmm1)))&
+                               /(h(im,2:jmm1)+EL_bry%EST(1,2:jmm1))
+
             case default
               uaf(im,2:jmm1) = 0.
 
@@ -1394,7 +1411,10 @@ module bry
 
             case ( bcFLATHER ) ! ??? Zero out tangential velocity gradient at imm1 point
                                ! (So we assume {partial U^T} over {partial n} = {partial U^T_exterior) over {partial n} = 0)
-              vaf(im,2:jmm1) = vaf(imm2,2:jmm1)
+!              vaf(im,2:jmm1) = vaf(imm2,2:jmm1)
+              vaf(im,2:jmm1) = vaf(imm1,2:jmm1)                     &
+                             + (vaf(imm1,2:jmm1)-vaf(imm2,2:jmm1))  !&
+!                              *dx(imm1,2:jmm1)/dx(imm2,2:jmm1)
 
             case default
               vaf(im,2:jmm1) = 0.
@@ -1424,6 +1444,13 @@ module bry
                            - sqrt(GRAV/h(2,2:jmm1))             &
                             *(el(2,2:jmm1)-EL_bry%WST(1,2:jmm1))
 
+            case ( bcGENFLATHER )
+              uaf(2,2:jmm1) = ( UA_bry%WST(1,2:jmm1)                 &
+                               *(h(2,2:jmm1)+el(2,2:jmm1))           &
+                               -sqrt(GRAV/h(2,2:jmm1))               &
+                               *(el(2,2:jmm1)-EL_bry%WST(1,2:jmm1))) &
+                              /(h(1,2:jmm1)+EL_bry%WST(1,2:jmm1))
+
             case default
               uaf(2,2:jmm1) = 0.
 
@@ -1446,7 +1473,10 @@ module bry
               vaf(1,2:jmm1) = VA_bry%WST(1,2:jmm1)
 
             case ( bcFLATHER ) ! ??? (See east boundary)
-              vaf(1,2:jmm1) = vaf(3,2:jmm1)
+!              vaf(1,2:jmm1) = vaf(3,2:jmm1)
+              vaf(1,2:jmm1) = vaf(2,2:jmm1)                   &
+                             + (vaf(2,2:jmm1)-vaf(3,2:jmm1))  !&
+!                              *dx(2,2:jmm1)/dx(3,2:jmm1)
 
             case default
               vaf(1,2:jmm1) = 0.
@@ -1498,6 +1528,13 @@ module bry
                          + sqrt(GRAV/h(2:imm1,jmm1))             &
                           *(el(2:imm1,jmm1)-EL_bry%NTH(2:imm1,1))
 
+            case ( bcGENFLATHER )
+              vaf(2:imm1,jm) = ( VA_bry%NTH(2:imm1,1)                   &
+                                *(h(2:imm1,jmm1)+el(2:imm1,jmm1))       &
+                                +sqrt(GRAV/h(2:imm1,jmm1))              &
+                                *(el(2:imm1,jmm1)-EL_bry%NTH(2:imm1,1)))&
+                               /(h(2:imm1,jm)+EL_bry%NTH(2:imm1,1))
+
             case default
               vaf(2:imm1,jm) = 0.
 
@@ -1519,7 +1556,10 @@ module bry
               uaf(2:imm1,jm) = UA_bry%NTH(2:imm1,1)
 
             case ( bcFLATHER ) ! ??? (See east boundary)
-              uaf(2:imm1,jm) = uaf(2:imm1,jmm2)
+!              uaf(2:imm1,jm) = uaf(2:imm1,jmm2)
+              uaf(2:imm1,jm) = uaf(2:imm1,jmm2)                     &
+                             + (uaf(2:imm1,jmm1)-uaf(2:imm1,jmm2))  !&
+!                              *dy(2:imm1,jmm1)/dy(2:imm1,jmm2)
 
             case default
               uaf(2:imm1,jm) = 0.
@@ -1549,6 +1589,13 @@ module bry
                            - sqrt(GRAV/h(2:imm1,2))             &
                             *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))
 
+            case ( bcGENFLATHER )
+              vaf(2:imm1,2) = ( VA_bry%STH(2:imm1,1)                 &
+                               *(h(2:imm1,2)+el(2:imm1,2))           &
+                               -sqrt(GRAV/h(2:imm1,2))               &
+                               *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))) &
+                              /(h(2:imm1,1)+EL_bry%STH(2:imm1,1))
+
             case default
               vaf(2:imm1,2) = 0.
 
@@ -1571,7 +1618,10 @@ module bry
               uaf(2:imm1,1) = UA_bry%STH(2:imm1,1)
 
             case ( bcFLATHER ) ! ??? (See east boundary)
-              uaf(2:imm1,1) = uaf(2:imm1,3)
+!              uaf(2:imm1,1) = uaf(2:imm1,3)
+              uaf(2:imm1,1) = uaf(2:imm1,2)                   &
+                             + (uaf(2:imm1,2)-uaf(2:imm1,3))  !&
+!                              *dy(2:imm1,2)/dy(2:imm1,3)
 
             case default
               uaf(2:imm1,1) = 0.
