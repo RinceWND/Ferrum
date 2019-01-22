@@ -145,6 +145,7 @@
 !______________________________________________________________________
 !
       use config     , only: aam_init, horcon, mode, n1d, npg
+      use bry        , only: aamfrz
       use glob_domain, only: im, imm1, jm, jmm1, kbm1
       use glob_grid  , only: dx, dy
       use glob_misc  , only: aamfac
@@ -186,6 +187,7 @@
      $                    +.25*(v(i+1,j,k)+v(i+1,j+1,k)
      $                           -v(i-1,j,k)-v(i-1,j+1,k))
      $                    /dx(i,j)) **2)
+     $                    *(1.+aamfrz(i,j))
               end do
             end do
           end do

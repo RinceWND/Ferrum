@@ -570,11 +570,11 @@ module bry
         frz = frz*rdisp !lyo:stcc:mar_:dec_:
 !     rdisp=1.;         frz(:,:)=frz(:,:)*rdisp !lyo:stcc:
 !     For aam is increased by (1.+aamfrz(i,j)) in subr lateral_viscosity
-        call bfrz(     0,     0,      0,      0   &
+        call bfrz(     7,     7,      7,      7   &
                  ,n_west,n_east,n_south,n_north   &
                  ,    im,    jm,      6, aamfrz)       !SPONGE:
-        rdisp  = 0.
-        aamfrz = aamfrz*rdisp
+!        rdisp  = 0.
+!        aamfrz = aamfrz*rdisp
 !lyo:pac10:end:
       end if
 
