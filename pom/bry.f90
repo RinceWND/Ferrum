@@ -22,17 +22,26 @@ module bry
 !----------------------------------------------------------------------
   logical           &
        , private :: &
-    DISABLED        & ! flag for active (read from file) boundaries
+    DERIVE_2D       & ! flag to average 3D boudaries and use 2D only
+  , DISABLED        & ! flag for active (read from file) boundaries
   , hasEAST         & ! flag for eastern boundary
   , hasNORTH        & ! flag for northern boundary
   , hasSOUTH        & ! flag for southern boundary
   , hasWEST         & ! flag for western boundary
-  , INTERP_BRY        ! flag for active boundary interpolation [ NOT IMPLEMENTED ]
+  , INTERP_BRY      & ! flag for active boundary interpolation [ NOT IMPLEMENTED ]
+  , MONTHLY           ! flag to read monthly
 
   integer           &
        , private :: &
     i, j, k         & ! simple counters
   , read_int          ! interval for reading (days) TODO: though should be months too
+
+!     days in month
+  integer(2)           &
+       , dimension(13) &
+       , parameter     &
+       , private ::    &
+    mday = int((/31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/),2)
 
   character(len=10)                       &
        , parameter                        &
@@ -273,8 +282,9 @@ module bry
       ,    velvert_east,    velvert_north,    velvert_south,    velvert_west
 
       namelist/bry_nml/                                                &
-        bry_path, el_name, Hmax  , interp_bry, periodic_x, periodic_y  &
-      , read_int, s_name , t_name, USE_SPONGE, u_name    , v_name
+        bry_path, DERIVE_2D , el_name   , Hmax    , interp_bry         &
+      , MONTHLY , periodic_x, periodic_y, read_int, s_name             &
+      , t_name  , USE_SPONGE, u_name    , v_name
 
       namelist/bry_cond/                                                     &
                 el_east,         el_north,         el_south,         el_west &
@@ -314,6 +324,8 @@ module bry
 
 ! Default configuration flags
       USE_SPONGE = .false.
+      MONTHLY    = .true.
+      DERIVE_2D  = .true.
 
 ! Default periodic
       periodic_x = .false.
@@ -605,10 +617,12 @@ module bry
 !______________________________________________________________________
 !
       use module_time
+      use glob_grid  , only: dz
 
       type(date), intent(in) :: d_in
 
-      integer            max_in_prev, max_in_this
+      integer            max_in_prev , max_in_this  &
+                       , mid_in_month, sec_in_month
       integer                          &
       , dimension(3)  :: record, year
       real               chunk
@@ -617,34 +631,116 @@ module bry
 ! Quit if the module is not used.
       if ( DISABLED ) return
 
-      year = d_in%year
+      if ( MONTHLY ) then
+! set year to -1 to denote climatology
+! TODO: monthly does not necessarily mean climatology. Allow year also.
+        year = -1
 
-      max_in_this = max_chunks_in_year( d_in%year  , read_int )
-      max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
+        record(1) = d_in%month
+
+!     current time [sec] from the beginning of the month.
+
+        sec_in_month = d_in%day*24*3600                           &
+                     + d_in%hour  *3600 + d_in%min*60 + d_in%sec
+
+!     mid-point [sec] in the month.
+        if ( d_in%month == 2 ) then
+          mid_in_month = int( real(mday(d_in%month+inc_leap(d_in%year))) &
+                                   *.5*24.*3600. )
+        else
+          mid_in_month = int( real(mday(d_in%month))*.5*24.*3600. )
+        end if
+
+!     decide between which two months.
+
+!     former half in the month.
+        if ( sec_in_month <= mid_in_month ) then
+          record(2) = d_in%month - 1
+!     latter half in the month
+        else
+          record(2) = d_in%month
+        end if
+
+        record(3) = record(2) + 1
+
+        if ( record(2) ==  0 ) record(2) = 12
+        if ( record(3) == 13 ) record(3) =  1
+
+      else
+
+        year = d_in%year
+
+        max_in_this = max_chunks_in_year( d_in%year  , read_int )
+        max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
 
 ! Decide on the record to read
-      chunk     = chunk_of_year( d_in, read_int )
-      record(1) = int(chunk)
+        chunk     = chunk_of_year( d_in, read_int )
+        record(1) = int(chunk)
 
-      if ( chunk - record(1) < .5 ) then
-        record(2) = record(1)
-      else
-        record(2) = record(1) + 1
+        if ( chunk - record(1) < .5 ) then
+          record(2) = record(1)
+        else
+          record(2) = record(1) + 1
+        end if
+        record(3) = record(2) + 1
+
+        if ( record(2) == 0 ) then
+          record(2) = max_in_prev + 1 ! TODO: [ NEEDS TESTING ]
+          year(2) = d_in%year - 1
+        elseif ( record(3) == max_in_this + 1 ) then
+          record(3) = 1
+          year(3) = d_in%year + 1
+        end if
+
+        record(1) = record(1) + 1
+
       end if
-      record(3) = record(2) + 1
-
-      if ( record(2) == 0 ) then
-        record(2) = max_in_prev + 1 ! TODO: [ NEEDS TESTING ]
-        year(2) = d_in%year - 1
-      elseif ( record(3) == max_in_this + 1 ) then
-        record(3) = 1
-        year(3) = d_in%year + 1
-      end if
-
-      record(1) = record(1) + 1
 
 ! Read wind if momentum flux is derived from wind
       call read_all( .true., 1, year, record )
+
+      if ( hasEAST ) then
+        UA_bry % EST = 0.
+        VA_bry % EST = 0.
+        do k = 1, kb
+          UA_bry % EST = UA_bry % EST                &
+                       +  U_bry % EST(:,:,k) * dz(k)
+          VA_bry % EST = VA_bry % EST                &
+                       +  V_bry % EST(:,:,k) * dz(k)
+        end do
+        print *, "EAST UA: min=", minval(UA_bry%EST), "; max=", maxval(UA_bry%EST)
+      end if
+      if ( hasNORTH ) then
+        UA_bry % NTH = 0.
+        VA_bry % NTH = 0.
+        do k = 1, kb
+          UA_bry % NTH = UA_bry % NTH                &
+                       +  U_bry % NTH(:,:,k) * dz(k)
+          VA_bry % NTH = VA_bry % NTH                &
+                       +  V_bry % NTH(:,:,k) * dz(k)
+        end do
+      end if
+      if ( hasSOUTH ) then
+        UA_bry % STH = 0.
+        VA_bry % STH = 0.
+        do k = 1, kb
+          UA_bry % STH = UA_bry % STH                &
+                       +  U_bry % STH(:,:,k) * dz(k)
+          VA_bry % STH = VA_bry % STH                &
+                       +  V_bry % STH(:,:,k) * dz(k)
+        end do
+        print *, "SOUTH VA: min=", minval(VA_bry%STH), "; max=", maxval(VA_bry%STH)
+      end if
+      if ( hasWEST ) then
+        UA_bry % WST = 0.
+        VA_bry % WST = 0.
+        do k = 1, kb
+          UA_bry % WST = UA_bry % WST                &
+                       +  U_bry % WST(:,:,k) * dz(k)
+          VA_bry % WST = VA_bry % WST                &
+                       +  V_bry % WST(:,:,k) * dz(k)
+        end do
+      end if
 
       call msg_print("BRY INITIALIZED", 2, "")
 
@@ -667,7 +763,8 @@ module bry
       type(date), intent(in) :: d_in
 
       logical            ADVANCE_REC
-      integer            max_in_prev, max_in_this
+      integer            max_in_prev, max_in_this  &
+                       , mid_in_month, sec_in_month
       integer                          &
       , dimension(3)  :: record, year
       real               chunk
@@ -676,28 +773,67 @@ module bry
 ! Quit if the module is not used.
       if ( DISABLED ) return
 
-      year = d_in%year
+      if ( MONTHLY ) then
 
-      max_in_this = max_chunks_in_year( d_in%year  , read_int )
-      max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
+        year = -1
+
+        record(1) = d_in%month
+
+!     current time [sec] from the beginning of the month.
+
+        sec_in_month = d_in%day*24*3600                           &
+                     + d_in%hour  *3600 + d_in%min*60 + d_in%sec
+
+!     mid-point [sec] in the month.
+        if ( d_in%month == 2 ) then
+          mid_in_month = int( real(mday(d_in%month+inc_leap(d_in%year))) &
+                                   *.5*24.*3600. )
+        else
+          mid_in_month = int( real(mday(d_in%month))*.5*24.*3600. )
+        end if
+
+!     decide between which two months.
+
+!     former half in the month.
+        ADVANCE_REC = .false.
+        if ( record(1) == record(3) ) then
+          if ( sec_in_month > mid_in_month ) then
+            record(2) = record(3)
+            ADVANCE_REC = .true.
+          end if
+        end if
+
+        record(3) = record(2) + 1
+
+        if ( record(2) ==  0 ) record(2) = 12
+        if ( record(3) == 13 ) record(3) =  1
+
+      else
+
+        year = d_in%year
+
+        max_in_this = max_chunks_in_year( d_in%year  , read_int )
+        max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
 
 ! Decide on the record to read
-      chunk     = chunk_of_year( d_in, read_int )
-      record(1) = int(chunk)
+        chunk     = chunk_of_year( d_in, read_int )
+        record(1) = int(chunk)
 
-      ADVANCE_REC = .false.
-      if ( secs - record(1)*read_int < dti ) then ! TODO: test this one as well.
-        ADVANCE_REC = .true.
-      end if
+        ADVANCE_REC = .false.
+        if ( secs - record(1)*read_int < dti ) then ! TODO: test this one as well.
+          ADVANCE_REC = .true.
+        end if
 
 !      if ( is_master ) print *, "III", secs-record(1)*read_int, dti, ADVANCE_REC
 
-      record(1) = record(1) + 1
+        record(1) = record(1) + 1
+
+      end if
 
       call read_all( ADVANCE_REC, 1, year, record )
 
       if ( ADVANCE_REC ) then
-! Derive barotropic velocities
+! Derive barotropic velocities ! TODO: Add flag for that
         if ( hasEAST ) then
           UA_bry % EST = 0.
           VA_bry % EST = 0.
@@ -707,6 +843,7 @@ module bry
             VA_bry % EST = VA_bry % EST                &
                          +  V_bry % EST(:,:,k) * dz(k)
           end do
+          print *, "EAST UA: min=", minval(UA_bry%EST), "; max=", maxval(UA_bry%EST)
         end if
         if ( hasNORTH ) then
           UA_bry % NTH = 0.
@@ -727,6 +864,7 @@ module bry
             VA_bry % STH = VA_bry % STH                &
                          +  V_bry % STH(:,:,k) * dz(k)
           end do
+          print *, "SOUTH VA: min=", minval(VA_bry%STH), "; max=", maxval(VA_bry%STH)
         end if
         if ( hasWEST ) then
           UA_bry % WST = 0.
@@ -800,7 +938,7 @@ module bry
 ! Temperature
         call read_var_3d_nc( bry_path, "east_"//t_name, T_bry%EST  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           do k=1,kb
             do j=1,jm
               do i=1,NFE
@@ -814,7 +952,7 @@ module bry
 ! Salinity
         call read_var_3d_nc( bry_path, "east_"//s_name, S_bry%EST  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           do k=1,kb
             do j=1,jm
               do i=1,NFE
@@ -828,14 +966,15 @@ module bry
 ! Normal velocity
         call read_var_3d_nc( bry_path, "east_"//u_name, U_bry%EST  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           U_bry%EST = 0.
+          print *, "!!!", ncid
           call msg_print("", 2, "Uvel@EAST defaulted to zero")
         end if
 ! Tangential velocity
         call read_var_3d_nc( bry_path, "east_"//v_name, V_bry%EST  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           V_bry%EST = 0.
           call msg_print("", 2, "Vvel@EAST defaulted to zero")
         end if
@@ -858,7 +997,7 @@ module bry
 ! Elevation
         call read_var_2d_nc( bry_path, "east_"//el_name, EL_bry%EST  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           EL_bry%EST = 0.
           call msg_print("", 2, "Elev@EAST defaulted to zero")
         end if
@@ -909,7 +1048,7 @@ module bry
 ! Temperature
         call read_var_3d_nc( bry_path, "north_"//t_name, T_bry%NTH  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           do k=1,kb
             do j=1,NFN
               do i=1,im
@@ -923,7 +1062,7 @@ module bry
 ! Salinity
         call read_var_3d_nc( bry_path, "north_"//s_name, S_bry%NTH  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           do k=1,kb
             do j=1,NFN
               do i=1,im
@@ -937,14 +1076,14 @@ module bry
 ! Normal velocity
         call read_var_3d_nc( bry_path, "north_"//u_name, U_bry%NTH  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           U_bry%NTH = 0.
           call msg_print("", 2, "Uvel@NORTH defaulted to zero")
         end if
 ! Tangential velocity
         call read_var_3d_nc( bry_path, "north_"//v_name, V_bry%NTH  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           V_bry%NTH = 0.
           call msg_print("", 2, "Vvel@NORTH defaulted to zero")
         end if
@@ -967,7 +1106,7 @@ module bry
 ! Elevation
         call read_var_2d_nc( bry_path, "north_"//el_name, EL_bry%NTH  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           EL_bry%NTH = 0.
           call msg_print("", 2, "Elev@NORTH defaulted to zero")
         end if
@@ -1018,7 +1157,7 @@ module bry
 ! Temperature
         call read_var_3d_nc( bry_path, "south_"//t_name, T_bry%STH  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           do k=1,kb
             do j=1,NFS
               do i=1,im
@@ -1031,7 +1170,7 @@ module bry
 ! Salinity
         call read_var_3d_nc( bry_path, "south_"//s_name, S_bry%STH  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           do k=1,kb
             do j=1,NFS
               do i=1,im
@@ -1044,14 +1183,14 @@ module bry
 ! Normal velocity
         call read_var_3d_nc( bry_path, "south_"//u_name, U_bry%STH  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           U_bry%STH = 0.
           call msg_print("", 2, "Uvel@SOUTH defaulted to zero")
         end if
 ! Tangential velocity
         call read_var_3d_nc( bry_path, "south_"//v_name, V_bry%STH  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           V_bry%STH = 0.
           call msg_print("", 2, "Vvel@SOUTH defaulted to zero")
         end if
@@ -1074,7 +1213,7 @@ module bry
 ! Elevation
         call read_var_2d_nc( bry_path, "south_"//el_name, EL_bry%STH  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           EL_bry%STH = 0.
           call msg_print("", 2, "Elev@SOUTH defaulted to zero")
         end if
@@ -1125,7 +1264,7 @@ module bry
 ! Temperature
         call read_var_3d_nc( bry_path, "west_"//t_name, T_bry%WST  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           do k=1,kb
             do j=1,jm
               do i=1,NFW
@@ -1138,7 +1277,7 @@ module bry
 ! Salinity
         call read_var_3d_nc( bry_path, "west_"//s_name, S_bry%WST  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           do k=1,kb
             do j=1,jm
               do i=1,NFW
@@ -1151,14 +1290,14 @@ module bry
 ! Normal velocity
         call read_var_3d_nc( bry_path, "west_"//u_name, U_bry%WST  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           U_bry%WST = 0.
           call msg_print("", 2, "Uvel@WEST defaulted to zero")
         end if
 ! Tangential velocity
         call read_var_3d_nc( bry_path, "west_"//v_name, V_bry%WST  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           V_bry%WST = 0.
           call msg_print("", 2, "Vvel@WEST defaulted to zero")
         end if
@@ -1181,7 +1320,7 @@ module bry
 ! Elevation
         call read_var_2d_nc( bry_path, "west_"//el_name, EL_bry%WST  &
                            , year(n), start, edge, ncid )
-        if ( ncid == -1 ) then
+        if ( ncid <= 0 ) then
           EL_bry%WST = 0.
           call msg_print("", 2, "Elev@WEST defaulted to zero")
         end if
@@ -2636,9 +2775,15 @@ module bry
       integer         , intent(in) :: year
 
 
-      write( get_filename, '( a, i4.4, a )' ) trim(path)      &
-                                            , year            &
-                                            , trim(FORMAT_EXT)
+      if ( year == -1 ) then
+        write( get_filename, '( a, a )' ) trim(path)      &
+                                        , trim(FORMAT_EXT)
+      else
+        write( get_filename, '( a, i4.4, a )' ) trim(path)      &
+                                              , year            &
+                                              , trim(FORMAT_EXT)
+      end if
+
 
     end ! function get_filename
 !
@@ -2691,8 +2836,13 @@ module bry
       end if
 
 ! get variable
-      call check( nf90mpi_inq_varid( ncid, var_name, varid )  &
-                , 'nfmpi_inq_varid: '//trim(var_name) )
+      status = nf90mpi_inq_varid( ncid, var_name, varid )
+      if ( status /= NF_NOERR ) then
+        call msg_print("", 2, "Failed reading `"//trim(var_name)  &
+                              //"` from `"//trim(filename)//"`")
+        ncid = -1
+        return
+      end if
 
 ! get data
       call check( get_var_real_3d                    &
@@ -2760,8 +2910,13 @@ module bry
       end if
 
 ! get variable
-      call check( nf90mpi_inq_varid( ncid, var_name, varid )  &
-                , 'nfmpi_inq_varid: '//trim(var_name) )
+      status = nf90mpi_inq_varid( ncid, var_name, varid )
+      if ( status /= NF_NOERR ) then
+        call msg_print("", 2, "Failed reading `"//trim(var_name)  &
+                              //"` from `"//trim(filename)//"`")
+        ncid = -1
+        return
+      end if
 
 ! get data
       call check( get_var_real_2d                    &
