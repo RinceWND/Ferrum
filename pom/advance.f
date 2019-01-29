@@ -25,7 +25,7 @@
 !            update_time       [globals.f90]
 !______________________________________________________________________
 !
-        use config   , only: calc_ice
+        use config   , only: use_ice
         use model_run, only: iext, isplit
      &                     , update_time
         use seaice
@@ -50,7 +50,7 @@
         do iext=1,isplit
           call mode_external
           call check_nan_2d  !fhx:tide:debug
-          if (calc_ice) call ice_advance
+          if (use_ice) call ice_advance
         end do
 
 ! internal (3-D) mode calculation
@@ -145,7 +145,7 @@
 !______________________________________________________________________
 !
       use config     , only: aam_init, horcon, mode, n1d, npg
-      use bry        , only: aamfrz
+      use bry        , only: aamfrz, USE_SPONGE
       use glob_domain, only: im, imm1, jm, jmm1, kbm1
       use glob_grid  , only: dx, dy
       use glob_misc  , only: aamfac
@@ -187,7 +187,9 @@
      $                    +.25*(v(i+1,j,k)+v(i+1,j+1,k)
      $                           -v(i-1,j,k)-v(i-1,j+1,k))
      $                    /dx(i,j)) **2)
-     $                    *(1.+aamfrz(i,j))
+                if ( USE_SPONGE ) then
+                  aam(i,j,k) = aam(i,j,k)*(1.+aamfrz(i,j))
+                end if
               end do
             end do
           end do
