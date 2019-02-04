@@ -245,7 +245,7 @@ module glob_out
 
 end module glob_out
 
-
+!TODO: Move to a separate file
 module model_run
 
   use glob_const , only: rk
@@ -263,6 +263,8 @@ module model_run
   , iend             & ! total internal mode time steps
   , iext             & ! external mode step counter
   , isplit           & ! dti/dte
+  , mid_in_month     & ! middle of a month (s)
+  , sec_of_month     & ! current second of a month (s)
   , sec_of_year        ! seconds since the beginning of year
 
   real(kind=rk)      &
@@ -284,6 +286,11 @@ module model_run
   type(date)         &
     dtime              ! current model datetime variable
 
+  integer(1)                &
+       , dimension(0:12) :: &  ! number of days in month (0 is December)
+    days_in_month
+
+
   contains
 
     subroutine initialize_time( time_string )
@@ -297,8 +304,9 @@ module model_run
 
       type(date) dtime_offset
 
+      days_in_month = int( (/31,31,28,31,30,31,30,31,31,30,31,30,31/), 1 )
 ! Determine internal timestep
-      dti  = dte*float(isplit)
+      dti  = dte*real(isplit)
       dte2 = dte*2
       dti2 = dti*2
 
@@ -308,8 +316,8 @@ module model_run
       irestart= max( nint(  write_rst*24.*3600./dti), 1 )
       iprints = max( nint(      prtd2*24.*3600./dti), 1 )
 
-      ispi = 1./    float(isplit)
-      isp2i= 1./(2.*float(isplit))
+      ispi = 1./    real(isplit)
+      isp2i= 1./(2.*real(isplit))
 
 ! Initialize time
 ! Do not offset time if not restarting
@@ -337,10 +345,31 @@ module model_run
 
       implicit none
 
-      sec_of_year = seconds_of_year(dtime)
+      time = dti*real(iint)/86400. + time0
 
-      time = dti*float(iint)/86400. + time0
-      ramp = 1.
+      if( is_leap( dtime%year ) ) then
+        days_in_month(2) = 29
+      else
+        days_in_month(2) = 28
+      end if
+
+      mid_in_month = days_in_month(dtime%month)*43200 !*24*3600/2
+
+      sec_of_month = dtime%day*24*3600                             &
+                   + dtime%hour  *3600 + dtime%min*60 + dtime%sec
+
+      if ( dtime%month > 1 ) then
+        sec_of_year = sec_of_month                               &
+                    + sum(days_in_month(1:dtime%month-1))*86400
+      else
+        sec_of_year = sec_of_month
+      end if
+
+!      print *, sec_of_year, ":", sec_of_month, "|", mid_in_month
+!      sec_of_year = seconds_of_year(dtime) ! TODO: is this faster?
+
+!      ramp = 1.
+
 !      if(lramp) then
 !        ramp=time/period
 !        if(ramp.gt.1.e0) ramp=1.e0
