@@ -87,7 +87,7 @@
 ! ayumi 2010/5/10
       subroutine write_output_pnetcdf0( netcdf_out_file )
 ! write output data
-        use config     , only: calc_ice, mode, title
+        use config     , only: use_ice, mode, title
         use glob_domain, only: i_global, im, im_global, is_master
      &                       , j_global, jm, jm_global
      &                       , kb, POM_COMM
@@ -305,7 +305,7 @@
      &                      ,wssurf_varid,NF_FLOAT
      &                      ,'salinity flux','psu m/s'
      &                      ,-1,0.,'east_e north_e',.true.)
-        if ( calc_ice ) then
+        if ( use_ice ) then
           call def_var_pnetcdf(ncid,'icec',3,vdims
      &                        ,icec_varid,NF_FLOAT
      &                        ,'sea ice concentration'
@@ -2993,7 +2993,7 @@
 !______________________________________________________________________
 
         use air
-        use config     , only: calc_ice, mode, title
+        use config     , only: use_ice, mode, title
         use glob_const , only: rk
         use glob_domain
         use glob_grid
@@ -3206,7 +3206,7 @@
      &                        ,wssurf_varid,NF_FLOAT
      &                        ,'salinity flux','psu m/s'
      &                        ,-1,0.,'east_e north_e',.true.)
-          if ( calc_ice ) then
+          if ( use_ice ) then
             call def_var_pnetcdf(ncid,'icec',3,vdims
      &                          ,icec_varid,NF_FLOAT
      &                          ,'sea ice concentration'
@@ -3401,7 +3401,7 @@
           status = nf90mpi_inq_varid(ncid,'wssurf',wssurf_varid)
           call handle_error_pnetcdf('nfmpi_inq_varid: wssurf'
      &                             , status )
-          if ( calc_ice ) then
+          if ( use_ice ) then
             status = nf90mpi_inq_varid(ncid,'icec',icec_varid)
             call handle_error_pnetcdf('nfmpi_inq_varid: icec'
      &                               , status )
@@ -3488,7 +3488,7 @@
           status=nfmpi_put_vara_real_all(ncid,wssurf_varid,start,edge
      &                                                            ,out2)
           call handle_error_pnetcdf('nf_put_vara_real: wssurf',status)
-          if ( calc_ice ) then
+          if ( use_ice ) then
             out2 = real(ice,4)
             status=nfmpi_put_vara_real_all(ncid,icec_varid,start,edge
      &                                                            ,out2)
@@ -3584,7 +3584,7 @@
           status=nfmpi_put_vara_real_all(ncid,wssurf_varid,start,edge
      &                                                            ,out2)
           call handle_error_pnetcdf('nf_put_vara_real: wssurf',status)
-          if ( calc_ice ) then
+          if ( use_ice ) then
             out2 = real(ice,4)
             status=nfmpi_put_vara_real_all(ncid,icec_varid,start,edge
      &                                                            ,out2)
