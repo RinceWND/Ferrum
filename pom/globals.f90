@@ -355,18 +355,16 @@ module model_run
 
       mid_in_month = days_in_month(dtime%month)*43200 !*24*3600/2
 
-      sec_of_month = dtime%day*24*3600                             &
-                   + dtime%hour  *3600 + dtime%min*60 + dtime%sec
+      sec_of_month = (dtime%day-1)*24*3600      &
+                    + dtime%hour     *3600      &
+                    + dtime%min*60 + dtime%sec
 
-      if ( dtime%month > 1 ) then
-        sec_of_year = sec_of_month                               &
-                    + sum(days_in_month(1:dtime%month-1))*86400
-      else
-        sec_of_year = sec_of_month
-      end if
+      sec_of_year = sec_of_month                               &
+                  + ( sum(days_in_month(1:dtime%month-1)))*86400
 
 !      print *, sec_of_year, ":", sec_of_month, "|", mid_in_month
 !      sec_of_year = seconds_of_year(dtime) ! TODO: is this faster?
+!      print *, ">>>", sec_of_year
 
 !      ramp = 1.
 
