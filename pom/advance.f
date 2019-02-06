@@ -50,7 +50,7 @@
         do iext=1,isplit
           call mode_external
           call check_nan_2d  !fhx:tide:debug
-          if (use_ice) call ice_advance
+!          if (use_ice) call ice_advance
         end do
 
 ! internal (3-D) mode calculation
@@ -120,11 +120,13 @@
 !
       use air      , only: air_step => step
       use bry      , only: bry_step => step
+      use seaice   , only: ice_step => step
       use model_run, only: dtime
 
       implicit none
 
 
+      call ice_step( dtime )
       call air_step( dtime )
       call bry_step( dtime )
 

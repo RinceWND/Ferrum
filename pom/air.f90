@@ -461,7 +461,7 @@ module air
 !      use glob_domain, only: is_master
       use module_time
       use model_run  , only: dti, iint, sec_of_year
-      use glob_misc  , only: ice
+      use seaice     , only: icec
 
       implicit none
 
@@ -548,8 +548,10 @@ module air
 
       end if
 
-!      swrad  =  swrad*(1.-ice)
-!      wtsurf = wtsurf*(1.-ice)
+! Simple parameterizion
+      swrad  =  swrad*(1.-icec)
+      wtsurf = wtsurf*(1.-icec)
+      wssurf = wssurf*(1.-icec)
 !      print *, minval(wtsurf), maxval(wtsurf)
 
     end ! subroutine step
@@ -564,7 +566,7 @@ module air
       use glob_const , only: rhow => rhoref
       use glob_domain, only: im, jm
       use glob_ocean , only: u, v
-      use glob_misc, only:ice
+      use seaice     , only: icec
 
       implicit none
 
@@ -596,8 +598,8 @@ module air
             end if
           end if
 
-          ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-u(i,j,1)) *(1.-ice(i,j))
-          vstr(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j)-v(i,j,1)) *(1.-ice(i,j))
+          ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-u(i,j,1)) *(1.-icec(i,j))
+          vstr(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j)-v(i,j,1)) *(1.-icec(i,j))
 
         end do
       end do

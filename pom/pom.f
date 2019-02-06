@@ -39,7 +39,7 @@
 !      call wind_init( dtime )
 !      call river_init( dtime )
 !      call assim_init( dtime )
-      if ( use_ice ) call ice_init( dtime )
+!      if ( use_ice ) call ice_init( dtime )
 ! TODO: Move all of these to initialize?
       call msg_print("INITIALIZATION COMPLETE", 1, "")
 

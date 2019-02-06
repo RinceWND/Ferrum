@@ -854,14 +854,16 @@
 !  Initialize all neccessary modules.
 !______________________________________________________________________
 !
-      use air, only: initialize_air
-      use bry, only: initialize_boundary
+      use air   , only: initialize_air
+      use bry   , only: initialize_boundary
+      use seaice, only: initialize_ice => initialize_mod
 
       implicit none
 
 
       call initialize_boundary( 'config.nml' )
       call initialize_air( 'config.nml' )
+      call initialize_ice( 'config.nml' )
 
 
       end subroutine initialize_modules
@@ -1447,6 +1449,7 @@
 
         use air        , only: air_init => init
         use bry        , only: bry_init => init
+        use seaice     , only: ice_init => init
         use module_time
 
         implicit none
@@ -1456,5 +1459,6 @@
 
         call air_init( dtime )
         call bry_init( dtime )
+        call ice_init( dtime )
 
       end subroutine
