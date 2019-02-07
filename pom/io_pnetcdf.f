@@ -3000,6 +3000,7 @@
         use glob_misc
         use glob_ocean
         use glob_out
+        use seaice     , only: icec, iceu, icev
         use model_run  , only: time, time_start
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf    , only: nf90mpi_close    , nf90mpi_create
@@ -3489,15 +3490,15 @@
      &                                                            ,out2)
           call handle_error_pnetcdf('nf_put_vara_real: wssurf',status)
           if ( use_ice ) then
-            out2 = real(ice,4)
+            out2 = real(icec,4)
             status=nfmpi_put_vara_real_all(ncid,icec_varid,start,edge
      &                                                            ,out2)
             call handle_error_pnetcdf('nf_put_vara_real: icec',status)
-            out2 = real(ui,4)
+            out2 = real(iceu,4)
             status=nfmpi_put_vara_real_all(ncid,ui_varid,start,edge
      &                                                            ,out2)
             call handle_error_pnetcdf('nf_put_vara_real: ui',status)
-            out2 = real(vi,4)
+            out2 = real(icev,4)
             status=nfmpi_put_vara_real_all(ncid,vi_varid,start,edge
      &                                                            ,out2)
             call handle_error_pnetcdf('nf_put_vara_real: vi',status)
@@ -3585,15 +3586,15 @@
      &                                                            ,out2)
           call handle_error_pnetcdf('nf_put_vara_real: wssurf',status)
           if ( use_ice ) then
-            out2 = real(ice,4)
+            out2 = real(icec,4)
             status=nfmpi_put_vara_real_all(ncid,icec_varid,start,edge
      &                                                            ,out2)
             call handle_error_pnetcdf('nf_put_vara_real: icec',status)
-            out2 = real(ui,4)
+            out2 = real(iceu,4)
             status=nfmpi_put_vara_real_all(ncid,ui_varid,start,edge
      &                                                            ,out2)
             call handle_error_pnetcdf('nf_put_vara_real: ui',status)
-            out2 = real(vi,4)
+            out2 = real(icev,4)
             status=nfmpi_put_vara_real_all(ncid,vi_varid,start,edge
      &                                                            ,out2)
             call handle_error_pnetcdf('nf_put_vara_real: vi',status)
