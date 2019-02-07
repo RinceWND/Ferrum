@@ -264,12 +264,9 @@
      $  q2lb(im,jm,kb) ,
      $  q2l(im,jm,kb)  ,
      $  rho(im,jm,kb)  ,
-     $  rmean(im,jm,kb),
      $  sb(im,jm,kb)   ,
-     $  sclim(im,jm,kb),
      $  s(im,jm,kb)    ,
      $  tb(im,jm,kb)   ,
-     $  tclim(im,jm,kb),
      $  t(im,jm,kb)    ,
      $  ub(im,jm,kb)   ,
      $  uf(im,jm,kb)   ,
@@ -854,13 +851,15 @@
 !  Initialize all neccessary modules.
 !______________________________________________________________________
 !
-      use air, only: initialize_air
-      use bry, only: initialize_boundary
+      use air , only: initialize_air
+      use bry , only: initialize_bry => initialize_boundary
+      use clim, only: initialize_clm => initialize_mod
 
       implicit none
 
 
-      call initialize_boundary( 'config.nml' )
+      call initialize_clm( 'config.nml' )
+      call initialize_bry( 'config.nml' )
       call initialize_air( 'config.nml' )
 
 
@@ -897,7 +896,7 @@
       end do
 
 
-      end
+      end ! subroutine bottom_friction
 !
 !______________________________________________________________________
 !
@@ -1447,6 +1446,7 @@
 
         use air        , only: air_init => init
         use bry        , only: bry_init => init
+        use clim       , only: clm_init => init
         use module_time
 
         implicit none
@@ -1454,7 +1454,9 @@
         type(date), intent(in) :: dtime
 
 
+        call clm_init( dtime )
         call air_init( dtime )
         call bry_init( dtime )
+
 
       end subroutine

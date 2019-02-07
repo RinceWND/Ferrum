@@ -19,8 +19,7 @@ module clim
 !----------------------------------------------------------------------
 ! Configuration variables
 !----------------------------------------------------------------------
-  integer, private :: read_int  ! interval for reading (days)
-  real   , private :: a         ! time-interpolation factor
+  real(rk), private :: a         ! time-interpolation factor
 
   character(len=10)                       &
        , parameter                        &
@@ -34,6 +33,7 @@ module clim
 !  0 = Yearly
 !  1 = Seasonal
 !  2 = Monthly
+!  3 = Daily
 
 !----------------------------------------------------------------------
 ! Paths configuration
@@ -70,7 +70,8 @@ module clim
   real(kind=rk)              &
        , allocatable         &
        , dimension(:,:,:) :: &
-    sclim                    &
+    rmean                    &
+  , sclim                    &
   , smean                    &
   , tclim                    &
   , tmean                    &
@@ -126,7 +127,7 @@ module clim
 
 
 ! Initialize with default values
-      CLIM_MODE = 3
+      CLIM_MODE = 2
 
       ts_clim_path = "in/clim/"
       ts_mean_path = "in/clim/"
@@ -175,6 +176,7 @@ module clim
 
       call msg_print("CLIM MODULE INITIALIZED", 1, "")
 
+
     end ! subroutine initialize_air
 !
 !______________________________________________________________________
@@ -188,15 +190,17 @@ module clim
 
       implicit none
 
-      integer*1 N ! Interpolation array extension size
-                  ! The structure is following:
-                  !   var at n-1 step: var(:,:,1)
-                  !   var at n+1 step: var(:,:,2)
+      integer*1             &
+      , parameter :: N = 2 ! Interpolation array extension size
+                           ! The structure is following:
+                           !   var at n-1 step: var(:,:,2)
+                           !   var at n+1 step: var(:,:,3)
 
 
 ! Allocate core arrays
       allocate(          &
         eclim(im,jm)     &
+      , rmean(im,jm,kb)  &
       , sclim(im,jm,kb)  &
       , smean(im,jm,kb)  &
       , tclim(im,jm,kb)  &
@@ -219,16 +223,16 @@ module clim
       vaclim= 0.
 
 ! Allocate interpolation arrays
-      allocate(             &
-        el_int(im,jm,   N)  &
-      , sc_int(im,jm,kb,N)  &
-      , sm_int(im,jm,kb,N)  &
-      , tc_int(im,jm,kb,N)  &
-      , tm_int(im,jm,kb,N)  &
-      , ua_int(im,jm,   N)  &
-      , uc_int(im,jm,kb,N)  &
-      , va_int(im,jm,   N)  &
-      , vc_int(im,jm,kb,N)  &
+      allocate(                 &
+        el_int(im,jm,   2:N+1)  &
+      , sc_int(im,jm,kb,2:N+1)  &
+      , sm_int(im,jm,kb,2:N+1)  &
+      , tc_int(im,jm,kb,2:N+1)  &
+      , tm_int(im,jm,kb,2:N+1)  &
+      , ua_int(im,jm,   2:N+1)  &
+      , uc_int(im,jm,kb,2:N+1)  &
+      , va_int(im,jm,   2:N+1)  &
+      , vc_int(im,jm,kb,2:N+1)  &
        )
 
 
@@ -241,20 +245,73 @@ module clim
 !  Reads forcing fields before experiment's start.
 !______________________________________________________________________
 !
-!      use glob_domain, only: is_master
-!      use config     , only: calc_wind
+      use glob_domain, only: is_master
       use module_time
-!      use glob_ocean , only: tb
+      use model_run  , only: sec_of_month, mid_in_month
 
       implicit none
 
       type(date), intent(in) :: d_in
-      
-      integer, dimension(3) :: record, year
 
-! Read wind if momentum flux is derived from wind
-      call read_all( .true., 1, year, record )
-      call read_all( .true., 2, year, record )
+      logical                  fexist
+      integer, dimension(3) :: record
+
+
+! Determine the record to read
+      record(1) = d_in%month
+
+      if ( sec_of_month <= mid_in_month ) then
+        record(2) = d_in%month - 1
+        if ( record(2) == 0 ) record(2) = 12
+      else
+        record(2) = d_in%month
+      end if
+
+      record(3) = mod( record(2), 12 ) + 1
+
+! Read climatology
+      inquire ( file = trim(ts_clim_path), exist = fexist )
+      call msg_print("", 6, "Read TS climatology:")
+      if ( fexist ) then
+        call read_clim_ts_pnetcdf( tc_int(:,:,:,2), sc_int(:,:,:,2)  &
+                                 , ts_clim_path, record(2) )
+        call read_clim_ts_pnetcdf( tc_int(:,:,:,3), sc_int(:,:,:,3)  &
+                                 , ts_clim_path, record(3) )
+      else
+        call msg_print("", 2, "FAILED...")
+        tc_int = 15.
+        sc_int = 33.
+      end if
+
+! Read background TS
+      inquire ( file = trim(ts_mean_path), exist = fexist )
+      call msg_print("", 6, "Read background TS:")
+      if ( fexist ) then
+        call read_mean_ts_pnetcdf( tm_int(:,:,:,2), sm_int(:,:,:,2)  &
+                                 , ts_mean_path, record(2) )
+        call read_mean_ts_pnetcdf( tm_int(:,:,:,3), sm_int(:,:,:,3)  &
+                                 , ts_mean_path, record(3) )
+      else
+        call msg_print("", 2, "FAILED...")
+        tm_int = tc_int
+        sm_int = sc_int
+      end if
+
+! TODO: Gather stats from all processors
+      if ( is_master ) then
+        print '(/a,f7.3,a,f7.3,a)',"Background temperature:     ("  &
+                                 , minval(tm_int), ":"              &
+                                 , maxval(tm_int), ")"
+        print '(a,f7.3,a,f7.3,a)', "Background salinity:        ("  &
+                                 , minval(sm_int), ":"              &
+                                 , maxval(sm_int), ")"
+        print '(a,f7.3,a,f7.3,a)', "Climatological temperature: ("  &
+                                 , minval(tc_int), ":"              &
+                                 , maxval(tc_int), ")"
+        print '(a,f7.3,a,f7.3,a)', "Climatological salinity:    ("  &
+                                 , minval(sc_int), ":"              &
+                                 , maxval(sc_int), ")"
+      end if
 
       call msg_print("CLIM INITIALIZED", 2, "")
 
@@ -271,55 +328,83 @@ module clim
 !      use glob_const , only: SEC2DAY
 !      use glob_domain, only: is_master
       use module_time
-      use model_run  , only: dti, iint, sec_of_year
+      use model_run  , only: dti, iint                               &
+                           , mid_in_month, mid_in_nbr, sec_of_month
 
       implicit none
 
       type(date), intent(in) :: d_in
 
-      logical            ADVANCE_REC, ADVANCE_REC_INT
-      integer            max_in_prev, max_in_this, secs
-      integer                          &
-      , dimension(3)  :: record, year
-      real               chunk
+      logical                   ADVANCE_REC_INT, fexist
+      integer, dimension(3)  :: record
 
 
+! Determine the record to read
+      record(1) = d_in%month
 
-      call read_all( ADVANCE_REC_INT, 3, year, record )
-      call read_all( ADVANCE_REC    , 1, year, record )
-
-    end ! subroutine step
-!
-!______________________________________________________________________
-!
-    subroutine read_all( execute, n, year, record )
-
-      use glob_ocean, only: tb
-
-      implicit none
-
-      logical              , intent(in) :: execute
-      integer              , intent(in) :: n
-      integer, dimension(3), intent(in) :: record, year
-
-      integer            ncid
-      character(len=128) desc
-
-
-      if ( .not. execute ) return
-
-      if ( n >= 2 ) then
-        write(desc,'("Reading interp. record #",i4," @ ",i4)') &
-            record(n), year(n)
+      if ( sec_of_month <= mid_in_month ) then
+        record(2) = d_in%month - 1
+        if ( record(2) == 0 ) record(2) = 12
+        a = real( sec_of_month + mid_in_nbr   )  &
+           /real( mid_in_nbr   + mid_in_month )
       else
-        write(desc,'("Reading clim. record #",i4," @ ",i4)') &
-            record(1), year(1)
+        record(2) = d_in%month
+        a = real( sec_of_month - mid_in_month )  &
+           /real( mid_in_nbr   + mid_in_month )
       end if
 
-      call msg_print("", 1, desc)
+      record(3) = mod( record(2), 12 ) + 1
+
+      if ( sec_of_month - mid_in_month <= dti .and.  &
+           record(2) == record(1) ) then
+        if ( iint > 1 ) ADVANCE_REC_INT = .true.
+      else
+        ADVANCE_REC_INT = .false.
+      end if
+
+      if ( ADVANCE_REC_INT ) then
+
+        sc_int(:,:,:,2) = sc_int(:,:,:,3)
+        tc_int(:,:,:,2) = tc_int(:,:,:,3)
+        sm_int(:,:,:,2) = sm_int(:,:,:,3)
+        tm_int(:,:,:,2) = tm_int(:,:,:,3)
+
+        ! Read climatology
+        inquire ( file = trim(ts_clim_path), exist = fexist )
+        call msg_print("", 6, "Read TS climatology:")
+        if ( fexist ) then
+          call read_clim_ts_pnetcdf( tc_int(:,:,:,3), sc_int(:,:,:,3)  &
+                                   , ts_clim_path, record(3) )
+        else
+          call msg_print("", 2, "FAILED...")
+          tc_int(:,:,:,3) = 15.
+          sc_int(:,:,:,3) = 33.
+        end if
+
+  ! Read background TS
+        inquire ( file = trim(ts_mean_path), exist = fexist )
+        call msg_print("", 6, "Read background TS:")
+        if ( fexist ) then
+          call read_mean_ts_pnetcdf( tm_int(:,:,:,3), sm_int(:,:,:,3)  &
+                                   , ts_mean_path, record(3) )
+        else
+          call msg_print("", 2, "FAILED...")
+          tm_int(:,:,:,3) = tc_int(:,:,:,3)
+          sm_int(:,:,:,3) = sc_int(:,:,:,3)
+        end if
+
+      end if
+
+! Interpolate TS and get background density
+      sclim = ( 1. - a )*sc_int(:,:,:,2) + a*sc_int(:,:,:,3)
+      tclim = ( 1. - a )*tc_int(:,:,:,2) + a*tc_int(:,:,:,3)
+      smean = ( 1. - a )*sm_int(:,:,:,2) + a*sm_int(:,:,:,3)
+      tmean = ( 1. - a )*tm_int(:,:,:,2) + a*tm_int(:,:,:,3)
+
+      call dens( smean, tmean, rmean )
 
 
-    end ! subroutine read_all
+    end ! subroutine step
 !
 !______________________________________________________________________
 !

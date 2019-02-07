@@ -1133,10 +1133,11 @@
 ! called by: pgscheme [advance.f]
 !______________________________________________________________________
 !
+      use clim       , only: rmean
       use glob_const , only: grav, rk
       use glob_domain, only: imm1, jmm1, kb, kbm1
       use glob_grid  , only: dum, dvm, dx, dy, zz
-      use glob_ocean , only: drhox, drhoy, dt, rmean, rho
+      use glob_ocean , only: drhox, drhoy, dt, rho
       use model_run  , only: ramp
 
       implicit none
@@ -1238,11 +1239,12 @@
 ! called by: pgscheme [advance.f]
 !______________________________________________________________________
 !
+      use clim       , only: rmean
       use glob_const , only: grav, rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
      &                     , n_south, n_west
       use glob_grid  , only: dum, dvm, dx, dy, dzz, zz
-      use glob_ocean , only: d, drhox, drhoy, dt, rmean, rho
+      use glob_ocean , only: d, drhox, drhoy, dt, rho
       use model_run  , only: ramp
 
       implicit none

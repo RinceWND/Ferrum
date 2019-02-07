@@ -172,15 +172,15 @@ module io
 !  Reads initial fields (T,S,u,v,el).
 !______________________________________________________________________
 !
-      use model_run , only: dtime
-!      use glob_domain, only: n_south, im, jm
-!      use glob_grid , only: dum,dvm
-      use glob_ocean, only: elb, rho, rmean, sb, sclim, tb, tclim
+      use model_run  , only: dtime
+      use glob_domain, only: kbm1
+      use glob_grid  , only: fsm
+      use glob_ocean , only: elb, rho, sb, tb
 
       implicit none
 
       logical fexist
-!      integer i,j
+      integer k
 
 
 ! Check if the climatology file exists and read it.
@@ -196,40 +196,13 @@ module io
         sb = 33.
       end if
 
+      do k = 1,kbm1
+        sb(:,:,k) = sb(:,:,k) * fsm
+        tb(:,:,k) = tb(:,:,k) * fsm
+      end do
+
 ! Calculate initial density.
       call dens(sb,tb,rho)
-
-! Read z-horizontally averaged TS for background density field.
-      inquire ( file = trim(mean_path), exist = fexist )
-      call msg_print("", 6, "Read background TS:")
-      if ( fexist ) then
-        call read_mean_ts_pnetcdf( tclim, sclim, clim_path, dtime%month )
-!        call read_ts_z_pnetcdf( tclim, sclim, 40, dtime%month, clim_path )
-!        tclim = tb
-!        sclim = sb
-      else
-        call msg_print("", 2, "FAILED...")
-        tclim = 0.
-        sclim = 0.
-      end if
-
-! Calculate background density.
-!  Should use T and S horizontally averaged in z-coordinates and only
-! after that interpolated to sigma-coordinates.
-      call dens(sclim,tclim,rmean)
-
-! Read climatology.
-      inquire ( file = trim(clim_path), exist = fexist )
-      call msg_print("", 6, "Read climatology:")
-      if ( fexist ) then
-        call read_clim_ts_pnetcdf( tclim, sclim, clim_path, dtime%month )
-!        tclim = tb
-!        sclim = sb
-      else
-        call msg_print("", 2, "FAILED...")
-        tclim = 15.
-        sclim = 33.
-      end if
 
 !      uab = .6*dum
 !      if (n_south==-1) then

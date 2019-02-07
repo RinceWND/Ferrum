@@ -263,7 +263,8 @@ module model_run
   , iend             & ! total internal mode time steps
   , iext             & ! external mode step counter
   , isplit           & ! dti/dte
-  , mid_in_month     & ! middle of a month (s)
+  , mid_in_month     & ! middle of a current month (s)
+  , mid_in_nbr       & ! middle of a neighbour month (s)
   , sec_of_month     & ! current second of a month (s)
   , sec_of_year        ! seconds since the beginning of year
 
@@ -305,6 +306,9 @@ module model_run
       type(date) dtime_offset
 
       days_in_month = int( (/31,31,28,31,30,31,30,31,31,30,31,30,31/), 1 )
+
+      ramp = 1.
+
 ! Determine internal timestep
       dti  = dte*real(isplit)
       dte2 = dte*2
@@ -338,6 +342,8 @@ module model_run
 
       time = time0
 
+      call update_time
+
 
     end subroutine
 
@@ -353,18 +359,26 @@ module model_run
         days_in_month(2) = 28
       end if
 
-      mid_in_month = days_in_month(dtime%month)*43200 !*24*3600/2
+      mid_in_month = days_in_month(dtime%month  )*43200 !*24*3600/2
 
       sec_of_month = (dtime%day-1)*24*3600      &
                     + dtime%hour     *3600      &
                     + dtime%min*60 + dtime%sec
 
-      sec_of_year = sec_of_month                               &
-                  + ( sum(days_in_month(1:dtime%month-1)))*86400
+      if ( sec_of_month <= mid_in_month ) then
+        mid_in_nbr = days_in_month(     dtime%month-1      )*43200
+      else
+        mid_in_nbr = days_in_month(mod( dtime%month+1, 12 ))*43200
+      end if
+
+      sec_of_year = sec_of_month                                   &
+                  + ( sum(days_in_month(1:dtime%month-1)) )*86400
+!______________________________________________________________________
+!  var(1:0) subset is expected to return 0.
+! gfortran does this. Not sure about ifort or others.
 
 !      print *, sec_of_year, ":", sec_of_month, "|", mid_in_month
 !      sec_of_year = seconds_of_year(dtime) ! TODO: is this faster?
-!      print *, ">>>", sec_of_year
 
 !      ramp = 1.
 
@@ -505,12 +519,9 @@ module glob_ocean
   , q2lb             & ! q2 x l at time n-1
   , q2l              & ! q2 x l at time n
   , rho              & ! density
-  , rmean            & ! horizontally averaged density
   , sb               & ! salinity at time n-1
-  , sclim            & ! horizontally averaged salinity
   , s                & ! salinity at time n
   , tb               & ! temperature at time n-1
-  , tclim            & ! horizontally averaged temperature
   , t                & ! temperature at time n
   , ub               & ! horizontal velocity in x at time n-1
   , uf               & ! horizontal velocity in x at time n+1

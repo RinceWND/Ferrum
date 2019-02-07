@@ -299,10 +299,11 @@
       subroutine assim_main( d_in )
 
 !      use glob_config, only: 
+      use clim       , only: tclim
       use glob_domain, only: i_global, im, j_global, jm, kb, kbm1
      &                     , my_task, n_proc, n_south, n_west
       use glob_grid  , only: h, zz
-      use glob_ocean , only: t, tb, tclim
+      use glob_ocean , only: t, tb
       use model_run  , only: iint
       use module_time
       use interp

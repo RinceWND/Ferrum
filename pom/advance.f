@@ -116,15 +116,18 @@
 !
 ! calls    : step    [air]
 !            step    [bry]
+!            step    [clim]
 !______________________________________________________________________
 !
       use air      , only: air_step => step
       use bry      , only: bry_step => step
+      use clim     , only: clm_step => step
       use model_run, only: dtime
 
       implicit none
 
 
+      call clm_step( dtime )
       call air_step( dtime )
       call bry_step( dtime )
 
@@ -462,6 +465,7 @@
 !
       use air        , only: vfluxb, vfluxf, wssurf, wtsurf
       use bry        , only: bc_ts, bc_turb, bc_vel_int, bc_vel_vert
+      use clim       , only: tclim, sclim
       use glob_const , only: rk, small
       use config     , only: mode, nadv, nbcs, nbct, do_restart
      &                     , smoth, t_lo, t_hi

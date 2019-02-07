@@ -1,11 +1,12 @@
       module tsforce
 
       use air        , only: wssurf, wtsurf
+      use clim       , only: tclim, sclim
       use glob_const , only: rk
       use glob_domain, only: im, jm, kb
       use glob_grid  , only: fsm
       use io         , only: clim_path
-      use glob_ocean , only: rho, s, sb, sclim, t, tb, tclim, u, v
+      use glob_ocean , only: rho, s, sb, t, tb, u, v
       use wind
 
       implicit none
@@ -278,9 +279,10 @@
       subroutine tsforce_main( d_in )
 
       use bry
+      use clim       , only: rmean
       use glob_domain, only: n_east, n_north, n_south, n_west
       use model_run  , only: dti
-      use glob_ocean , only: rmean, ssurf, tsurf
+      use glob_ocean , only: ssurf, tsurf
       use module_time
 
       implicit none

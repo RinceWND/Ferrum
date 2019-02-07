@@ -22,26 +22,24 @@ module bry
 !----------------------------------------------------------------------
   logical           &
        , private :: &
-    DERIVE_2D       & ! flag to average 3D boudaries and use 2D only
-  , DISABLED        & ! flag for active (read from file) boundaries
-  , hasEAST         & ! flag for eastern boundary
-  , hasNORTH        & ! flag for northern boundary
-  , hasSOUTH        & ! flag for southern boundary
-  , hasWEST         & ! flag for western boundary
-  , INTERP_BRY      & ! flag for active boundary interpolation [ NOT IMPLEMENTED ]
+    DERIVE_2D       & ! average 3D boudaries and use 2D only
+  , DISABLED        & ! active (read from file) boundaries
+  , CLIM_BRY        & ! derive boundary values from climatology
+  , hasEAST         & ! eastern boundary present
+  , hasNORTH        & ! northern boundary present
+  , hasSOUTH        & ! southern boundary present
+  , hasWEST         & ! western boundary present
+  , INTERP_BRY      & ! active boundary interpolation [IMPLEMENTED PARTIALLY]
   , MONTHLY           ! flag to read monthly
 
   integer           &
        , private :: &
     i, j, k         & ! simple counters
+  , N               & ! interpolation nodes (if interp_bry then N=2, linear)
   , read_int          ! interval for reading (days) TODO: though should be months too
 
-!     days in month
-  integer(2)           &
-       , dimension(13) &
-       , parameter     &
-       , private ::    &
-    mday = int((/31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/),2)
+  real(rk)             &
+       , private :: a    ! time-interpolation factor
 
   character(len=10)                       &
        , parameter                        &
@@ -124,32 +122,41 @@ module bry
                     , VEL3D      !  internal velocity
   end type
 
-  type BRY_1D                        ! 1D arrays for boundaries
-    real(kind=rk)                  & !
-        , allocatable              & !
-        , dimension(:)     :: est  & !   east
-                            , nth  & !   north
-                            , sth  & !   south
-                            , wst    !   west
+  type BRY_1D                          ! 1D arrays for boundaries
+    real(kind=rk)                    & !
+        , allocatable                & !
+        , dimension(:)       :: est  & !   east
+                              , nth  & !   north
+                              , sth  & !   south
+                              , wst    !   west
   end type BRY_1D
 
-  type BRY_2D                        ! 2D arrays for boundaries
-    real(kind=rk)                  & !
-        , allocatable              & !
-        , dimension(:,:)   :: est  & ! ( I think you get the idea )
-                            , nth  & !
-                            , sth  & !
-                            , wst    !
+  type BRY_2D                          ! 2D arrays for boundaries
+    real(kind=rk)                    & !
+        , allocatable                & !
+        , dimension(:,:)     :: est  & ! ( I think you get the idea )
+                              , nth  & !
+                              , sth  & !
+                              , wst    !
   end type BRY_2D
 
-  type BRY_3D                        ! 3D arrays for boundaries
-    real(kind=rk)                  & !
-        , allocatable              & !
-        , dimension(:,:,:) :: est  & !
-                            , nth  & !
-                            , sth  & !
-                            , wst    !
+  type BRY_3D                          ! 3D arrays for boundaries
+    real(kind=rk)                    & !
+        , allocatable                & !
+        , dimension(:,:,:)   :: est  & !
+                              , nth  & !
+                              , sth  & !
+                              , wst    !
   end type BRY_3D
+
+  type BRY_4D                          ! 4D arrays for boundaries
+    real(kind=rk)                    & !
+        , allocatable                & !
+        , dimension(:,:,:,:) :: est  & !
+                              , nth  & !
+                              , sth  & !
+                              , wst    !
+  end type BRY_4D
 
 !----------------------------------------------------------------------
 ! Custom types variables
@@ -160,7 +167,15 @@ module bry
 ! data vars
   type (bry_2d) el_bry, ua_bry, va_bry
   type (bry_3d) s_bry, t_bry, u_bry, v_bry
+! interpolation vars
+  type (bry_3d) el_int, ua_int, va_int
+  type (bry_4d) s_int, t_int, u_int, v_int
 
+!----------------------------------------------------------------------
+! Climatology filler flags
+!----------------------------------------------------------------------
+  type (BC_TYPE_VAL) fill_clim_t, fill_clim_s  &
+                   , fill_clim_u, fill_clim_v, fill_clim_el
 !----------------------------------------------------------------------
 ! Sponge layer arrays
 !----------------------------------------------------------------------
@@ -193,7 +208,6 @@ module bry
 !
       implicit none
 
-
 ! Allocate arrays
       if ( hasEAST ) then
         allocate(               &
@@ -205,6 +219,17 @@ module bry
         , U_bry%est(NFE,jm,kb)  &
         , V_bry%est(NFE,jm,kb)  &
          )
+        if ( INTERP_BRY ) then
+          allocate(                     &
+            el_int%est(NFE,jm,2:N+1)    &
+          , ua_int%est(NFE,jm,2:N+1)    &
+          , va_int%est(NFE,jm,2:N+1)    &
+          , S_int%est(NFE,jm,kb,2:N+1)  &
+          , T_int%est(NFE,jm,kb,2:N+1)  &
+          , U_int%est(NFE,jm,kb,2:N+1)  &
+          , V_int%est(NFE,jm,kb,2:N+1)  &
+           )
+        end if
       end if
 
       if ( hasNORTH ) then
@@ -217,6 +242,17 @@ module bry
         , U_bry%nth(im,NFN,kb)  &
         , V_bry%nth(im,NFN,kb)  &
          )
+        if ( INTERP_BRY ) then
+          allocate(                     &
+            el_int%nth(im,NFN,2:N+1)    &
+          , ua_int%nth(im,NFN,2:N+1)    &
+          , va_int%nth(im,NFN,2:N+1)    &
+          , S_int%nth(im,NFN,kb,2:N+1)  &
+          , T_int%nth(im,NFN,kb,2:N+1)  &
+          , U_int%nth(im,NFN,kb,2:N+1)  &
+          , V_int%nth(im,NFN,kb,2:N+1)  &
+           )
+        end if
       end if
 
       if ( hasSOUTH ) then
@@ -229,6 +265,17 @@ module bry
         , U_bry%sth(im,NFS,kb)  &
         , V_bry%sth(im,NFS,kb)  &
          )
+        if ( INTERP_BRY ) then
+          allocate(                     &
+            el_int%sth(im,NFS,2:N+1)    &
+          , ua_int%sth(im,NFS,2:N+1)    &
+          , va_int%sth(im,NFS,2:N+1)    &
+          , S_int%sth(im,NFS,kb,2:N+1)  &
+          , T_int%sth(im,NFS,kb,2:N+1)  &
+          , U_int%sth(im,NFS,kb,2:N+1)  &
+          , V_int%sth(im,NFS,kb,2:N+1)  &
+           )
+        end if
       end if
 
       if ( hasWEST ) then
@@ -241,6 +288,17 @@ module bry
         , U_bry%wst(NFW,jm,kb)  &
         , V_bry%wst(NFW,jm,kb)  &
          )
+        if ( INTERP_BRY ) then
+          allocate(                     &
+            el_int%wst(NFW,jm,2:N+1)    &
+          , ua_int%wst(NFW,jm,2:N+1)    &
+          , va_int%wst(NFW,jm,2:N+1)    &
+          , S_int%wst(NFW,jm,kb,2:N+1)  &
+          , T_int%wst(NFW,jm,kb,2:N+1)  &
+          , U_int%wst(NFW,jm,kb,2:N+1)  &
+          , V_int%wst(NFW,jm,kb,2:N+1)  &
+           )
+        end if
       end if
 
       if ( USE_SPONGE ) then
@@ -250,9 +308,6 @@ module bry
          )
       end if
 
-!      if ( DISABLED ) return
-!      
-!      allocate( bry_path )
 
     end ! subroutine allocate_boundary
 !______________________________________________________________________
@@ -311,6 +366,9 @@ module bry
       NFS = 1
       NFW = 1
 
+! Interpolation value
+      N = 1
+
 ! Set boundary flags
       hasEAST  = .false.
       hasNORTH = .false.
@@ -326,6 +384,7 @@ module bry
       USE_SPONGE = .false.
       MONTHLY    = .true.
       DERIVE_2D  = .true.
+      CLIM_BRY   = .true.
 
 ! Default periodic
       periodic_x = .false.
@@ -434,7 +493,9 @@ module bry
       BC % turb % NORTH = turb_north
       BC % turb % SOUTH = turb_south
       BC % turb % WEST  = turb_west
-      
+
+      if ( INTERP_BRY ) N = 2
+
       pos = len(trim(bry_path))
       if ( bry_path(pos:pos) == "/" ) then
         bry_path = trim(bry_path)//"bry."
@@ -466,106 +527,22 @@ module bry
 !
       use glob_const , only: SEC2DAY
       use glob_domain, only: im, jm, n_east, n_north, n_south, n_west
-      use glob_grid  , only: fsm
-      use glob_ocean , only: elb, sclim, tclim
+!      use glob_grid  , only: fsm
+!      use glob_ocean , only: elb, sclim, tclim
       use model_run  , only: dti
 
       implicit none
 
-      integer  ii, jj
+!      integer  ii, jj
       real(rk) rdisp
 
 
-! Initial conditions ! TODO: Move to a separate subroutine?
-      if ( hasEAST ) then
-
-        EL_bry % EST(1,:) = elb(im,:)
-
-        UA_bry % EST = 0.
-        VA_bry % EST = 0.
-
-        U_bry % EST = 0.
-        V_bry % EST = 0.
-
-        do k=1,kb
-          do j=1,jm
-            do i=1,NFE
-              ii=im-i+1
-              T_bry%EST(i,j,k) = tclim(ii,j,k) * fsm(ii,j)
-              S_bry%EST(i,j,k) = sclim(ii,j,k) * fsm(ii,j)
-            end do
-          end do
-        end do
-
+! Initial conditions
+      if ( CLIM_BRY ) then
+        call clim_to_bry
+      else
+        call init_to_bry
       end if
-
-
-      if ( hasWEST ) then
-
-        EL_bry % WST(1,:) = elb(1,:)
-
-        UA_bry % WST = 0.
-        VA_bry % WST = 0.
-
-        U_bry % WST = 0.
-        V_bry % WST = 0.
-
-        do k=1,kb
-          do j=1,jm
-            do i=1,NFW
-              T_bry%WST(i,j,k) = tclim(i,j,k) * fsm(i,j)
-              S_bry%WST(i,j,k) = sclim(i,j,k) * fsm(i,j)
-            end do
-          end do
-        end do
-
-      end if
-
-
-      if ( hasNORTH ) then
-
-        EL_bry % NTH(:,1) = elb(:,jm)
-
-        UA_bry % NTH = 0.
-        VA_bry % NTH = 0.
-
-        U_bry % NTH = 0.
-        V_bry % NTH = 0.
-
-        do k=1,kb
-          do i=1,im
-            do j=1,NFN
-              jj=jm-j+1
-              T_bry%NTH(i,j,k) = tclim(i,jj,k) * fsm(i,jj)
-              S_bry%NTH(i,j,k) = sclim(i,jj,k) * fsm(i,jj)
-            end do
-          end do
-        end do
-
-      end if
-
-
-      if ( hasSOUTH ) then
-
-        EL_bry % STH(:,1) = elb(:,1)
-
-        UA_bry % STH = 0.
-        VA_bry % STH = 0.
-
-        U_bry % STH = 0.
-        V_bry % STH = 0.
-
-        do k=1,kb
-          do i=1,im
-            do j=1,NFS
-              T_bry%STH(i,j,k) = tclim(i,j,k) * fsm(i,j)
-              S_bry%STH(i,j,k) = sclim(i,j,k) * fsm(i,j)
-            end do
-          end do
-        end do
-
-      end if
-
 
       if ( USE_SPONGE ) then
 !lyo:pac10:beg:
@@ -618,11 +595,11 @@ module bry
 !
       use module_time
       use glob_grid  , only: dz
+      use model_run  , only: mid_in_month, sec_of_month
 
       type(date), intent(in) :: d_in
 
-      integer            max_in_prev , max_in_this  &
-                       , mid_in_month, sec_in_month
+      integer            max_in_prev , max_in_this
       integer                          &
       , dimension(3)  :: record, year
       real               chunk
@@ -636,35 +613,17 @@ module bry
 ! TODO: monthly does not necessarily mean climatology. Allow year also.
         year = -1
 
+! Determine the record to read
         record(1) = d_in%month
 
-!     current time [sec] from the beginning of the month.
-
-        sec_in_month = d_in%day*24*3600                           &
-                     + d_in%hour  *3600 + d_in%min*60 + d_in%sec
-
-!     mid-point [sec] in the month.
-        if ( d_in%month == 2 ) then
-          mid_in_month = int( real(mday(d_in%month+inc_leap(d_in%year))) &
-                                   *.5*24.*3600. )
-        else
-          mid_in_month = int( real(mday(d_in%month))*.5*24.*3600. )
-        end if
-
-!     decide between which two months.
-
-!     former half in the month.
-        if ( sec_in_month <= mid_in_month ) then
+        if ( sec_of_month <= mid_in_month ) then
           record(2) = d_in%month - 1
-!     latter half in the month
+          if ( record(2) == 0 ) record(2) = 12
         else
           record(2) = d_in%month
         end if
 
-        record(3) = record(2) + 1
-
-        if ( record(2) ==  0 ) record(2) = 12
-        if ( record(3) == 13 ) record(3) =  1
+        record(3) = mod( record(2), 12 ) + 1
 
       else
 
@@ -696,50 +655,59 @@ module bry
 
       end if
 
-! Read wind if momentum flux is derived from wind
-      call read_all( .true., 1, year, record )
+! Read boundary fields
+      if ( INTERP_BRY ) then
+        call read_all( .true., 2, year, record )
+        call read_all( .true., 3, year, record )
+      else
+        call read_all( .true., 1, year, record )
+      end if
 
-      if ( hasEAST ) then
-        UA_bry % EST = 0.
-        VA_bry % EST = 0.
-        do k = 1, kb
-          UA_bry % EST = UA_bry % EST                &
-                       +  U_bry % EST(:,:,k) * dz(k)
-          VA_bry % EST = VA_bry % EST                &
-                       +  V_bry % EST(:,:,k) * dz(k)
-        end do
-        print *, "EAST UA: min=", minval(UA_bry%EST), "; max=", maxval(UA_bry%EST)
-      end if
-      if ( hasNORTH ) then
-        UA_bry % NTH = 0.
-        VA_bry % NTH = 0.
-        do k = 1, kb
-          UA_bry % NTH = UA_bry % NTH                &
-                       +  U_bry % NTH(:,:,k) * dz(k)
-          VA_bry % NTH = VA_bry % NTH                &
-                       +  V_bry % NTH(:,:,k) * dz(k)
-        end do
-      end if
-      if ( hasSOUTH ) then
-        UA_bry % STH = 0.
-        VA_bry % STH = 0.
-        do k = 1, kb
-          UA_bry % STH = UA_bry % STH                &
-                       +  U_bry % STH(:,:,k) * dz(k)
-          VA_bry % STH = VA_bry % STH                &
-                       +  V_bry % STH(:,:,k) * dz(k)
-        end do
-        print *, "SOUTH VA: min=", minval(VA_bry%STH), "; max=", maxval(VA_bry%STH)
-      end if
-      if ( hasWEST ) then
-        UA_bry % WST = 0.
-        VA_bry % WST = 0.
-        do k = 1, kb
-          UA_bry % WST = UA_bry % WST                &
-                       +  U_bry % WST(:,:,k) * dz(k)
-          VA_bry % WST = VA_bry % WST                &
-                       +  V_bry % WST(:,:,k) * dz(k)
-        end do
+      if ( DERIVE_2D ) then
+
+        if ( hasEAST ) then
+          UA_bry % EST = 0.
+          VA_bry % EST = 0.
+          do k = 1, kb
+            UA_bry % EST = UA_bry % EST                &
+                         +  U_bry % EST(:,:,k) * dz(k)
+            VA_bry % EST = VA_bry % EST                &
+                         +  V_bry % EST(:,:,k) * dz(k)
+          end do
+!          print *, "EAST UA: min=", minval(UA_bry%EST), "; max=", maxval(UA_bry%EST)
+        end if
+        if ( hasNORTH ) then
+          UA_bry % NTH = 0.
+          VA_bry % NTH = 0.
+          do k = 1, kb
+            UA_bry % NTH = UA_bry % NTH                &
+                         +  U_bry % NTH(:,:,k) * dz(k)
+            VA_bry % NTH = VA_bry % NTH                &
+                         +  V_bry % NTH(:,:,k) * dz(k)
+          end do
+        end if
+        if ( hasSOUTH ) then
+          UA_bry % STH = 0.
+          VA_bry % STH = 0.
+          do k = 1, kb
+            UA_bry % STH = UA_bry % STH                &
+                         +  U_bry % STH(:,:,k) * dz(k)
+            VA_bry % STH = VA_bry % STH                &
+                         +  V_bry % STH(:,:,k) * dz(k)
+          end do
+!          print *, "SOUTH VA: min=", minval(VA_bry%STH), "; max=", maxval(VA_bry%STH)
+        end if
+        if ( hasWEST ) then
+          UA_bry % WST = 0.
+          VA_bry % WST = 0.
+          do k = 1, kb
+            UA_bry % WST = UA_bry % WST                &
+                         +  U_bry % WST(:,:,k) * dz(k)
+            VA_bry % WST = VA_bry % WST                &
+                         +  V_bry % WST(:,:,k) * dz(k)
+          end do
+        end if
+
       end if
 
       call msg_print("BRY INITIALIZED", 2, "")
@@ -755,16 +723,16 @@ module bry
 !
       use glob_grid  , only: dz
 !      use glob_domain, only: is_master
-      use model_run  , only: dti, secs => sec_of_year
+      use model_run  , only: dti, iint, mid_in_month, mid_in_nbr      &
+                           , secs => sec_of_year, sec_of_month
       use module_time
 
       implicit none
 
       type(date), intent(in) :: d_in
 
-      logical            ADVANCE_REC
-      integer            max_in_prev, max_in_this  &
-                       , mid_in_month, sec_in_month
+      logical            ADVANCE_REC, ADVANCE_REC_INT
+      integer            max_in_prev, max_in_this
       integer                          &
       , dimension(3)  :: record, year
       real               chunk
@@ -777,36 +745,28 @@ module bry
 
         year = -1
 
+! Determine the record to read
         record(1) = d_in%month
 
-!     current time [sec] from the beginning of the month.
-
-        sec_in_month = d_in%day*24*3600                           &
-                     + d_in%hour  *3600 + d_in%min*60 + d_in%sec
-
-!     mid-point [sec] in the month.
-        if ( d_in%month == 2 ) then
-          mid_in_month = int( real(mday(d_in%month+inc_leap(d_in%year))) &
-                                   *.5*24.*3600. )
+        if ( sec_of_month <= mid_in_month ) then
+          record(2) = d_in%month - 1
+          if ( record(2) == 0 ) record(2) = 12
+          a = real( sec_of_month + mid_in_nbr   )  &
+             /real( mid_in_nbr   + mid_in_month )
         else
-          mid_in_month = int( real(mday(d_in%month))*.5*24.*3600. )
+          record(2) = d_in%month
+          a = real( sec_of_month - mid_in_month )  &
+             /real( mid_in_nbr   + mid_in_month )
         end if
 
-!     decide between which two months.
+        record(3) = mod( record(2), 12 ) + 1
 
-!     former half in the month.
-        ADVANCE_REC = .false.
-        if ( record(1) == record(3) ) then
-          if ( sec_in_month > mid_in_month ) then
-            record(2) = record(3)
-            ADVANCE_REC = .true.
-          end if
+        if ( sec_of_month - mid_in_month <= dti .and.  &
+             record(2) == record(1) ) then
+          ADVANCE_REC_INT = .true.
+        else
+          ADVANCE_REC_INT = .false.
         end if
-
-        record(3) = record(2) + 1
-
-        if ( record(2) ==  0 ) record(2) = 12
-        if ( record(3) == 13 ) record(3) =  1
 
       else
 
@@ -830,62 +790,401 @@ module bry
 
       end if
 
-      call read_all( ADVANCE_REC, 1, year, record )
-
-      if ( ADVANCE_REC ) then
-! Derive barotropic velocities ! TODO: Add flag for that
-        if ( hasEAST ) then
-          UA_bry % EST = 0.
-          VA_bry % EST = 0.
-          do k = 1, kb
-            UA_bry % EST = UA_bry % EST                &
-                         +  U_bry % EST(:,:,k) * dz(k)
-            VA_bry % EST = VA_bry % EST                &
-                         +  V_bry % EST(:,:,k) * dz(k)
-          end do
-          print *, "EAST UA: min=", minval(UA_bry%EST), "; max=", maxval(UA_bry%EST)
-        end if
-        if ( hasNORTH ) then
-          UA_bry % NTH = 0.
-          VA_bry % NTH = 0.
-          do k = 1, kb
-            UA_bry % NTH = UA_bry % NTH                &
-                         +  U_bry % NTH(:,:,k) * dz(k)
-            VA_bry % NTH = VA_bry % NTH                &
-                         +  V_bry % NTH(:,:,k) * dz(k)
-          end do
-        end if
-        if ( hasSOUTH ) then
-          UA_bry % STH = 0.
-          VA_bry % STH = 0.
-          do k = 1, kb
-            UA_bry % STH = UA_bry % STH                &
-                         +  U_bry % STH(:,:,k) * dz(k)
-            VA_bry % STH = VA_bry % STH                &
-                         +  V_bry % STH(:,:,k) * dz(k)
-          end do
-          print *, "SOUTH VA: min=", minval(VA_bry%STH), "; max=", maxval(VA_bry%STH)
-        end if
-        if ( hasWEST ) then
-          UA_bry % WST = 0.
-          VA_bry % WST = 0.
-          do k = 1, kb
-            UA_bry % WST = UA_bry % WST                &
-                         +  U_bry % WST(:,:,k) * dz(k)
-            VA_bry % WST = VA_bry % WST                &
-                         +  V_bry % WST(:,:,k) * dz(k)
-          end do
+! Override with active boundaries
+      if ( iint > 1 ) then
+        if ( INTERP_BRY .and. ADVANCE_REC_INT ) then
+          call advance_record
+          call read_all( ADVANCE_REC_INT, 3, year, record )
+        else
+          call read_all( ADVANCE_REC    , 1, year, record )
         end if
       end if
 
+! Interpolate boundaries or just get the values
+      if ( INTERP_BRY ) then
+
+        if ( hasEAST ) then
+
+          EL_bry % EST(1:NFE,:) =                          &
+            ( 1. - a ) * EL_int % EST(1:NFE,:,2)  &
+           +       a   * EL_int % EST(1:NFE,:,3)
+           S_bry % EST(1:NFE,:,:) =                          &
+            ( 1. - a ) *  S_int % EST(1:NFE,:,:,2)  &
+           +       a   *  S_int % EST(1:NFE,:,:,3)
+           T_bry % EST(1:NFE,:,:) =                          &
+            ( 1. - a ) *  T_int % EST(1:NFE,:,:,2)  &
+           +       a   *  T_int % EST(1:NFE,:,:,3)
+           U_bry % EST(1:NFE,:,:) =                          &
+            ( 1. - a ) *  U_int % EST(1:NFE,:,:,2)  &
+           +       a   *  U_int % EST(1:NFE,:,:,3)
+           V_bry % EST(1:NFE,:,:) =                          &
+            ( 1. - a ) *  V_int % EST(1:NFE,:,:,2)  &
+           +       a   *  V_int % EST(1:NFE,:,:,3)
+
+          if ( DERIVE_2D ) then
+            UA_bry % EST = 0.
+            VA_bry % EST = 0.
+            do k = 1, kb
+              UA_bry % EST = UA_bry % EST                &
+                           +  U_bry % EST(:,:,k) * dz(k)
+              VA_bry % EST = VA_bry % EST                &
+                           +  V_bry % EST(:,:,k) * dz(k)
+            end do
+!            print *, "EAST UA: min=", minval(UA_bry%EST), "; max=", maxval(UA_bry%EST)
+          else
+            UA_bry % EST(1:NFE,:) =                           &
+              ( 1. - a ) *  UA_int % EST(1:NFE,:,2)  &
+             +       a   *  UA_int % EST(1:NFE,:,3)
+            VA_bry % EST(1:NFE,:) =                           &
+              ( 1. - a ) *  VA_int % EST(1:NFE,:,2)  &
+             +       a   *  VA_int % EST(1:NFE,:,3)
+          end if
+
+        end if
+
+        if ( hasNORTH ) then
+
+          EL_bry % NTH(:,1:NFN) =                          &
+            ( 1. - a ) * EL_int % NTH(:,1:NFN,2)  &
+           +       a   * EL_int % NTH(:,1:NFN,3)
+           S_bry % NTH(:,1:NFN,:) =                          &
+            ( 1. - a ) *  S_int % NTH(:,1:NFN,:,2)  &
+           +       a   *  S_int % NTH(:,1:NFN,:,3)
+           T_bry % NTH(:,1:NFN,:) =                          &
+            ( 1. - a ) *  T_int % NTH(:,1:NFN,:,2)  &
+           +       a   *  T_int % NTH(:,1:NFN,:,3)
+           U_bry % NTH(:,1:NFN,:) =                          &
+            ( 1. - a ) *  U_int % NTH(:,1:NFN,:,2)  &
+           +       a   *  U_int % NTH(:,1:NFN,:,3)
+           V_bry % NTH(:,1:NFN,:) =                          &
+            ( 1. - a ) *  V_int % NTH(:,1:NFN,:,2)  &
+           +       a   *  V_int % NTH(:,1:NFN,:,3)
+
+          if ( DERIVE_2D ) then
+            UA_bry % NTH = 0.
+            VA_bry % NTH = 0.
+            do k = 1, kb
+              UA_bry % NTH = UA_bry % NTH                &
+                           +  U_bry % NTH(:,:,k) * dz(k)
+              VA_bry % NTH = VA_bry % NTH                &
+                           +  V_bry % NTH(:,:,k) * dz(k)
+            end do
+          else
+            UA_bry % NTH(:,1:NFN) =                           &
+              ( 1. - a ) *  UA_int % NTH(:,1:NFN,2)  &
+             +       a   *  UA_int % NTH(:,1:NFN,3)
+            VA_bry % NTH(:,1:NFN) =                           &
+              ( 1. - a ) *  VA_int % NTH(:,1:NFN,2)  &
+             +       a   *  VA_int % NTH(:,1:NFN,3)
+          end if
+
+        end if
+
+        if ( hasSOUTH ) then
+
+          EL_bry % STH(:,1:NFS) =                 &
+            ( 1. - a ) * EL_int % STH(:,1:NFS,2)  &
+           +       a   * EL_int % STH(:,1:NFS,3)
+           S_bry % STH(:,1:NFS,:) =                 &
+            ( 1. - a ) *  S_int % STH(:,1:NFS,:,2)  &
+           +       a   *  S_int % STH(:,1:NFS,:,3)
+           T_bry % STH(:,1:NFS,:) =                 &
+            ( 1. - a ) *  T_int % STH(:,1:NFS,:,2)  &
+           +       a   *  T_int % STH(:,1:NFS,:,3)
+           U_bry % STH(:,1:NFS,:) =                 &
+            ( 1. - a ) *  U_int % STH(:,1:NFS,:,2)  &
+           +       a   *  U_int % STH(:,1:NFS,:,3)
+           V_bry % STH(:,1:NFS,:) =                 &
+            ( 1. - a ) *  V_int % STH(:,1:NFS,:,2)  &
+           +       a   *  V_int % STH(:,1:NFS,:,3)
+
+          if ( DERIVE_2D ) then
+            UA_bry % STH = 0.
+            VA_bry % STH = 0.
+            do k = 1, kb
+              UA_bry % STH = UA_bry % STH                &
+                           +  U_bry % STH(:,:,k) * dz(k)
+              VA_bry % STH = VA_bry % STH                &
+                           +  V_bry % STH(:,:,k) * dz(k)
+            end do
+!            print *, "SOUTH VA: min=", minval(VA_bry%STH), "; max=", maxval(VA_bry%STH)
+          else
+            UA_bry % STH(:,1:NFS) =                  &
+              ( 1. - a ) *  UA_int % STH(:,1:NFS,2)  &
+             +       a   *  UA_int % STH(:,1:NFS,3)
+            VA_bry % STH(:,1:NFS) =                  &
+              ( 1. - a ) *  VA_int % STH(:,1:NFS,2)  &
+             +       a   *  VA_int % STH(:,1:NFS,3)
+          end if
+
+        end if
+
+        if ( hasWEST ) then
+
+          EL_bry % WST(1:NFW,:) =                 &
+            ( 1. - a ) * EL_int % WST(1:NFW,:,2)  &
+           +       a   * EL_int % WST(1:NFW,:,3)
+           S_bry % WST(1:NFW,:,:) =                 &
+            ( 1. - a ) *  S_int % WST(1:NFW,:,:,2)  &
+           +       a   *  S_int % WST(1:NFW,:,:,3)
+           T_bry % WST(1:NFW,:,:) =                 &
+            ( 1. - a ) *  T_int % WST(1:NFW,:,:,2)  &
+           +       a   *  T_int % WST(1:NFW,:,:,3)
+           U_bry % WST(1:NFW,:,:) =                 &
+            ( 1. - a ) *  U_int % WST(1:NFW,:,:,2)  &
+           +       a   *  U_int % WST(1:NFW,:,:,3)
+           V_bry % WST(1:NFW,:,:) =                 &
+            ( 1. - a ) *  V_int % WST(1:NFW,:,:,2)  &
+           +       a   *  V_int % WST(1:NFW,:,:,3)
+
+          if ( DERIVE_2D ) then
+            UA_bry % WST = 0.
+            VA_bry % WST = 0.
+            do k = 1, kb
+              UA_bry % WST = UA_bry % WST                &
+                           +  U_bry % WST(:,:,k) * dz(k)
+              VA_bry % WST = VA_bry % WST                &
+                           +  V_bry % WST(:,:,k) * dz(k)
+            end do
+  !          print *, "EAST UA: min=", minval(UA_bry%WST), "; max=", maxval(UA_bry%WST)
+          else
+            UA_bry % WST(1:NFW,:) =                  &
+              ( 1. - a ) *  UA_int % WST(1:NFW,:,2)  &
+             +       a   *  UA_int % WST(1:NFW,:,3)
+            VA_bry % WST(1:NFW,:) =                  &
+              ( 1. - a ) *  VA_int % WST(1:NFW,:,2)  &
+             +       a   *  VA_int % WST(1:NFW,:,3)
+          end if
+
+        end if
+
+      end if
+
+! Fill in climate to boundaries
+      if ( CLIM_BRY ) call clim_to_bry
+
+
     end ! subroutine step
+!______________________________________________________________________
+!
+    subroutine advance_record
+!----------------------------------------------------------------------
+!  Advances interpolation fields when reading the next record.
+!______________________________________________________________________
+!
+      implicit none
+
+
+      if ( hasEAST ) then
+        EL_int % EST(:,:,2)   = EL_int % EST(:,:,3)
+         S_int % EST(:,:,:,2) =  S_int % EST(:,:,:,3)
+         T_int % EST(:,:,:,2) =  T_int % EST(:,:,:,3)
+         U_int % EST(:,:,:,2) =  U_int % EST(:,:,:,3)
+        UA_int % EST(:,:,2)   = UA_int % EST(:,:,3)
+         V_int % EST(:,:,:,2) =  V_int % EST(:,:,:,3)
+        VA_int % EST(:,:,2)   = VA_int % EST(:,:,3)
+      end if
+
+      if ( hasNORTH ) then
+        EL_int % NTH(:,:,2)   = EL_int % NTH(:,:,3)
+         S_int % NTH(:,:,:,2) =  S_int % NTH(:,:,:,3)
+         T_int % NTH(:,:,:,2) =  T_int % NTH(:,:,:,3)
+         U_int % NTH(:,:,:,2) =  U_int % NTH(:,:,:,3)
+        UA_int % NTH(:,:,2)   = UA_int % NTH(:,:,3)
+         V_int % NTH(:,:,:,2) =  V_int % NTH(:,:,:,3)
+        VA_int % NTH(:,:,2)   = VA_int % NTH(:,:,3)
+      end if
+
+      if ( hasSOUTH ) then
+        EL_int % STH(:,:,2)   = EL_int % STH(:,:,3)
+         S_int % STH(:,:,:,2) =  S_int % STH(:,:,:,3)
+         T_int % STH(:,:,:,2) =  T_int % STH(:,:,:,3)
+         U_int % STH(:,:,:,2) =  U_int % STH(:,:,:,3)
+        UA_int % STH(:,:,2)   = UA_int % STH(:,:,3)
+         V_int % STH(:,:,:,2) =  V_int % STH(:,:,:,3)
+        VA_int % STH(:,:,2)   = VA_int % STH(:,:,3)
+      end if
+
+      if ( hasWEST ) then
+        EL_int % WST(:,:,2)   = EL_int % WST(:,:,3)
+         S_int % WST(:,:,:,2) =  S_int % WST(:,:,:,3)
+         T_int % WST(:,:,:,2) =  T_int % WST(:,:,:,3)
+         U_int % WST(:,:,:,2) =  U_int % WST(:,:,:,3)
+        UA_int % WST(:,:,2)   = UA_int % WST(:,:,3)
+         V_int % WST(:,:,:,2) =  V_int % WST(:,:,:,3)
+        VA_int % WST(:,:,2)   = VA_int % WST(:,:,3)
+      end if
+
+
+    end ! subroutine
+!______________________________________________________________________
+!
+    subroutine init_to_bry
+!----------------------------------------------------------------------
+!  Gets boundariy values from climatology.
+!______________________________________________________________________
+!
+      use glob_ocean, only: elb, sb, tb, ub, uab, vb, vab
+
+      implicit none
+
+
+      if ( hasEAST ) then
+
+        EL_bry % EST(1:NFE,:) = elb(im:im-NFE+1:-1,:)
+
+        S_bry % EST(1:NFE,:,:) = sb(im:im-NFE+1:-1,:,:)
+        T_bry % EST(1:NFE,:,:) = tb(im:im-NFE+1:-1,:,:)
+
+        U_bry % EST(1:NFE,:,:) = ub(im:im-NFE+1:-1,:,:)
+        V_bry % EST(1:NFE,:,:) = vb(im:im-NFE+1:-1,:,:)
+
+        UA_bry % EST(1:NFE,:) = uab(im:im-NFE+1:-1,:)
+        VA_bry % EST(1:NFE,:) = vab(im:im-NFE+1:-1,:)
+
+      end if
+
+
+      if ( hasNORTH ) then
+
+        EL_bry % NTH(:,1:NFN) = elb(:,jm:jm-NFN+1:-1)
+
+        S_bry % NTH(:,1:NFN,:) = sb(:,jm:jm-NFN+1:-1,:)
+        T_bry % NTH(:,1:NFN,:) = tb(:,jm:jm-NFN+1:-1,:)
+
+        U_bry % NTH(:,1:NFN,:) = ub(:,jm:jm-NFN+1:-1,:)
+        V_bry % NTH(:,1:NFN,:) = vb(:,jm:jm-NFN+1:-1,:)
+
+        UA_bry % NTH(:,1:NFN) = uab(:,jm:jm-NFN+1:-1)
+        VA_bry % NTH(:,1:NFN) = vab(:,jm:jm-NFN+1:-1)
+
+      end if
+
+
+      if ( hasSOUTH ) then
+
+        EL_bry % STH(:,1:NFS) = elb(:,1:NFS)
+
+        S_bry % STH(:,1:NFS,:) = sb(:,1:NFS,:)
+        T_bry % STH(:,1:NFS,:) = tb(:,1:NFS,:)
+
+        UA_bry % STH(:,1:NFS) = uab(:,1:NFS)
+        VA_bry % STH(:,1:NFS) = vab(:,1:NFS)
+
+        U_bry % STH(:,1:NFS,:) = ub(:,1:NFS,:)
+        V_bry % STH(:,1:NFS,:) = vb(:,1:NFS,:)
+
+      end if
+
+
+      if ( hasWEST ) then
+
+        EL_bry % WST(1:NFW,:) = elb(1:NFW,:)
+
+        S_bry % WST(1:NFW,:,:) = sb(1:NFW,:,:)
+        T_bry % WST(1:NFW,:,:) = tb(1:NFW,:,:)
+
+        U_bry % WST(1:NFW,:,:) = ub(1:NFW,:,:)
+        V_bry % WST(1:NFW,:,:) = vb(1:NFW,:,:)
+
+        UA_bry % WST(1:NFW,:) = uab(1:NFW,:)
+        VA_bry % WST(1:NFW,:) = vab(1:NFW,:)
+
+      end if
+
+
+    end ! subroutine init_to_bry
+!______________________________________________________________________
+!
+    subroutine clim_to_bry
+!----------------------------------------------------------------------
+!  Gets boundariy values from climatology.
+!______________________________________________________________________
+!
+      use clim, only: eclim, sclim, tclim, uclim, uaclim, vclim, vaclim
+
+      implicit none
+
+
+! TODO: add frz to boundaries in case of NF*>1
+      if ( hasEAST ) then
+
+        if ( fill_clim_el % EAST == 1 )  &
+          EL_bry % EST(1:NFE,:) = eclim(im:im-NFE+1:-1,:)
+
+        if ( fill_clim_s % EAST == 1 )  &
+          S_bry % EST(1:NFE,:,:) = sclim(im:im-NFE+1:-1,:,:)
+        if ( fill_clim_t % EAST == 1 )  &
+          T_bry % EST(1:NFE,:,:) = tclim(im:im-NFE+1:-1,:,:)
+
+        if ( fill_clim_u % EAST == 1 )  &
+          U_bry % EST(1:NFE,:,:) = uclim(im:im-NFE+1:-1,:,:)
+        if ( fill_clim_v % EAST == 1 )  &
+          V_bry % EST(1:NFE,:,:) = vclim(im:im-NFE+1:-1,:,:)
+
+      end if
+
+
+      if ( hasWEST ) then
+
+        if ( fill_clim_el % WEST == 1 )  &
+          EL_bry % WST(1:NFW,:) = eclim(1:NFW,:)
+
+        if ( fill_clim_s % WEST == 1 )  &
+          S_bry % WST(1:NFW,:,:) = sclim(1:NFW,:,:)
+        if ( fill_clim_t % WEST == 1 )  &
+          T_bry % WST(1:NFW,:,:) = tclim(1:NFW,:,:)
+
+        if ( fill_clim_u % WEST == 1 )  &
+          U_bry % WST(1:NFW,:,:) = uclim(1:NFW,:,:)
+        if ( fill_clim_v % WEST == 1 )  &
+          V_bry % WST(1:NFW,:,:) = vclim(1:NFW,:,:)
+
+      end if
+
+
+      if ( hasNORTH ) then
+
+        if ( fill_clim_el % NORTH == 1 )  &
+          EL_bry % NTH(:,1:NFN) = eclim(:,jm:jm-NFN+1:-1)
+
+        if ( fill_clim_s % NORTH == 1 )  &
+          S_bry % NTH(:,1:NFN,:) = sclim(:,jm:jm-NFN+1:-1,:)
+        if ( fill_clim_t % NORTH == 1 )  &
+          T_bry % NTH(:,1:NFN,:) = tclim(:,jm:jm-NFN+1:-1,:)
+
+        if ( fill_clim_u % NORTH == 1 )  &
+          U_bry % NTH(:,1:NFN,:) = uclim(:,jm:jm-NFN+1:-1,:)
+        if ( fill_clim_v % NORTH == 1 )  &
+          V_bry % NTH(:,1:NFN,:) = vclim(:,jm:jm-NFN+1:-1,:)
+
+      end if
+
+
+      if ( hasSOUTH ) then
+
+        if ( fill_clim_el % SOUTH == 1 )  &
+          EL_bry % STH(:,1:NFS) = eclim(:,1:NFS)
+
+        if ( fill_clim_s % SOUTH == 1 )  &
+          S_bry % STH(:,1:NFS,:) = sclim(:,1:NFS,:)
+        if ( fill_clim_t % SOUTH == 1 )  &
+          T_bry % STH(:,1:NFS,:) = tclim(:,1:NFS,:)
+
+        if ( fill_clim_u % SOUTH == 1 )  &
+          U_bry % STH(:,1:NFS,:) = uclim(:,1:NFS,:)
+        if ( fill_clim_v % SOUTH == 1 )  &
+          V_bry % STH(:,1:NFS,:) = vclim(:,1:NFS,:)
+
+      end if
+
+
+    end ! subroutine clim_to_bry
 !______________________________________________________________________
 !
     subroutine read_all( execute, n, year, record )
 
       use glob_domain, only: i_global, j_global
-      use glob_grid  , only: fsm
-      use glob_ocean , only: sclim, tclim
       use mpi        , only: MPI_OFFSET_KIND
 
       implicit none
@@ -894,7 +1193,7 @@ module bry
       integer              , intent(in) :: n
       integer, dimension(3), intent(in) :: record, year
 
-      integer                  ii, ncid
+      integer                  ncid
       integer(MPI_OFFSET_KIND) start(4), edge(4)
       real(rk)                 dummy(1,1,1)
       character(len=128)       desc
@@ -902,12 +1201,12 @@ module bry
 
       if ( .not. execute ) return
 
-      if ( n >= 2 ) then
-        write(desc,'("[interp_bry not implemented yet] #",i4," @ ",i4)') &
-            record(n), year(n)
-      else
+      if ( n == 1 ) then
         write(desc,'("Reading BC record #",i4," @ ",i4)') &
             record(1), year(1)
+      else
+        write(desc,'("Reading interp.BC #",i4," @ ",i4)') &
+            record(n), year(n)
       end if
 
       call msg_print("", 1, desc)
@@ -936,47 +1235,63 @@ module bry
           edge(3:4) = 1
         end if
 ! Temperature
-        call read_var_3d_nc( bry_path, "east_"//t_name, T_bry%EST  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "east_"//t_name               &
+                             , T_bry%EST, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "east_"//t_name     &
+                             , T_int%EST(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_t % east = 0
         if ( ncid <= 0 ) then
-          do k=1,kb
-            do j=1,jm
-              do i=1,NFE
-                ii=im-i+1
-                T_bry%EST(i,j,k) = tclim(ii,j,k) * fsm(ii,j)
-              end do
-            end do
-          end do
-          call msg_print("", 2, "Temp@EAST defaulted to climatology")
+          fill_clim_t % east = 1
+          call msg_print("", 2, "Temp@EAST read error. Skipping...")
         end if
 ! Salinity
-        call read_var_3d_nc( bry_path, "east_"//s_name, S_bry%EST  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "east_"//s_name               &
+                             , S_bry%EST, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "east_"//s_name     &
+                             , S_int%EST(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_s % east = 0
         if ( ncid <= 0 ) then
-          do k=1,kb
-            do j=1,jm
-              do i=1,NFE
-                ii=im-i+1
-                S_bry%EST(i,j,k) = sclim(ii,j,k) * fsm(ii,j)
-              end do
-            end do
-          end do
-          call msg_print("", 2, "Salt@EAST defaulted to climatology")
+          fill_clim_s % east = 1
+          if ( n > 1 ) S_int%EST(:,:,:,n) = S_bry%EST
+          call msg_print("", 2, "Salt@EAST read error. Skipping...")
         end if
 ! Normal velocity
-        call read_var_3d_nc( bry_path, "east_"//u_name, U_bry%EST  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "east_"//u_name               &
+                             , U_bry%EST, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "east_"//u_name     &
+                             , U_int%EST(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_u % east = 0
         if ( ncid <= 0 ) then
-          U_bry%EST = 0.
-          print *, "!!!", ncid
-          call msg_print("", 2, "Uvel@EAST defaulted to zero")
+          fill_clim_u % east = 1
+          if ( n > 1 ) U_int%EST(:,:,:,n) = U_bry%EST
+          call msg_print("", 2, "Uvel@EAST read error. Skipping...")
         end if
 ! Tangential velocity
-        call read_var_3d_nc( bry_path, "east_"//v_name, V_bry%EST  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "east_"//v_name               &
+                             , V_bry%EST, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "east_"//v_name     &
+                             , V_int%EST(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_v % east = 0
         if ( ncid <= 0 ) then
-          V_bry%EST = 0.
-          call msg_print("", 2, "Vvel@EAST defaulted to zero")
+          fill_clim_v % east = 1
+          if ( n > 1 ) V_int%EST(:,:,:,n) = V_bry%EST
+          call msg_print("", 2, "Vvel@EAST read error. Skipping...")
         end if
 ! set reading bounds for 2D vars
         if ( NFE > 1 ) then
@@ -995,11 +1310,19 @@ module bry
           edge(2:4) = 1
         end if
 ! Elevation
-        call read_var_2d_nc( bry_path, "east_"//el_name, EL_bry%EST  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_2d_nc( bry_path, "east_"//el_name               &
+                             , EL_bry%EST, year(n), start, edge, ncid )
+        else
+          call read_var_2d_nc( bry_path, "east_"//el_name     &
+                             , EL_int%EST(:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_el % east = 0
         if ( ncid <= 0 ) then
-          EL_bry%EST = 0.
-          call msg_print("", 2, "Elev@EAST defaulted to zero")
+          fill_clim_el % east = 1
+          if ( n > 1 ) EL_int%EST(:,:,n) = EL_bry%EST
+          call msg_print("", 2, "Elev@EAST read error. Skipping...")
         end if
 
       else
@@ -1046,46 +1369,64 @@ module bry
           edge(3:4) = 1
         end if
 ! Temperature
-        call read_var_3d_nc( bry_path, "north_"//t_name, T_bry%NTH  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "north_"//t_name               &
+                             , T_bry%NTH, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "north_"//t_name     &
+                             , T_int%NTH(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_t % north = 0
         if ( ncid <= 0 ) then
-          do k=1,kb
-            do j=1,NFN
-              do i=1,im
-                ii=jm-j+1
-                T_bry%NTH(i,j,k) = tclim(i,ii,k) * fsm(i,ii)
-              end do
-            end do
-          end do
-          call msg_print("", 2, "Temp@NORTH defaulted to climatology")
+          fill_clim_t % north = 1
+          if ( n > 1 ) T_int%NTH(:,:,:,n) = T_bry%NTH
+          call msg_print("", 2, "Temp@NORTH read error. Skipping...")
         end if
 ! Salinity
-        call read_var_3d_nc( bry_path, "north_"//s_name, S_bry%NTH  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "north_"//s_name               &
+                             , S_bry%NTH, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "north_"//s_name     &
+                             , S_int%NTH(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_s % north = 0
         if ( ncid <= 0 ) then
-          do k=1,kb
-            do j=1,NFN
-              do i=1,im
-                ii=jm-j+1
-                S_bry%NTH(i,j,k) = sclim(i,ii,k) * fsm(i,ii)
-              end do
-            end do
-          end do
-          call msg_print("", 2, "Salt@NORTH defaulted to climatology")
+          fill_clim_s % north = 1
+          if ( n > 1 ) S_int%NTH(:,:,:,n) = S_bry%NTH
+          call msg_print("", 2, "Salt@NORTH read error. Skipping...")
         end if
 ! Normal velocity
-        call read_var_3d_nc( bry_path, "north_"//u_name, U_bry%NTH  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "north_"//u_name               &
+                             , U_bry%NTH, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "north_"//u_name     &
+                             , U_int%NTH(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_u % north = 0
         if ( ncid <= 0 ) then
-          U_bry%NTH = 0.
-          call msg_print("", 2, "Uvel@NORTH defaulted to zero")
+          fill_clim_u % north = 1
+          if ( n > 1 ) U_int%NTH(:,:,:,n) = U_bry%NTH
+          call msg_print("", 2, "Uvel@NORTH read error. Skipping...")
         end if
 ! Tangential velocity
-        call read_var_3d_nc( bry_path, "north_"//v_name, V_bry%NTH  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "north_"//v_name               &
+                             , V_bry%NTH, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "north_"//v_name     &
+                             , V_int%NTH(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_v % north = 0
         if ( ncid <= 0 ) then
-          V_bry%NTH = 0.
-          call msg_print("", 2, "Vvel@NORTH defaulted to zero")
+          fill_clim_v % north = 1
+          if ( n > 1 ) V_int%NTH(:,:,:,n) = V_bry%NTH
+          call msg_print("", 2, "Vvel@NORTH read error. Skipping...")
         end if
 ! set reading bounds for 2D vars
         if ( NFN > 1 ) then
@@ -1104,11 +1445,19 @@ module bry
           edge(2:4) = 1
         end if
 ! Elevation
-        call read_var_2d_nc( bry_path, "north_"//el_name, EL_bry%NTH  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_2d_nc( bry_path, "north_"//el_name               &
+                             , EL_bry%NTH, year(n), start, edge, ncid )
+        else
+          call read_var_2d_nc( bry_path, "north_"//el_name     &
+                             , EL_int%NTH(:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_el % north = 0
         if ( ncid <= 0 ) then
-          EL_bry%NTH = 0.
-          call msg_print("", 2, "Elev@NORTH defaulted to zero")
+          fill_clim_el % north = 1
+          if ( n > 1 ) EL_int%NTH(:,:,n) = EL_bry%NTH
+          call msg_print("", 2, "Elev@NORTH read error. Skipping...")
         end if
 
       else
@@ -1155,44 +1504,64 @@ module bry
           edge(3:4) = 1
         end if
 ! Temperature
-        call read_var_3d_nc( bry_path, "south_"//t_name, T_bry%STH  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "south_"//t_name               &
+                             , T_bry%STH, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "south_"//t_name     &
+                             , T_int%STH(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_t % south = 0
         if ( ncid <= 0 ) then
-          do k=1,kb
-            do j=1,NFS
-              do i=1,im
-                T_bry%STH(i,j,k) = tclim(i,j,k) * fsm(i,j)
-              end do
-            end do
-          end do
-          call msg_print("", 2, "Temp@SOUTH defaulted to climatology")
+          fill_clim_t % south = 1
+          if ( n > 1 ) T_int%STH(:,:,:,n) = T_bry%STH
+          call msg_print("", 2, "Temp@SOUTH read error. Skipping...")
         end if
 ! Salinity
-        call read_var_3d_nc( bry_path, "south_"//s_name, S_bry%STH  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "south_"//s_name               &
+                             , S_bry%STH, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "south_"//s_name     &
+                             , S_int%STH(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_s % south = 0
         if ( ncid <= 0 ) then
-          do k=1,kb
-            do j=1,NFS
-              do i=1,im
-                S_bry%STH(i,j,k) = sclim(i,j,k) * fsm(i,j)
-              end do
-            end do
-          end do
-          call msg_print("", 2, "Salt@SOUTH defaulted to climatology")
+          fill_clim_s % south = 1
+          if ( n > 1 ) S_int%STH(:,:,:,n) = S_bry%STH
+          call msg_print("", 2, "Salt@SOUTH read error. Skipping...")
         end if
 ! Normal velocity
-        call read_var_3d_nc( bry_path, "south_"//u_name, U_bry%STH  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "south_"//u_name               &
+                             , U_bry%STH, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "south_"//u_name     &
+                             , U_int%STH(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_u % south = 0
         if ( ncid <= 0 ) then
-          U_bry%STH = 0.
-          call msg_print("", 2, "Uvel@SOUTH defaulted to zero")
+          fill_clim_u % south = 1
+          if ( n > 1 ) U_int%STH(:,:,:,n) = U_bry%STH
+          call msg_print("", 2, "Uvel@SOUTH read error. Skipping...")
         end if
 ! Tangential velocity
-        call read_var_3d_nc( bry_path, "south_"//v_name, V_bry%STH  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "south_"//v_name               &
+                             , V_bry%STH, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "south_"//v_name     &
+                             , V_int%STH(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_v % south = 0
         if ( ncid <= 0 ) then
-          V_bry%STH = 0.
-          call msg_print("", 2, "Vvel@SOUTH defaulted to zero")
+          fill_clim_v % south = 1
+          if ( n > 1 ) V_int%STH(:,:,:,n) = V_bry%STH
+          call msg_print("", 2, "Vvel@SOUTH read error. Skipping...")
         end if
 ! set reading bounds for 2D vars
         if ( NFS > 1 ) then
@@ -1211,11 +1580,19 @@ module bry
           edge(2:4) = 1
         end if
 ! Elevation
-        call read_var_2d_nc( bry_path, "south_"//el_name, EL_bry%STH  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_2d_nc( bry_path, "south_"//el_name               &
+                             , EL_bry%STH, year(n), start, edge, ncid )
+        else
+          call read_var_2d_nc( bry_path, "south_"//el_name     &
+                             , EL_int%STH(:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_el % south = 0
         if ( ncid <= 0 ) then
-          EL_bry%STH = 0.
-          call msg_print("", 2, "Elev@SOUTH defaulted to zero")
+          fill_clim_el % south = 1
+          if ( n > 1 ) EL_int%STH(:,:,n) = EL_bry%STH
+          call msg_print("", 2, "Elev@SOUTH read error. Skipping...")
         end if
 
       else
@@ -1262,44 +1639,64 @@ module bry
           edge(3:4) = 1
         end if
 ! Temperature
-        call read_var_3d_nc( bry_path, "west_"//t_name, T_bry%WST  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "west_"//t_name               &
+                             , T_bry%WST, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "west_"//t_name     &
+                             , T_int%WST(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_t % west = 0
         if ( ncid <= 0 ) then
-          do k=1,kb
-            do j=1,jm
-              do i=1,NFW
-                T_bry%WST(i,j,k) = tclim(i,j,k) * fsm(i,j)
-              end do
-            end do
-          end do
-          call msg_print("", 2, "Temp@WEST defaulted to climatology")
+          fill_clim_t % west = 1
+          if ( n > 1 ) T_int%WST(:,:,:,n) = T_bry%WST
+          call msg_print("", 2, "Temp@WEST read error. Skipping...")
         end if
 ! Salinity
-        call read_var_3d_nc( bry_path, "west_"//s_name, S_bry%WST  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "west_"//s_name               &
+                             , S_bry%WST, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "west_"//s_name     &
+                             , S_int%WST(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_s % west = 0
         if ( ncid <= 0 ) then
-          do k=1,kb
-            do j=1,jm
-              do i=1,NFW
-                S_bry%WST(i,j,k) = sclim(i,j,k) * fsm(i,j)
-              end do
-            end do
-          end do
-          call msg_print("", 2, "Salt@WEST defaulted to climatology")
+          fill_clim_s % west = 1
+          if ( n > 1 ) S_int%WST(:,:,:,n) = S_bry%WST
+          call msg_print("", 2, "Salt@WEST read error. Skipping...")
         end if
 ! Normal velocity
-        call read_var_3d_nc( bry_path, "west_"//u_name, U_bry%WST  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "west_"//u_name               &
+                             , U_bry%WST, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "west_"//u_name     &
+                             , U_int%WST(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_u % west = 0
         if ( ncid <= 0 ) then
-          U_bry%WST = 0.
-          call msg_print("", 2, "Uvel@WEST defaulted to zero")
+          fill_clim_u % west = 1
+          if ( n > 1 ) U_int%WST(:,:,:,n) = U_bry%WST
+          call msg_print("", 2, "Uvel@WEST read error. Skipping...")
         end if
 ! Tangential velocity
-        call read_var_3d_nc( bry_path, "west_"//v_name, V_bry%WST  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_3d_nc( bry_path, "west_"//v_name               &
+                             , V_bry%WST, year(n), start, edge, ncid )
+        else
+          call read_var_3d_nc( bry_path, "west_"//v_name     &
+                             , V_int%WST(:,:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_v % west = 0
         if ( ncid <= 0 ) then
-          V_bry%WST = 0.
-          call msg_print("", 2, "Vvel@WEST defaulted to zero")
+          fill_clim_v % west = 1
+          if ( n > 1 ) V_int%WST(:,:,:,n) = V_bry%WST
+          call msg_print("", 2, "Vvel@WEST read error. Skipping...")
         end if
 ! set reading bounds for 2D vars
         if ( NFW > 1 ) then
@@ -1318,11 +1715,19 @@ module bry
           edge(2:4) = 1
         end if
 ! Elevation
-        call read_var_2d_nc( bry_path, "west_"//el_name, EL_bry%WST  &
-                           , year(n), start, edge, ncid )
+        if ( n == 1 ) then
+          call read_var_2d_nc( bry_path, "west_"//el_name               &
+                             , EL_bry%WST, year(n), start, edge, ncid )
+        else
+          call read_var_2d_nc( bry_path, "west_"//el_name     &
+                             , EL_int%WST(:,:,n)            &
+                             , year(n), start, edge, ncid )
+        end if
+        fill_clim_el % west = 0
         if ( ncid <= 0 ) then
-          EL_bry%WST = 0.
-          call msg_print("", 2, "Elev@WEST defaulted to zero")
+          fill_clim_el % west = 1
+          if ( n > 1 ) EL_int%WST(:,:,n) = EL_bry%WST
+          call msg_print("", 2, "Elev@WEST read error. Skipping...")
         end if
 
       else
@@ -1474,7 +1879,7 @@ module bry
 !______________________________________________________________________
 !
       use glob_const , only: GRAV
-      use glob_grid  , only: dum, dvm, h, dx, dy
+      use glob_grid  , only: dum, dvm, h!, dx, dy
       use glob_ocean , only: el, uaf, vaf
       use model_run  , only: ramp
 
