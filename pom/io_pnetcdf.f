@@ -4690,8 +4690,8 @@
      &                             , status )
           where (var==mv) var = 0.
         end if
-
-        if (fk/=1. .and. ok/=0.) then
+        
+        if (fk/=1. .or. ok/=0.) then
           var = var*fk+ok
         end if
 
