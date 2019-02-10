@@ -1,5 +1,5 @@
 #
-# sbPOM makefile
+# Ferrum makefile (modifed sbPOM makefile)
 #
 
 #-----------------------------------------------------------------------
@@ -7,19 +7,16 @@
 #-----------------------------------------------------------------------
 # Set macros
 CPP = cpp -P
-#FC = ftn   #yoyo
-#LD = ftn
 FC = mpifort
 LD = mpifort
 CLEAN = rm
 
 # Set miscellaneous compiler flags
-MISCFLAGS = -g -fcheck=all -fbacktrace -fbounds-check -Wall#-ffpe-trap=underflow,denormal,zero,overflow -Wall #-Warray-temporaries -Wcharacter-truncation -Wconversion-extra  -Wrealloc-lhs
+#MISCFLAGS = -g -fcheck=all -fbacktrace -fbounds-check -Wall#-ffpe-trap=underflow,denormal,zero,overflow -Wall #-Warray-temporaries -Wcharacter-truncation -Wconversion-extra  -Wrealloc-lhs
+MISCFLAGS =
 
 # Set libraries and include files
-# NETCDFINC = -I/autofs/na1_sw/eslogin/p-netcdf/1.1.1/cnl3.1.gnu/include #yoyo
-# NETCDFLIB = -L/autofs/na1_sw/eslogin/p-netcdf/1.1.1/cnl3.1.gnu/lib
-NETCDFINC = -I/usr/include -I./
+NETCDFINC = -I/usr/include/x86_64-linux-gnu -I./
 NETCDFLIB = -L/usr/lib/x86_64-linux-gnu
 
 #FFLAGS = -ip -O3 -lmpi  $(NETCDFINC)
@@ -49,28 +46,29 @@ OUTDIR = out
 #-----------------------------------------------------------------------
 # Define objects
 #-----------------------------------------------------------------------
-OBJS = module_time.o    \
-       globals.o        \
-       config.o         \
-       bry.o            \
-       air.o            \
-       io.o             \
-       parallel_mpi.o   \
-       io_pnetcdf.o     \
-       seaice.o         \
-       advance.o        \
-       river.o          \
-       solver.o         \
-       initialize.o     \
-       heat.o           \
-       interp.o         \
-       wind.o           \
-       tsforce.o        \
-       assim.o          \
-       assim_drf.o      \
-       mcsst.o          \
-       uvforce.o        \
-       pom.o
+ OBJS = module_time.o    \
+        globals.o        \
+        config.o         \
+        clim.o           \
+        bry.o            \
+        seaice.o         \
+        air.o            \
+        io.o             \
+        parallel_mpi.o   \
+        io_pnetcdf.o     \
+        river.o          \
+        advance.o        \
+        solver.o         \
+        initialize.o     \
+        heat.o           \
+        interp.o         \
+        wind.o           \
+        tsforce.o        \
+        assim.o          \
+        assim_drf.o      \
+        mcsst.o          \
+        uvforce.o        \
+        pom.o
 VPATH = $(SRCDIR)
 
 #-----------------------------------------------------------------------
@@ -82,7 +80,7 @@ VPATH = $(SRCDIR)
 
 %.o: %.f
 	@echo
-	$(FC) -c $(FFLAGS)  $<
+	$(FC) -c $(FFLAGS) $<
 
 #-----------------------------------------------------------------------
 # Set implicit rules for dependencies
