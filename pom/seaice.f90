@@ -658,8 +658,6 @@ module seaice
 !
     subroutine read_all( execute, n, year, record )
 
-      use glob_ocean, only: tb
-
       implicit none
 
       logical              , intent(in) :: execute
@@ -731,7 +729,7 @@ module seaice
 !  Read a variable (NC format).
 !______________________________________________________________________
 !
-      use glob_const , only: C2K, rk
+      use glob_const , only: rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf

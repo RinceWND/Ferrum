@@ -720,7 +720,7 @@ module air
 !______________________________________________________________________
 !
       use glob_const , only: C2K, DEG2RAD, rhoref, Rho_Cpw, rk
-      use glob_domain, only: im, jm, my_task
+      use glob_domain, only: im, jm!, my_task
       use glob_grid  , only: east_e, fsm, north_e
       use glob_ocean , only: rho, s, t, u, v
       use config     , only: tbias, sbias

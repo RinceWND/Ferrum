@@ -1770,7 +1770,7 @@ module io
       start(1) = i_global(1)
       start(2) = j_global(1)
       start(3) = 1
-      start(4) = 1
+      start(4) = n
       edge(1) = im
       edge(2) = jm
       edge(3) = ks

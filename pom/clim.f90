@@ -355,11 +355,10 @@ module clim
 
       record(3) = mod( record(2), 12 ) + 1
 
+      ADVANCE_REC_INT = .false.
       if ( sec_of_month - mid_in_month <= dti .and.  &
            record(2) == record(1) ) then
         if ( iint > 1 ) ADVANCE_REC_INT = .true.
-      else
-        ADVANCE_REC_INT = .false.
       end if
 
       if ( ADVANCE_REC_INT ) then

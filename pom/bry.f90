@@ -1101,7 +1101,7 @@ module bry
 !  Gets boundariy values from climatology.
 !______________________________________________________________________
 !
-      use clim, only: eclim, sclim, tclim, uclim, uaclim, vclim, vaclim
+      use clim, only: eclim, sclim, tclim, uclim, vclim
 
       implicit none
 
@@ -1245,13 +1245,11 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "east_"//t_name      &
-                                 , T_bry%EST                      &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "east_"//t_name, T_bry%EST  &
+                                 , start, edge, ncid )
         else
-          status =  read_var_3d_nc( bry_path, "east_"//t_name     &
-                                  , T_int%EST(:,:,:,n)            &
-                                  , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "east_"//t_name, T_int%EST(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_t % east = 0
         if ( status < 0 ) then
@@ -1260,13 +1258,11 @@ module bry
         end if
 ! Salinity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "east_"//s_name     &
-                                 , S_bry%EST                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "east_"//s_name, S_bry%EST  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "east_"//s_name     &
-                                 , S_int%EST(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "east_"//s_name, S_int%EST(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_s % east = 0
         if ( status < 0 ) then
@@ -1275,13 +1271,11 @@ module bry
         end if
 ! Normal velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "east_"//u_name     &
-                                 , U_bry%EST                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "east_"//u_name, U_bry%EST  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "east_"//u_name     &
-                                 , U_int%EST(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "east_"//u_name, U_int%EST(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_u % east = 0
         if ( status < 0 ) then
@@ -1290,13 +1284,11 @@ module bry
         end if
 ! Tangential velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "east_"//v_name     &
-                                 , V_bry%EST                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "east_"//v_name, V_bry%EST  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "east_"//v_name     &
-                                 , V_int%EST(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "east_"//v_name, V_int%EST(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_v % east = 0
         if ( status < 0 ) then
@@ -1321,13 +1313,11 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          status = read_var_2d_nc( bry_path, "east_"//el_name    &
-                                 , EL_bry%EST                    &
-                                 , year(n), start, edge, ncid )
+          status = read_var_2d_nc( "east_"//el_name, EL_bry%EST  &
+                                 , start, edge, ncid )
         else
-          status = read_var_2d_nc( bry_path, "east_"//el_name    &
-                                 , EL_int%EST(:,:,n)             &
-                                 , year(n), start, edge, ncid )
+          status = read_var_2d_nc( "east_"//el_name, EL_int%EST(:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_el % east = 0
         if ( status < 0 ) then
@@ -1341,20 +1331,20 @@ module bry
         start = 1
         edge = 0
 ! Temperature
-        status = read_var_3d_nc( bry_path, "east_"//t_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "east_"//t_name, dummy  &
+                               , start, edge, ncid )
 ! Salinity
-        status = read_var_3d_nc( bry_path, "east_"//s_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "east_"//s_name, dummy  &
+                               , start, edge, ncid )
 ! Normal velocity
-        status = read_var_3d_nc( bry_path, "east_"//u_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "east_"//u_name, dummy  &
+                               , start, edge, ncid )
 ! Tangential velocity
-        status = read_var_3d_nc( bry_path, "east_"//v_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "east_"//v_name, dummy  &
+                               , start, edge, ncid )
 ! Elevation
-        status = read_var_2d_nc( bry_path, "east_"//el_name, dummy(1,:,:)  &
-                           , year(n), start, edge, ncid )
+        status = read_var_2d_nc( "east_"//el_name, dummy(1,:,:)  &
+                               , start, edge, ncid )
 
       end if
 
@@ -1381,13 +1371,11 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "north_"//t_name    &
-                                 , T_bry%NTH                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "north_"//t_name, T_bry%NTH  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "north_"//t_name    &
-                                 , T_int%NTH(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "north_"//t_name, T_int%NTH(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_t % north = 0
         if ( status < 0 ) then
@@ -1396,43 +1384,37 @@ module bry
         end if
 ! Salinity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "north_"//s_name    &
-                                 , S_bry%NTH                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "north_"//s_name, S_bry%NTH  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "north_"//s_name    &
-                                 , S_int%NTH(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "north_"//s_name, S_int%NTH(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_s % north = 0
         if ( status < 0 ) then
           fill_clim_s % north = 1
           call msg_print("", 2, "Salt@NORTH read error. Skipping...")
         end if
-! Normal velocity
+! Tangential velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "north_"//u_name    &
-                                 , U_bry%NTH                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "north_"//u_name, U_bry%NTH  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "north_"//u_name    &
-                                 , U_int%NTH(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "north_"//u_name, U_int%NTH(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_u % north = 0
         if ( status < 0 ) then
           fill_clim_u % north = 1
           call msg_print("", 2, "Uvel@NORTH read error. Skipping...")
         end if
-! Tangential velocity
+! Normal velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "north_"//v_name    &
-                                 , V_bry%NTH                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "north_"//v_name, V_bry%NTH  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "north_"//v_name    &
-                                 , V_int%NTH(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "north_"//v_name, V_int%NTH(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_v % north = 0
         if ( status < 0 ) then
@@ -1457,13 +1439,11 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          status = read_var_2d_nc( bry_path, "north_"//el_name   &
-                                 , EL_bry%NTH                    &
-                                 , year(n), start, edge, ncid )
+          status = read_var_2d_nc( "north_"//el_name, EL_bry%NTH  &
+                                 , start, edge, ncid )
         else
-          status = read_var_2d_nc( bry_path, "north_"//el_name   &
-                                 , EL_int%NTH(:,:,n)             &
-                                 , year(n), start, edge, ncid )
+          status = read_var_2d_nc( "north_"//el_name, EL_int%NTH(:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_el % north = 0
         if ( status < 0 ) then
@@ -1476,20 +1456,20 @@ module bry
         start = 1
         edge = 0
 ! Temperature
-        status = read_var_3d_nc( bry_path, "north_"//t_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "north_"//t_name, dummy  &
+                               , start, edge, ncid )
 ! Salinity
-        status = read_var_3d_nc( bry_path, "north_"//s_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "north_"//s_name, dummy  &
+                               , start, edge, ncid )
 ! Normal velocity
-        status = read_var_3d_nc( bry_path, "north_"//u_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "north_"//u_name, dummy  &
+                               , start, edge, ncid )
 ! Tangential velocity
-        status = read_var_3d_nc( bry_path, "north_"//v_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "north_"//v_name, dummy  &
+                               , start, edge, ncid )
 ! Elevation
-        status = read_var_2d_nc( bry_path, "north_"//el_name, dummy(1,:,:)  &
-                           , year(n), start, edge, ncid )
+        status = read_var_2d_nc( "north_"//el_name, dummy(1,:,:)  &
+                               , start, edge, ncid )
 
       end if
 
@@ -1516,13 +1496,11 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "south_"//t_name    &
-                                 , T_bry%STH                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "south_"//t_name, T_bry%STH  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "south_"//t_name    &
-                                 , T_int%STH(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "south_"//t_name, T_int%STH(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_t % south = 0
         if ( status < 0 ) then
@@ -1531,43 +1509,37 @@ module bry
         end if
 ! Salinity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "south_"//s_name    &
-                                 , S_bry%STH                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "south_"//s_name, S_bry%STH  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "south_"//s_name    &
-                                 , S_int%STH(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "south_"//s_name, S_int%STH(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_s % south = 0
         if ( status < 0 ) then
           fill_clim_s % south = 1
           call msg_print("", 2, "Salt@SOUTH read error. Skipping...")
         end if
-! Normal velocity
+! Tangential velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "south_"//u_name    &
-                                 , U_bry%STH                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "south_"//u_name, U_bry%STH  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "south_"//u_name    &
-                                 , U_int%STH(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "south_"//u_name, U_int%STH(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_u % south = 0
         if ( status < 0 ) then
           fill_clim_u % south = 1
           call msg_print("", 2, "Uvel@SOUTH read error. Skipping...")
         end if
-! Tangential velocity
+! Normal velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "south_"//v_name    &
-                                 , V_bry%STH                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "south_"//v_name, V_bry%STH  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "south_"//v_name    &
-                                 , V_int%STH(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "south_"//v_name, V_int%STH(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_v % south = 0
         if ( status < 0 ) then
@@ -1592,13 +1564,11 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          status = read_var_2d_nc( bry_path, "south_"//el_name   &
-                                 , EL_bry%STH                    &
-                                 , year(n), start, edge, ncid )
+          status = read_var_2d_nc( "south_"//el_name, EL_bry%STH  &
+                                 , start, edge, ncid )
         else
-          status = read_var_2d_nc( bry_path, "south_"//el_name   &
-                                 , EL_int%STH(:,:,n)             &
-                                 , year(n), start, edge, ncid )
+          status = read_var_2d_nc( "south_"//el_name, EL_int%STH(:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_el % south = 0
         if ( status < 0 ) then
@@ -1611,20 +1581,20 @@ module bry
         start = 1
         edge = 0
 ! Temperature
-        status = read_var_3d_nc( bry_path, "south_"//t_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "south_"//t_name, dummy  &
+                               , start, edge, ncid )
 ! Salinity
-        status = read_var_3d_nc( bry_path, "south_"//s_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "south_"//s_name, dummy  &
+                               , start, edge, ncid )
 ! Normal velocity
-        status = read_var_3d_nc( bry_path, "south_"//u_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "south_"//u_name, dummy  &
+                               , start, edge, ncid )
 ! Tangential velocity
-        status = read_var_3d_nc( bry_path, "south_"//v_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "south_"//v_name, dummy  &
+                               , start, edge, ncid )
 ! Elevation
-        status = read_var_2d_nc( bry_path, "south_"//el_name, dummy(1,:,:)  &
-                           , year(n), start, edge, ncid )
+        status = read_var_2d_nc( "south_"//el_name, dummy(1,:,:)  &
+                               , start, edge, ncid )
 
       end if
 
@@ -1651,13 +1621,11 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "west_"//t_name     &
-                                 , T_bry%WST                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "west_"//t_name, T_bry%WST  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "west_"//t_name     &
-                                 , T_int%WST(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "west_"//t_name, T_int%WST(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_t % west = 0
         if ( status < 0 ) then
@@ -1666,13 +1634,11 @@ module bry
         end if
 ! Salinity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "west_"//s_name     &
-                                 , S_bry%WST                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "west_"//s_name, S_bry%WST  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "west_"//s_name     &
-                                 , S_int%WST(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "west_"//s_name, S_int%WST(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_s % west = 0
         if ( status < 0 ) then
@@ -1681,13 +1647,11 @@ module bry
         end if
 ! Normal velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "west_"//u_name     &
-                                 , U_bry%WST                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "west_"//u_name, U_bry%WST  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "west_"//u_name     &
-                                 , U_int%WST(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "west_"//u_name, U_int%WST(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_u % west = 0
         if ( status < 0 ) then
@@ -1696,13 +1660,11 @@ module bry
         end if
 ! Tangential velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( bry_path, "west_"//v_name     &
-                                 , V_bry%WST                     &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "west_"//v_name, V_bry%WST  &
+                                 , start, edge, ncid )
         else
-          status = read_var_3d_nc( bry_path, "west_"//v_name     &
-                                 , V_int%WST(:,:,:,n)            &
-                                 , year(n), start, edge, ncid )
+          status = read_var_3d_nc( "west_"//v_name, V_int%WST(:,:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_v % west = 0
         if ( status < 0 ) then
@@ -1727,13 +1689,11 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          status = read_var_2d_nc( bry_path, "west_"//el_name    &
-                                 , EL_bry%WST                    &
-                                 , year(n), start, edge, ncid )
+          status = read_var_2d_nc( "west_"//el_name, EL_bry%WST  &
+                                 , start, edge, ncid )
         else
-          status = read_var_2d_nc( bry_path, "west_"//el_name    &
-                                 , EL_int%WST(:,:,n)             &
-                                 , year(n), start, edge, ncid )
+          status = read_var_2d_nc( "west_"//el_name, EL_int%WST(:,:,n)  &
+                                 , start, edge, ncid )
         end if
         fill_clim_el % west = 0
         if ( status < 0 ) then
@@ -1746,20 +1706,20 @@ module bry
         start = 1
         edge = 0
 ! Temperature
-        status = read_var_3d_nc( bry_path, "west_"//t_name, dummy  &
-                               , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "west_"//t_name, dummy  &
+                               , start, edge, ncid )
 ! Salinity
-        status = read_var_3d_nc( bry_path, "west_"//s_name, dummy  &
-                               , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "west_"//s_name, dummy  &
+                               , start, edge, ncid )
 ! Normal velocity
-        status = read_var_3d_nc( bry_path, "west_"//u_name, dummy  &
-                               , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "west_"//u_name, dummy  &
+                               , start, edge, ncid )
 ! Tangential velocity
-        status = read_var_3d_nc( bry_path, "west_"//v_name, dummy  &
-                               , year(n), start, edge, ncid )
+        status = read_var_3d_nc( "west_"//v_name, dummy  &
+                               , start, edge, ncid )
 ! Elevation
-        status = read_var_2d_nc( bry_path, "west_"//el_name, dummy(1,:,:)  &
-                               , year(n), start, edge, ncid )
+        status = read_var_2d_nc( "west_"//el_name, dummy(1,:,:)  &
+                               , start, edge, ncid )
 
       end if
 
@@ -1780,7 +1740,7 @@ module bry
 !
       use glob_const, only: g => GRAV
       use glob_grid , only: dx, dy, fsm, h
-      use glob_ocean, only: elb, elf, ua, uab, uaf, va, vab, vaf
+      use glob_ocean, only: elb, elf, uab, uaf, vab, vaf
       use model_run , only: dti2
 
       implicit none
@@ -3212,8 +3172,8 @@ module bry
 != I/O SECTION ========================================================
 !______________________________________________________________________
 !
-    integer(1) function read_var_3d_nc( path, var_name, var          &
-                                      , year, start   , edge, ncid )
+    integer(1) function read_var_3d_nc( var_name, var        &
+                                      , start, edge, ncid )
 !----------------------------------------------------------------------
 !  Read a variable (NC format).
 !______________________________________________________________________
@@ -3228,11 +3188,10 @@ module bry
       integer, external :: get_var_real_3d
 
       integer                   , intent(in   ) :: ncid
-      integer                   , intent(in   ) :: year
       integer(MPI_OFFSET_KIND)                                 &
               , dimension(4)    , intent(in   ) :: start, edge
       real(rk), dimension(:,:,:), intent(  out) :: var
-      character(len=*)          , intent(in   ) :: path, var_name
+      character(len=*)          , intent(in   ) :: var_name
 
       integer                  varid, status
       character(len=256)       units
@@ -3268,8 +3227,8 @@ module bry
     end ! subroutine read_var_3d_nc
 !______________________________________________________________________
 !
-    integer(1) function read_var_2d_nc( path, var_name, var         &
-                                      , year, start   , edge, ncid )
+    integer(1) function read_var_2d_nc( var_name, var        &
+                                      , start, edge, ncid )
 !----------------------------------------------------------------------
 !  Read a variable (NC format).
 !______________________________________________________________________
@@ -3284,11 +3243,10 @@ module bry
       integer, external :: get_var_real_2d
 
       integer                   , intent(in   ) :: ncid
-      integer                   , intent(in   ) :: year
       integer(MPI_OFFSET_KIND)                                 &
               , dimension(4)    , intent(in   ) :: start, edge
       real(rk), dimension(:,:)  , intent(  out) :: var
-      character(len=*)          , intent(in   ) :: path, var_name
+      character(len=*)          , intent(in   ) :: var_name
 
       integer                  varid, status
       character(len=256)       units
