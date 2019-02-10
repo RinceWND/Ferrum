@@ -12,7 +12,7 @@
 !
 module bry
 
-  use config     , only: rk ! SO... If a module uses some other module's variable, another module can access the variable through this "medium" module?
+  use config     , only: PATH_LEN, rk, VAR_LEN ! SO... If a module uses some other module's variable, another module can access the variable through this "medium" module?
   use glob_domain, only: im, imm1, imm2, jm, jmm1, jmm2, kb, kbm1
 
   implicit none
@@ -1184,8 +1184,10 @@ module bry
 !
     subroutine read_all( execute, n, year, record )
 
-      use glob_domain, only: i_global, j_global
-      use mpi        , only: MPI_OFFSET_KIND
+      use glob_domain, only: i_global, j_global, POM_COMM
+      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
+      use pnetcdf    , only: NF_NOERR     , NF_NOWRITE    &
+                           , nf90mpi_close, nf90mpi_open
 
       implicit none
 
@@ -1193,10 +1195,11 @@ module bry
       integer              , intent(in) :: n
       integer, dimension(3), intent(in) :: record, year
 
-      integer                  ncid
+      integer                  ncid, status
       integer(MPI_OFFSET_KIND) start(4), edge(4)
       real(rk)                 dummy(1,1,1)
       character(len=128)       desc
+      character(len=PATH_LEN)  netcdf_file
 
 
       if ( .not. execute ) return
@@ -1211,7 +1214,13 @@ module bry
 
       call msg_print("", 1, desc)
 
-      ncid = -1
+      netcdf_file = trim(get_filename( bry_path, year(n) ))
+      status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE   &
+                           , MPI_INFO_NULL, ncid )
+      if ( status /= NF_NOERR ) then
+        call msg_print("", 2, "Failed opening `"//trim(netcdf_file)//"`")
+        return
+      end if
 
 ! EAST
       if ( hasEAST ) then
@@ -1236,61 +1245,62 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "east_"//t_name               &
-                             , T_bry%EST, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "east_"//t_name      &
+                                 , T_bry%EST                      &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "east_"//t_name     &
-                             , T_int%EST(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status =  read_var_3d_nc( bry_path, "east_"//t_name     &
+                                  , T_int%EST(:,:,:,n)            &
+                                  , year(n), start, edge, ncid )
         end if
         fill_clim_t % east = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_t % east = 1
           call msg_print("", 2, "Temp@EAST read error. Skipping...")
         end if
 ! Salinity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "east_"//s_name               &
-                             , S_bry%EST, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "east_"//s_name     &
+                                 , S_bry%EST                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "east_"//s_name     &
-                             , S_int%EST(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "east_"//s_name     &
+                                 , S_int%EST(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_s % east = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_s % east = 1
-          if ( n > 1 ) S_int%EST(:,:,:,n) = S_bry%EST
           call msg_print("", 2, "Salt@EAST read error. Skipping...")
         end if
 ! Normal velocity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "east_"//u_name               &
-                             , U_bry%EST, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "east_"//u_name     &
+                                 , U_bry%EST                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "east_"//u_name     &
-                             , U_int%EST(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "east_"//u_name     &
+                                 , U_int%EST(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_u % east = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_u % east = 1
-          if ( n > 1 ) U_int%EST(:,:,:,n) = U_bry%EST
           call msg_print("", 2, "Uvel@EAST read error. Skipping...")
         end if
 ! Tangential velocity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "east_"//v_name               &
-                             , V_bry%EST, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "east_"//v_name     &
+                                 , V_bry%EST                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "east_"//v_name     &
-                             , V_int%EST(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "east_"//v_name     &
+                                 , V_int%EST(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_v % east = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_v % east = 1
-          if ( n > 1 ) V_int%EST(:,:,:,n) = V_bry%EST
           call msg_print("", 2, "Vvel@EAST read error. Skipping...")
         end if
 ! set reading bounds for 2D vars
@@ -1311,38 +1321,39 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          call read_var_2d_nc( bry_path, "east_"//el_name               &
-                             , EL_bry%EST, year(n), start, edge, ncid )
+          status = read_var_2d_nc( bry_path, "east_"//el_name    &
+                                 , EL_bry%EST                    &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_2d_nc( bry_path, "east_"//el_name     &
-                             , EL_int%EST(:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_2d_nc( bry_path, "east_"//el_name    &
+                                 , EL_int%EST(:,:,n)             &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_el % east = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_el % east = 1
-          if ( n > 1 ) EL_int%EST(:,:,n) = EL_bry%EST
           call msg_print("", 2, "Elev@EAST read error. Skipping...")
         end if
+        print *, "EL: ", minval(EL_bry%EST), maxval(EL_bry%EST), n
 
       else
 
         start = 1
         edge = 0
 ! Temperature
-        call read_var_3d_nc( bry_path, "east_"//t_name, dummy  &
+        status = read_var_3d_nc( bry_path, "east_"//t_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Salinity
-        call read_var_3d_nc( bry_path, "east_"//s_name, dummy  &
+        status = read_var_3d_nc( bry_path, "east_"//s_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Normal velocity
-        call read_var_3d_nc( bry_path, "east_"//u_name, dummy  &
+        status = read_var_3d_nc( bry_path, "east_"//u_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Tangential velocity
-        call read_var_3d_nc( bry_path, "east_"//v_name, dummy  &
+        status = read_var_3d_nc( bry_path, "east_"//v_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Elevation
-        call read_var_2d_nc( bry_path, "east_"//el_name, dummy(1,:,:)  &
+        status = read_var_2d_nc( bry_path, "east_"//el_name, dummy(1,:,:)  &
                            , year(n), start, edge, ncid )
 
       end if
@@ -1370,62 +1381,62 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "north_"//t_name               &
-                             , T_bry%NTH, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "north_"//t_name    &
+                                 , T_bry%NTH                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "north_"//t_name     &
-                             , T_int%NTH(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "north_"//t_name    &
+                                 , T_int%NTH(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_t % north = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_t % north = 1
-          if ( n > 1 ) T_int%NTH(:,:,:,n) = T_bry%NTH
           call msg_print("", 2, "Temp@NORTH read error. Skipping...")
         end if
 ! Salinity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "north_"//s_name               &
-                             , S_bry%NTH, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "north_"//s_name    &
+                                 , S_bry%NTH                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "north_"//s_name     &
-                             , S_int%NTH(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "north_"//s_name    &
+                                 , S_int%NTH(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_s % north = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_s % north = 1
-          if ( n > 1 ) S_int%NTH(:,:,:,n) = S_bry%NTH
           call msg_print("", 2, "Salt@NORTH read error. Skipping...")
         end if
 ! Normal velocity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "north_"//u_name               &
-                             , U_bry%NTH, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "north_"//u_name    &
+                                 , U_bry%NTH                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "north_"//u_name     &
-                             , U_int%NTH(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "north_"//u_name    &
+                                 , U_int%NTH(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_u % north = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_u % north = 1
-          if ( n > 1 ) U_int%NTH(:,:,:,n) = U_bry%NTH
           call msg_print("", 2, "Uvel@NORTH read error. Skipping...")
         end if
 ! Tangential velocity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "north_"//v_name               &
-                             , V_bry%NTH, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "north_"//v_name    &
+                                 , V_bry%NTH                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "north_"//v_name     &
-                             , V_int%NTH(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "north_"//v_name    &
+                                 , V_int%NTH(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_v % north = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_v % north = 1
-          if ( n > 1 ) V_int%NTH(:,:,:,n) = V_bry%NTH
           call msg_print("", 2, "Vvel@NORTH read error. Skipping...")
         end if
 ! set reading bounds for 2D vars
@@ -1446,17 +1457,17 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          call read_var_2d_nc( bry_path, "north_"//el_name               &
-                             , EL_bry%NTH, year(n), start, edge, ncid )
+          status = read_var_2d_nc( bry_path, "north_"//el_name   &
+                                 , EL_bry%NTH                    &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_2d_nc( bry_path, "north_"//el_name     &
-                             , EL_int%NTH(:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_2d_nc( bry_path, "north_"//el_name   &
+                                 , EL_int%NTH(:,:,n)             &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_el % north = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_el % north = 1
-          if ( n > 1 ) EL_int%NTH(:,:,n) = EL_bry%NTH
           call msg_print("", 2, "Elev@NORTH read error. Skipping...")
         end if
 
@@ -1465,19 +1476,19 @@ module bry
         start = 1
         edge = 0
 ! Temperature
-        call read_var_3d_nc( bry_path, "north_"//t_name, dummy  &
+        status = read_var_3d_nc( bry_path, "north_"//t_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Salinity
-        call read_var_3d_nc( bry_path, "north_"//s_name, dummy  &
+        status = read_var_3d_nc( bry_path, "north_"//s_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Normal velocity
-        call read_var_3d_nc( bry_path, "north_"//u_name, dummy  &
+        status = read_var_3d_nc( bry_path, "north_"//u_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Tangential velocity
-        call read_var_3d_nc( bry_path, "north_"//v_name, dummy  &
+        status = read_var_3d_nc( bry_path, "north_"//v_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Elevation
-        call read_var_2d_nc( bry_path, "north_"//el_name, dummy(1,:,:)  &
+        status = read_var_2d_nc( bry_path, "north_"//el_name, dummy(1,:,:)  &
                            , year(n), start, edge, ncid )
 
       end if
@@ -1505,62 +1516,62 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "south_"//t_name               &
-                             , T_bry%STH, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "south_"//t_name    &
+                                 , T_bry%STH                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "south_"//t_name     &
-                             , T_int%STH(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "south_"//t_name    &
+                                 , T_int%STH(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_t % south = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_t % south = 1
-          if ( n > 1 ) T_int%STH(:,:,:,n) = T_bry%STH
           call msg_print("", 2, "Temp@SOUTH read error. Skipping...")
         end if
 ! Salinity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "south_"//s_name               &
-                             , S_bry%STH, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "south_"//s_name    &
+                                 , S_bry%STH                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "south_"//s_name     &
-                             , S_int%STH(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "south_"//s_name    &
+                                 , S_int%STH(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_s % south = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_s % south = 1
-          if ( n > 1 ) S_int%STH(:,:,:,n) = S_bry%STH
           call msg_print("", 2, "Salt@SOUTH read error. Skipping...")
         end if
 ! Normal velocity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "south_"//u_name               &
-                             , U_bry%STH, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "south_"//u_name    &
+                                 , U_bry%STH                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "south_"//u_name     &
-                             , U_int%STH(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "south_"//u_name    &
+                                 , U_int%STH(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_u % south = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_u % south = 1
-          if ( n > 1 ) U_int%STH(:,:,:,n) = U_bry%STH
           call msg_print("", 2, "Uvel@SOUTH read error. Skipping...")
         end if
 ! Tangential velocity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "south_"//v_name               &
-                             , V_bry%STH, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "south_"//v_name    &
+                                 , V_bry%STH                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "south_"//v_name     &
-                             , V_int%STH(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "south_"//v_name    &
+                                 , V_int%STH(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_v % south = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_v % south = 1
-          if ( n > 1 ) V_int%STH(:,:,:,n) = V_bry%STH
           call msg_print("", 2, "Vvel@SOUTH read error. Skipping...")
         end if
 ! set reading bounds for 2D vars
@@ -1581,17 +1592,17 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          call read_var_2d_nc( bry_path, "south_"//el_name               &
-                             , EL_bry%STH, year(n), start, edge, ncid )
+          status = read_var_2d_nc( bry_path, "south_"//el_name   &
+                                 , EL_bry%STH                    &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_2d_nc( bry_path, "south_"//el_name     &
-                             , EL_int%STH(:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_2d_nc( bry_path, "south_"//el_name   &
+                                 , EL_int%STH(:,:,n)             &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_el % south = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_el % south = 1
-          if ( n > 1 ) EL_int%STH(:,:,n) = EL_bry%STH
           call msg_print("", 2, "Elev@SOUTH read error. Skipping...")
         end if
 
@@ -1600,19 +1611,19 @@ module bry
         start = 1
         edge = 0
 ! Temperature
-        call read_var_3d_nc( bry_path, "south_"//t_name, dummy  &
+        status = read_var_3d_nc( bry_path, "south_"//t_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Salinity
-        call read_var_3d_nc( bry_path, "south_"//s_name, dummy  &
+        status = read_var_3d_nc( bry_path, "south_"//s_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Normal velocity
-        call read_var_3d_nc( bry_path, "south_"//u_name, dummy  &
+        status = read_var_3d_nc( bry_path, "south_"//u_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Tangential velocity
-        call read_var_3d_nc( bry_path, "south_"//v_name, dummy  &
+        status = read_var_3d_nc( bry_path, "south_"//v_name, dummy  &
                            , year(n), start, edge, ncid )
 ! Elevation
-        call read_var_2d_nc( bry_path, "south_"//el_name, dummy(1,:,:)  &
+        status = read_var_2d_nc( bry_path, "south_"//el_name, dummy(1,:,:)  &
                            , year(n), start, edge, ncid )
 
       end if
@@ -1640,62 +1651,62 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "west_"//t_name               &
-                             , T_bry%WST, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "west_"//t_name     &
+                                 , T_bry%WST                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "west_"//t_name     &
-                             , T_int%WST(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "west_"//t_name     &
+                                 , T_int%WST(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_t % west = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_t % west = 1
-          if ( n > 1 ) T_int%WST(:,:,:,n) = T_bry%WST
           call msg_print("", 2, "Temp@WEST read error. Skipping...")
         end if
 ! Salinity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "west_"//s_name               &
-                             , S_bry%WST, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "west_"//s_name     &
+                                 , S_bry%WST                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "west_"//s_name     &
-                             , S_int%WST(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "west_"//s_name     &
+                                 , S_int%WST(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_s % west = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_s % west = 1
-          if ( n > 1 ) S_int%WST(:,:,:,n) = S_bry%WST
           call msg_print("", 2, "Salt@WEST read error. Skipping...")
         end if
 ! Normal velocity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "west_"//u_name               &
-                             , U_bry%WST, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "west_"//u_name     &
+                                 , U_bry%WST                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "west_"//u_name     &
-                             , U_int%WST(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "west_"//u_name     &
+                                 , U_int%WST(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_u % west = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_u % west = 1
-          if ( n > 1 ) U_int%WST(:,:,:,n) = U_bry%WST
           call msg_print("", 2, "Uvel@WEST read error. Skipping...")
         end if
 ! Tangential velocity
         if ( n == 1 ) then
-          call read_var_3d_nc( bry_path, "west_"//v_name               &
-                             , V_bry%WST, year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "west_"//v_name     &
+                                 , V_bry%WST                     &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_3d_nc( bry_path, "west_"//v_name     &
-                             , V_int%WST(:,:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_3d_nc( bry_path, "west_"//v_name     &
+                                 , V_int%WST(:,:,:,n)            &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_v % west = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_v % west = 1
-          if ( n > 1 ) V_int%WST(:,:,:,n) = V_bry%WST
           call msg_print("", 2, "Vvel@WEST read error. Skipping...")
         end if
 ! set reading bounds for 2D vars
@@ -1716,17 +1727,17 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          call read_var_2d_nc( bry_path, "west_"//el_name               &
-                             , EL_bry%WST, year(n), start, edge, ncid )
+          status = read_var_2d_nc( bry_path, "west_"//el_name    &
+                                 , EL_bry%WST                    &
+                                 , year(n), start, edge, ncid )
         else
-          call read_var_2d_nc( bry_path, "west_"//el_name     &
-                             , EL_int%WST(:,:,n)            &
-                             , year(n), start, edge, ncid )
+          status = read_var_2d_nc( bry_path, "west_"//el_name    &
+                                 , EL_int%WST(:,:,n)             &
+                                 , year(n), start, edge, ncid )
         end if
         fill_clim_el % west = 0
-        if ( ncid <= 0 ) then
+        if ( status < 0 ) then
           fill_clim_el % west = 1
-          if ( n > 1 ) EL_int%WST(:,:,n) = EL_bry%WST
           call msg_print("", 2, "Elev@WEST read error. Skipping...")
         end if
 
@@ -1735,21 +1746,27 @@ module bry
         start = 1
         edge = 0
 ! Temperature
-        call read_var_3d_nc( bry_path, "west_"//t_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( bry_path, "west_"//t_name, dummy  &
+                               , year(n), start, edge, ncid )
 ! Salinity
-        call read_var_3d_nc( bry_path, "west_"//s_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( bry_path, "west_"//s_name, dummy  &
+                               , year(n), start, edge, ncid )
 ! Normal velocity
-        call read_var_3d_nc( bry_path, "west_"//u_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( bry_path, "west_"//u_name, dummy  &
+                               , year(n), start, edge, ncid )
 ! Tangential velocity
-        call read_var_3d_nc( bry_path, "west_"//v_name, dummy  &
-                           , year(n), start, edge, ncid )
+        status = read_var_3d_nc( bry_path, "west_"//v_name, dummy  &
+                               , year(n), start, edge, ncid )
 ! Elevation
-        call read_var_2d_nc( bry_path, "west_"//el_name, dummy(1,:,:)  &
-                           , year(n), start, edge, ncid )
+        status = read_var_2d_nc( bry_path, "west_"//el_name, dummy(1,:,:)  &
+                               , year(n), start, edge, ncid )
 
+      end if
+
+! Close file
+      status = nf90mpi_close( ncid )
+      if ( status /= NF_NOERR ) then
+        call msg_print("", 2, "Failed closing `"//trim(netcdf_file)//"`")
       end if
 
 
@@ -1791,9 +1808,9 @@ module bry
                                  /(uab(imm1,2:jmm1)-sqrt(g*h(imm1,2:jmm1)))
 
 
-            elf(im,:) = elf(imm1,:)
-
           end select
+
+          elf(im,:) = elf(imm1,:)
 
         end if
 ! WEST
@@ -1810,9 +1827,9 @@ module bry
                               + dti2*(uab(2,2:jmm1)-uab(3,2:jmm1)) &
                                /dx(2,2:jmm1)
 
-            elf( 1,:) = elf(2   ,:)
-
           end select
+
+          elf(1,:) = elf(2,:)
 
         end if
 
@@ -1839,9 +1856,9 @@ module bry
                               + dti2*(vab(2:imm1,jmm1)-vab(2:imm1,jmm2)) &
                                /dy(2:imm1,jmm1)
 
-            elf(:,jm) = elf(:,jmm1)
-
           end select
+
+          elf(:,jm) = elf(:,jmm1)
 
         end if
 ! SOUTH
@@ -1858,9 +1875,9 @@ module bry
                               + dti2*(vab(2:imm1,2)-vab(2:imm1,3)) &
                                /dy(2:imm1,2)
 
-            elf(:, 1) = elf(:,   2)
-
           end select
+
+          elf(:,1) = elf(:,2)
 
         end if
 
@@ -1928,10 +1945,10 @@ module bry
 
             case ( bcGENFLATHER )
               uaf(im,2:jmm1) = ( UA_bry%EST(1,2:jmm1)                   &
-                                *(h(imm1,2:jmm1)+el(imm1,2:jmm1))       &
+                                *(h(im,2:jmm1)+EL_bry%EST(1,2:jmm1))    &
                                 +sqrt(GRAV/h(imm1,2:jmm1))              &
                                 *(el(imm1,2:jmm1)-EL_bry%EST(1,2:jmm1)))&
-                               /(h(im,2:jmm1)+EL_bry%EST(1,2:jmm1))
+                               /(h(imm1,2:jmm1)+el(imm1,2:jmm1))
 
             case default
               uaf(im,2:jmm1) = 0.
@@ -1990,10 +2007,10 @@ module bry
 
             case ( bcGENFLATHER )
               uaf(2,2:jmm1) = ( UA_bry%WST(1,2:jmm1)                 &
-                               *(h(2,2:jmm1)+el(2,2:jmm1))           &
+                               *(h(1,2:jmm1)+EL_bry%WST(1,2:jmm1))   &
                                -sqrt(GRAV/h(2,2:jmm1))               &
                                *(el(2,2:jmm1)-EL_bry%WST(1,2:jmm1))) &
-                              /(h(1,2:jmm1)+EL_bry%WST(1,2:jmm1))
+                              /(h(2,2:jmm1)+el(2,2:jmm1))
 
             case default
               uaf(2,2:jmm1) = 0.
@@ -2074,10 +2091,10 @@ module bry
 
             case ( bcGENFLATHER )
               vaf(2:imm1,jm) = ( VA_bry%NTH(2:imm1,1)                   &
-                                *(h(2:imm1,jmm1)+el(2:imm1,jmm1))       &
+                                *(h(2:imm1,jm)+EL_bry%NTH(2:imm1,1))    &
                                 +sqrt(GRAV/h(2:imm1,jmm1))              &
                                 *(el(2:imm1,jmm1)-EL_bry%NTH(2:imm1,1)))&
-                               /(h(2:imm1,jm)+EL_bry%NTH(2:imm1,1))
+                               /(h(2:imm1,jmm1)+el(2:imm1,jmm1))
 
             case default
               vaf(2:imm1,jm) = 0.
@@ -2135,10 +2152,10 @@ module bry
 
             case ( bcGENFLATHER )
               vaf(2:imm1,2) = ( VA_bry%STH(2:imm1,1)                 &
-                               *(h(2:imm1,2)+el(2:imm1,2))           &
+                               *(h(2:imm1,1)+EL_bry%STH(2:imm1,1))   &
                                -sqrt(GRAV/h(2:imm1,2))               &
                                *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))) &
-                              /(h(2:imm1,1)+EL_bry%STH(2:imm1,1))
+                              /(h(2:imm1,2)+el(2:imm1,2))
 
             case default
               vaf(2:imm1,2) = 0.
@@ -3195,22 +3212,22 @@ module bry
 != I/O SECTION ========================================================
 !______________________________________________________________________
 !
-    subroutine read_var_3d_nc( path, var_name, var          &
-                             , year, start   , edge, ncid )
+    integer(1) function read_var_3d_nc( path, var_name, var          &
+                                      , year, start   , edge, ncid )
 !----------------------------------------------------------------------
 !  Read a variable (NC format).
 !______________________________________________________________________
 !
       use glob_const , only: rk
       use glob_domain
-      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
+      use mpi        , only: MPI_OFFSET_KIND
       use pnetcdf
 
       implicit none
 
       integer, external :: get_var_real_3d
 
-      integer                   , intent(inout) :: ncid
+      integer                   , intent(in   ) :: ncid
       integer                   , intent(in   ) :: year
       integer(MPI_OFFSET_KIND)                                 &
               , dimension(4)    , intent(in   ) :: start, edge
@@ -3218,34 +3235,16 @@ module bry
       character(len=*)          , intent(in   ) :: path, var_name
 
       integer                  varid, status
-      character(len=256)       filename, netcdf_file, units
+      character(len=256)       units
 
 
-      if ( ncid <= 0 ) then
-! open netcdf file
-        if ( ncid == 0 ) then
-          call check( nf90mpi_close( ncid )              &
-                    , 'nfmpi_close:'//trim(netcdf_file) )
-        end if
-
-        filename = get_filename( path, year )
-        netcdf_file = trim(filename)
-        status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE   &
-                             , MPI_INFO_NULL, ncid )
-        if ( status /= NF_NOERR ) then
-          call msg_print("", 2, "Failed reading `"//trim(var_name)  &
-                              //"` from `"//trim(filename)//"`")
-          ncid = -1
-          return
-        end if
-      end if
+      read_var_3d_nc = 0
 
 ! get variable
       status = nf90mpi_inq_varid( ncid, var_name, varid )
       if ( status /= NF_NOERR ) then
-        call msg_print("", 2, "Failed reading `"//trim(var_name)  &
-                              //"` from `"//trim(filename)//"`")
-        ncid = -1
+        call msg_print( "", 2, "Failed reading `"//trim(var_name) )
+        read_var_3d_nc = -1
         return
       end if
 
@@ -3269,8 +3268,8 @@ module bry
     end ! subroutine read_var_3d_nc
 !______________________________________________________________________
 !
-    subroutine read_var_2d_nc( path, var_name, var         &
-                             , year, start   , edge, ncid )
+    integer(1) function read_var_2d_nc( path, var_name, var         &
+                                      , year, start   , edge, ncid )
 !----------------------------------------------------------------------
 !  Read a variable (NC format).
 !______________________________________________________________________
@@ -3284,7 +3283,7 @@ module bry
 
       integer, external :: get_var_real_2d
 
-      integer                   , intent(inout) :: ncid
+      integer                   , intent(in   ) :: ncid
       integer                   , intent(in   ) :: year
       integer(MPI_OFFSET_KIND)                                 &
               , dimension(4)    , intent(in   ) :: start, edge
@@ -3292,34 +3291,16 @@ module bry
       character(len=*)          , intent(in   ) :: path, var_name
 
       integer                  varid, status
-      character(len=256)       filename, netcdf_file, units
+      character(len=256)       units
 
 
-      if ( ncid <= 0 ) then
-! open netcdf file
-        if ( ncid == 0 ) then
-          call check( nf90mpi_close( ncid )              &
-                    , 'nfmpi_close:'//trim(netcdf_file) )
-        end if
-
-        filename = get_filename( path, year )
-        netcdf_file = trim(filename)
-        status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE   &
-                             , MPI_INFO_NULL, ncid )
-        if ( status /= NF_NOERR ) then
-          call msg_print("", 2, "Failed reading `"//trim(var_name)  &
-                              //"` from `"//trim(filename)//"`")
-          ncid = -1
-          return
-        end if
-      end if
+      read_var_2d_nc = 0
 
 ! get variable
       status = nf90mpi_inq_varid( ncid, var_name, varid )
       if ( status /= NF_NOERR ) then
-        call msg_print("", 2, "Failed reading `"//trim(var_name)  &
-                              //"` from `"//trim(filename)//"`")
-        ncid = -1
+        call msg_print( "", 2, "Failed reading `"//trim(var_name) )
+        read_var_2d_nc = -1
         return
       end if
 
