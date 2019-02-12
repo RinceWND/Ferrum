@@ -287,7 +287,7 @@ module model_run
   type(date)         &
     dtime              ! current model datetime variable
 
-  integer(1)                &
+  integer(2)                &
        , dimension(0:12) :: &  ! number of days in month (0 is December)
     days_in_month
 
@@ -305,7 +305,7 @@ module model_run
 
       type(date) dtime_offset
 
-      days_in_month = int( (/31,31,28,31,30,31,30,31,31,30,31,30,31/), 1 )
+      days_in_month = int( (/31,31,28,31,30,31,30,31,31,30,31,30,31/), 2 )
 
       ramp = 1.
 
@@ -389,7 +389,7 @@ module model_run
 !        ramp=1.e0
 !      endif
 
-    end subroutine
+    end ! subroutine
 
 
 end module model_run
