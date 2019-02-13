@@ -55,9 +55,12 @@ module io
   ,    z_name         & !  vertical grid's cell faces positions (0..-1)
   ,   zz_name           !  vertical grid's cell centers positions (0..-1-eps)
 
-  public :: check            , initialize_io            &
-          , read_grid_pnetcdf, read_initial , out_init  &
-          , clim_path, grid_path, out_debug
+!  TODO: make `io` module independent and move all irrelevant routines
+! to their respective modules.
+  public :: check        , file_open_nc     , file_close_nc  &
+          , initialize_io, read_grid_pnetcdf, read_initial   &
+          , out_init     , clim_path        , grid_path      &
+          , out_debug
 
   private
 
@@ -1788,6 +1791,53 @@ module io
 
 
     end ! subroutine read_ts_z_pnetcdf
+!
+!___________________________________________________________________
+!
+    integer function file_open_nc( path )
+!-------------------------------------------------------------------
+!  Opens netcdf file for reading.
+!___________________________________________________________________
+!
+      use glob_domain, only: POM_COMM
+      use mpi        , only: MPI_INFO_NULL
+      use pnetcdf    , only: nf90mpi_open, NF_NOERR, NF_NOWRITE
+
+      implicit none
+
+      character(len=*), intent(in) :: path
+
+      integer                         status
+
+
+      status = nf90mpi_open( POM_COMM, trim(path), NF_NOWRITE   &
+                           , MPI_INFO_NULL, file_open_nc )
+      if ( status /= NF_NOERR ) then
+        call msg_print("", 2, "Failed to open `"//trim(path)//"`")
+        file_open_nc = -1
+      end if
+
+
+    end ! function file_open_nc
+!
+!___________________________________________________________________
+!
+    integer function file_close_nc( ncid )
+!-------------------------------------------------------------------
+!  Opens netcdf file for reading.
+!___________________________________________________________________
+!
+      use pnetcdf, only: nf90mpi_close
+
+      implicit none
+
+      integer, intent(in) :: ncid
+
+
+      file_close_nc = nf90mpi_close( ncid )
+
+
+    end ! function file_close_nc
 !
 !______________________________________________________________________
 !

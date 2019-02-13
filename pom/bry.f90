@@ -1184,10 +1184,8 @@ module bry
 !
     subroutine read_all( execute, n, year, record )
 
-      use glob_domain, only: i_global, j_global, POM_COMM
-      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
-      use pnetcdf    , only: NF_NOERR     , NF_NOWRITE    &
-                           , nf90mpi_close, nf90mpi_open
+      use glob_domain, only: i_global, j_global
+      use mpi        , only: MPI_OFFSET_KIND
 
       implicit none
 
@@ -1199,7 +1197,7 @@ module bry
       integer(MPI_OFFSET_KIND) start(4), edge(4)
       real(rk)                 dummy(1,1,1)
       character(len=128)       desc
-      character(len=PATH_LEN)  netcdf_file
+!      character(len=PATH_LEN)  netcdf_file
 
 
       if ( .not. execute ) return
@@ -1214,13 +1212,8 @@ module bry
 
       call msg_print("", 1, desc)
 
-      netcdf_file = trim(get_filename( bry_path, year(n) ))
-      status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE   &
-                           , MPI_INFO_NULL, ncid )
-      if ( status /= NF_NOERR ) then
-        call msg_print("", 2, "Failed opening `"//trim(netcdf_file)//"`")
-        return
-      end if
+      ncid = file_open_nc( trim(get_filename( bry_path, year(n) )) )
+      if ( ncid == -1 ) return
 
 ! EAST
       if ( hasEAST ) then
@@ -1724,10 +1717,7 @@ module bry
       end if
 
 ! Close file
-      status = nf90mpi_close( ncid )
-      if ( status /= NF_NOERR ) then
-        call msg_print("", 2, "Failed closing `"//trim(netcdf_file)//"`")
-      end if
+      call check( file_close_nc( ncid ), "nf_close: bry" )
 
 
     end ! subroutine read_all
@@ -3280,6 +3270,53 @@ module bry
 
 
     end ! subroutine read_var_2d_nc
+!
+!___________________________________________________________________
+!
+    integer function file_open_nc( path )
+!-------------------------------------------------------------------
+!  Opens netcdf file for reading.
+!___________________________________________________________________
+!
+      use glob_domain, only: POM_COMM
+      use mpi        , only: MPI_INFO_NULL
+      use pnetcdf    , only: nf90mpi_open, NF_NOERR, NF_NOWRITE
+
+      implicit none
+
+      character(len=*), intent(in) :: path
+
+      integer            status
+
+
+      status = nf90mpi_open( POM_COMM, trim( path ), NF_NOWRITE   &
+                           , MPI_INFO_NULL, file_open_nc )
+      if ( status /= NF_NOERR ) then
+        call msg_print("", 2, "Failed to open `"//trim( path )//"`")
+        file_open_nc = -1
+      end if
+
+    end ! function file_open_nc
+!
+!___________________________________________________________________
+!
+    integer function file_close_nc( ncid )
+!-------------------------------------------------------------------
+!  Opens netcdf file for reading.
+!___________________________________________________________________
+!
+      use pnetcdf, only: nf90mpi_close
+
+      implicit none
+
+      integer, intent(in) :: ncid
+
+
+      file_close_nc = nf90mpi_close( ncid )
+
+
+    end ! function file_close_nc
+!
 !______________________________________________________________________
 !
     subroutine check(status, routine)
