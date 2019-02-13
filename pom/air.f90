@@ -1134,140 +1134,154 @@ module air
       call msg_print("", 1, desc)
 
 ! Read wind file
-      ncid = file_open_nc( wind_path, year(n) )
+      if ( read_wind ) then
 
-      if ( read_wind .and. ncid /= -1 ) then
+        ncid = file_open_nc( wind_path, year(n) )
 
-        if ((     interp_wind .and. n>=2) .or.       &
-            (.not.interp_wind .and. n==1)      ) then
-          call read_var_nc( uwnd_name, uwnd(:,:,n), record(n), ncid )
-          call read_var_nc( vwnd_name, vwnd(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            uwnd(:,:,n) = 0.
-            vwnd(:,:,n) = 0.
-            call msg_print("", 2, "Wind is set to zero.")
+        if ( ncid /= -1 ) then
+
+          if ((     interp_wind .and. n>=2) .or.       &
+              (.not.interp_wind .and. n==1)      ) then
+            call read_var_nc( uwnd_name, uwnd(:,:,n), record(n), ncid )
+            call read_var_nc( vwnd_name, vwnd(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              uwnd(:,:,n) = 0.
+              vwnd(:,:,n) = 0.
+              call msg_print("", 2, "Wind is set to zero.")
+            end if
           end if
-        end if
 
-        call check( file_close_nc( ncid ), "nf_close" )
+          call check( file_close_nc( ncid ), "nf_close" )
+
+        end if
 
       end if
 
 ! Read bulk file
-      ncid = file_open_nc( bulk_path, year(n) )
+      if ( read_bulk ) then
 
-      if ( read_bulk .and. ncid /= -1 ) then
+        ncid = file_open_nc( bulk_path, year(n) )
 
-        if ((     interp_humid .and. n>=2) .or.       &
-            (.not.interp_humid .and. n==1)      ) then
-          call read_var_nc( humid_name, humid(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            humid(:,:,n) = 1.
-            call msg_print("", 2, "Humidity is set to 100%")
+        if ( ncid /= -1 ) then
+
+          if ((     interp_humid .and. n>=2) .or.       &
+              (.not.interp_humid .and. n==1)      ) then
+            call read_var_nc( humid_name, humid(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              humid(:,:,n) = 1.
+              call msg_print("", 2, "Humidity is set to 100%")
+            end if
           end if
-        end if
 
-        if ((     interp_rain .and. n>=2) .or.       &
-            (.not.interp_rain .and. n==1)      ) then
-          call read_var_nc( rain_name,  rain(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            rain(:,:,n) = 0.
-            call msg_print("", 2, "Precip.rate is set to zero.")
+          if ((     interp_rain .and. n>=2) .or.       &
+              (.not.interp_rain .and. n==1)      ) then
+            call read_var_nc( rain_name,  rain(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              rain(:,:,n) = 0.
+              call msg_print("", 2, "Precip.rate is set to zero.")
+            end if
           end if
-        end if
 
-        if ((     interp_pres .and. n>=2) .or.       &
-            (.not.interp_pres .and. n==1)      ) then
-          call read_var_nc( pres_name,  pres(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            pres(:,:,n) = 1013.
-            call msg_print("", 2, "Atm.pressure is set to 1013 hPa.")
+          if ((     interp_pres .and. n>=2) .or.       &
+              (.not.interp_pres .and. n==1)      ) then
+            call read_var_nc( pres_name,  pres(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              pres(:,:,n) = 1013.
+              call msg_print("", 2, "Atm.pressure is set to 1013 hPa.")
+            end if
           end if
-        end if
 
-        if ((     interp_sst .and. n>=2) .or.       &
-            (.not.interp_sst .and. n==1)      ) then
-          call read_var_nc( sst_name,   sst(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            sst(:,:,n) = tb(:,:,1)
-            call msg_print("", 2, "SST is set to surf. level temp.")
+          if ((     interp_sst .and. n>=2) .or.       &
+              (.not.interp_sst .and. n==1)      ) then
+            call read_var_nc( sst_name,   sst(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              sst(:,:,n) = tb(:,:,1)
+              call msg_print("", 2, "SST is set to surf. level temp.")
+            end if
           end if
-        end if
 
-        if ((     interp_tair .and. n>=2) .or.       &
-            (.not.interp_tair .and. n==1)      ) then
-          call read_var_nc( tair_name,  temp(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            temp(:,:,n) = tb(:,:,1)
-            call msg_print("", 2, "Tair is set to surf. level temp.")
+          if ((     interp_tair .and. n>=2) .or.       &
+              (.not.interp_tair .and. n==1)      ) then
+            call read_var_nc( tair_name,  temp(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              temp(:,:,n) = tb(:,:,1)
+              call msg_print("", 2, "Tair is set to surf. level temp.")
+            end if
           end if
-        end if
 
-        if ((     interp_cloud .and. n>=2) .or.       &
-            (.not.interp_cloud .and. n==1)      ) then
-          call read_var_nc( tcld_name, cloud(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            cloud(:,:,n) = 0.
-            call msg_print("", 2, "Cloud cover is set to zero.")
+          if ((     interp_cloud .and. n>=2) .or.       &
+              (.not.interp_cloud .and. n==1)      ) then
+            call read_var_nc( tcld_name, cloud(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              cloud(:,:,n) = 0.
+              call msg_print("", 2, "Cloud cover is set to zero.")
+            end if
           end if
-        end if
 
-        call check( file_close_nc( ncid ), "nf_close" )
+          call check( file_close_nc( ncid ), "nf_close" )
+
+        end if
 
       end if ! if READ_BULK
 
 ! Read flux file
-      ncid = file_open_nc( flux_path, year(n) )
+      if ( read_stress .or. read_heat ) then
 
-      if ( read_stress .and. ncid /= -1 ) then
+        ncid = file_open_nc( flux_path, year(n) )
 
-        if ((     interp_stress .and. n>=2) .or.       &
-            (.not.interp_stress .and. n==1)      ) then
-          call read_var_nc( ustr_name, ustr(:,:,n), record(n), ncid )
-          call read_var_nc( vstr_name, vstr(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            ustr(:,:,n) = 0.
-            vstr(:,:,n) = 0.
-            call msg_print("", 2, "Wind stress is set to zero.")
+        if ( read_stress .and. ncid /= -1 ) then
+
+          if ((     interp_stress .and. n>=2) .or.       &
+              (.not.interp_stress .and. n==1)      ) then
+            call read_var_nc( ustr_name, ustr(:,:,n), record(n), ncid )
+            call read_var_nc( vstr_name, vstr(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              ustr(:,:,n) = 0.
+              vstr(:,:,n) = 0.
+              call msg_print("", 2, "Wind stress is set to zero.")
+            end if
           end if
+
         end if
 
-      end if
+        if ( read_heat .and. ncid /= -1 ) then
 
-      if ( read_heat .and. ncid /= -1 ) then
+          if ((     interp_heat .and. n>=2) .or.       &
+              (.not.interp_heat .and. n==1)      ) then
+            call read_var_nc( dlrad_name, dlrad(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              dlrad(:,:,n) = 370.
+              call msg_print("", 2, "Downlonrad. is set to 370 W/m^2.")
+            end if
+            call read_var_nc( lheat_name, lheat(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              lheat(:,:,n) = 0.
+              call msg_print("", 2, "Latent heat is set to zero.")
+            end if
+            call read_var_nc(  lrad_name,  lrad(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              lrad(:,:,n) = 0.
+              call msg_print("", 2, "Net longrad. is set to zero.")
+            end if
+            call read_var_nc( sheat_name, sheat(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              sheat(:,:,n) = 0.
+              call msg_print("", 2, "Sensible heat is set to zero.")
+            end if
+            call read_var_nc(  srad_name,  srad(:,:,n), record(n), ncid )
+            if ( ncid == -1 ) then
+              srad(:,:,n) = 0.
+              call msg_print("", 2, "Net shortrad. is set to zero.")
+            end if
+          end if
 
-        if ((     interp_heat .and. n>=2) .or.       &
-            (.not.interp_heat .and. n==1)      ) then
-          call read_var_nc( dlrad_name, dlrad(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            dlrad(:,:,n) = 370.
-            call msg_print("", 2, "Downlonrad. is set to 370 W/m^2.")
-          end if
-          call read_var_nc( lheat_name, lheat(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            lheat(:,:,n) = 0.
-            call msg_print("", 2, "Latent heat is set to zero.")
-          end if
-          call read_var_nc(  lrad_name,  lrad(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            lrad(:,:,n) = 0.
-            call msg_print("", 2, "Net longrad. is set to zero.")
-          end if
-          call read_var_nc( sheat_name, sheat(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            sheat(:,:,n) = 0.
-            call msg_print("", 2, "Sensible heat is set to zero.")
-          end if
-          call read_var_nc(  srad_name,  srad(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            srad(:,:,n) = 0.
-            call msg_print("", 2, "Net shortrad. is set to zero.")
-          end if
+        end if
+        
+        if ( ncid /= -1 ) then
+          call check( file_close_nc( ncid ), "nf_close" )
         end if
 
-        call check( file_close_nc( ncid ), "nf_close" )
-
-        end if ! if READ_FLUX
+      end if ! if READ_FLUX
 
 
     end ! subroutine read_all
