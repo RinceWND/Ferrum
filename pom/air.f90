@@ -305,7 +305,7 @@ module air
        )
 
 ! Initialize mandatory arrays
-      e_atmos= Ps
+      e_atmos= 0.
       swrad  = 0.
       uwsrf  = 0.
       vfluxb = 0.
