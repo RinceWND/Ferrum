@@ -162,9 +162,13 @@ module air
 
 !______________________________________________________________________
 !
-    subroutine initialize_air( config_file )
+    subroutine initialize_mod( config_file )
 !----------------------------------------------------------------------
 !  Initialize air module.
+!----------------------------------------------------------------------
+! called by: initialize_arrays [initialize.f]
+!
+! calls    : allocate_arrays   [air]
 !______________________________________________________________________
 !
       use config     , only: use_air
@@ -198,7 +202,7 @@ module air
 
 ! Allocate mandatory arrays even if not active
       if ( DISABLED ) then
-        call allocate_air
+        call allocate_arrays
         return
       end if
 
@@ -265,19 +269,21 @@ module air
       end if
 
 ! Allocate necessary arrays
-      call allocate_air
+      call allocate_arrays
 
       call msg_print("AIR MODULE INITIALIZED", 1, "")
 
-    end ! subroutine initialize_air
+    end ! subroutine initialize_mod
 !
 !______________________________________________________________________
 !
-    subroutine allocate_air
+    subroutine allocate_arrays
 !----------------------------------------------------------------------
 !  Allocate necessary variables.
+!----------------------------------------------------------------------
+! called by: initialize_mod    [air]
 !______________________________________________________________________
-
+!
 !      use config     , only: calc_wind
       use glob_domain, only: im, jm
 
@@ -385,28 +391,31 @@ module air
          )
       end if
 
-    end ! subroutine allocate_air
+    end ! subroutine allocate_arrays
 !
 !______________________________________________________________________
 !
     subroutine init( d_in )
 !----------------------------------------------------------------------
 !  Reads forcing fields before experiment's start.
+!----------------------------------------------------------------------
+! called by: modules_initial_step  [initialize.f]
+!
+! calls    : chunk_of_year         [module_time.f]
+!            max_chunks_in_year    [module_time.f]
+!            read_all              [air]
 !______________________________________________________________________
 !
 !      use glob_domain, only: is_master
-!      use config     , only: calc_wind
       use module_time
-!      use glob_ocean , only: tb
 
       implicit none
 
       type(date), intent(in) :: d_in
 
-      integer            max_in_prev, max_in_this, ncid
-      integer                          &
-      , dimension(3)  :: record, year
-      real               chunk
+      integer                   max_in_prev, max_in_this, ncid
+      integer, dimension(3)  :: record, year
+      real(rk)                  chunk
 
 
 ! Quit if the module is not used.
@@ -455,10 +464,18 @@ module air
     subroutine step( d_in )
 !----------------------------------------------------------------------
 !  Reads forcing fields during experiment.
+!----------------------------------------------------------------------
+! called by: update_bc             [advance.f]
+!
+! calls    : calculate_fluxes      [air]
+!            chunk_of_year         [module_time.f]
+!            max_chunks_in_year    [module_time.f]
+!            read_all              [air]
+!            wind_to_stress        [air]
 !______________________________________________________________________
 !
-!      use glob_const , only: SEC2DAY
 !      use glob_domain, only: is_master
+      use config     , only: nbct
       use module_time
       use model_run  , only: dti, iint, sec_of_year
       use seaice     , only: icec
@@ -548,11 +565,15 @@ module air
 
       end if
 
+! If solar radiation does not penetrate water
+      if ( nbct == 1 ) wtsurf = wtsurf + swrad
+
 ! Simple parameterizion
       swrad  =  swrad*(1.-icec)
       wtsurf = wtsurf*(1.-icec)
       wssurf = wssurf*(1.-icec)
 !      print *, minval(wtsurf), maxval(wtsurf)
+
 
     end ! subroutine step
 !
@@ -561,6 +582,8 @@ module air
     subroutine wind_to_stress( uwnd, vwnd, ustr, vstr, mode )
 !----------------------------------------------------------------------
 !  Calculates momentum flux (m^2/s^2) from wind velocity (m/s).
+!----------------------------------------------------------------------
+! called by: step  [air]
 !______________________________________________________________________
 !
       use glob_const , only: rhow => rhoref
@@ -587,12 +610,12 @@ module air
                       + (vwnd(i,j)-v(i,j,1))**2 )
 
           if ( mode == 1 ) then
-            if (     uvabs <= 11. ) then
+            if (     uvabs <=  11. ) then
               cda = .0012
-            elseif ( uvabs <= 19. ) then
-              cda = .00049  + .000065 *uvabs
+            elseif ( uvabs <=  19. ) then
+              cda = .00049  + uvabs* .000065
             elseif ( uvabs <= 100. ) then
-              cda = .001364 + .0000234*uvabs - 2.31579e-7*uvabs**2
+              cda = .001364 + uvabs*(.0000234 - uvabs*2.31579e-7)
             else
               cda = .00138821
             end if
@@ -614,6 +637,10 @@ module air
     subroutine calculate_fluxes
 !----------------------------------------------------------------------
 !  Generates and interpolates all surface fluxes.
+!----------------------------------------------------------------------
+! called by: step         [air]
+!
+! calls    : bulk_fluxes  [air]
 !______________________________________________________________________
 !
       implicit none
@@ -650,6 +677,10 @@ module air
 !
     subroutine bulk_fluxes
 !----------------------------------------------------------------------
+! Based on: http://pelagos.oc.phys.uoa.gr/mfstep/alermo/bulk_dis2.f
+!
+! Report: http://pelagos.oc.phys.uoa.gr/mfstep/alermo/airsea_report.pdf
+!
 !  This subroutine provides surface boundary conditions for momentum,
 ! heat and salt equations solved by the hydrodynamic model in cases
 ! when the atmospheric model provides cloud cover data instead of the

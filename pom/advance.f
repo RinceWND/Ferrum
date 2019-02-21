@@ -117,6 +117,7 @@
 ! calls    : step    [air]
 !            step    [bry]
 !            step    [clim]
+!            step    [seaice]
 !______________________________________________________________________
 !
       use air      , only: air_step => step
@@ -297,14 +298,16 @@
 !            bc_zeta        [bry.f90]
 !______________________________________________________________________
 !
+      use module_time
       use air        , only: e_atmos, vfluxf, wusurf, wvsurf
       use bry        , only: bc_vel_ext, bc_zeta
-      use config     , only: alpha, ispadv, smoth
+      use config     , only: alpha, ispadv, smoth, use_tide
       use glob_const , only: grav
       use glob_domain, only: im, imm1, jm, jmm1!, my_task
       use glob_grid  , only: art, aru, arv, cor, dx, dy, fsm, h
       use glob_ocean
-      use model_run  , only: dte, dte2, iext, isp2i, ispi, isplit!,iint
+      use tide       , only: tide_ua, tide_va, tide_advance => step
+      use model_run  , only: dte, dte2, iext, isp2i, ispi, isplit,dtime
 
       implicit none
 
@@ -394,6 +397,12 @@
 
       call exchange2d_mpi(uaf,im,jm)
       call exchange2d_mpi(vaf,im,jm)
+
+      if ( use_tide ) then
+        call tide_advance( dtime + int(iext*dte) )
+        uaf = uaf + tide_ua! - tide_ua_b
+        vaf = vaf + tide_va! - tide_va_b
+      end if
 
       if     ( iext == (isplit-2) ) then
 
