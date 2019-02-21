@@ -109,7 +109,7 @@
       end if
 
 ! read previous (initial) record
-      call modules_bc_init( dtime )
+      call modules_initial_step( dtime )
 
 ! write grid and initial conditions
       if (output_flag == 1) then
@@ -148,8 +148,6 @@
 !  Allocate arrays and initialize them for safety.
 !______________________________________________________________________
 !
-      use air        , only: initialize_air
-      use bry        , only: initialize_boundary
       use config     , only: ntide
       use glob_const , only: rk
       use glob_domain, only: im, im_coarse, jm, jm_coarse, kb, kbm1
@@ -851,10 +849,11 @@
 !  Initialize all neccessary modules.
 !______________________________________________________________________
 !
-      use air   , only: initialize_air
-      use bry   , only: initialize_bry => initialize_boundary
+      use air   , only: initialize_air => initialize_mod
+      use bry   , only: initialize_bry => initialize_mod
       use clim  , only: initialize_clm => initialize_mod
       use seaice, only: initialize_ice => initialize_mod
+      use tide  , only: initialize_tide=> initialize_mod
 
       implicit none
 
@@ -863,9 +862,10 @@
       call initialize_bry( 'config.nml' )
       call initialize_air( 'config.nml' )
       call initialize_ice( 'config.nml' )
+      call initialize_tide('config.nml' )
 
 
-      end subroutine initialize_modules
+      end ! subroutine initialize_modules
 !
 !______________________________________________________________________
 !
@@ -1444,12 +1444,13 @@
       end subroutine check_cfl_min
 !______________________________________________________________________
 !
-      subroutine modules_bc_init( dtime )
+      subroutine modules_initial_step( dtime )
 
         use air        , only: air_init => init
         use bry        , only: bry_init => init
         use clim       , only: clm_init => init
         use seaice     , only: ice_init => init
+        use tide       , only: tide_init=> init
         use module_time
 
         implicit none
@@ -1461,6 +1462,7 @@
         call air_init( dtime )
         call bry_init( dtime )
         call ice_init( dtime )
+        call tide_init(dtime )
 
 
-      end subroutine
+      end ! subroutine
