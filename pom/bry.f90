@@ -368,7 +368,7 @@ module bry
     end ! subroutine allocate_boundary
 !______________________________________________________________________
 !
-    subroutine initialize_boundary( conf )
+    subroutine initialize_mod( conf )
 !----------------------------------------------------------------------
 !  Initialize arrays for boundary conditions.
 !______________________________________________________________________
@@ -573,7 +573,7 @@ module bry
       call msg_print("BRY MODULE INITIALIZED", 1, "")
 
 
-    end ! subroutine initialize_boundary
+    end ! subroutine initialize_mod
 !______________________________________________________________________
 !
     subroutine initial_conditions_boundary

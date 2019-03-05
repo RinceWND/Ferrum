@@ -54,6 +54,7 @@ OUTDIR = out
         seaice.o         \
         air.o            \
         io.o             \
+        tide.o           \
         parallel_mpi.o   \
         io_pnetcdf.o     \
         river.o          \

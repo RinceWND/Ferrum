@@ -260,7 +260,7 @@ module config
       USE_TIDE  = .false.
 
 
-    end subroutine
+    end ! subroutine
 
 !______________________________________________________________________
 !
