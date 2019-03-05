@@ -219,6 +219,13 @@ module bry
         , U_bry%est(NFE,jm,kb)  &
         , V_bry%est(NFE,jm,kb)  &
          )
+        el_bry%est = 0.
+        ua_bry%est = 0.
+        va_bry%est = 0.
+        s_bry%est  = 0.
+        t_bry%est  = 0.
+        u_bry%est  = 0.
+        v_bry%est  = 0.
         if ( INTERP_BRY ) then
           allocate(                     &
             el_int%est(NFE,jm,2:N+1)    &
@@ -229,6 +236,13 @@ module bry
           , U_int%est(NFE,jm,kb,2:N+1)  &
           , V_int%est(NFE,jm,kb,2:N+1)  &
            )
+          el_int%est = 0.
+          ua_int%est = 0.
+          va_int%est = 0.
+          s_int%est  = 0.
+          t_int%est  = 0.
+          u_int%est  = 0.
+          v_int%est  = 0.
         end if
       end if
 
@@ -242,6 +256,13 @@ module bry
         , U_bry%nth(im,NFN,kb)  &
         , V_bry%nth(im,NFN,kb)  &
          )
+        el_bry%nth = 0.
+        ua_bry%nth = 0.
+        va_bry%nth = 0.
+        s_bry%nth  = 0.
+        t_bry%nth  = 0.
+        u_bry%nth  = 0.
+        v_bry%nth  = 0.
         if ( INTERP_BRY ) then
           allocate(                     &
             el_int%nth(im,NFN,2:N+1)    &
@@ -252,6 +273,13 @@ module bry
           , U_int%nth(im,NFN,kb,2:N+1)  &
           , V_int%nth(im,NFN,kb,2:N+1)  &
            )
+          el_int%nth = 0.
+          ua_int%nth = 0.
+          va_int%nth = 0.
+          s_int%nth  = 0.
+          t_int%nth  = 0.
+          u_int%nth  = 0.
+          v_int%nth  = 0.
         end if
       end if
 
@@ -265,6 +293,13 @@ module bry
         , U_bry%sth(im,NFS,kb)  &
         , V_bry%sth(im,NFS,kb)  &
          )
+        el_bry%sth = 0.
+        ua_bry%sth = 0.
+        va_bry%sth = 0.
+        s_bry%sth  = 0.
+        t_bry%sth  = 0.
+        u_bry%sth  = 0.
+        v_bry%sth  = 0.
         if ( INTERP_BRY ) then
           allocate(                     &
             el_int%sth(im,NFS,2:N+1)    &
@@ -275,6 +310,13 @@ module bry
           , U_int%sth(im,NFS,kb,2:N+1)  &
           , V_int%sth(im,NFS,kb,2:N+1)  &
            )
+          el_int%sth = 0.
+          ua_int%sth = 0.
+          va_int%sth = 0.
+          s_int%sth  = 0.
+          t_int%sth  = 0.
+          u_int%sth  = 0.
+          v_int%sth  = 0.
         end if
       end if
 
@@ -288,6 +330,13 @@ module bry
         , U_bry%wst(NFW,jm,kb)  &
         , V_bry%wst(NFW,jm,kb)  &
          )
+        el_bry%wst = 0.
+        ua_bry%wst = 0.
+        va_bry%wst = 0.
+        s_bry%wst  = 0.
+        t_bry%wst  = 0.
+        u_bry%wst  = 0.
+        v_bry%wst  = 0.
         if ( INTERP_BRY ) then
           allocate(                     &
             el_int%wst(NFW,jm,2:N+1)    &
@@ -298,6 +347,13 @@ module bry
           , U_int%wst(NFW,jm,kb,2:N+1)  &
           , V_int%wst(NFW,jm,kb,2:N+1)  &
            )
+          el_int%wst = 0.
+          ua_int%wst = 0.
+          va_int%wst = 0.
+          s_int%wst  = 0.
+          t_int%wst  = 0.
+          u_int%wst  = 0.
+          v_int%wst  = 0.
         end if
       end if
 
