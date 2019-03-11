@@ -177,7 +177,7 @@ module clim
       call msg_print("CLIM MODULE INITIALIZED", 1, "")
 
 
-    end ! subroutine initialize_air
+    end ! subroutine initialize_mod
 !
 !______________________________________________________________________
 !
@@ -555,7 +555,7 @@ module clim
       if ( status /= NF_NOERR ) then
         error_status = 1
         if ( is_master ) then
-          print '(/a,a)', 'IO error at module `AIR`: ', routine
+          print '(/a,a)', 'IO error at module `CLIM`: ', routine
           print '("[",i4,"] ",a)', status, nf90mpi_strerror(status)
           stop
         end if
