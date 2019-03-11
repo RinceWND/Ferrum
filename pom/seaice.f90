@@ -23,14 +23,9 @@ module seaice
 ! Constants
 !----------------------------------------------------------------------
   real(rk), parameter ::     &  !
-    Cp     = 1005.           &  ! Specific heat capacity of air
-  , emiss  =     .97         &  ! Ocean emissivity
-  , expsi  =     .622        &  ! ???
-  , Ps     = 1013.           &  ! Surface air pressure
-  , Rd     =  287.           &  ! Dry air gas constant
-  , RHOa   =    1.22         &  ! Density of air
-  , sigma  =    5.670367e-8  &  ! Stefan-Boltzmann constant (kg s^-3 K^-4)
-  , solar  = 1350.              ! Solar constant (W/m^2)
+    Cp     = 2113.           &  ! Specific heat capacity of "pure" ice
+  , Ch     =     .004        &  ! Heat transfer coefficient between ocean and sea ice (very rough approximation)
+  , RHOi   =  920.              ! Reference density of sea ice (typically, 720-940 kg m^-3)
 
 !----------------------------------------------------------------------
 ! Configuration variables
@@ -70,7 +65,8 @@ module seaice
     icec                     & ! ice concentration (fraction)
   , iceh                     & ! ice thickness (m)
   , iceu                     & ! ice x-velocity (m/s)
-  , icev                       ! ice y-velocity (m/s)
+  , icev                     & ! ice y-velocity (m/s)
+  , itsurf                     ! ice-water heat flux
 
 !----------------------------------------------------------------------
 ! Private variables
@@ -165,18 +161,20 @@ module seaice
 
 
 ! Allocate core arrays
-      allocate(      &
-        icec(im,jm)  &
-      , iceh(im,jm)  &
-      , iceu(im,jm)  &
-      , icev(im,jm)  &
+      allocate(        &
+        icec(im,jm)    &
+      , iceh(im,jm)    &
+      , iceu(im,jm)    &
+      , icev(im,jm)    &
+      , itsurf(im,jm)  &
        )
 
 ! Initialize mandatory arrays
-      icec = 0.
-      iceh =  .35
-      iceu = 0.
-      icev = 0.
+      icec   = 0.
+      iceh   =  .35
+      iceu   = 0.
+      icev   = 0.
+      itsurf = 0.
 
 ! Allocate optional arrays
       N = 1
@@ -247,7 +245,7 @@ module seaice
 ! Read ice fields
       if ( interp_ice ) then
         call read_all( .true., 2, year, record )
-        print *, "!!!", minval(icec_int), maxval(icec_int)
+        call read_all( .true., 3, year, record )
       else
         call read_all( .true., 1, year, record )
       end if
@@ -264,10 +262,12 @@ module seaice
 !  Reads forcing fields during experiment.
 !______________________________________________________________________
 !
-!      use glob_const , only: SEC2DAY
+      use glob_const , only: rhoref
+      use config     , only: tbias
 !      use glob_domain, only: is_master
       use module_time
-      use model_run  , only: dti, iint, sec_of_year
+      use model_run  , only: dti, sec_of_year
+      use glob_ocean , only: t
 
       implicit none
 
@@ -319,7 +319,7 @@ module seaice
         year(3) = d_in%year + 1
       end if
 
-      if ( iint == 1 .or. ( secs >= 0 .and. secs < dti ) ) then
+      if ( secs >= 0 .and. secs < dti ) then
         ADVANCE_REC_INT = .true.
         if ( interp_ice ) then
           icec_int(:,:,2) = icec_int(:,:,3)
@@ -331,9 +331,6 @@ module seaice
 
       record(1) = record(1) + 1
 
-!      if ( is_master ) print *, "II"&!, uwnd(50,50,2), uwnd(50,50,3) &
-!                              , a, ADVANCE_REC_INT, ADVANCE_REC
-
       if ( interp_ice ) then
         call read_all( ADVANCE_REC_INT, 3, year, record )
         icec = ( 1. - a ) * icec_int(:,:,2) + a * icec_int(:,:,3)
@@ -341,6 +338,10 @@ module seaice
       else
         call read_all( ADVANCE_REC    , 1, year, record )
       end if
+
+      itsurf = rhoi/rhoref * Ch * ( t(:,:,1) + tbias + 1.82 )
+!      print *, minval(itsurf), maxval(itsurf) ,":"
+!      stop
 
 
     end ! subroutine step

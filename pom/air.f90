@@ -478,7 +478,7 @@ module air
       use config     , only: nbct
       use module_time
       use model_run  , only: dti, iint, sec_of_year
-      use seaice     , only: icec
+      use seaice     , only: icec, itsurf
 
       implicit none
 
@@ -570,7 +570,7 @@ module air
 
 ! Simple parameterizion
       swrad  =  swrad*(1.-icec)
-      wtsurf = wtsurf*(1.-icec)
+      wtsurf = wtsurf*(1.-icec) + itsurf*icec
       wssurf = wssurf*(1.-icec)
 !      print *, minval(wtsurf), maxval(wtsurf)
 
@@ -588,7 +588,7 @@ module air
 !
       use glob_const , only: rhow => rhoref
       use glob_domain, only: im, jm
-      use glob_ocean , only: u, v
+      use glob_ocean , only: t, u, v
       use seaice     , only: icec
 
       implicit none
@@ -609,24 +609,38 @@ module air
           uvabs = sqrt( (uwnd(i,j)-u(i,j,1))**2  &
                       + (vwnd(i,j)-v(i,j,1))**2 )
 
-          if ( mode == 1 ) then
-            if (     uvabs <=  11. ) then
-              cda = .0012
-            elseif ( uvabs <=  19. ) then
-              cda = .00049  + uvabs* .000065
-            elseif ( uvabs <= 100. ) then
-              cda = .001364 + uvabs*(.0000234 - uvabs*2.31579e-7)
-            else
-              cda = .00138821
-            end if
-          end if
+          select case ( mode )
+
+! Standard POM formula (LY Oey?)
+            case ( 1 )
+
+              if (     uvabs <=  11. ) then
+                cda = .0012
+              elseif ( uvabs <=  19. ) then
+                cda = .00049  + uvabs* .000065
+              elseif ( uvabs <= 100. ) then
+                cda = .001364 + uvabs*(.0000234 - uvabs*2.31579e-7)
+              else
+                cda = .00138821
+              end if
+
+! Hellerman and Rosenstein
+            case ( 2 )
+
+              cda = t(i,j,1)-temp(i,j,1)
+              cda = .934e-3 + uvabs*(  .788e-4 - uvabs*.616e-6   &
+                                     - .214e-5*cda )             &
+                            +   cda*(  .868e-4 -   cda*.12e-5 )
+              if ( cda < .00125 ) cda = .00125
+
+          end select
 
           ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-u(i,j,1)) *(1.-icec(i,j))
           vstr(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j)-v(i,j,1)) *(1.-icec(i,j))
 
         end do
       end do
-      
+
 !      print *, minval(ustr), maxval(ustr), minval(vstr), maxval(vstr)
 
 
