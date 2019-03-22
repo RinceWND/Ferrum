@@ -19,12 +19,14 @@ module clim
 !----------------------------------------------------------------------
 ! Configuration variables
 !----------------------------------------------------------------------
-  real(rk), private :: a         ! time-interpolation factor
+  real(rk), private :: a   & ! time-interpolation factor
+                     , ct    ! relaxation inverse period
 
   character(len=10)                       &
        , parameter                        &
        , private   :: FORMAT_EXT = ".nc"
 
+  logical RELAX_TO_CLIM
 !----------------------------------------------------------------------
 ! Climatology time mode
 !----------------------------------------------------------------------
@@ -65,6 +67,8 @@ module clim
        , allocatable         &
        , dimension(:,:)   :: &
      eclim                   &
+  , s_relx                   &
+  , t_relx                   &
   , uaclim                   &
   , vaclim
   real(kind=rk)              &
@@ -110,6 +114,7 @@ module clim
 !______________________________________________________________________
 !
       use glob_domain, only: is_master
+      use glob_grid  , only: h
 
       implicit none
 
@@ -117,8 +122,8 @@ module clim
 
       integer pos
 
-      namelist/clim/                                         &
-        CLIM_MODE, ts_clim_path, ts_mean_path, uv_clim_path
+      namelist/clim/                                             &
+        CLIM_MODE, ct, ts_clim_path, ts_mean_path, uv_clim_path
 
       namelist/clim_vars/                        &
         el_clim_name, s_clim_name,  s_mean_name  &
@@ -127,7 +132,11 @@ module clim
 
 
 ! Initialize with default values
+      ct = 1. / (15.*86400.)  ! 15-days relaxation period
+
       CLIM_MODE = 2
+
+      RELAX_TO_CLIM = .false.
 
       ts_clim_path = "in/clim/"
       ts_mean_path = "in/clim/"
@@ -173,6 +182,11 @@ module clim
 
 ! Allocate necessary arrays
       call allocate_arrays
+
+      if ( RELAX_TO_CLIM ) then
+        s_relx = ( 1. + tanh( .002*(h-1000.) ) )*.5
+        t_relx = ( 1. + tanh( .002*(h-1000.) ) )*.5
+      end if
 
       call msg_print("CLIM MODULE INITIALIZED", 1, "")
 
@@ -234,6 +248,14 @@ module clim
       , va_int(im,jm,   2:N+1)  &
       , vc_int(im,jm,kb,2:N+1)  &
        )
+       
+! Allocate depth-relaxation arrays
+      if ( RELAX_TO_CLIM ) then
+        allocate(        &
+          s_relx(im,jm)  &
+        , t_relx(im,jm)  &
+         )
+      end if
 
 
     end ! subroutine allocate_arrays
@@ -402,8 +424,30 @@ module clim
 
       call dens( smean, tmean, rmean )
 
+! Relax to climatology
+      if ( RELAX_TO_CLIM ) call relax_surf
+
 
     end ! subroutine step
+!
+!______________________________________________________________________
+!
+    subroutine relax_surf
+!----------------------------------------------------------------------
+!  Relax surface fluxes to climatologies
+!______________________________________________________________________
+!
+      use air       , only: wtsurf, wssurf
+      use glob_ocean, only: sb, tb
+
+      implicit none
+
+
+      wtsurf = wtsurf + ct * s_relx * ( tb(:,:,1) - tclim(:,:,1) )
+      wssurf = wssurf + ct * s_relx * ( sb(:,:,1) - sclim(:,:,1) )
+
+
+    end ! subroutine relax_surf
 !
 !______________________________________________________________________
 !
