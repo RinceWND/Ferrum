@@ -70,7 +70,7 @@ module air
                      ! Treat surface forcing differently:
   , USE_BULK       & !  heat flux is estimated using bulk formulas
   , USE_COARE      & !  use COARE algorithm for bulk formulations
-  , USE_STRESS       !  momentum flux is read directly from files
+  , USE_FLUXES       !  momentum flux is read directly from files
 
   integer*1        &
     LWRAD_FORMULA    ! Bulk formula to estimate longwave radiation
@@ -185,7 +185,7 @@ module air
       , INTERP_PRES, INTERP_RAIN  , INTERP_SST , INTERP_STRESS  &
       , INTERP_TAIR, INTERP_WIND  , READ_BULK  , READ_HEAT      &
       , READ_STRESS, READ_WIND    , USE_BULK   , USE_COARE      &
-      , USE_STRESS , LWRAD_FORMULA, bulk_path  , flux_path      &
+      , USE_FLUXES , LWRAD_FORMULA, bulk_path  , flux_path      &
       , wind_path  , read_int
 
       namelist/air_vars_nml/                           &
@@ -215,7 +215,7 @@ module air
       READ_WIND  = .false.
       USE_BULK   = .false.
       USE_COARE  = .false.
-      USE_STRESS = .false.
+      USE_FLUXES = .false.
 
       bulk_path = "in/surf/"
       flux_path = "in/surf/"
@@ -238,7 +238,9 @@ module air
       vwnd_name  = "vwnd"
       wgst_name  = "gust"
 
-      interp_pres = .false.
+      INTERP_HEAT   = .false.
+      INTERP_PRES   = .false.
+      INTERP_STRESS = .false.
 
 ! Override configuration
       open ( 73, file = config_file, status = 'old' )
@@ -272,6 +274,7 @@ module air
       call allocate_arrays
 
       call msg_print("AIR MODULE INITIALIZED", 1, "")
+
 
     end ! subroutine initialize_mod
 !
@@ -384,7 +387,8 @@ module air
         N = 1
         if ( interp_heat ) N = 3
         allocate(         &
-          sheat(im,jm,N)  &
+          dlrad(im,jm,N)  &
+        , sheat(im,jm,N)  &
         , srad(im,jm,N)   &
         , lheat(im,jm,N)  &
         , lrad(im,jm,N)   &
@@ -408,6 +412,8 @@ module air
 !
 !      use glob_domain, only: is_master
       use module_time
+      use config     , only: nbct
+      use seaice     , only: icec, itsurf
 
       implicit none
 
@@ -415,7 +421,7 @@ module air
 
       integer                   max_in_prev, max_in_this, ncid
       integer, dimension(3)  :: record, year
-      real(rk)                  chunk
+      real(rk)                  a, chunk
 
 
 ! Quit if the module is not used.
@@ -435,8 +441,10 @@ module air
 
       if ( chunk - record(1) < .5 ) then
         record(2) = record(1)
+        a = chunk - record(1) + .5
       else
         record(2) = record(1) + 1
+        a = chunk - record(1) - .5
       end if
       record(3) = record(2) + 1
 
@@ -453,6 +461,52 @@ module air
 ! Read wind if momentum flux is derived from wind
       call read_all( .true., 1, year, record )
       call read_all( .true., 2, year, record )
+      call read_all( .true., 3, year, record )
+
+      if ( READ_WIND ) then
+
+        if ( interp_wind ) then
+          uwnd(:,:,1) = ( 1. - a ) * uwnd(:,:,2) + a * uwnd(:,:,3)
+          vwnd(:,:,1) = ( 1. - a ) * vwnd(:,:,2) + a * vwnd(:,:,3)
+        end if
+
+! TODO: Are these surface arrays even needed?
+        uwsrf = uwnd(:,:,1)
+        vwsrf = vwnd(:,:,1)
+
+! Calculate wind stress
+        if ( USE_BULK ) then
+          call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+          call calculate_fluxes
+        end if
+
+      end if
+
+      if ( USE_FLUXES ) then
+        if ( INTERP_STRESS ) then
+          wusurf = ( 1. - a ) * ustr(:,:,2) + a * ustr(:,:,3)
+          wvsurf = ( 1. - a ) * vstr(:,:,2) + a * vstr(:,:,3)
+        else
+          wusurf = ustr(:,:,1)
+          wvsurf = vstr(:,:,1)
+        end if
+        if ( INTERP_HEAT ) then
+          wtsurf = ( 1. - a ) * ( lrad(:,:,2)+sheat(:,:,2)+lheat(:,:,2) )  &
+                 +        a   * ( lrad(:,:,3)+sheat(:,:,3)+lheat(:,:,3) )
+          swrad  = ( 1. - a ) * srad(:,:,2) + a * srad(:,:,3)
+        else
+          wtsurf = lrad(:,:,1) + sheat(:,:,1) + lheat(:,:,1)
+          swrad  = srad(:,:,1)
+        end if
+      end if
+
+! If solar radiation does not penetrate water
+      if ( nbct == 1 ) wtsurf = wtsurf + swrad
+
+! Simple parameterizion
+      swrad  =  swrad*(1.-icec)
+      wtsurf = wtsurf*(1.-icec) + itsurf*icec
+      wssurf = wssurf*(1.-icec)
 
       call msg_print("AIR INITIALIZED", 2, "")
 
@@ -530,11 +584,24 @@ module air
         year(3) = d_in%year + 1
       end if
 
-      if ( iint == 1 .or. ( secs >= 0 .and. secs < dti ) ) then
+      if ( secs >= 0 .and. secs < dti ) then
         ADVANCE_REC_INT = .true.
         if ( interp_wind ) then
           uwnd(:,:,2) = uwnd(:,:,3)
           vwnd(:,:,2) = vwnd(:,:,3)
+        end if
+        if ( USE_FLUXES ) then
+          if ( INTERP_STRESS ) then
+            ustr(:,:,2) = ustr(:,:,3)
+            vstr(:,:,2) = vstr(:,:,3)
+          end if
+          if ( INTERP_HEAT ) then
+            dlrad(:,:,2) = dlrad(:,:,3)
+            lheat(:,:,2) = lheat(:,:,3)
+            lrad(:,:,2)  = lrad(:,:,3)
+            sheat(:,:,2) = sheat(:,:,3)
+            srad(:,:,2)  = srad(:,:,3)
+          end if
         end if
       else
         ADVANCE_REC_INT = .false.
@@ -560,9 +627,29 @@ module air
         vwsrf = vwnd(:,:,1)
 
 ! Calculate wind stress
-        call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
-        call calculate_fluxes
+        if ( USE_BULK ) then
+          call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+          call calculate_fluxes
+        end if
 
+      end if
+
+      if ( USE_FLUXES ) then
+        if ( INTERP_STRESS ) then
+          wusurf = ( 1. - a ) * ustr(:,:,2) + a * ustr(:,:,3)
+          wvsurf = ( 1. - a ) * vstr(:,:,2) + a * vstr(:,:,3)
+        else
+          wusurf = ustr(:,:,1)
+          wvsurf = vstr(:,:,1)
+        end if
+        if ( INTERP_HEAT ) then
+          wtsurf = ( 1. - a ) * ( lrad(:,:,2)+sheat(:,:,2)+lheat(:,:,2) )  &
+                 +        a   * ( lrad(:,:,3)+sheat(:,:,3)+lheat(:,:,3) )
+          swrad  = ( 1. - a ) * srad(:,:,2) + a * srad(:,:,3)
+        else
+          wtsurf = lrad(:,:,1) + sheat(:,:,1) + lheat(:,:,1)
+          swrad  = srad(:,:,1)
+        end if
       end if
 
 ! If solar radiation does not penetrate water
@@ -924,9 +1011,9 @@ module air
                           , dtime%year, dtime%month, dtime%day       &
                           , dtime%hour, dtime%min )
 
+! --- 1. Divide net solar radiation flux by rho*Cpw and reverse sign
               swrad(i,j) = -sol_net/rho_cpw
             end if
-! --- 1. Divide net solar radiation flux by rho*Cpw and reverse sign
 !
 
           if ( use_coare ) then
@@ -1359,7 +1446,7 @@ module air
 !  Read a variable (NC format).
 !______________________________________________________________________
 !
-      use glob_const , only: C2K, rk
+      use glob_const , only: C2K, rhoref, rho_cpw, rk
       use glob_domain
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -1406,6 +1493,10 @@ module air
             var = var - C2K
           case ( "Pa" )
             var = var/100.
+          case ( "W m**-2" )
+            var = var/rho_cpw
+          case ( "N m**-2" )
+            var = -var/rhoref
         end select
       end if
 
