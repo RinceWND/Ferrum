@@ -3043,9 +3043,9 @@
         out2 = 0.
         out3 = 0.
 
-        iout = iout + 1
+          iout = iout + 1
 
-        if ( iout == 1  ) then
+        if ( iout == 1 ) then
 
 !     create netcdf file
           if ( is_master )
@@ -3505,39 +3505,46 @@
           end if
 
 
-          start(1) = i_global(1)
-          start(2) = j_global(1)
-          start(3) = 1
-          start(4) = iout
-          edge(1) = im
-          edge(2) = jm
-          edge(3) = kb
-          edge(4) = 1
+          if ( mode /= 2 ) then
 
-          out3 = real(u,4)
-          status=nfmpi_put_vara_real_all(ncid,u_varid,start,edge,out3)
-          call handle_error_pnetcdf('nf_put_vara_real: u',status)
-          out3 = real(v,4)
-          status=nfmpi_put_vara_real_all(ncid,v_varid,start,edge,out3)
-          call handle_error_pnetcdf('nf_put_vara_real: v',status)
-          out3 = real(w,4)
-          status=nfmpi_put_vara_real_all(ncid,w_varid,start,edge,out3)
-          call handle_error_pnetcdf('nf_put_vara_real: w',status)
-          out3 = real(t,4)
-          status=nfmpi_put_vara_real_all(ncid,t_varid,start,edge,out3)
-          call handle_error_pnetcdf('nf_put_vara_real: t',status)
-          out3 = real(s,4)
-          status=nfmpi_put_vara_real_all(ncid,s_varid,start,edge,out3)
-          call handle_error_pnetcdf('nf_put_vara_real: s',status)
-          out3 = real(rho,4)
-          status=nfmpi_put_vara_real_all(ncid,rho_varid,start,edge,out3)
-          call handle_error_pnetcdf('nf_put_vara_real: rho',status)
-          out3 = real(kh,4)
-          status=nfmpi_put_vara_real_all(ncid,kh_varid,start,edge,out3)
-          call handle_error_pnetcdf('nf_put_vara_real: kh',status)
-          out3 = real(km,4)
-          status=nfmpi_put_vara_real_all(ncid,km_varid,start,edge,out3)
-          call handle_error_pnetcdf('nf_put_vara_real: km',status)
+            start(1) = i_global(1)
+            start(2) = j_global(1)
+            start(3) = 1
+            start(4) = iout
+            edge(1) = im
+            edge(2) = jm
+            edge(3) = kb
+            edge(4) = 1
+
+            out3 = real(u,4)
+            status=nfmpi_put_vara_real_all(ncid,u_varid,start,edge,out3)
+            call handle_error_pnetcdf('nf_put_vara_real: u',status)
+            out3 = real(v,4)
+            status=nfmpi_put_vara_real_all(ncid,v_varid,start,edge,out3)
+            call handle_error_pnetcdf('nf_put_vara_real: v',status)
+            out3 = real(w,4)
+            status=nfmpi_put_vara_real_all(ncid,w_varid,start,edge,out3)
+            call handle_error_pnetcdf('nf_put_vara_real: w',status)
+            out3 = real(t,4)
+            status=nfmpi_put_vara_real_all(ncid,t_varid,start,edge,out3)
+            call handle_error_pnetcdf('nf_put_vara_real: t',status)
+            out3 = real(s,4)
+            status=nfmpi_put_vara_real_all(ncid,s_varid,start,edge,out3)
+            call handle_error_pnetcdf('nf_put_vara_real: s',status)
+            out3 = real(rho,4)
+            status=nfmpi_put_vara_real_all(ncid,rho_varid,start,edge
+     &                                                            ,out3)
+            call handle_error_pnetcdf('nf_put_vara_real: rho',status)
+            out3 = real(kh,4)
+            status=nfmpi_put_vara_real_all(ncid,kh_varid,start,edge
+     &                                                            ,out3)
+            call handle_error_pnetcdf('nf_put_vara_real: kh',status)
+            out3 = real(km,4)
+            status=nfmpi_put_vara_real_all(ncid,km_varid,start,edge
+     &                                                            ,out3)
+            call handle_error_pnetcdf('nf_put_vara_real: km',status)
+
+          end if
 
         else !lyo:20110224:stcc:save *_mean
 
