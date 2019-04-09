@@ -510,6 +510,7 @@ module glob_ocean
   , dtef             & 
   , ee               & 
   , gg               & 
+  , hz               & ! model cell depth [m]
   , kh               & ! vertical diffusivity
   , km               & ! vertical kinematic viscosity
   , kq               & 

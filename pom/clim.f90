@@ -25,6 +25,8 @@ module clim
        , parameter                        &
        , private   :: FORMAT_EXT = ".nc"
 
+  logical, private :: INTERP_CLIM  & ! Interpolation flag
+                    , RELAX_TS       ! Relaxation flag
 !----------------------------------------------------------------------
 ! Climatology time mode
 !----------------------------------------------------------------------
@@ -57,6 +59,11 @@ module clim
   ,  v_clim_name          & ! Y-velocity
   , va_clim_name            ! Vertically integrated y-velocity
 
+  real(rk)              &
+       , private        &
+       , parameter ::   &
+    h_thres = 1000.     &  ! apply TS relaxation to cells deeper than set threshold
+  , t_rel   = 30.          ! relaxation period (days)
 
 !----------------------------------------------------------------------
 ! Climatological arrays
@@ -117,8 +124,9 @@ module clim
 
       integer pos
 
-      namelist/clim/                                         &
-        CLIM_MODE, ts_clim_path, ts_mean_path, uv_clim_path
+      namelist/clim/                                           &
+        CLIM_MODE   , INTERP_CLIM, ts_clim_path, ts_mean_path  &
+      , uv_clim_path
 
       namelist/clim_vars/                        &
         el_clim_name, s_clim_name,  s_mean_name  &
@@ -127,6 +135,9 @@ module clim
 
 
 ! Initialize with default values
+      INTERP_CLIM = .true.
+      RELAX_TS    = .true.
+
       CLIM_MODE = 2
 
       ts_clim_path = "in/clim/"
@@ -190,12 +201,13 @@ module clim
 
       implicit none
 
-      integer*1             &
-      , parameter :: N = 2 ! Interpolation array extension size
+      integer(1) N         ! Interpolation array extension size
                            ! The structure is following:
                            !   var at n-1 step: var(:,:,2)
                            !   var at n+1 step: var(:,:,3)
 
+      N = 2
+      if ( .not.INTERP_CLIM ) N = 1
 
 ! Allocate core arrays
       allocate(          &
@@ -247,7 +259,7 @@ module clim
 !
       use glob_domain, only: is_master
       use module_time
-      use model_run  , only: sec_of_month, mid_in_month
+      use model_run  , only: sec_of_month, mid_in_month, mid_in_nbr
 
       implicit none
 
@@ -260,14 +272,24 @@ module clim
 ! Determine the record to read
       record(1) = d_in%month
 
-      if ( sec_of_month <= mid_in_month ) then
-        record(2) = d_in%month - 1
-        if ( record(2) == 0 ) record(2) = 12
-      else
-        record(2) = d_in%month
-      end if
+      if ( INTERP_CLIM ) then
 
-      record(3) = mod( record(2), 12 ) + 1
+        if ( sec_of_month <= mid_in_month ) then
+          record(2) = d_in%month - 1
+          if ( record(2) == 0 ) record(2) = 12
+          a = real( sec_of_month + mid_in_nbr   )  &
+             /real( mid_in_nbr   + mid_in_month )
+        else
+          record(2) = d_in%month
+          a = real( sec_of_month - mid_in_month )  &
+             /real( mid_in_nbr   + mid_in_month )
+        end if
+
+        record(3) = mod( record(2), 12 ) + 1
+
+      else
+        record(2) = record(1)
+      end if
 
 ! Read climatology
       inquire ( file = trim(ts_clim_path), exist = fexist )
@@ -275,8 +297,10 @@ module clim
       if ( fexist ) then
         call read_clim_ts_pnetcdf( tc_int(:,:,:,2), sc_int(:,:,:,2)  &
                                  , ts_clim_path, record(2) )
-        call read_clim_ts_pnetcdf( tc_int(:,:,:,3), sc_int(:,:,:,3)  &
-                                 , ts_clim_path, record(3) )
+        if ( INTERP_CLIM ) then
+          call read_clim_ts_pnetcdf( tc_int(:,:,:,3), sc_int(:,:,:,3)  &
+                                   , ts_clim_path, record(3) )
+        end if
       else
         call msg_print("", 2, "FAILED...")
         tc_int = 15.
@@ -289,13 +313,30 @@ module clim
       if ( fexist ) then
         call read_mean_ts_pnetcdf( tm_int(:,:,:,2), sm_int(:,:,:,2)  &
                                  , ts_mean_path, record(2) )
-        call read_mean_ts_pnetcdf( tm_int(:,:,:,3), sm_int(:,:,:,3)  &
-                                 , ts_mean_path, record(3) )
+        if ( INTERP_CLIM ) then
+          call read_mean_ts_pnetcdf( tm_int(:,:,:,3), sm_int(:,:,:,3)  &
+                                   , ts_mean_path, record(3) )
+        end if
       else
         call msg_print("", 2, "FAILED...")
         tm_int = tc_int
         sm_int = sc_int
       end if
+
+      if ( INTERP_CLIM ) then
+! Interpolate TS and get background density
+        sclim = ( 1. - a )*sc_int(:,:,:,2) + a*sc_int(:,:,:,3)
+        tclim = ( 1. - a )*tc_int(:,:,:,2) + a*tc_int(:,:,:,3)
+        smean = ( 1. - a )*sm_int(:,:,:,2) + a*sm_int(:,:,:,3)
+        tmean = ( 1. - a )*tm_int(:,:,:,2) + a*tm_int(:,:,:,3)
+      else
+        sclim = sc_int(:,:,:,2)
+        tclim = tc_int(:,:,:,2)
+        smean = sm_int(:,:,:,2)
+        tmean = tm_int(:,:,:,2)
+      end if
+
+      call dens( smean, tmean, rmean )
 
 ! TODO: Gather stats from all processors
       if ( is_master ) then
@@ -311,6 +352,18 @@ module clim
         print '(a,f7.3,a,f7.3,a)', "Climatological salinity:    ("  &
                                  , minval(sc_int), ":"              &
                                  , maxval(sc_int), ")"
+        print '(a,f7.3,a,f7.3,a)', "Climatological x-current:   ("  &
+                                 , minval(uc_int), ":"              &
+                                 , maxval(uc_int), ")"
+        print '(a,f7.3,a,f7.3,a)', "Climatological y-current:   ("  &
+                                 , minval(vc_int), ":"              &
+                                 , maxval(vc_int), ")"
+        print '(a,f7.3,a,f7.3,a)', "Climatological 2D x-current:("  &
+                                 , minval(ua_int), ":"              &
+                                 , maxval(ua_int), ")"
+        print '(a,f7.3,a,f7.3,a)', "Climatological 2D y-current:("  &
+                                 , minval(va_int), ":"              &
+                                 , maxval(va_int), ")"
       end if
 
       call msg_print("CLIM INITIALIZED", 2, "")
@@ -356,24 +409,35 @@ module clim
       record(3) = mod( record(2), 12 ) + 1
 
       ADVANCE_REC_INT = .false.
-      if ( sec_of_month - mid_in_month <= dti .and.  &
-           record(2) == record(1) ) then
-        if ( iint > 1 ) ADVANCE_REC_INT = .true.
+      if ( INTERP_CLIM ) then
+        if ( sec_of_month - mid_in_month <= dti .and.  &
+             record(2) == record(1) ) then
+          if ( iint > 1 ) ADVANCE_REC_INT = .true.
+        end if
+      else
+        if ( sec_of_month <= dti ) ADVANCE_REC_INT = .true.
       end if
 
       if ( ADVANCE_REC_INT ) then
 
-        sc_int(:,:,:,2) = sc_int(:,:,:,3)
-        tc_int(:,:,:,2) = tc_int(:,:,:,3)
-        sm_int(:,:,:,2) = sm_int(:,:,:,3)
-        tm_int(:,:,:,2) = tm_int(:,:,:,3)
+        if ( INTERP_CLIM ) then
+          sc_int(:,:,:,2) = sc_int(:,:,:,3)
+          tc_int(:,:,:,2) = tc_int(:,:,:,3)
+          sm_int(:,:,:,2) = sm_int(:,:,:,3)
+          tm_int(:,:,:,2) = tm_int(:,:,:,3)
+        end if
 
         ! Read climatology
         inquire ( file = trim(ts_clim_path), exist = fexist )
         call msg_print("", 6, "Read TS climatology:")
         if ( fexist ) then
-          call read_clim_ts_pnetcdf( tc_int(:,:,:,3), sc_int(:,:,:,3)  &
-                                   , ts_clim_path, record(3) )
+          if ( INTERP_CLIM ) then
+            call read_clim_ts_pnetcdf( tc_int(:,:,:,3), sc_int(:,:,:,3)  &
+                                     , ts_clim_path, record(3) )
+          else
+            call read_clim_ts_pnetcdf( tc_int(:,:,:,2), sc_int(:,:,:,2)  &
+                                     , ts_clim_path, record(1) )
+          end if
         else
           call msg_print("", 2, "FAILED...")
           tc_int(:,:,:,3) = 15.
@@ -384,8 +448,13 @@ module clim
         inquire ( file = trim(ts_mean_path), exist = fexist )
         call msg_print("", 6, "Read background TS:")
         if ( fexist ) then
-          call read_mean_ts_pnetcdf( tm_int(:,:,:,3), sm_int(:,:,:,3)  &
-                                   , ts_mean_path, record(3) )
+          if ( INTERP_CLIM ) then
+            call read_mean_ts_pnetcdf( tm_int(:,:,:,3), sm_int(:,:,:,3)  &
+                                     , ts_mean_path, record(3) )
+          else
+            call read_mean_ts_pnetcdf( tm_int(:,:,:,2), sm_int(:,:,:,2)  &
+                                     , ts_mean_path, record(1) )
+          end if
         else
           call msg_print("", 2, "FAILED...")
           tm_int(:,:,:,3) = tc_int(:,:,:,3)
@@ -395,15 +464,47 @@ module clim
       end if
 
 ! Interpolate TS and get background density
-      sclim = ( 1. - a )*sc_int(:,:,:,2) + a*sc_int(:,:,:,3)
-      tclim = ( 1. - a )*tc_int(:,:,:,2) + a*tc_int(:,:,:,3)
-      smean = ( 1. - a )*sm_int(:,:,:,2) + a*sm_int(:,:,:,3)
-      tmean = ( 1. - a )*tm_int(:,:,:,2) + a*tm_int(:,:,:,3)
+      if ( INTERP_CLIM ) then
+        sclim = ( 1. - a )*sc_int(:,:,:,2) + a*sc_int(:,:,:,3)
+        tclim = ( 1. - a )*tc_int(:,:,:,2) + a*tc_int(:,:,:,3)
+        smean = ( 1. - a )*sm_int(:,:,:,2) + a*sm_int(:,:,:,3)
+        tmean = ( 1. - a )*tm_int(:,:,:,2) + a*tm_int(:,:,:,3)
+      else
+        sclim = sc_int(:,:,:,2)
+        tclim = tc_int(:,:,:,2)
+        sclim = sm_int(:,:,:,2)
+        tclim = tm_int(:,:,:,2)
+      end if
 
       call dens( smean, tmean, rmean )
 
 
     end ! subroutine step
+!
+!______________________________________________________________________
+!
+    subroutine relax_to_clim( temp, salt )
+!----------------------------------------------------------------------
+!  Relaxes temperature and salinity to climatology.
+!______________________________________________________________________
+!
+      use glob_domain, only: im, jm, kb
+      use glob_ocean , only: hz
+
+      implicit none
+
+      real(rk), dimension(im,jm,kb), intent(inout) :: salt, temp
+
+
+      if ( .not.RELAX_TS ) return
+
+      where ( hz .gt. h_thres )
+        temp = ( tclim - temp ) / ( t_rel * 86400. )
+        salt = ( sclim - salt ) / ( t_rel * 86400. )
+      end where
+
+
+    end ! subroutine relax_ts
 !
 !______________________________________________________________________
 !

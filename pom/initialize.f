@@ -17,6 +17,7 @@
       use io         , only: initialize_io
       use glob_misc  , only: aamfac
       use glob_ocean , only: d, dt, el, et
+      use glob_out   , only: iout, iprint
       use model_run  , only: dtime, initialize_time, time, time0
 
       implicit none
@@ -84,6 +85,9 @@
 ! read M2 tidal amplitude & phase
       if ( calc_tide ) call read_tide      !fhx:tide
 
+! read previous (initial) record [TODO: NOTE! This step should be done before update_initial for clim to get rmean. But what happens to boundary?]
+      call modules_initial_step( dtime )
+
 ! update initial conditions and set the remaining conditions
       call update_initial
 
@@ -106,10 +110,8 @@
         dt = h+et
 ! update time
         time = time0
+        if ( append_output ) iout = int(time/iprint)
       end if
-
-! read previous (initial) record
-      call modules_initial_step( dtime )
 
 ! write grid and initial conditions
       if (output_flag == 1) then
@@ -158,6 +160,7 @@
 
       implicit none
 
+      integer k
 
       iout = 0
 
@@ -208,6 +211,7 @@
      $  fsm(im,jm)     ,
      $  h(im,jm)       ,
      $  hi(im,jm)      ,    !:rwnd
+     $  hz(im,jm,kb)   ,
      $  north_c(im,jm) ,
      $  north_e(im,jm) ,
      $  north_u(im,jm) ,
@@ -334,6 +338,10 @@
 
       ub(:,:,1:kbm1) = 0.
       vb(:,:,1:kbm1) = 0.
+
+      do k = 1, kb
+        hz(:,:,kb) = -h*zz(k)
+      end do
 
 
       end ! subroutine initialize_arrays
@@ -781,7 +789,7 @@
       use glob_ocean , only: aam, d, drhox, drhoy, drx2d, dry2d, dt
      &                     , el, elb, et, etb, etf
      &                     , kh, km, kq, l, q2, q2b, q2l, q2lb
-     &                     , s, sb, t, tb, u, ua, ub, uab
+     &                     , rho, s, sb, t, tb, u, ua, ub, uab
      &                     , v, va, vb, vab, w
 
       implicit none
@@ -828,6 +836,8 @@
           print '("   Defaulting to McCalpin 4th order (npg=2)")'
         end if
       end if
+
+      call dens(s,t,rho)
 
       call pgscheme(npg)
 
@@ -1328,7 +1338,6 @@
       d  = h + el
       dt = h + et
 
-      return
 
       end
 !______________________________________________________________________
@@ -1354,7 +1363,7 @@
         end do
       end if
 
-      end subroutine
+      end ! subroutine
 
 !______________________________________________________________________
 ! fhx:interp_flag
@@ -1390,7 +1399,8 @@
 
       end if
 
-      end subroutine
+
+      end ! subroutine
 
 !______________________________________________________________________
 !
@@ -1398,7 +1408,7 @@
 !----------------------------------------------------------------------
 !  Estimates minimum barotropic timestep (sec)
 !______________________________________________________________________
-
+!
         use glob_const , only: grav, rk, SMALL
         use glob_domain, only: im, jm, master_task, my_task, POM_COMM
         use glob_grid  , only: dx, dy, fsm, h
@@ -1441,7 +1451,8 @@
           end if
         end if
 
-      end subroutine check_cfl_min
+
+      end ! subroutine check_cfl_min
 !______________________________________________________________________
 !
       subroutine modules_initial_step( dtime )
