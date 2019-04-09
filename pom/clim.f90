@@ -10,7 +10,8 @@
 !
 module clim
 
-  use glob_const, only: PATH_LEN, rk, VAR_LEN
+  use glob_const , only: PATH_LEN, rk, VAR_LEN
+  use glob_domain, only: im, jm, kb
 
   implicit none
 
@@ -19,14 +20,16 @@ module clim
 !----------------------------------------------------------------------
 ! Configuration variables
 !----------------------------------------------------------------------
-  real(rk), private :: a         ! time-interpolation factor
+  real(rk), private :: a   & ! time-interpolation factor
+                     , ct    ! relaxation inverse period
 
   character(len=10)                       &
        , parameter                        &
        , private   :: FORMAT_EXT = ".nc"
 
   logical, private :: INTERP_CLIM  & ! Interpolation flag
-                    , RELAX_TS       ! Relaxation flag
+                    , RELAX_SURF   & ! Surface relaxation flag
+                    , RELAX_TS       ! Deep cells relaxation flag
 !----------------------------------------------------------------------
 ! Climatology time mode
 !----------------------------------------------------------------------
@@ -72,6 +75,8 @@ module clim
        , allocatable         &
        , dimension(:,:)   :: &
      eclim                   &
+  , s_relx                   &
+  , t_relx                   &
   , uaclim                   &
   , vaclim
   real(kind=rk)              &
@@ -117,6 +122,7 @@ module clim
 !______________________________________________________________________
 !
       use glob_domain, only: is_master
+      use glob_grid  , only: h
 
       implicit none
 
@@ -124,8 +130,8 @@ module clim
 
       integer pos
 
-      namelist/clim/                                           &
-        CLIM_MODE   , INTERP_CLIM, ts_clim_path, ts_mean_path  &
+      namelist/clim/                                            &
+        CLIM_MODE, ct, INTERP_CLIM, ts_clim_path, ts_mean_path  &
       , uv_clim_path
 
       namelist/clim_vars/                        &
@@ -137,8 +143,11 @@ module clim
 ! Initialize with default values
       INTERP_CLIM = .true.
       RELAX_TS    = .true.
+      RELAX_SURF = .false.
 
       CLIM_MODE = 2
+
+      ct = 1. / (15.*86400.)  ! 15-days surface relaxation period
 
       ts_clim_path = "in/clim/"
       ts_mean_path = "in/clim/"
@@ -185,10 +194,15 @@ module clim
 ! Allocate necessary arrays
       call allocate_arrays
 
+      if ( RELAX_SURF ) then
+        s_relx = ( 1. + tanh( .002*(h-1000.) ) )*.5
+        t_relx = ( 1. + tanh( .002*(h-1000.) ) )*.5
+      end if
+
       call msg_print("CLIM MODULE INITIALIZED", 1, "")
 
 
-    end ! subroutine initialize_air
+    end ! subroutine initialize_mod
 !
 !______________________________________________________________________
 !
@@ -197,8 +211,6 @@ module clim
 !  Allocate necessary variables.
 !______________________________________________________________________
 !
-      use glob_domain, only: im, jm, kb
-
       implicit none
 
       integer(1) N         ! Interpolation array extension size
@@ -246,6 +258,14 @@ module clim
       , va_int(im,jm,   2:N+1)  &
       , vc_int(im,jm,kb,2:N+1)  &
        )
+       
+! Allocate depth-relaxation arrays
+      if ( RELAX_SURF ) then
+        allocate(        &
+          s_relx(im,jm)  &
+        , t_relx(im,jm)  &
+         )
+      end if
 
 
     end ! subroutine allocate_arrays
@@ -488,7 +508,6 @@ module clim
 !  Relaxes temperature and salinity to climatology.
 !______________________________________________________________________
 !
-      use glob_domain, only: im, jm, kb
       use glob_ocean , only: hz
 
       implicit none
@@ -505,6 +524,28 @@ module clim
 
 
     end ! subroutine relax_ts
+!
+!______________________________________________________________________
+!
+    subroutine relax_surface( wssurf, wtsurf )
+!----------------------------------------------------------------------
+!  Relax surface fluxes to climatologies
+!______________________________________________________________________
+!
+      use glob_ocean, only: sb, tb
+
+      implicit none
+
+      real(rk), dimension(im,jm), intent(inout) :: wssurf, wtsurf
+
+
+      if ( .not.RELAX_SURF ) return
+
+      wtsurf = wtsurf + ct * t_relx * ( tb(:,:,1) - tclim(:,:,1) )
+      wssurf = wssurf + ct * s_relx * ( sb(:,:,1) - sclim(:,:,1) )
+
+
+    end ! subroutine relax_surface
 !
 !______________________________________________________________________
 !
@@ -656,7 +697,7 @@ module clim
       if ( status /= NF_NOERR ) then
         error_status = 1
         if ( is_master ) then
-          print '(/a,a)', 'IO error at module `AIR`: ', routine
+          print '(/a,a)', 'IO error at module `CLIM`: ', routine
           print '("[",i4,"] ",a)', status, nf90mpi_strerror(status)
           stop
         end if

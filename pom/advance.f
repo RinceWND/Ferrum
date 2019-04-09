@@ -25,7 +25,7 @@
 !            update_time       [globals.f90]
 !______________________________________________________________________
 !
-        use config   , only: use_ice
+        use config   , only: spinup, use_ice
         use model_run, only: iext, isplit
      &                     , update_time
         use seaice
@@ -38,7 +38,7 @@
         call update_time
 
 ! set time dependent boundary conditions
-        call update_bc
+        if ( .not.spinup ) call update_bc
 
 ! set lateral viscosity
         call lateral_viscosity

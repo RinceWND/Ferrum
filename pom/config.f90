@@ -110,8 +110,13 @@ module config
 
   contains
 
+!______________________________________________________________________
+!
     subroutine parameters_init
-
+!----------------------------------------------------------------------
+!  Initializes parameters with their default values.
+!______________________________________________________________________
+!
       use model_run, only: days, dte, isplit, time_start
 
       implicit none
@@ -266,14 +271,14 @@ module config
 
 
     end ! subroutine
-
+!
 !______________________________________________________________________
 !
     subroutine read_config( config )
 !----------------------------------------------------------------------
 !  Reads input values and defines constants.
 !______________________________________________________________________
-
+!
       use glob_const , only: rk
       use glob_out   , only: prtd1, prtd2, write_rst
       use model_run  , only: days, dte, isplit, time_start
@@ -286,9 +291,9 @@ module config
 !      include 'io.h'
 !      include 'bulk.h'
 
-      namelist/run_nml/                                   &
-        do_restart, restart_file, title                   &
-      , days      , dte         , isplit, time_start
+      namelist/run_nml/                          &
+        days      , dte  , do_restart  , isplit  &
+      , time_start, title, restart_file, spinup
 
       namelist/setup_nml/                     &
         aam_init, alpha , cbcmax, cbcmin      &
@@ -306,7 +311,7 @@ module config
         USE_AIR, USE_BRY, USE_ICE, USE_RIVER, USE_TIDE
 
       namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
-      namelist/misc_nml/ spinup, t_lo, t_hi
+      namelist/misc_nml/ t_lo, t_hi
 
 
 !  Initialize parameters first.
@@ -329,24 +334,22 @@ module config
 ! End of input of constants
 
 
-      return
-
-    end
-
-
+    end ! subroutine read_config
+!
 !______________________________________________________________________
 !
     subroutine print_config
 !----------------------------------------------------------------------
 !  Prints model configuration.
 !______________________________________________________________________
-
+!
       use glob_const
       use glob_domain, only: is_master
       use glob_out   , only: iprint, irestart, prtd1, prtd2, write_rst
       use model_run
 
       implicit none
+
 
       if ( .not.is_master ) return
 
@@ -418,10 +421,8 @@ module config
 !        end if
 !      end if
 
-      return
 
-      end
-
+    end ! subroutine print_config
 
 
 end module config
