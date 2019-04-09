@@ -187,12 +187,12 @@
                 aam(i,j,k) = horcon*dx(i,j)*dy(i,j)*aamfac(i,j)       !fhx:incmix
      $                    *sqrt( ((u(i+1,j,k)-u(i,j,k))/dx(i,j))**2
      $                          +((v(i,j+1,k)-v(i,j,k))/dy(i,j))**2
-     $                    +.5*(.25*(u(i,j+1,k)+u(i+1,j+1,k)
-     $                                 -u(i,j-1,k)-u(i+1,j-1,k))
-     $                    /dy(i,j)
-     $                    +.25*(v(i+1,j,k)+v(i+1,j+1,k)
-     $                           -v(i-1,j,k)-v(i-1,j+1,k))
-     $                    /dx(i,j)) **2)
+     $                    +.5*( .25*(u(i,j+1,k)+u(i+1,j+1,k)
+     $                              -u(i,j-1,k)-u(i+1,j-1,k))
+     $                              /dy(i,j)
+     $                         +.25*(v(i+1,j,k)+v(i+1,j+1,k)
+     $                              -v(i-1,j,k)-v(i-1,j+1,k))
+     $                              /dx(i,j) )**2)
                 if ( USE_SPONGE ) then
                   aam(i,j,k) = aam(i,j,k)*(1.+aamfrz(i,j))
                 end if
@@ -301,10 +301,11 @@
       use module_time
       use air        , only: e_atmos, vfluxf, wusurf, wvsurf
       use bry        , only: bc_vel_ext, bc_zeta
-      use config     , only: alpha, ispadv, smoth, use_tide
-      use glob_const , only: grav
-      use glob_domain, only: im, imm1, jm, jmm1!, my_task
-      use glob_grid  , only: art, aru, arv, cor, dx, dy, fsm, h
+      use config     , only: alpha, cbcmax, cbcmin, ispadv, smoth
+     &                     , use_tide, z0b
+      use glob_const , only: grav, Kappa
+      use glob_domain, only: im, imm1, jm, jmm1, kbm1!, my_task
+      use glob_grid  , only: art, aru, arv, cor, dx, dy, fsm, h, zz
       use glob_ocean
       use tide       , only: tide_ua, tide_va, tide_advance => step
       use model_run  , only: dte, dte2, iext, isp2i, ispi, isplit,dtime
@@ -316,10 +317,10 @@
 
       do j=2,jm
         do i=2,im
-          fluxua(i,j)=.25*(d(i,j)+d(i-1,j))
-     $                 *(dy(i,j)+dy(i-1,j))*ua(i,j)
-          fluxva(i,j)=.25*(d(i,j)+d(i,j-1))
-     $                 *(dx(i,j)+dx(i,j-1))*va(i,j)
+          fluxua(i,j)=.25*( d(i,j)+ d(i-1,j))
+     $                   *(dy(i,j)+dy(i-1,j))*ua(i,j)
+          fluxva(i,j)=.25*( d(i,j)+ d(i,j-1))
+     $                   *(dx(i,j)+dx(i,j-1))*va(i,j)
         end do
       end do
 
@@ -431,6 +432,15 @@
       vab = va
       va  = vaf
 
+! update bottom friction
+      do j=1,jm
+        do i=1,im
+          cbc(i,j)=(Kappa/log((.1+(1.0+zz(kbm1))*d(i,j))/z0b))**2
+          cbc(i,j)=max(cbcmin,cbc(i,j))
+          cbc(i,j)=min(cbcmax,cbc(i,j))
+        end do
+      end do
+
       if ( iext /= isplit ) then
 
         egf = egf + el*ispi
@@ -476,7 +486,7 @@
 !
       use air        , only: vfluxb, vfluxf, wssurf, wtsurf
       use bry        , only: bc_ts, bc_turb, bc_vel_int, bc_vel_vert
-      use clim       , only: tclim, sclim
+      use clim       , only: tclim, sclim, relax_to_clim
       use glob_const , only: rk, small
       use config     , only: mode, nadv, nbcs, nbct, do_restart
      &                     , smoth, t_lo, t_hi
@@ -607,7 +617,6 @@
           call proft(vf,wssurf,ssurf,nbcs,tps)
 
 
-          call bc_ts ! bcond(4)
           if ( t_lo > -999. ) then
             where ( uf < t_lo ) uf = t_lo
           end if
@@ -615,6 +624,9 @@
             where ( uf > t_hi ) uf = t_hi
           end if
 
+          call relax_to_clim( uf, vf )
+
+          call bc_ts ! bcond(4)
 
           call exchange3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
           call exchange3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
