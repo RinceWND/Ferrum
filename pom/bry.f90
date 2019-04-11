@@ -570,6 +570,27 @@ module bry
 ! Allocate arrays
       call allocate_boundary
 
+      fill_clim_el % EAST  = 1
+      fill_clim_el % NORTH = 1
+      fill_clim_el % SOUTH = 1
+      fill_clim_el % WEST  = 1
+      fill_clim_s  % EAST  = 1
+      fill_clim_s  % NORTH = 1
+      fill_clim_s  % SOUTH = 1
+      fill_clim_s  % WEST  = 1
+      fill_clim_t  % EAST  = 1
+      fill_clim_t  % NORTH = 1
+      fill_clim_t  % SOUTH = 1
+      fill_clim_t  % WEST  = 1
+      fill_clim_u  % EAST  = 1
+      fill_clim_u  % NORTH = 1
+      fill_clim_u  % SOUTH = 1
+      fill_clim_u  % WEST  = 1
+      fill_clim_v  % EAST  = 1
+      fill_clim_v  % NORTH = 1
+      fill_clim_v  % SOUTH = 1
+      fill_clim_v  % WEST  = 1
+
       call msg_print("BRY MODULE INITIALIZED", 1, "")
 
 
