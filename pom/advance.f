@@ -491,17 +491,18 @@
       use config     , only: mode, nadv, nbcs, nbct, do_restart
      &                     , smoth, t_lo, t_hi
       use glob_domain
-      use glob_grid  , only: dx, dy, dz, fsm, h, zz
+      use glob_grid  , only: dz, h
       use glob_ocean
       use model_run
 
       implicit none
 
       integer i,j,k
-      real(rk) dxr,dxl,dyt,dyb
 
 
-      if ( (iint/=1 .or. time0/=0.) .and. mode/=2 ) then
+      if ( mode /= 2 ) then
+      if ( ( iint>1 .and. .not.do_restart )
+     & .or.( iint>2 .and.      do_restart ) ) then
 
 ! adjust u(z) and v(z) such that depth average of (u,v) = (ua,va)
         tps = 0.
@@ -700,6 +701,9 @@
         vb = v
         v  = vf
 
+        call geopotential_vertical_velocity
+
+      end if
       end if
 
       egb = egf
@@ -710,56 +714,81 @@
       vtb = vtf
       vfluxb = vfluxf
 
-! calculate real w as wr
-      wr = 0.
 
-      do k=1,kbm1
-        do j=1,jm
-          do i=1,im
-            tps(i,j) = zz(k)*dt(i,j) + et(i,j)
+      end ! subroutine mode_internal
+!
+!______________________________________________________________________
+!
+      subroutine geopotential_vertical_velocity
+!----------------------------------------------------------------------
+!  Calculates real (geopotential) vertical velocity as `wr`
+!----------------------------------------------------------------------
+! called by: mode_internal  [advance.f]
+!
+! calls    : exchange3d_mpi [parallel_mpi.f]
+!______________________________________________________________________
+!
+        use glob_const , only: rk
+        use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+     &                       , n_east, n_north, n_south, n_west
+        use glob_grid  , only: dx, dy, fsm, zz
+        use glob_ocean , only: dt, et, etb, etf, tps, u, v, w, wr
+        use model_run  , only: dti2
+
+        implicit none
+
+        integer  i, j, k
+        real(rk) dxr, dxl, dyt, dyb
+
+
+        wr = 0.
+
+        do k=1,kbm1
+          do j=1,jm
+            do i=1,im
+              tps(i,j) = zz(k)*dt(i,j) + et(i,j)
+            end do
           end do
-        end do
-        do j=2,jmm1
-          do i=2,imm1
-            dxr=2.0/(dx(i+1,j)+dx(i,j))
-            dxl=2.0/(dx(i,j)+dx(i-1,j))
-            dyt=2.0/(dy(i,j+1)+dy(i,j))
-            dyb=2.0/(dy(i,j)+dy(i,j-1))
-            wr(i,j,k)=0.5*(w(i,j,k)+w(i,j,k+1))+0.5*
+          do j=2,jmm1
+            do i=2,imm1
+              dxr=2.0/(dx(i+1,j)+dx(i,j))
+              dxl=2.0/(dx(i,j)+dx(i-1,j))
+              dyt=2.0/(dy(i,j+1)+dy(i,j))
+              dyb=2.0/(dy(i,j)+dy(i,j-1))
+              wr(i,j,k)=0.5*(w(i,j,k)+w(i,j,k+1))+0.5*
      $                (u(i+1,j,k)*(tps(i+1,j)-tps(i,j))*dxr+
      $                 u(i,j,k)*(tps(i,j)-tps(i-1,j))*dxl+
      $                 v(i,j+1,k)*(tps(i,j+1)-tps(i,j))*dyt+
      $                 v(i,j,k)*(tps(i,j)-tps(i,j-1))*dyb)
      $                +(1.0+zz(k))*(etf(i,j)-etb(i,j))/dti2
+            end do
           end do
         end do
-      end do
 
-      call exchange3d_mpi(wr(:,:,1:kbm1),im,jm,kbm1)
+        call exchange3d_mpi(wr(:,:,1:kbm1),im,jm,kbm1)
 
-      do k=1,kb
-        do i=1,im
-          if(n_south.eq.-1) wr(i,1,k)=wr(i,2,k)
-          if(n_north.eq.-1) wr(i,jm,k)=wr(i,jmm1,k)
-        end do
-      end do
-      do k=1,kb
-        do j=1,jm
-          if(n_west.eq.-1) wr(1,j,k)=wr(2,j,k)
-          if(n_east.eq.-1) wr(im,j,k)=wr(imm1,j,k)
-        end do
-      end do
-
-      do k=1,kbm1
-        do j=1,jm
+        do k=1,kb
           do i=1,im
-            wr(i,j,k)=fsm(i,j)*wr(i,j,k)
+            if(n_south.eq.-1) wr(i,1,k)=wr(i,2,k)
+            if(n_north.eq.-1) wr(i,jm,k)=wr(i,jmm1,k)
           end do
         end do
-      end do
+        do k=1,kb
+          do j=1,jm
+            if(n_west.eq.-1) wr(1,j,k)=wr(2,j,k)
+            if(n_east.eq.-1) wr(im,j,k)=wr(imm1,j,k)
+          end do
+        end do
 
+        do k=1,kbm1
+          do j=1,jm
+            do i=1,im
+              wr(i,j,k)=fsm(i,j)*wr(i,j,k)
+            end do
+          end do
+        end do
 
-      end ! subroutine mode_internal
+      end ! subroutine geopotential_vertical_velocity
 !
 !______________________________________________________________________
 !
@@ -1191,7 +1220,7 @@
       use air
       use glob_const , only: rk
       use glob_domain, only: i_global, im, j_global, jm
-      use glob_grid  , only: h
+      use glob_grid  , only: fsm, h
       use model_run  , only: time
       use glob_ocean
 
