@@ -254,7 +254,7 @@ module config
 
 ! Thresholds for temperature and salinity
       t_hi =  999.
-      t_lo = -999.
+      t_lo = -2. !-999.
 !      s_hi =  999.
 !      s_lo = -999.
 

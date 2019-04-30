@@ -148,8 +148,8 @@ module io
 !
       use model_run  , only: dtime
       use glob_domain, only: kbm1
-      use glob_grid  , only: fsm
-      use glob_ocean , only: elb, rho, sb, tb
+      use glob_grid  , only: dz, fsm
+      use glob_ocean , only: elb, rho, sb, tb, uab, ub, vab, vb
 
       implicit none
 
@@ -162,7 +162,7 @@ module io
       call msg_print("", 6, "Read initial conditions:")
       if ( fexist ) then
 ! TODO: Make it possible to read separate initial file, not just clim.
-        call read_initial_ts_pnetcdf( tb, sb, elb, dtime%month )
+        call read_initial_ts_pnetcdf( tb, sb, ub, vb, elb, 1 ) !dtime%month )
 !        call read_ts_z_pnetcdf( tb, sb, 40, dtime%month, ic_path )
       else
         call msg_print("", 2, "FAILED...")
@@ -170,9 +170,14 @@ module io
         sb = 33.
       end if
 
+      uab = 0.
+      vab = 0.
+
       do k = 1,kbm1
         sb(:,:,k) = sb(:,:,k) * fsm
         tb(:,:,k) = tb(:,:,k) * fsm
+        uab(:,:)  = uab(:,:) + ub(:,:,k)*dz(k)
+        vab(:,:)  = vab(:,:) + vb(:,:,k)*dz(k)
       end do
 
 ! Calculate initial density.
@@ -721,6 +726,7 @@ module io
       if ( n_east == -1 ) then
         start(1) = j_global(1)
         edge(1) = jm
+        print *, "!!!", shape(el_bry%est), shape(out1y)
         out1y = real(el_bry%est(1,:),4)
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,ele_varid,start,edge,out1y )  &
@@ -1618,7 +1624,7 @@ module io
 !
 !______________________________________________________________________
 !
-    subroutine read_initial_ts_pnetcdf( temp, salt, ssh, n )
+    subroutine read_initial_ts_pnetcdf( temp, salt, u, v, ssh, n )
 !----------------------------------------------------------------------
 !  Reads initial temperature, salinity and elevation.
 ! TODO: Add u and v. Add check for single record to read if not climatology.
@@ -1636,10 +1642,11 @@ module io
                          , get_var_real_3d
 
       integer , intent(in)  :: n
-      real(rk), intent(out) :: temp(im,jm,kb),salt(im,jm,kb),ssh(im,jm)
+      real(rk), intent(out) :: temp(im,jm,kb),salt(im,jm,kb)        &
+                             , u(im,jm,kb),v(im,jm,kb), ssh(im,jm)
 
       integer                  ncid, status
-      integer                  el_varid, sb_varid, tb_varid
+      integer                  el_varid,sb_varid,tb_varid,u_varid,v_varid
       integer(MPI_OFFSET_KIND) start(4),edge(4)
 
 
@@ -1655,12 +1662,12 @@ module io
                 , "nfmpi_open: "//ic_path )
 
 !  Get variables. [ TODO: parameterize varnames ]
-      call check( nf90mpi_inq_varid( ncid, 'tclim', tb_varid )  &
+      call check( nf90mpi_inq_varid( ncid, 't_init', tb_varid )  &
                 , "nfmpi_inq_varid: t_init @ "//ic_path )
-      call check( nf90mpi_inq_varid( ncid, 'sclim', sb_varid )  &
+      call check( nf90mpi_inq_varid( ncid, 's_init', sb_varid )  &
                 , "nfmpi_inq_varid: s_init @ "//ic_path )
 
-      status = nf90mpi_inq_varid( ncid, 'eclim', el_varid )
+      status = nf90mpi_inq_varid( ncid, 'einit', el_varid )
       if ( status == NF_NOERR ) then
 ! Get elevation.
         start(1) = i_global(1)
@@ -1695,6 +1702,23 @@ module io
                 , "nf_get_var : temp @ "//ic_path )
       call check( get_var_real_3d(ncid,sb_varid,start,edge,salt)  &
                 , "nf_get_var : salt @ "//ic_path )
+
+      status = nf90mpi_inq_varid( ncid, 'u_init', u_varid )
+      if ( status == NF_NOERR ) then
+        call check( get_var_real_3d(ncid,u_varid,start,edge,u)  &
+                , "nf_get_var : u @ "//ic_path )
+        u = u/100.
+      else
+        u = 0.
+      end if
+      status = nf90mpi_inq_varid( ncid, 'v_init', v_varid )
+      if ( status == NF_NOERR ) then
+        call check( get_var_real_3d(ncid,v_varid,start,edge,v)  &
+                , "nf_get_var : v @ "//ic_path )
+        v = v/100.
+      else
+        v = 0.
+      end if
 
 !! TODO: move out
 !      do k=1,kb-1
