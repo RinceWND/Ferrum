@@ -430,7 +430,7 @@ module bry
       if ( use_bry ) DISABLED = .false.
 
 ! Set max depth
-      hmax = 8000.
+      hmax = 4500. !8000.
 
 ! Set default relaxation thickness
       NFE = 1
@@ -695,14 +695,14 @@ module bry
 !
       use module_time
       use glob_grid  , only: dz
-      use model_run  , only: mid_in_month, sec_of_month
+      use model_run  , only: mid_in_month, mid_in_nbr, sec_of_month
 
       type(date), intent(in) :: d_in
 
       integer            max_in_prev , max_in_this
       integer                          &
       , dimension(3)  :: record, year
-      real               chunk
+      real               a, chunk
 
 
 ! Quit if the module is not used.
@@ -719,8 +719,12 @@ module bry
         if ( sec_of_month <= mid_in_month ) then
           record(2) = d_in%month - 1
           if ( record(2) == 0 ) record(2) = 12
+          a = real( sec_of_month + mid_in_nbr   )  &
+             /real( mid_in_nbr   + mid_in_month )
         else
           record(2) = d_in%month
+          a = real( sec_of_month - mid_in_month )  &
+             /real( mid_in_nbr   + mid_in_month )
         end if
 
         record(3) = mod( record(2), 12 ) + 1
@@ -744,9 +748,9 @@ module bry
         record(3) = record(2) + 1
 
         if ( record(2) == 0 ) then
-          record(2) = max_in_prev + 1 ! TODO: [ NEEDS TESTING ]
+          record(2) = max_in_prev ! TODO: [ NEEDS TESTING ]
           year(2) = d_in%year - 1
-        elseif ( record(3) == max_in_this + 1 ) then
+        elseif ( record(3) == max_in_this ) then
           record(3) = 1
           year(3) = d_in%year + 1
         end if
@@ -759,56 +763,12 @@ module bry
       if ( INTERP_BRY ) then
         call read_all( .true., 2, year, record )
         call read_all( .true., 3, year, record )
+        call interpolate
       else
         call read_all( .true., 1, year, record )
       end if
-
-      if ( DERIVE_2D ) then
-
-        if ( hasEAST ) then
-          UA_bry % EST = 0.
-          VA_bry % EST = 0.
-          do k = 1, kb
-            UA_bry % EST = UA_bry % EST                &
-                         +  U_bry % EST(:,:,k) * dz(k)
-            VA_bry % EST = VA_bry % EST                &
-                         +  V_bry % EST(:,:,k) * dz(k)
-          end do
-!          print *, "EAST UA: min=", minval(UA_bry%EST), "; max=", maxval(UA_bry%EST)
-        end if
-        if ( hasNORTH ) then
-          UA_bry % NTH = 0.
-          VA_bry % NTH = 0.
-          do k = 1, kb
-            UA_bry % NTH = UA_bry % NTH                &
-                         +  U_bry % NTH(:,:,k) * dz(k)
-            VA_bry % NTH = VA_bry % NTH                &
-                         +  V_bry % NTH(:,:,k) * dz(k)
-          end do
-        end if
-        if ( hasSOUTH ) then
-          UA_bry % STH = 0.
-          VA_bry % STH = 0.
-          do k = 1, kb
-            UA_bry % STH = UA_bry % STH                &
-                         +  U_bry % STH(:,:,k) * dz(k)
-            VA_bry % STH = VA_bry % STH                &
-                         +  V_bry % STH(:,:,k) * dz(k)
-          end do
-!          print *, "SOUTH VA: min=", minval(VA_bry%STH), "; max=", maxval(VA_bry%STH)
-        end if
-        if ( hasWEST ) then
-          UA_bry % WST = 0.
-          VA_bry % WST = 0.
-          do k = 1, kb
-            UA_bry % WST = UA_bry % WST                &
-                         +  U_bry % WST(:,:,k) * dz(k)
-            VA_bry % WST = VA_bry % WST                &
-                         +  V_bry % WST(:,:,k) * dz(k)
-          end do
-        end if
-
-      end if
+      
+      if ( DERIVE_2D ) call derive_barotropic_velocities
 
       call msg_print("BRY INITIALIZED", 2, "")
 
@@ -841,6 +801,9 @@ module bry
 ! Quit if the module is not used.
       if ( DISABLED ) return
 
+      ADVANCE_REC     = .false.
+      ADVANCE_REC_INT = .false.
+
       if ( MONTHLY ) then
 
         year = -1
@@ -864,8 +827,7 @@ module bry
         if ( sec_of_month - mid_in_month <= dti .and.  &
              record(2) == record(1) ) then
           ADVANCE_REC_INT = .true.
-        else
-          ADVANCE_REC_INT = .false.
+          print *, "[!!!] ", sec_of_month, mid_in_month, dti
         end if
 
       else
@@ -879,7 +841,6 @@ module bry
         chunk     = chunk_of_year( d_in, read_int )
         record(1) = int(chunk)
 
-        ADVANCE_REC = .false.
         if ( secs - record(1)*read_int < dti ) then ! TODO: test this one as well.
           ADVANCE_REC = .true.
         end if
@@ -895,169 +856,12 @@ module bry
         if ( INTERP_BRY .and. ADVANCE_REC_INT ) then
           call advance_record
           call read_all( ADVANCE_REC_INT, 3, year, record )
-        else
+          call interpolate
+        end if
+        if ( ADVANCE_REC ) then
           call read_all( ADVANCE_REC    , 1, year, record )
         end if
-      end if
-
-! Interpolate boundaries or just get the values
-      if ( INTERP_BRY ) then
-
-        if ( hasEAST ) then
-
-          EL_bry % EST(1:NFE,:) =                          &
-            ( 1. - a ) * EL_int % EST(1:NFE,:,2)  &
-           +       a   * EL_int % EST(1:NFE,:,3)
-           S_bry % EST(1:NFE,:,:) =                          &
-            ( 1. - a ) *  S_int % EST(1:NFE,:,:,2)  &
-           +       a   *  S_int % EST(1:NFE,:,:,3)
-           T_bry % EST(1:NFE,:,:) =                          &
-            ( 1. - a ) *  T_int % EST(1:NFE,:,:,2)  &
-           +       a   *  T_int % EST(1:NFE,:,:,3)
-           U_bry % EST(1:NFE,:,:) =                          &
-            ( 1. - a ) *  U_int % EST(1:NFE,:,:,2)  &
-           +       a   *  U_int % EST(1:NFE,:,:,3)
-           V_bry % EST(1:NFE,:,:) =                          &
-            ( 1. - a ) *  V_int % EST(1:NFE,:,:,2)  &
-           +       a   *  V_int % EST(1:NFE,:,:,3)
-
-          if ( DERIVE_2D ) then
-            UA_bry % EST = 0.
-            VA_bry % EST = 0.
-            do k = 1, kb
-              UA_bry % EST = UA_bry % EST                &
-                           +  U_bry % EST(:,:,k) * dz(k)
-              VA_bry % EST = VA_bry % EST                &
-                           +  V_bry % EST(:,:,k) * dz(k)
-            end do
-!            print *, "EAST UA: min=", minval(UA_bry%EST), "; max=", maxval(UA_bry%EST)
-          else
-            UA_bry % EST(1:NFE,:) =                           &
-              ( 1. - a ) *  UA_int % EST(1:NFE,:,2)  &
-             +       a   *  UA_int % EST(1:NFE,:,3)
-            VA_bry % EST(1:NFE,:) =                           &
-              ( 1. - a ) *  VA_int % EST(1:NFE,:,2)  &
-             +       a   *  VA_int % EST(1:NFE,:,3)
-          end if
-
-        end if
-
-        if ( hasNORTH ) then
-
-          EL_bry % NTH(:,1:NFN) =                          &
-            ( 1. - a ) * EL_int % NTH(:,1:NFN,2)  &
-           +       a   * EL_int % NTH(:,1:NFN,3)
-           S_bry % NTH(:,1:NFN,:) =                          &
-            ( 1. - a ) *  S_int % NTH(:,1:NFN,:,2)  &
-           +       a   *  S_int % NTH(:,1:NFN,:,3)
-           T_bry % NTH(:,1:NFN,:) =                          &
-            ( 1. - a ) *  T_int % NTH(:,1:NFN,:,2)  &
-           +       a   *  T_int % NTH(:,1:NFN,:,3)
-           U_bry % NTH(:,1:NFN,:) =                          &
-            ( 1. - a ) *  U_int % NTH(:,1:NFN,:,2)  &
-           +       a   *  U_int % NTH(:,1:NFN,:,3)
-           V_bry % NTH(:,1:NFN,:) =                          &
-            ( 1. - a ) *  V_int % NTH(:,1:NFN,:,2)  &
-           +       a   *  V_int % NTH(:,1:NFN,:,3)
-
-          if ( DERIVE_2D ) then
-            UA_bry % NTH = 0.
-            VA_bry % NTH = 0.
-            do k = 1, kb
-              UA_bry % NTH = UA_bry % NTH                &
-                           +  U_bry % NTH(:,:,k) * dz(k)
-              VA_bry % NTH = VA_bry % NTH                &
-                           +  V_bry % NTH(:,:,k) * dz(k)
-            end do
-          else
-            UA_bry % NTH(:,1:NFN) =                           &
-              ( 1. - a ) *  UA_int % NTH(:,1:NFN,2)  &
-             +       a   *  UA_int % NTH(:,1:NFN,3)
-            VA_bry % NTH(:,1:NFN) =                           &
-              ( 1. - a ) *  VA_int % NTH(:,1:NFN,2)  &
-             +       a   *  VA_int % NTH(:,1:NFN,3)
-          end if
-
-        end if
-
-        if ( hasSOUTH ) then
-
-          EL_bry % STH(:,1:NFS) =                 &
-            ( 1. - a ) * EL_int % STH(:,1:NFS,2)  &
-           +       a   * EL_int % STH(:,1:NFS,3)
-           S_bry % STH(:,1:NFS,:) =                 &
-            ( 1. - a ) *  S_int % STH(:,1:NFS,:,2)  &
-           +       a   *  S_int % STH(:,1:NFS,:,3)
-           T_bry % STH(:,1:NFS,:) =                 &
-            ( 1. - a ) *  T_int % STH(:,1:NFS,:,2)  &
-           +       a   *  T_int % STH(:,1:NFS,:,3)
-           U_bry % STH(:,1:NFS,:) =                 &
-            ( 1. - a ) *  U_int % STH(:,1:NFS,:,2)  &
-           +       a   *  U_int % STH(:,1:NFS,:,3)
-           V_bry % STH(:,1:NFS,:) =                 &
-            ( 1. - a ) *  V_int % STH(:,1:NFS,:,2)  &
-           +       a   *  V_int % STH(:,1:NFS,:,3)
-
-          if ( DERIVE_2D ) then
-            UA_bry % STH = 0.
-            VA_bry % STH = 0.
-            do k = 1, kb
-              UA_bry % STH = UA_bry % STH                &
-                           +  U_bry % STH(:,:,k) * dz(k)
-              VA_bry % STH = VA_bry % STH                &
-                           +  V_bry % STH(:,:,k) * dz(k)
-            end do
-!            print *, "SOUTH VA: min=", minval(VA_bry%STH), "; max=", maxval(VA_bry%STH)
-          else
-            UA_bry % STH(:,1:NFS) =                  &
-              ( 1. - a ) *  UA_int % STH(:,1:NFS,2)  &
-             +       a   *  UA_int % STH(:,1:NFS,3)
-            VA_bry % STH(:,1:NFS) =                  &
-              ( 1. - a ) *  VA_int % STH(:,1:NFS,2)  &
-             +       a   *  VA_int % STH(:,1:NFS,3)
-          end if
-
-        end if
-
-        if ( hasWEST ) then
-
-          EL_bry % WST(1:NFW,:) =                 &
-            ( 1. - a ) * EL_int % WST(1:NFW,:,2)  &
-           +       a   * EL_int % WST(1:NFW,:,3)
-           S_bry % WST(1:NFW,:,:) =                 &
-            ( 1. - a ) *  S_int % WST(1:NFW,:,:,2)  &
-           +       a   *  S_int % WST(1:NFW,:,:,3)
-           T_bry % WST(1:NFW,:,:) =                 &
-            ( 1. - a ) *  T_int % WST(1:NFW,:,:,2)  &
-           +       a   *  T_int % WST(1:NFW,:,:,3)
-           U_bry % WST(1:NFW,:,:) =                 &
-            ( 1. - a ) *  U_int % WST(1:NFW,:,:,2)  &
-           +       a   *  U_int % WST(1:NFW,:,:,3)
-           V_bry % WST(1:NFW,:,:) =                 &
-            ( 1. - a ) *  V_int % WST(1:NFW,:,:,2)  &
-           +       a   *  V_int % WST(1:NFW,:,:,3)
-
-          if ( DERIVE_2D ) then
-            UA_bry % WST = 0.
-            VA_bry % WST = 0.
-            do k = 1, kb
-              UA_bry % WST = UA_bry % WST                &
-                           +  U_bry % WST(:,:,k) * dz(k)
-              VA_bry % WST = VA_bry % WST                &
-                           +  V_bry % WST(:,:,k) * dz(k)
-            end do
-  !          print *, "EAST UA: min=", minval(UA_bry%WST), "; max=", maxval(UA_bry%WST)
-          else
-            UA_bry % WST(1:NFW,:) =                  &
-              ( 1. - a ) *  UA_int % WST(1:NFW,:,2)  &
-             +       a   *  UA_int % WST(1:NFW,:,3)
-            VA_bry % WST(1:NFW,:) =                  &
-              ( 1. - a ) *  VA_int % WST(1:NFW,:,2)  &
-             +       a   *  VA_int % WST(1:NFW,:,3)
-          end if
-
-        end if
-
+        if ( DERIVE_2D ) call derive_barotropic_velocities
       end if
 
 ! Fill in climate to boundaries
@@ -1280,6 +1084,203 @@ module bry
 
 
     end ! subroutine clim_to_bry
+!
+!______________________________________________________________________
+!
+    subroutine interpolate
+!----------------------------------------------------------------------
+!  Interpolate boundaries or just get the values
+!______________________________________________________________________
+!
+      implicit none
+
+
+      if ( hasEAST ) then
+
+        EL_bry % EST(1:NFE,:) =                          &
+          ( 1. - a ) * EL_int % EST(1:NFE,:,2)  &
+         +       a   * EL_int % EST(1:NFE,:,3)
+         S_bry % EST(1:NFE,:,:) =                          &
+          ( 1. - a ) *  S_int % EST(1:NFE,:,:,2)  &
+         +       a   *  S_int % EST(1:NFE,:,:,3)
+         T_bry % EST(1:NFE,:,:) =                          &
+          ( 1. - a ) *  T_int % EST(1:NFE,:,:,2)  &
+         +       a   *  T_int % EST(1:NFE,:,:,3)
+         U_bry % EST(1:NFE,:,:) =                          &
+          ( 1. - a ) *  U_int % EST(1:NFE,:,:,2)  &
+         +       a   *  U_int % EST(1:NFE,:,:,3)
+         V_bry % EST(1:NFE,:,:) =                          &
+          ( 1. - a ) *  V_int % EST(1:NFE,:,:,2)  &
+         +       a   *  V_int % EST(1:NFE,:,:,3)
+
+        if ( .not.DERIVE_2D ) then
+          UA_bry % EST(1:NFE,:) =                           &
+            ( 1. - a ) *  UA_int % EST(1:NFE,:,2)  &
+           +       a   *  UA_int % EST(1:NFE,:,3)
+          VA_bry % EST(1:NFE,:) =                           &
+            ( 1. - a ) *  VA_int % EST(1:NFE,:,2)  &
+           +       a   *  VA_int % EST(1:NFE,:,3)
+        end if
+
+      end if
+
+      if ( hasNORTH ) then
+
+        EL_bry % NTH(:,1:NFN) =                          &
+          ( 1. - a ) * EL_int % NTH(:,1:NFN,2)  &
+         +       a   * EL_int % NTH(:,1:NFN,3)
+         S_bry % NTH(:,1:NFN,:) =                          &
+          ( 1. - a ) *  S_int % NTH(:,1:NFN,:,2)  &
+         +       a   *  S_int % NTH(:,1:NFN,:,3)
+         T_bry % NTH(:,1:NFN,:) =                          &
+          ( 1. - a ) *  T_int % NTH(:,1:NFN,:,2)  &
+         +       a   *  T_int % NTH(:,1:NFN,:,3)
+         U_bry % NTH(:,1:NFN,:) =                          &
+          ( 1. - a ) *  U_int % NTH(:,1:NFN,:,2)  &
+         +       a   *  U_int % NTH(:,1:NFN,:,3)
+         V_bry % NTH(:,1:NFN,:) =                          &
+          ( 1. - a ) *  V_int % NTH(:,1:NFN,:,2)  &
+         +       a   *  V_int % NTH(:,1:NFN,:,3)
+
+        if ( .not.DERIVE_2D ) then
+          UA_bry % NTH(:,1:NFN) =                           &
+            ( 1. - a ) *  UA_int % NTH(:,1:NFN,2)  &
+           +       a   *  UA_int % NTH(:,1:NFN,3)
+          VA_bry % NTH(:,1:NFN) =                           &
+            ( 1. - a ) *  VA_int % NTH(:,1:NFN,2)  &
+           +       a   *  VA_int % NTH(:,1:NFN,3)
+        end if
+
+      end if
+
+      if ( hasSOUTH ) then
+
+        EL_bry % STH(:,1:NFS) =                 &
+          ( 1. - a ) * EL_int % STH(:,1:NFS,2)  &
+         +       a   * EL_int % STH(:,1:NFS,3)
+         S_bry % STH(:,1:NFS,:) =                 &
+          ( 1. - a ) *  S_int % STH(:,1:NFS,:,2)  &
+         +       a   *  S_int % STH(:,1:NFS,:,3)
+         T_bry % STH(:,1:NFS,:) =                 &
+          ( 1. - a ) *  T_int % STH(:,1:NFS,:,2)  &
+         +       a   *  T_int % STH(:,1:NFS,:,3)
+         U_bry % STH(:,1:NFS,:) =                 &
+          ( 1. - a ) *  U_int % STH(:,1:NFS,:,2)  &
+         +       a   *  U_int % STH(:,1:NFS,:,3)
+         V_bry % STH(:,1:NFS,:) =                 &
+          ( 1. - a ) *  V_int % STH(:,1:NFS,:,2)  &
+         +       a   *  V_int % STH(:,1:NFS,:,3)
+
+        if ( .not.DERIVE_2D ) then
+          UA_bry % STH(:,1:NFS) =                  &
+            ( 1. - a ) *  UA_int % STH(:,1:NFS,2)  &
+           +       a   *  UA_int % STH(:,1:NFS,3)
+          VA_bry % STH(:,1:NFS) =                  &
+            ( 1. - a ) *  VA_int % STH(:,1:NFS,2)  &
+           +       a   *  VA_int % STH(:,1:NFS,3)
+        end if
+
+      end if
+
+      if ( hasWEST ) then
+
+        EL_bry % WST(1:NFW,:) =                 &
+          ( 1. - a ) * EL_int % WST(1:NFW,:,2)  &
+         +       a   * EL_int % WST(1:NFW,:,3)
+         S_bry % WST(1:NFW,:,:) =                 &
+          ( 1. - a ) *  S_int % WST(1:NFW,:,:,2)  &
+         +       a   *  S_int % WST(1:NFW,:,:,3)
+         T_bry % WST(1:NFW,:,:) =                 &
+          ( 1. - a ) *  T_int % WST(1:NFW,:,:,2)  &
+         +       a   *  T_int % WST(1:NFW,:,:,3)
+         U_bry % WST(1:NFW,:,:) =                 &
+          ( 1. - a ) *  U_int % WST(1:NFW,:,:,2)  &
+         +       a   *  U_int % WST(1:NFW,:,:,3)
+         V_bry % WST(1:NFW,:,:) =                 &
+          ( 1. - a ) *  V_int % WST(1:NFW,:,:,2)  &
+         +       a   *  V_int % WST(1:NFW,:,:,3)
+
+        if ( .not.DERIVE_2D ) then
+          UA_bry % WST(1:NFW,:) =                  &
+            ( 1. - a ) *  UA_int % WST(1:NFW,:,2)  &
+           +       a   *  UA_int % WST(1:NFW,:,3)
+          VA_bry % WST(1:NFW,:) =                  &
+            ( 1. - a ) *  VA_int % WST(1:NFW,:,2)  &
+           +       a   *  VA_int % WST(1:NFW,:,3)
+        end if
+
+      end if
+
+
+    end ! subroutine
+!
+!______________________________________________________________________
+!
+    subroutine derive_barotropic_velocities
+!----------------------------------------------------------------------
+!  Vertically integrates baroclinic boundary values
+!______________________________________________________________________
+!
+      use glob_grid, only: dz
+
+      implicit none
+
+
+      if ( hasEAST ) then
+
+        UA_bry % EST = 0.
+        VA_bry % EST = 0.
+        do k = 1, kb
+          UA_bry % EST = UA_bry % EST                &
+                       +  U_bry % EST(:,:,k) * dz(k)
+          VA_bry % EST = VA_bry % EST                &
+                       +  V_bry % EST(:,:,k) * dz(k)
+        end do
+
+      end if
+
+      if ( hasNORTH ) then
+
+        UA_bry % NTH = 0.
+        VA_bry % NTH = 0.
+        do k = 1, kb
+          UA_bry % NTH = UA_bry % NTH                &
+                       +  U_bry % NTH(:,:,k) * dz(k)
+          VA_bry % NTH = VA_bry % NTH                &
+                       +  V_bry % NTH(:,:,k) * dz(k)
+        end do
+
+      end if
+
+      if ( hasSOUTH ) then
+
+        UA_bry % STH = 0.
+        VA_bry % STH = 0.
+        do k = 1, kb
+          UA_bry % STH = UA_bry % STH                &
+                       +  U_bry % STH(:,:,k) * dz(k)
+          VA_bry % STH = VA_bry % STH                &
+                       +  V_bry % STH(:,:,k) * dz(k)
+        end do
+
+      end if
+
+      if ( hasWEST ) then
+
+        UA_bry % WST = 0.
+        VA_bry % WST = 0.
+        do k = 1, kb
+          UA_bry % WST = UA_bry % WST                &
+                       +  U_bry % WST(:,:,k) * dz(k)
+          VA_bry % WST = VA_bry % WST                &
+                       +  V_bry % WST(:,:,k) * dz(k)
+        end do
+
+      end if
+
+
+    end ! subroutine
+!
 !______________________________________________________________________
 !
     subroutine read_all( execute, n, year, record )
@@ -1417,7 +1418,7 @@ module bry
           fill_clim_el % east = 1
           call msg_print("", 2, "Elev@EAST read error. Skipping...")
         end if
-        print *, "EL: ", minval(EL_bry%EST), maxval(EL_bry%EST), n
+!        print *, "EL: ", minval(EL_bry%EST), maxval(EL_bry%EST), n
 
       else
 
@@ -1947,7 +1948,7 @@ module bry
 !
       use glob_const , only: GRAV
       use glob_grid  , only: dum, dvm, h!, dx, dy
-      use glob_ocean , only: el, uaf, vaf
+      use glob_ocean , only: d, el, uaf, vaf
       use model_run  , only: ramp
 
       implicit none
@@ -1990,7 +1991,7 @@ module bry
 
             case ( bcFLATHER )
               uaf(im,2:jmm1) = UA_bry%EST(1,2:jmm1)              &
-                         + sqrt(GRAV/h(imm1,2:jmm1))             &
+                         + sqrt(GRAV/d(imm1,2:jmm1))             &
                           *(el(imm1,2:jmm1)-EL_bry%EST(1,2:jmm1))
 
             case ( bcGENFLATHER )
@@ -2052,7 +2053,7 @@ module bry
 
             case ( bcFLATHER )
               uaf(2,2:jmm1) = UA_bry%WST(1,2:jmm1)              &
-                           - sqrt(GRAV/h(2,2:jmm1))             &
+                           - sqrt(GRAV/d(2,2:jmm1))             &
                             *(el(2,2:jmm1)-EL_bry%WST(1,2:jmm1))
 
             case ( bcGENFLATHER )
@@ -2136,7 +2137,7 @@ module bry
 
             case ( bcFLATHER )
               vaf(2:imm1,jm) = VA_bry%NTH(2:imm1,1)              &
-                         + sqrt(GRAV/h(2:imm1,jmm1))             &
+                         + sqrt(GRAV/d(2:imm1,jmm1))             &
                           *(el(2:imm1,jmm1)-EL_bry%NTH(2:imm1,1))
 
             case ( bcGENFLATHER )
@@ -2197,7 +2198,7 @@ module bry
 
             case ( bcFLATHER )
               vaf(2:imm1,2) = VA_bry%STH(2:imm1,1)              &
-                           - sqrt(GRAV/h(2:imm1,2))             &
+                           - sqrt(GRAV/d(2:imm1,2))             &
                             *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))
 
             case ( bcGENFLATHER )
@@ -2259,7 +2260,7 @@ module bry
 !
       use glob_const , only: SMALL
       use glob_grid  , only: dum, dvm, h
-      use glob_ocean , only: u, ub, uf, v, vb, vf, wubot, wvbot
+      use glob_ocean , only: d, u, ub, uf, v, vb, vf, wubot, wvbot
 
       implicit none
 
@@ -2313,7 +2314,7 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do j = 2,jmm1
-                  cff = sqrt( h(im,j) / hmax )
+                  cff = sqrt( d(im,j) / hmax )
                   uf(im,j,k) = .25 * (     cff  * ( u(imm1,j-1,k)     &
                                  + 2.*u(imm1,j,k) + u(imm1,j+1,k) )   &
                                      + (1.-cff) * ( u(im  ,j-1,k)     &
@@ -2415,7 +2416,7 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do j = 2,jmm1
-                  cff = sqrt( h(1,j) / hmax )
+                  cff = sqrt( d(1,j) / hmax )
                   uf(2,j,k) = .25 * (     cff  * ( u(3,j-1,k)     &
                                    + 2.*u(3,j,k) + u(3,j+1,k) )   &
                                     + (1.-cff) * ( u(2,j-1,k)     &
@@ -2548,7 +2549,7 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do i = 2,imm1
-                  cff = sqrt( h(i,jm) / hmax )
+                  cff = sqrt( d(i,jm) / hmax )
                   vf(i,jm,k) = .25 * (     cff  * ( v(i-1,jmm1,k)     &
                                  + 2.*v(i,jmm1,k) + v(i+1,jmm1,k) )   &
                                      + (1.-cff) * ( v(i-1,jm  ,k)     &
@@ -2650,7 +2651,7 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do i = 2,imm1
-                  cff = sqrt( h(i,1) / hmax )
+                  cff = sqrt( d(i,1) / hmax )
                   vf(i,2,k) = .25 * (     cff  * ( v(i-1,3,k)     &
                                    + 2.*v(i,3,k) + v(i+1,3,k) )   &
                                     + (1.-cff) * ( v(i-1,2,k)     &

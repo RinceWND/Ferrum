@@ -10,7 +10,8 @@ module config
 ! Input variables
 !----------------------------------------------------------------------
   logical            &
-    do_restart         ! flag to start from restart file
+    do_restart       & ! flag to start from restart file
+  , append_output      ! write to an existing output file
 
   integer            &
     mode             & ! calculation mode
@@ -264,6 +265,10 @@ module config
       USE_RIVER = .false.
       USE_TIDE  = .false.
 
+! Restart flags
+      do_restart    = .false.
+      append_output = .false.
+
 
     end ! subroutine
 !
@@ -298,9 +303,9 @@ module config
       , tbias   , tprni , umol  , vmaxl       &
       , z0b
 
-      namelist/output_nml/                                   &
-        monthly_flag, netcdf_file  , output_flag, prtd1      &
-      , prtd2       , write_rst, SURF_flag
+      namelist/output_nml/                                       &
+        append_output, monthly_flag, netcdf_file  , output_flag  &
+      , prtd1        , prtd2       , write_rst    , SURF_flag
 
       namelist/modules_nml/                             &
         USE_AIR, USE_BRY, USE_ICE, USE_RIVER, USE_TIDE
@@ -315,8 +320,11 @@ module config
 !  Read input namelist.
       open ( 73, file = config, status = 'old' )
       read ( 73, nml =     run_nml )
+      rewind( 73 )
       read ( 73, nml =  output_nml )
+      rewind( 73 )
       read ( 73, nml =   setup_nml )
+      rewind( 73 )
       read ( 73, nml = modules_nml )
       close( 73 )
 

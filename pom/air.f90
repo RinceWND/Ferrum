@@ -67,6 +67,7 @@ module air
   , READ_HEAT      & !  heat fluxes
   , READ_STRESS    & !  momentum flux
   , READ_WIND      & !  wind (even if using wind stress)
+  , TAPER_BRY      & ! Apply tapering along boundaries
                      ! Treat surface forcing differently:
   , USE_BULK       & !  heat flux is estimated using bulk formulas
   , USE_COARE      & !  use COARE algorithm for bulk formulations
@@ -114,6 +115,7 @@ module air
     e_atmos                  & ! atmospheric pressure
   , swrad                    & ! short wave radiation incident
                                !  on the ocean surface
+  , taper_mask               & ! mask for surface forcing tapering
   , uwsrf                    & ! wind speed in x-direction
   , vfluxb                   & ! volume flux through water column
                                !  surface at time n-1
@@ -172,7 +174,8 @@ module air
 !______________________________________________________________________
 !
       use config     , only: use_air
-      use glob_domain, only: is_master
+      use glob_domain, only: im,jm, is_master, n_east,n_north,n_south,n_west
+      use glob_grid  , only: fsm
 
       implicit none
 
@@ -180,13 +183,13 @@ module air
 
       integer pos
 
-      namelist/air_nml/                                         &
-        CALC_SWR   , INTERP_CLOUD , INTERP_HEAT, INTERP_HUMID   &
-      , INTERP_PRES, INTERP_RAIN  , INTERP_SST , INTERP_STRESS  &
-      , INTERP_TAIR, INTERP_WIND  , READ_BULK  , READ_HEAT      &
-      , READ_STRESS, READ_WIND    , USE_BULK   , USE_COARE      &
-      , USE_FLUXES , LWRAD_FORMULA, bulk_path  , flux_path      &
-      , wind_path  , read_int
+      namelist/air_nml/                                          &
+        CALC_SWR   , INTERP_CLOUD, INTERP_HEAT  , INTERP_HUMID   &
+      , INTERP_PRES, INTERP_RAIN , INTERP_SST   , INTERP_STRESS  &
+      , INTERP_TAIR, INTERP_WIND , READ_BULK    , READ_HEAT      &
+      , READ_STRESS, READ_WIND   , TAPER_BRY    , USE_BULK       &
+      , USE_COARE  , USE_FLUXES  , LWRAD_FORMULA, bulk_path      &
+      , flux_path  , wind_path   , read_int
 
       namelist/air_vars_nml/                           &
         dlrad_name, lheat_name,  lrad_name, rain_name  &
@@ -213,6 +216,7 @@ module air
       READ_HEAT  = .false.
       READ_STRESS= .false.
       READ_WIND  = .false.
+      TAPER_BRY  = .false.
       USE_BULK   = .false.
       USE_COARE  = .false.
       USE_FLUXES = .false.
@@ -273,6 +277,44 @@ module air
 ! Allocate necessary arrays
       call allocate_arrays
 
+      if ( n_east==-1 ) then
+        where ( fsm(im,:) /= 0. )
+          taper_mask(im  ,:) = 0.
+          taper_mask(im-1,:) = 0.2
+          taper_mask(im-2,:) = 0.5
+          taper_mask(im-3,:) = 0.8
+        end where
+      end if
+
+      if ( n_west==-1 ) then
+        where ( fsm(1,:) /= 0. )
+          taper_mask(1,:) = 0.
+          taper_mask(2,:) = 0.
+          taper_mask(3,:) = 0.2
+          taper_mask(4,:) = 0.5
+          taper_mask(5,:) = 0.8
+        end where
+      end if
+
+      if ( n_north==-1 ) then
+        where ( fsm(:,jm) /= 0. )
+          taper_mask(:,jm  ) = 0.
+          taper_mask(:,jm-1) = 0.2*taper_mask(:,jm-1)
+          taper_mask(:,jm-2) = 0.5*taper_mask(:,jm-2)
+          taper_mask(:,jm-3) = 0.8*taper_mask(:,jm-3)
+        end where
+      end if
+
+      if ( n_south==-1 ) then
+        where ( fsm(:,1) /= 0. )
+          taper_mask(:,1) = 0.
+          taper_mask(:,2) = 0.
+          taper_mask(:,3) = 0.2*taper_mask(:,3)
+          taper_mask(:,4) = 0.5*taper_mask(:,4)
+          taper_mask(:,5) = 0.8*taper_mask(:,5)
+        end where
+      end if
+
       call msg_print("AIR MODULE INITIALIZED", 1, "")
 
 
@@ -300,30 +342,32 @@ module air
 
 
 ! Allocate core arrays
-      allocate(         &
-        e_atmos(im,jm)  &
-      , swrad(im,jm)    &
-      , uwsrf(im,jm)    &
-      , vfluxb(im,jm)   &
-      , vfluxf(im,jm)   &
-      , vwsrf(im,jm)    &
-      , wssurf(im,jm)   &
-      , wtsurf(im,jm)   &
-      , wusurf(im,jm)   &
-      , wvsurf(im,jm)   &
+      allocate(            &
+        e_atmos(im,jm)     &
+      , swrad(im,jm)       &
+      , taper_mask(im,jm)  &
+      , uwsrf(im,jm)       &
+      , vfluxb(im,jm)      &
+      , vfluxf(im,jm)      &
+      , vwsrf(im,jm)       &
+      , wssurf(im,jm)      &
+      , wtsurf(im,jm)      &
+      , wusurf(im,jm)      &
+      , wvsurf(im,jm)      &
        )
 
 ! Initialize mandatory arrays
-      e_atmos= 0.
-      swrad  = 0.
-      uwsrf  = 0.
-      vfluxb = 0.
-      vfluxf = 0.
-      vwsrf  = 0.
-      wssurf = 0.
-      wtsurf = 0.
-      wusurf = 0.
-      wvsurf = 0.
+      e_atmos    = 0.
+      swrad      = 0.
+      taper_mask = 1.
+      uwsrf      = 0.
+      vfluxb     = 0.
+      vfluxf     = 0.
+      vwsrf      = 0.
+      wssurf     = 0.
+      wtsurf     = 0.
+      wusurf     = 0.
+      wvsurf     = 0.
 
 ! Quit if the module is not used.
       if ( DISABLED ) return
@@ -508,6 +552,18 @@ module air
       wtsurf = wtsurf*(1.-icec) + itsurf*icec
       wssurf = wssurf*(1.-icec)
 
+      if ( READ_WIND ) then
+
+! TODO: Are these surface arrays even needed?
+        uwsrf = uwnd(:,:,1)
+        vwsrf = vwnd(:,:,1)
+
+! Calculate wind stress
+        call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+!        call calculate_fluxes
+
+      end if
+
       call msg_print("AIR INITIALIZED", 2, "")
 
 
@@ -529,6 +585,7 @@ module air
 !______________________________________________________________________
 !
 !      use glob_domain, only: is_master
+      use clim       , only: relax_surface
       use config     , only: nbct
       use module_time
       use model_run  , only: dti, iint, sec_of_year
@@ -657,12 +714,37 @@ module air
 
 ! Simple parameterizion
       swrad  =  swrad*(1.-icec)
-      wtsurf = wtsurf*(1.-icec) + itsurf*icec
+      wtsurf = wtsurf*(1.-icec)! + itsurf*icec ! [TODO] itsurf is unstable after spinup for some reason
       wssurf = wssurf*(1.-icec)
 !      print *, minval(wtsurf), maxval(wtsurf)
 
+      if ( TAPER_BRY ) call taper_forcing
+! Relax to climatology
+      call relax_surface( wssurf, wtsurf )
+
 
     end ! subroutine step
+!
+!______________________________________________________________________
+!
+    subroutine taper_forcing
+!----------------------------------------------------------------------
+!  Primitive surface fluxes tapering at the border
+!----------------------------------------------------------------------
+! called by: step [air]
+!______________________________________________________________________
+!
+      implicit none
+
+
+      swrad  = swrad *taper_mask
+      wssurf = wssurf*taper_mask
+      wtsurf = wtsurf*taper_mask
+      wusurf = wusurf*taper_mask
+      wvsurf = wvsurf*taper_mask
+
+
+    end ! subroutine
 !
 !______________________________________________________________________
 !

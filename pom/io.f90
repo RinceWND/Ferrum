@@ -23,12 +23,9 @@ module io
 ! Paths configuration
 !----------------------------------------------------------------------
   character(len=PATH_LEN)  & ! Full paths (with filenames) to:
-      bc_path         & !  boundary condition file
-  , clim_path         & !  climatology file
-  , grid_path         & !  grid file
-  ,   ic_path         & !  ic file
-  , mean_path         & !  mean ts file
-  ,  out_path           ! Full path to output directory
+    grid_path              & !  grid file
+  ,   ic_path              & !  ic file
+  ,  out_path                ! Full path to output directory
 !______________________________________________________________________
 !  If `bc_path`, `bulk_path` or `flux_path` end with a `.` (dot)
 ! then these files will be read as <path>YYYY.<FORMAT_EXT>.
@@ -59,8 +56,7 @@ module io
 ! to their respective modules.
   public :: check        , file_open_nc     , file_close_nc  &
           , initialize_io, read_grid_pnetcdf, read_initial   &
-          , out_init     , clim_path        , grid_path      &
-          , out_debug
+          , out_init     , grid_path        , out_debug
 
   private
 
@@ -73,7 +69,7 @@ module io
 !
     subroutine initialize_io( config_nml )
 !----------------------------------------------------------------------
-!  Initialize IO module.
+!  Initializes IO module.
 !______________________________________________________________________
 !
       use glob_domain, only: is_master
@@ -83,21 +79,18 @@ module io
       character(len=*), intent(in) :: config_nml
 
       namelist/input_files_nml/                                       &
-          bc_path, clim_path, grid_path, ic_path, mean_path,  out_path
+          grid_path, ic_path, out_path
       namelist/input_vars_nml/                                        &
            dx_name, dy_name, ec_name, ee_name, eu_name, ev_name       &
         , fsm_name,  h_name, nc_name, ne_name, nu_name, nv_name       &
         , rot_name,  z_name, zz_name
 
-      integer pos
+      integer number_of_modules_to_output, pos
 
 
 ! Initialize with default values
-      bc_path   = "in/bc/"
-      clim_path = "in/clim/"
       grid_path = "in/grid/"
       ic_path   = "in/init/"
-      mean_path = "in/clim/"
       out_path  = "out/"
 
       h_name  = "h"
@@ -123,29 +116,9 @@ module io
       close( 73 )
 
 ! Manage inmput_files values
-      pos = len(trim(bc_path))
-      if ( bc_path(pos:pos) == "/" ) then
-        bc_path = trim(bc_path)//"bc."//FORMAT_EXT
-      end if
-
-      pos = len(trim(clim_path))
-      if ( clim_path(pos:pos) == "/" ) then
-        clim_path = trim(clim_path)//"clim."//FORMAT_EXT
-      end if
-
       pos = len(trim(grid_path))
       if ( grid_path(pos:pos) == "/" ) then
         grid_path = trim(grid_path)//"grid."//FORMAT_EXT
-      end if
-
-      pos = len(trim(ic_path))
-      if ( ic_path(pos:pos) == "/" ) then
-        ic_path = trim(ic_path)//"init."//FORMAT_EXT
-      end if
-
-      pos = len(trim(mean_path))
-      if ( mean_path(pos:pos) == "/" ) then
-        mean_path = trim(mean_path)//"mean."//FORMAT_EXT
       end if
 
       pos = len(trim(out_path))
@@ -155,13 +128,11 @@ module io
 
 ! Print config
       if ( is_master ) then
-        print *, "Grid          : ", trim(grid_path)
-        print *, "Climatology   : ", trim(clim_path)
-        print *, "Mean TS       : ", trim(mean_path)
-        print *, "Initial cond. : ", trim(ic_path)
-        print *, "Boundary cond.: ", trim(bc_path)
         print *, "--------------|----------------------------"
-        print *, "Output to     : ", trim(out_path)
+        print *, " Grid         : ", trim(grid_path)
+        print *, "--------------|----------------------------"
+        print *, " Output to    : ", trim(out_path)
+        print *, "--------------|----------------------------"
         call msg_print("CORE I/O MODULE INITIALIZED", 1, "")
       end if
 
@@ -965,13 +936,14 @@ module io
 !______________________________________________________________________
 !
 !      use air        , only: wssurf, wtsurf, wusurf, wvsurf
-      use bry
+      use bry        , only: el_bry
       use config     , only: mode, title, use_air
       use glob_const , only: rk
       use glob_domain
       use glob_grid
       use glob_misc
       use glob_ocean
+      use tide
       use model_run  , only: time, time_start
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf    , only: nf90mpi_close     , nf90mpi_create     &
@@ -989,7 +961,7 @@ module io
 
       character(len=*), intent(in) :: out_file  ! Output filename
 
-      integer time_dimid, x_dimid, y_dimid, z_dimid
+      integer time_dimid, x_dimid, y_dimid, z_dimid, cons_dimid
       integer  aam2d_varid,    aam_varid,  advua_varid, advva_varid  &
             ,   advx_varid,   advy_varid,  adx2d_varid, ady2d_varid  &
             ,  drhox_varid,  drhoy_varid,  drx2d_varid, dry2d_varid  &
@@ -1004,7 +976,7 @@ module io
             ,    uaf_varid,     ub_varid,     uf_varid,     v_varid  &
             ,     va_varid,     vb_varid,    vab_varid,   vaf_varid  &
             ,     vf_varid,      w_varid,     wr_varid,     z_varid  &
-            ,     zz_varid
+            ,     zz_varid, el_amp_varid
 
       integer, dimension(4)      :: vdims
       integer(MPI_OFFSET_KIND)                       &
@@ -1046,6 +1018,9 @@ module io
       call check( nf90mpi_def_dim                                   &
                   ( ncid, 'time', int(NF_UNLIMITED,8), time_dimid ) &
                 , 'nf_def_dim: time @ '//out_file )
+      call check( nf90mpi_def_dim                                   &
+                  ( ncid,  'nct', int(       ncons,8), cons_dimid ) &
+                , 'nf_def_dim: constituents @ '//out_file )
       call check( nf90mpi_def_dim                                   &
                   ( ncid,    'z', int(          kb,8),    z_dimid ) &
                 , 'nf_def_dim: z @ '//out_file )
@@ -1178,6 +1153,13 @@ module io
       vaf_varid = def_var_pnetcdf(ncid,'vaf',2,vdims,NF_FLOAT          &
                                  ,'vertical mean of v at time n+1',''  &
                                  ,-1,0.,'east_v north_v',.true.)
+
+      vdims(1) = x_dimid
+      vdims(2) = y_dimid
+      vdims(3) = cons_dimid
+      el_amp_varid = def_var_pnetcdf(ncid,'el_amp',3,vdims,NF_FLOAT    &
+                                 ,'elevation amplitude',''  &
+                                 ,-1,0.,'east_e north_e nct',.true.)
 
       vdims(1) = x_dimid
       vdims(2) = y_dimid
@@ -1402,6 +1384,7 @@ module io
       call exchange3d_mpi(w,im,jm,kb)
       call exchange3d_mpi(wr,im,jm,kb)
 
+      call exchange3d_mpi(el_amp,im,jm,ncons)
 
       start(1) = i_global(1)
       start(2) = j_global(1)
@@ -1499,6 +1482,19 @@ module io
       call check( nfmpi_put_vara_real_all               &
                   ( ncid,vaf_varid,start,edge,out2 )    &
                 , 'nf_put_var_real: vaf @ '//out_file )
+
+      start(1) = i_global(1)
+      start(2) = j_global(1)
+      start(3) = 1
+      start(4) = 1
+      edge(1) = im
+      edge(2) = jm
+      edge(3) = ncons
+      edge(4) = 1
+      out3 = real(el_amp,4)
+      call check( nfmpi_put_vara_real_all               &
+                  ( ncid,el_amp_varid,start,edge,out3 )    &
+                , 'nf_put_var_real: el_amp @ '//out_file )
 
       start(1) = i_global(1)
       start(2) = j_global(1)
