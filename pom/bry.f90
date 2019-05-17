@@ -1924,12 +1924,14 @@ module bry
 !______________________________________________________________________
 !
       use glob_const , only: GRAV
-      use glob_grid  , only: dum, dvm, h!, dx, dy
-      use glob_ocean , only: d, el, uaf, vaf
-      use model_run  , only: ramp
+      use glob_grid  , only: dum, dvm, h, dx, dy
+      use glob_ocean , only: d, el, uaf, ua, vaf, va
+      use model_run  , only: dte, ramp
 
       implicit none
 
+      real(rk), dimension(im) :: ce
+      real(rk), dimension(jm) :: cx
 
 ! Apply periodic BC in x-dimension
       if ( periodic_bc % x ) then
@@ -1974,9 +1976,16 @@ module bry
             case ( bcGENFLATHER )
               uaf(im,2:jmm1) = ( UA_bry%EST(1,2:jmm1)                   &
                                 *(h(im,2:jmm1)+EL_bry%EST(1,2:jmm1))    &
-                                +sqrt(GRAV/h(imm1,2:jmm1))              &
+                                +sqrt(GRAV/d(imm1,2:jmm1))              &
                                 *(el(imm1,2:jmm1)-EL_bry%EST(1,2:jmm1)))&
                                /(h(imm1,2:jmm1)+el(imm1,2:jmm1))
+
+            case ( 10 ) ! bcFLATHER
+              cx(2:jmm1) = sqrt( 2.*GRAV / (d(imm1,2:jmm1)+d(im,2:jmm1)) )
+              uaf(im,2:jmm1) = UA_bry%EST(1,2:jmm1)                    &
+                             + cx(2:jmm1)                              &
+                               * ( .5*(el(imm1,2:jmm1)+el(im,2:jmm1))  &
+                                 - EL_bry%EST(1,2:jmm1) )
 
             case default
               uaf(im,2:jmm1) = 0.
@@ -2004,6 +2013,12 @@ module bry
               vaf(im,2:jmm1) = vaf(imm1,2:jmm1)                     &
                              + (vaf(imm1,2:jmm1)-vaf(imm2,2:jmm1))  !&
 !                              *dx(imm1,2:jmm1)/dx(imm2,2:jmm1)
+
+            case ( 10 ) ! bcCHAPMAN
+              cx(2:jmm1) = dte*.5*(1./dx(imm1,1:jmm2)+1./dx(imm1,2:jmm1))     &
+                         * sqrt( .5*GRAV * (d(imm1,1:jmm2)+d(imm1,2:jmm1)) )
+              vaf(im,2:jmm1) = (va(im,2:jmm1)+cx(2:jmm1)*vaf(imm1,2:jmm1))  &
+                             / (1.+cx(2:jmm1))
 
             case default
               vaf(im,2:jmm1) = 0.
@@ -2036,9 +2051,16 @@ module bry
             case ( bcGENFLATHER )
               uaf(2,2:jmm1) = ( UA_bry%WST(1,2:jmm1)                 &
                                *(h(1,2:jmm1)+EL_bry%WST(1,2:jmm1))   &
-                               -sqrt(GRAV/h(2,2:jmm1))               &
+                               -sqrt(GRAV/d(2,2:jmm1))               &
                                *(el(2,2:jmm1)-EL_bry%WST(1,2:jmm1))) &
                               /(h(2,2:jmm1)+el(2,2:jmm1))
+
+            case ( 10 ) ! bcFLATHER
+              cx(2:jmm1) = sqrt( 2.*GRAV / (d(1,2:jmm1)+d(2,2:jmm1)) )
+              uaf(2,2:jmm1) = UA_bry%WST(1,2:jmm1)                &
+                            - cx(2:jmm1)                          &
+                              * ( .5*(el(1,2:jmm1)+el(2,2:jmm1))  &
+                                 - EL_bry%WST(1,2:jmm1) )
 
             case default
               uaf(2,2:jmm1) = 0.
@@ -2066,6 +2088,12 @@ module bry
               vaf(1,2:jmm1) = vaf(2,2:jmm1)                   &
                              + (vaf(2,2:jmm1)-vaf(3,2:jmm1))  !&
 !                              *dx(2,2:jmm1)/dx(3,2:jmm1)
+
+            case ( 10 ) ! bcCHAPMAN
+              cx(2:jmm1) = dte*.5*(1./dx(3,1:jmm2)+1./dx(3,2:jmm1))     &
+                         * sqrt( .5*GRAV * (d(3,1:jmm2)+d(3,2:jmm1)) )
+              vaf(2,2:jmm1) = (va(2,2:jmm1)+cx(2:jmm1)*vaf(3,2:jmm1))  &
+                             / (1.+cx(2:jmm1))
 
             case default
               vaf(1,2:jmm1) = 0.
@@ -2120,9 +2148,16 @@ module bry
             case ( bcGENFLATHER )
               vaf(2:imm1,jm) = ( VA_bry%NTH(2:imm1,1)                   &
                                 *(h(2:imm1,jm)+EL_bry%NTH(2:imm1,1))    &
-                                +sqrt(GRAV/h(2:imm1,jmm1))              &
+                                +sqrt(GRAV/d(2:imm1,jmm1))              &
                                 *(el(2:imm1,jmm1)-EL_bry%NTH(2:imm1,1)))&
                                /(h(2:imm1,jmm1)+el(2:imm1,jmm1))
+
+            case ( 10 ) ! bcFLATHER
+              ce(2:imm1) = sqrt( 2.*GRAV / (d(2:imm1,jmm1)+d(2:imm1,jm)) )
+              vaf(2:imm1,jm) = VA_bry%NTH(2:imm1,1)                    &
+                             + ce(2:imm1)                              &
+                               * ( .5*(el(2:imm1,jmm1)+el(2:imm1,jm))  &
+                                  - EL_bry%NTH(2:imm1,1) )
 
             case default
               vaf(2:imm1,jm) = 0.
@@ -2149,6 +2184,12 @@ module bry
               uaf(2:imm1,jm) = uaf(2:imm1,jmm2)                     &
                              + (uaf(2:imm1,jmm1)-uaf(2:imm1,jmm2))  !&
 !                              *dy(2:imm1,jmm1)/dy(2:imm1,jmm2)
+
+            case ( 10 ) ! bcCHAPMAN
+              ce(2:imm1) = dte*.5*(1./dy(1:imm2,jmm1)+1./dy(2:imm1,jmm1))     &
+                         * sqrt( .5*GRAV * (d(1:imm2,jmm1)+d(2:imm1,jmm1)) )
+              uaf(2:imm1,jm) = (ua(2:imm1,jm)+ce(2:imm1)*uaf(2:imm1,jmm1))  &
+                             / (1.+ce(2:imm1))
 
             case default
               uaf(2:imm1,jm) = 0.
@@ -2181,9 +2222,16 @@ module bry
             case ( bcGENFLATHER )
               vaf(2:imm1,2) = ( VA_bry%STH(2:imm1,1)                 &
                                *(h(2:imm1,1)+EL_bry%STH(2:imm1,1))   &
-                               -sqrt(GRAV/h(2:imm1,2))               &
+                               -sqrt(GRAV/d(2:imm1,2))               &
                                *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))) &
                               /(h(2:imm1,2)+el(2:imm1,2))
+
+            case ( 10 ) ! bcFLATHER
+              ce(2:imm1) = sqrt( 2.*GRAV / (d(2:imm1,1)+d(2:imm1,2)) )
+              vaf(2:imm1,2) = VA_bry%STH(2:imm1,1)                &
+                            - ce(2:imm1)                          &
+                              * ( .5*(el(2:imm1,1)+el(2:imm1,2))  &
+                                 - EL_bry%STH(2:imm1,1) )
 
             case default
               vaf(2:imm1,2) = 0.
@@ -2211,6 +2259,12 @@ module bry
               uaf(2:imm1,1) = uaf(2:imm1,2)                   &
                              + (uaf(2:imm1,2)-uaf(2:imm1,3))  !&
 !                              *dy(2:imm1,2)/dy(2:imm1,3)
+
+            case ( 10 ) ! bcCHAPMAN
+              ce(2:imm1) = dte*.5*(1./dy(1:imm2,2)+1./dy(2:imm1,2))     &
+                         * sqrt( .5*GRAV * (d(1:imm2,2)+d(2:imm1,2)) )
+              uaf(2:imm1,1) = (ua(2:imm1,1)+ce(2:imm1)*uaf(2:imm1,2))  &
+                             / (1.+ce(2:imm1))
 
             case default
               uaf(2:imm1,1) = 0.
