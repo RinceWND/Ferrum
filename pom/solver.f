@@ -3711,7 +3711,7 @@
       use air        , only: swrad
       use config     , only: ntp, umol
       use glob_const , only: rk
-      use glob_domain, only: im, jm, kb, kbm1, kbm2
+      use glob_domain, only: im, jm, kb, kbm1, kbm2, i_global, j_global
       use glob_grid  , only: dz, dzz, h, z
       use glob_ocean , only: a, c, ee, etf, gg, kh
       use model_run  , only: dti2
@@ -3839,7 +3839,7 @@
           do i=1,im
           f(i,j,ki)=(ee(i,j,ki)*f(i,j,ki+1)+gg(i,j,ki))
               if (isnan(f(i,j,ki))) then
-                print *, "[ PROFT ]"
+                print *, "[ PROFT ]", i_global(i), j_global(j)
                 print *, " ee: ", ee(i,j,ki)
                 print *, " f+: ", f(i,j,ki+1)
                 print *, " gg: ", gg(i,j,ki)

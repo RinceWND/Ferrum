@@ -148,8 +148,8 @@ module io
 !
       use model_run  , only: dtime
       use glob_domain, only: kbm1
-      use glob_grid  , only: fsm
-      use glob_ocean , only: elb, rho, sb, tb
+      use glob_grid  , only: dz, fsm
+      use glob_ocean , only: elb, rho, sb, tb, uab, ub, vab, vb
 
       implicit none
 
@@ -162,7 +162,7 @@ module io
       call msg_print("", 6, "Read initial conditions:")
       if ( fexist ) then
 ! TODO: Make it possible to read separate initial file, not just clim.
-        call read_initial_ts_pnetcdf( tb, sb, elb, dtime%month )
+        call read_initial_ts_pnetcdf( tb, sb, ub, vb, elb, 1 ) !dtime%month )
 !        call read_ts_z_pnetcdf( tb, sb, 40, dtime%month, ic_path )
       else
         call msg_print("", 2, "FAILED...")
@@ -170,9 +170,14 @@ module io
         sb = 33.
       end if
 
+      uab = 0.
+      vab = 0.
+
       do k = 1,kbm1
         sb(:,:,k) = sb(:,:,k) * fsm
         tb(:,:,k) = tb(:,:,k) * fsm
+        uab(:,:)  = uab(:,:) + ub(:,:,k)*dz(k)
+        vab(:,:)  = vab(:,:) + vb(:,:,k)*dz(k)
       end do
 
 ! Calculate initial density.
@@ -453,7 +458,7 @@ module io
 !______________________________________________________________________
 !
       use air        , only: wssurf, wtsurf, wusurf, wvsurf
-      use bry
+      use bry        , only: aamfrz, el_bry, frz, USE_SPONGE
       use config     , only: mode, title, use_air
       use glob_const , only: rk
       use glob_domain
@@ -721,6 +726,7 @@ module io
       if ( n_east == -1 ) then
         start(1) = j_global(1)
         edge(1) = jm
+        print *, "!!!", shape(el_bry%est), shape(out1y)
         out1y = real(el_bry%est(1,:),4)
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,ele_varid,start,edge,out1y )  &
@@ -936,7 +942,8 @@ module io
 !______________________________________________________________________
 !
 !      use air        , only: wssurf, wtsurf, wusurf, wvsurf
-      use bry        , only: el_bry
+      use air        , only: e_atmos
+      use bry        , only: el_bry, s_bry, t_bry, ua_bry, va_bry
       use config     , only: mode, title, use_air
       use glob_const , only: rk
       use glob_domain
@@ -976,7 +983,11 @@ module io
             ,    uaf_varid,     ub_varid,     uf_varid,     v_varid  &
             ,     va_varid,     vb_varid,    vab_varid,   vaf_varid  &
             ,     vf_varid,      w_varid,     wr_varid,     z_varid  &
-            ,     zz_varid, el_amp_varid
+            ,     zz_varid, el_amp_varid,   uabe_varid,  uabn_varid  &
+            ,   uabs_varid,   uabw_varid,   vabe_varid,  vabn_varid  &
+            ,   vabs_varid,   vabw_varid,    tbe_varid,   tbn_varid  &
+            ,    tbs_varid,    tbw_varid,    sbe_varid,   sbn_varid  &
+            ,    sbs_varid,    sbw_varid
 
       integer, dimension(4)      :: vdims
       integer(MPI_OFFSET_KIND)                       &
@@ -1078,6 +1089,57 @@ module io
                                  ,'West elevation BC','meter'  &
                                  ,-1,0.,'north_e',.true.)
 
+      vdims(1) = x_dimid
+      vdims(2) = z_dimid
+      uabs_varid = def_var_pnetcdf(ncid,'uabs',1,vdims,NF_FLOAT  &
+                                  ,'South u-velocity BC','m/s'   &
+                                  ,-1,0.,'east_u',.true.)
+      uabn_varid = def_var_pnetcdf(ncid,'uabn',1,vdims,NF_FLOAT  &
+                                  ,'North u-velocity BC','m/s'   &
+                                  ,-1,0.,'east_u',.true.)
+      vabs_varid = def_var_pnetcdf(ncid,'vabs',1,vdims,NF_FLOAT  &
+                                  ,'South v-velocity BC','m/s'   &
+                                  ,-1,0.,'east_v',.true.)
+      vabn_varid = def_var_pnetcdf(ncid,'vabn',1,vdims,NF_FLOAT  &
+                                  ,'North v-velocity BC','m/s'   &
+                                  ,-1,0.,'east_v',.true.)
+      sbs_varid = def_var_pnetcdf(ncid,'sbs',2,vdims,NF_FLOAT  &
+                                 ,'South salinity BC','psu'    &
+                                 ,-1,0.,'east_e',.true.)
+      sbn_varid = def_var_pnetcdf(ncid,'sbn',2,vdims,NF_FLOAT  &
+                                 ,'North salinity BC','psu'    &
+                                 ,-1,0.,'east_e',.true.)
+      tbs_varid = def_var_pnetcdf(ncid,'tbs',2,vdims,NF_FLOAT   &
+                                ,'South temperature BC','degC'  &
+                                ,-1,0.,'east_e',.true.)
+      tbn_varid = def_var_pnetcdf(ncid,'tbn',2,vdims,NF_FLOAT   &
+                                ,'North temperature BC','degC'  &
+                                ,-1,0.,'east_e',.true.)
+      vdims(1) = y_dimid
+      uabe_varid = def_var_pnetcdf(ncid,'uabe',1,vdims,NF_FLOAT  &
+                                  ,'East u-velocity BC','m/s'    &
+                                  ,-1,0.,'east_u',.true.)
+      uabw_varid = def_var_pnetcdf(ncid,'uabw',1,vdims,NF_FLOAT  &
+                                  ,'West u-velocity BC','m/s'    &
+                                  ,-1,0.,'east_u',.true.)
+      vabe_varid = def_var_pnetcdf(ncid,'vabe',1,vdims,NF_FLOAT  &
+                                  ,'East v-velocity BC','m/s'    &
+                                  ,-1,0.,'east_v',.true.)
+      vabw_varid = def_var_pnetcdf(ncid,'vabw',1,vdims,NF_FLOAT  &
+                                  ,'West v-velocity BC','m/s'    &
+                                  ,-1,0.,'east_v',.true.)
+      sbe_varid = def_var_pnetcdf(ncid,'sbe',2,vdims,NF_FLOAT  &
+                                 ,'East salinity BC','psu'     &
+                                 ,-1,0.,'east_e',.true.)
+      sbw_varid = def_var_pnetcdf(ncid,'sbw',2,vdims,NF_FLOAT  &
+                                 ,'West salinity BC','psu'     &
+                                 ,-1,0.,'east_e',.true.)
+      tbe_varid = def_var_pnetcdf(ncid,'tbe',2,vdims,NF_FLOAT   &
+                                 ,'East temperature BC','degC'  &
+                                 ,-1,0.,'east_e',.true.)
+      tbw_varid = def_var_pnetcdf(ncid,'tbw',2,vdims,NF_FLOAT   &
+                                 ,'West temperature BC','degC'  &
+                                 ,-1,0.,'east_e',.true.)
 
       vdims(1) = x_dimid
       vdims(2) = y_dimid
@@ -1276,6 +1338,24 @@ module io
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,ele_varid,start,edge,out1y )  &
                   , 'nf_put_var_real: ele @ '//out_file )
+        out1y = real(ua_bry%est(1,:),4)
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,uabe_varid,start,edge,out1y )  &
+                  , 'nf_put_var_real: uabe @ '//out_file )
+        out1y = real(va_bry%est(1,:),4)
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,vabe_varid,start,edge,out1y )  &
+                  , 'nf_put_var_real: vabe @ '//out_file )
+        start(2) = 1
+        edge(2) = kb
+        out3(1,:,:) = real(s_bry%est(1,:,:),4)
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,sbe_varid,start,edge,out3(1,:,:) )  &
+                  , 'nf_put_var_real: sbe @ '//out_file )
+        out3(1,:,:) = real(t_bry%est(1,:,:),4)
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,tbe_varid,start,edge,out3(1,:,:) )  &
+                  , 'nf_put_var_real: tbe @ '//out_file )
       else
         start(1) = 1
         edge(1) = 0
@@ -1283,6 +1363,22 @@ module io
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,ele_varid,start,edge,out1y )  &
                   , 'nf_put_var_real: ele (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,uabe_varid,start,edge,out1y )  &
+                  , 'nf_put_var_real: uabe (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,vabe_varid,start,edge,out1y )  &
+                  , 'nf_put_var_real: vabe (dummy) @ '//out_file )
+        start(2) = 1
+        edge(2) = 0
+        out3(1,:,:) = 0.
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,sbe_varid,start,edge,out3(1,:,:) )  &
+                  , 'nf_put_var_real: sbe (dummy) @ '//out_file )
+        out3(1,:,:) = 0.
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,tbe_varid,start,edge,out3(1,:,:) )  &
+                  , 'nf_put_var_real: tbe (dummy) @ '//out_file )
       end if
 ! West
       if ( n_west == -1 ) then
@@ -1292,6 +1388,24 @@ module io
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,elw_varid,start,edge,out1y )  &
                   , 'nf_put_var_real: elw @ '//out_file )
+        out1y = real(ua_bry%wst(1,:),4)
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,uabw_varid,start,edge,out1y )  &
+                  , 'nf_put_var_real: uabw @ '//out_file )
+        out1y = real(va_bry%wst(1,:),4)
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,vabw_varid,start,edge,out1y )  &
+                  , 'nf_put_var_real: vabw @ '//out_file )
+        start(2) = 1
+        edge(2) = kb
+        out3(1,:,:) = real(s_bry%wst(1,:,:),4)
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,sbw_varid,start,edge,out3(1,:,:) )  &
+                  , 'nf_put_var_real: sbw @ '//out_file )
+        out3(1,:,:) = real(t_bry%wst(1,:,:),4)
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,tbw_varid,start,edge,out3(1,:,:) )  &
+                  , 'nf_put_var_real: tbw @ '//out_file )
       else
         start(1) = 1
         edge(1) = 0
@@ -1299,6 +1413,22 @@ module io
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,elw_varid,start,edge,out1y )  &
                   , 'nf_put_var_real: elw (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,uabw_varid,start,edge,out1y )  &
+                  , 'nf_put_var_real: uabw (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,vabw_varid,start,edge,out1y )  &
+                  , 'nf_put_var_real: vabw (dummy) @ '//out_file )
+        start(2) = 1
+        edge(2) = 0
+        out3(1,:,:) = 0.
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,sbw_varid,start,edge,out3(1,:,:) )  &
+                  , 'nf_put_var_real: sbw (dummy) @ '//out_file )
+        out3(1,:,:) = 0.
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,tbw_varid,start,edge,out3(1,:,:) )  &
+                  , 'nf_put_var_real: tbw (dummy) @ '//out_file )
       end if
 ! South
       if ( n_south == -1 ) then
@@ -1308,6 +1438,24 @@ module io
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,els_varid,start,edge,out1x )  &
                   , 'nf_put_var_real: els @ '//out_file )
+        out1x = real(ua_bry%sth(:,1),4)
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,uabs_varid,start,edge,out1x )  &
+                  , 'nf_put_var_real: uabs @ '//out_file )
+        out1x = real(va_bry%sth(:,1),4)
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,vabs_varid,start,edge,out1x )  &
+                  , 'nf_put_var_real: vabs @ '//out_file )
+        start(2) = 1
+        edge(2) = kb
+        out3(:,1,:) = real(s_bry%sth(:,1,:),4)
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,sbs_varid,start,edge,out3(:,1,:) )  &
+                  , 'nf_put_var_real: sbs @ '//out_file )
+        out3(:,1,:) = real(t_bry%sth(:,1,:),4)
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,tbs_varid,start,edge,out3(:,1,:) )  &
+                  , 'nf_put_var_real: tbs @ '//out_file )
       else
         start(1) = 1
         edge(1) = 0
@@ -1315,6 +1463,22 @@ module io
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,els_varid,start,edge,out1x )  &
                   , 'nf_put_var_real: els (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,uabs_varid,start,edge,out1x )  &
+                  , 'nf_put_var_real: uabs (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,vabs_varid,start,edge,out1x )  &
+                  , 'nf_put_var_real: vabs (dummy) @ '//out_file )
+        start(2) = 1
+        edge(2) = 0
+        out3(:,1,:) = 0.
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,sbs_varid,start,edge,out3(:,1,:) )  &
+                  , 'nf_put_var_real: sbs (dummy) @ '//out_file )
+        out3(:,1,:) = 0.
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,tbs_varid,start,edge,out3(:,1,:) )  &
+                  , 'nf_put_var_real: tbs (dummy) @ '//out_file )
       end if
 ! North
       if ( n_north == -1 ) then
@@ -1324,6 +1488,24 @@ module io
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,eln_varid,start,edge,out1x )  &
                   , 'nf_put_var_real: eln @ '//out_file )
+        out1x = real(ua_bry%nth(:,1),4)
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,uabn_varid,start,edge,out1x )  &
+                  , 'nf_put_var_real: uabn @ '//out_file )
+        out1x = real(va_bry%nth(:,1),4)
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,vabn_varid,start,edge,out1x )  &
+                  , 'nf_put_var_real: vabn @ '//out_file )
+        start(2) = 1
+        edge(2) = kb
+        out3(:,1,:) = real(s_bry%nth(:,1,:),4)
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,sbn_varid,start,edge,out3(:,1,:) )  &
+                  , 'nf_put_var_real: sbn @ '//out_file )
+        out3(:,1,:) = real(t_bry%nth(:,1,:),4)
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,tbn_varid,start,edge,out3(:,1,:) )  &
+                  , 'nf_put_var_real: tbn @ '//out_file )
       else
         start(1) = 1
         edge(1) = 0
@@ -1331,6 +1513,22 @@ module io
         call check( nfmpi_put_vara_real_all              &
                     ( ncid,eln_varid,start,edge,out1x )  &
                   , 'nf_put_var_real: eln @ (dummy)'//out_file )
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,uabn_varid,start,edge,out1x )  &
+                  , 'nf_put_var_real: uabn (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all               &
+                    ( ncid,vabn_varid,start,edge,out1x )  &
+                  , 'nf_put_var_real: vabn (dummy) @ '//out_file )
+        start(2) = 1
+        edge(2) = 0
+        out3(:,1,:) = 0.
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,sbn_varid,start,edge,out3(:,1,:) )  &
+                  , 'nf_put_var_real: sbn (dummy) @ '//out_file )
+        out3(:,1,:) = 0.
+        call check( nfmpi_put_vara_real_all                    &
+                    ( ncid,tbn_varid,start,edge,out3(:,1,:) )  &
+                  , 'nf_put_var_real: tbn (dummy) @ '//out_file )
       end if
 
       call exchange2d_mpi(aam2d,im,jm)
@@ -1340,6 +1538,7 @@ module io
       call exchange2d_mpi(ady2d,im,jm)
       call exchange2d_mpi(drx2d,im,jm)
       call exchange2d_mpi(dry2d,im,jm)
+      call exchange2d_mpi(e_atmos,im,jm)
       call exchange2d_mpi(egb,im,jm)
       call exchange2d_mpi(egf,im,jm)
       call exchange2d_mpi(el,im,jm)
@@ -1418,6 +1617,10 @@ module io
       call check( nfmpi_put_vara_real_all                     &
                   ( ncid,dry2d_varid,start,edge,out2 )      &
                 , 'nf_put_var_real: dry2d @ '//out_file )
+      out2 = real(e_atmos,4)
+      call check( nfmpi_put_vara_real_all                     &
+                  ( ncid,e_atmos_varid,start,edge,out2 )      &
+                , 'nf_put_var_real: e_atmos @ '//out_file )
       out2 = real(egb,4)
       call check( nfmpi_put_vara_real_all                     &
                   ( ncid,egb_varid,start,edge,out2 )      &
@@ -1618,7 +1821,7 @@ module io
 !
 !______________________________________________________________________
 !
-    subroutine read_initial_ts_pnetcdf( temp, salt, ssh, n )
+    subroutine read_initial_ts_pnetcdf( temp, salt, u, v, ssh, n )
 !----------------------------------------------------------------------
 !  Reads initial temperature, salinity and elevation.
 ! TODO: Add u and v. Add check for single record to read if not climatology.
@@ -1636,10 +1839,11 @@ module io
                          , get_var_real_3d
 
       integer , intent(in)  :: n
-      real(rk), intent(out) :: temp(im,jm,kb),salt(im,jm,kb),ssh(im,jm)
+      real(rk), intent(out) :: temp(im,jm,kb),salt(im,jm,kb)        &
+                             , u(im,jm,kb),v(im,jm,kb), ssh(im,jm)
 
       integer                  ncid, status
-      integer                  el_varid, sb_varid, tb_varid
+      integer                  el_varid,sb_varid,tb_varid,u_varid,v_varid
       integer(MPI_OFFSET_KIND) start(4),edge(4)
 
 
@@ -1655,12 +1859,12 @@ module io
                 , "nfmpi_open: "//ic_path )
 
 !  Get variables. [ TODO: parameterize varnames ]
-      call check( nf90mpi_inq_varid( ncid, 'tclim', tb_varid )  &
+      call check( nf90mpi_inq_varid( ncid, 't_init', tb_varid )  &
                 , "nfmpi_inq_varid: t_init @ "//ic_path )
-      call check( nf90mpi_inq_varid( ncid, 'sclim', sb_varid )  &
+      call check( nf90mpi_inq_varid( ncid, 's_init', sb_varid )  &
                 , "nfmpi_inq_varid: s_init @ "//ic_path )
 
-      status = nf90mpi_inq_varid( ncid, 'eclim', el_varid )
+      status = nf90mpi_inq_varid( ncid, 'einit', el_varid )
       if ( status == NF_NOERR ) then
 ! Get elevation.
         start(1) = i_global(1)
@@ -1695,6 +1899,23 @@ module io
                 , "nf_get_var : temp @ "//ic_path )
       call check( get_var_real_3d(ncid,sb_varid,start,edge,salt)  &
                 , "nf_get_var : salt @ "//ic_path )
+
+      status = nf90mpi_inq_varid( ncid, 'u_init', u_varid )
+      if ( status == NF_NOERR ) then
+        call check( get_var_real_3d(ncid,u_varid,start,edge,u)  &
+                , "nf_get_var : u @ "//ic_path )
+        u = u/100.
+      else
+        u = 0.
+      end if
+      status = nf90mpi_inq_varid( ncid, 'v_init', v_varid )
+      if ( status == NF_NOERR ) then
+        call check( get_var_real_3d(ncid,v_varid,start,edge,v)  &
+                , "nf_get_var : v @ "//ic_path )
+        v = v/100.
+      else
+        v = 0.
+      end if
 
 !! TODO: move out
 !      do k=1,kb-1

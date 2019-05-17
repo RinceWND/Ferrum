@@ -330,7 +330,8 @@ module air
 !______________________________________________________________________
 !
 !      use config     , only: calc_wind
-      use glob_domain, only: im, jm
+      use glob_domain, only: im, jm, n_south
+      use glob_grid  , only: fsm
 
       implicit none
 
@@ -439,6 +440,7 @@ module air
          )
       end if
 
+
     end ! subroutine allocate_arrays
 !
 !______________________________________________________________________
@@ -456,6 +458,7 @@ module air
 !
 !      use glob_domain, only: is_master
       use module_time
+      use glob_grid  , only: fsm
       use config     , only: nbct
       use seaice     , only: icec, itsurf
 
@@ -527,13 +530,14 @@ module air
       end if
 
       if ( USE_FLUXES ) then
-        if ( INTERP_STRESS ) then
-          wusurf = ( 1. - a ) * ustr(:,:,2) + a * ustr(:,:,3)
-          wvsurf = ( 1. - a ) * vstr(:,:,2) + a * vstr(:,:,3)
-        else
-          wusurf = ustr(:,:,1)
-          wvsurf = vstr(:,:,1)
-        end if
+!        if ( INTERP_STRESS ) then
+!          ustr(:,:,1) = ( 1. - a ) * ustr(:,:,2) + a * ustr(:,:,3)
+!          vstr(:,:,1) = ( 1. - a ) * vstr(:,:,2) + a * vstr(:,:,3)
+          call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+!        else
+!          wusurf = ustr(:,:,1)
+!          wvsurf = vstr(:,:,1)
+!        end if
         if ( INTERP_HEAT ) then
           wtsurf = ( 1. - a ) * ( lrad(:,:,2)+sheat(:,:,2)+lheat(:,:,2) )  &
                  +        a   * ( lrad(:,:,3)+sheat(:,:,3)+lheat(:,:,3) )
@@ -549,7 +553,7 @@ module air
 
 ! Simple parameterizion
       swrad  =  swrad*(1.-icec)
-      wtsurf = wtsurf*(1.-icec) + itsurf*icec
+      wtsurf = wtsurf*(1.-icec)! + itsurf*icec
       wssurf = wssurf*(1.-icec)
 
       if (.true.) call river_flux
@@ -565,6 +569,8 @@ module air
 !        call calculate_fluxes
 
       end if
+
+      if ( TAPER_BRY ) call taper_forcing
 
       call msg_print("AIR INITIALIZED", 2, "")
 
@@ -588,6 +594,7 @@ module air
 !
       use glob_domain, only: is_master
       use clim       , only: relax_surface
+      use glob_grid  , only: fsm
       use config     , only: nbct
       use module_time
       use model_run  , only: dti, iint, sec_of_year
@@ -701,13 +708,14 @@ module air
       end if
 
       if ( USE_FLUXES ) then
-        if ( INTERP_STRESS ) then
-          wusurf = ( 1. - a ) * ustr(:,:,2) + a * ustr(:,:,3)
-          wvsurf = ( 1. - a ) * vstr(:,:,2) + a * vstr(:,:,3)
-        else
-          wusurf = ustr(:,:,1)
-          wvsurf = vstr(:,:,1)
-        end if
+!        if ( INTERP_STRESS ) then
+!          wusurf = ( 1. - a ) * ustr(:,:,2) + a * ustr(:,:,3)
+!          wvsurf = ( 1. - a ) * vstr(:,:,2) + a * vstr(:,:,3)
+        call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+!        else
+!          wusurf = ustr(:,:,1)
+!          wvsurf = vstr(:,:,1)
+!        end if
         if ( INTERP_HEAT ) then
           wtsurf = ( 1. - a ) * ( lrad(:,:,2)+sheat(:,:,2)+lheat(:,:,2) )  &
                  +        a   * ( lrad(:,:,3)+sheat(:,:,3)+lheat(:,:,3) )
@@ -725,7 +733,11 @@ module air
       swrad  =  swrad*(1.-icec)
       wtsurf = wtsurf*(1.-icec)! + itsurf*icec ! [TODO] itsurf is unstable after spinup for some reason
       wssurf = wssurf*(1.-icec)
-!      print *, minval(wtsurf), maxval(wtsurf)
+!      print *, "WT:", minval(wtsurf), maxval(wtsurf)
+!      print *, "WS:", minval(wssurf), maxval(wssurf)
+!      print *, "IT:", minval(itsurf), maxval(itsurf)
+!      print *, "SW:", minval(swrad) , maxval(swrad)
+!      print *, "Ci:", minval(icec)  , maxval(icec)
 
       if ( TAPER_BRY ) call taper_forcing
 
@@ -855,7 +867,7 @@ module air
           temp(:,:,1) = ( 1. - a ) * temp(:,:,2) + a * temp(:,:,3)
         end if
 
-        e_atmos = 0.01 * ( pres(:,:,1) - 1013. )
+!        e_atmos = 0.01 * ( pres(:,:,1) - 1013. )
 
 ! Calculate fluxes
         if ( USE_BULK ) then
@@ -945,7 +957,7 @@ module air
 !______________________________________________________________________
 !
       use glob_const , only: C2K, DEG2RAD, rhoref, Rho_Cpw, rk
-      use glob_domain, only: im, jm!, my_task
+      use glob_domain, only: im, jm     , my_task
       use glob_grid  , only: east_e, fsm, north_e
       use glob_ocean , only: rho, s, t, u, v
       use config     , only: tbias, sbias

@@ -603,6 +603,66 @@
 
       end function judge_inout
 !-------------------------------------------------------------
+      subroutine river_flux
 
+      use glob_domain, only: im, jm, i_global, j_global
+      use glob_grid  , only: art
+      use model_run  , only: dtime
+
+      implicit none
+
+      real(rk), parameter, dimension(12) :: tumen_dis = (/ 30.2463253   &
+     $                                                   , 44.2542105   &
+     $                                                   ,105.8621385   &
+     $                                                   ,156.2726807   &
+     $                                                   ,357.9148493   &
+     $                                                   ,526.118025    &
+     $                                                   ,584.7622891   &
+     $                                                   ,988.0466263   &
+     $                                                   ,593.8361866   &
+     $                                                   ,277.2579819   &
+     $                                                   ,125.0181446   &
+     $                                                   , 50.4105421   &
+     $                                                  /)              &
+     $                                    , amur_dis  = (/  1982.       &
+     $                                                   ,  1324.       &
+     $                                                   ,  1058.       &
+     $                                                   ,  3231.       &
+     $                                                   , 14094.       &
+     $                                                   , 15948.       &
+     $                                                   , 15553.       &
+     $                                                   , 19291.       &
+     $                                                   , 20813.       &
+     $                                                   , 16596.       &
+     $                                                   ,  6162.       &
+     $                                                   ,  2441.       &
+     $                                                  /)
+!      integer, parameter :: tumen_i = 7, tumen_j = 108
+      integer, parameter :: tumen_i = 5, tumen_j = 59
+      integer, parameter :: amur_i = 31, amur_j  = 233
+      integer i,j
+
+
+      if (   i_global(1) <= tumen_i .and. i_global(im) >= tumen_i       &
+     $ .and. j_global(1) <= tumen_j .and. j_global(jm) >= tumen_j ) then
+         i = tumen_i - i_global(1) + 1
+         j = tumen_j - j_global(1) + 1
+         vfluxf(i,j) = -tumen_dis( dtime%month ) / art(i,j)
+         print *, "Tumen discharge: ", vfluxf(i,j)
+      end if
+
+      if (     i_global(1) <= amur_i .and. i_global(im) >= amur_i       &
+     $   .and. j_global(1) <= amur_j .and. j_global(jm) >= amur_j ) then
+         i = amur_i - i_global(1) + 1
+         j = amur_j - j_global(1) + 1
+         vfluxf(i,j) = -amur_dis( dtime%month ) / art(i,j)
+         print *, "Amur discharge: ", vfluxf(i,j)
+      end if
+
+
+      end ! subroutine
+!
+!______________________________________________________________________
+!
       end module river
 

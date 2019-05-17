@@ -467,8 +467,8 @@ module glob_ocean
   , drx2d            & ! vertical integral of drhox
   , dry2d            & ! vertical integral of drhoy
   , dt               & ! h+et
-  , egb              & ! surface elevation use for pressure gradient at time n-1
-  , egf              & ! surface elevation use for pressure gradient at time n+1
+  , egb              & ! surface elevation used for pressure gradient at time n-1
+  , egf              & ! surface elevation used for pressure gradient at time n+1
   , el               & ! surface elevation used in the external mode at time n
   , elb              & ! surface elevation used in the external mode at time n-1
   , elf              & ! surface elevation used in the external mode at time n+1

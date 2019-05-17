@@ -61,7 +61,7 @@ module bry
 !----------------------------------------------------------------------
 ! Constants
 !----------------------------------------------------------------------
-  integer*2, parameter ::  & ! Boundary conditions named constants
+  integer(2), parameter :: & ! Boundary conditions named constants
     bc0GRADIENT       = 0  & !  zero-gradient (free-slip) condition
   , bc3POINTSMOOTH    = 1  & !  smoothing with 3 interior points
   , bcCLAMPED         = 2  & !  forced value condition
@@ -71,6 +71,20 @@ module bry
   , bcORLANSKI        = 6  & !  Orlanski internal normal velocity condition
   , bcRADIATION_ENH   = 7  & !  enhanced radiation condition
   , bcGENFLATHER      = 8    !  generalized Flather (Oddo, Pinardi, 2010)
+
+  character(32), dimension(-1:8), parameter :: & ! Boundary conditions name strings (first four characters are index keys)
+    bcTITLES = [             &
+      "NULL condition     "  &
+    , "Zero gradient      "  &
+    , "3pts smoothing     "  &
+    , "Clamped (Dirichlet)"  &
+    , "Flather            "  &
+    , "Tracer radiation   "  &
+    , "Radiation          "  &
+    , "Orlanski           "  &
+    , "Enhanced Radiation "  &
+    , "Generalized Flather"  &
+    ]
 
 !----------------------------------------------------------------------
 ! Configuration
@@ -219,13 +233,13 @@ module bry
         , U_bry%est(NFE,jm,kb)  &
         , V_bry%est(NFE,jm,kb)  &
          )
-        el_bry%est = 0.
-        ua_bry%est = 0.
-        va_bry%est = 0.
-        s_bry%est  = 0.
-        t_bry%est  = 0.
-        u_bry%est  = 0.
-        v_bry%est  = 0.
+        el_bry % est = 0.
+        ua_bry % est = 0.
+        va_bry % est = 0.
+         s_bry % est = 0.
+         t_bry % est = 0.
+         u_bry % est = 0.
+         v_bry % est = 0.
         if ( INTERP_BRY ) then
           allocate(                     &
             el_int%est(NFE,jm,2:N+1)    &
@@ -236,13 +250,13 @@ module bry
           , U_int%est(NFE,jm,kb,2:N+1)  &
           , V_int%est(NFE,jm,kb,2:N+1)  &
            )
-          el_int%est = 0.
-          ua_int%est = 0.
-          va_int%est = 0.
-          s_int%est  = 0.
-          t_int%est  = 0.
-          u_int%est  = 0.
-          v_int%est  = 0.
+          el_int % est = 0.
+          ua_int % est = 0.
+          va_int % est = 0.
+           s_int % est = 0.
+           t_int % est = 0.
+           u_int % est = 0.
+           v_int % est = 0.
         end if
       end if
 
@@ -256,13 +270,13 @@ module bry
         , U_bry%nth(im,NFN,kb)  &
         , V_bry%nth(im,NFN,kb)  &
          )
-        el_bry%nth = 0.
-        ua_bry%nth = 0.
-        va_bry%nth = 0.
-        s_bry%nth  = 0.
-        t_bry%nth  = 0.
-        u_bry%nth  = 0.
-        v_bry%nth  = 0.
+        el_bry % nth = 0.
+        ua_bry % nth = 0.
+        va_bry % nth = 0.
+         s_bry % nth = 0.
+         t_bry % nth = 0.
+         u_bry % nth = 0.
+         v_bry % nth = 0.
         if ( INTERP_BRY ) then
           allocate(                     &
             el_int%nth(im,NFN,2:N+1)    &
@@ -273,13 +287,13 @@ module bry
           , U_int%nth(im,NFN,kb,2:N+1)  &
           , V_int%nth(im,NFN,kb,2:N+1)  &
            )
-          el_int%nth = 0.
-          ua_int%nth = 0.
-          va_int%nth = 0.
-          s_int%nth  = 0.
-          t_int%nth  = 0.
-          u_int%nth  = 0.
-          v_int%nth  = 0.
+          el_int % nth = 0.
+          ua_int % nth = 0.
+          va_int % nth = 0.
+           s_int % nth = 0.
+           t_int % nth = 0.
+           u_int % nth = 0.
+           v_int % nth = 0.
         end if
       end if
 
@@ -293,13 +307,13 @@ module bry
         , U_bry%sth(im,NFS,kb)  &
         , V_bry%sth(im,NFS,kb)  &
          )
-        el_bry%sth = 0.
-        ua_bry%sth = 0.
-        va_bry%sth = 0.
-        s_bry%sth  = 0.
-        t_bry%sth  = 0.
-        u_bry%sth  = 0.
-        v_bry%sth  = 0.
+        el_bry % sth = 0.
+        ua_bry % sth = 0.
+        va_bry % sth = 0.
+         s_bry % sth = 0.
+         t_bry % sth = 0.
+         u_bry % sth = 0.
+         v_bry % sth = 0.
         if ( INTERP_BRY ) then
           allocate(                     &
             el_int%sth(im,NFS,2:N+1)    &
@@ -310,13 +324,13 @@ module bry
           , U_int%sth(im,NFS,kb,2:N+1)  &
           , V_int%sth(im,NFS,kb,2:N+1)  &
            )
-          el_int%sth = 0.
-          ua_int%sth = 0.
-          va_int%sth = 0.
-          s_int%sth  = 0.
-          t_int%sth  = 0.
-          u_int%sth  = 0.
-          v_int%sth  = 0.
+          el_int % sth = 0.
+          ua_int % sth = 0.
+          va_int % sth = 0.
+           s_int % sth = 0.
+           t_int % sth = 0.
+           u_int % sth = 0.
+           v_int % sth = 0.
         end if
       end if
 
@@ -330,13 +344,13 @@ module bry
         , U_bry%wst(NFW,jm,kb)  &
         , V_bry%wst(NFW,jm,kb)  &
          )
-        el_bry%wst = 0.
-        ua_bry%wst = 0.
-        va_bry%wst = 0.
-        s_bry%wst  = 0.
-        t_bry%wst  = 0.
-        u_bry%wst  = 0.
-        v_bry%wst  = 0.
+        el_bry % wst = 0.
+        ua_bry % wst = 0.
+        va_bry % wst = 0.
+         s_bry % wst = 0.
+         t_bry % wst = 0.
+         u_bry % wst = 0.
+         v_bry % wst = 0.
         if ( INTERP_BRY ) then
           allocate(                     &
             el_int%wst(NFW,jm,2:N+1)    &
@@ -347,13 +361,13 @@ module bry
           , U_int%wst(NFW,jm,kb,2:N+1)  &
           , V_int%wst(NFW,jm,kb,2:N+1)  &
            )
-          el_int%wst = 0.
-          ua_int%wst = 0.
-          va_int%wst = 0.
-          s_int%wst  = 0.
-          t_int%wst  = 0.
-          u_int%wst  = 0.
-          v_int%wst  = 0.
+          el_int % wst = 0.
+          ua_int % wst = 0.
+          va_int % wst = 0.
+           s_int % wst = 0.
+           t_int % wst = 0.
+           u_int % wst = 0.
+           v_int % wst = 0.
         end if
       end if
 
@@ -362,6 +376,8 @@ module bry
           aamfrz(im,jm)  &
         ,    frz(im,jm)  &
          )
+         aamfrz = 0.
+            frz = 0.
       end if
 
 
@@ -512,43 +528,43 @@ module bry
       periodic_bc % y = periodic_y
 
 !   elevation
-      BC % zeta % EAST  = el_east
-      BC % zeta % NORTH = el_north
-      BC % zeta % SOUTH = el_south
-      BC % zeta % WEST  = el_west
+      BC % zeta % EAST  = max(el_east ,-1_2)
+      BC % zeta % NORTH = max(el_north,-1_2)
+      BC % zeta % SOUTH = max(el_south,-1_2)
+      BC % zeta % WEST  = max(el_west ,-1_2)
 !   external velocity
-      BC % vel2d % NORM % EAST  = vel2d_norm_east
-      BC % vel2d % NORM % NORTH = vel2d_norm_north
-      BC % vel2d % NORM % SOUTH = vel2d_norm_south
-      BC % vel2d % NORM % WEST  = vel2d_norm_west
-      BC % vel2d % TANG % EAST  = vel2d_tang_east
-      BC % vel2d % TANG % NORTH = vel2d_tang_north
-      BC % vel2d % TANG % SOUTH = vel2d_tang_south
-      BC % vel2d % TANG % WEST  = vel2d_tang_west
+      BC % vel2d % NORM % EAST  = max(vel2d_norm_east ,-1_2)
+      BC % vel2d % NORM % NORTH = max(vel2d_norm_north,-1_2)
+      BC % vel2d % NORM % SOUTH = max(vel2d_norm_south,-1_2)
+      BC % vel2d % NORM % WEST  = max(vel2d_norm_west ,-1_2)
+      BC % vel2d % TANG % EAST  = max(vel2d_tang_east ,-1_2)
+      BC % vel2d % TANG % NORTH = max(vel2d_tang_north,-1_2)
+      BC % vel2d % TANG % SOUTH = max(vel2d_tang_south,-1_2)
+      BC % vel2d % TANG % WEST  = max(vel2d_tang_west ,-1_2)
 !   internal velocity
-      BC % vel3d % NORM % EAST  = vel3d_norm_east
-      BC % vel3d % NORM % NORTH = vel3d_norm_north
-      BC % vel3d % NORM % SOUTH = vel3d_norm_south
-      BC % vel3d % NORM % WEST  = vel3d_norm_west
-      BC % vel3d % TANG % EAST  = vel3d_tang_east
-      BC % vel3d % TANG % NORTH = vel3d_tang_north
-      BC % vel3d % TANG % SOUTH = vel3d_tang_south
-      BC % vel3d % TANG % WEST  = vel3d_tang_east
+      BC % vel3d % NORM % EAST  = max(vel3d_norm_east ,-1_2)
+      BC % vel3d % NORM % NORTH = max(vel3d_norm_north,-1_2)
+      BC % vel3d % NORM % SOUTH = max(vel3d_norm_south,-1_2)
+      BC % vel3d % NORM % WEST  = max(vel3d_norm_west ,-1_2)
+      BC % vel3d % TANG % EAST  = max(vel3d_tang_east ,-1_2)
+      BC % vel3d % TANG % NORTH = max(vel3d_tang_north,-1_2)
+      BC % vel3d % TANG % SOUTH = max(vel3d_tang_south,-1_2)
+      BC % vel3d % TANG % WEST  = max(vel3d_tang_east ,-1_2)
 !   temp and salt
-      BC % ts % EAST  = ts_east
-      BC % ts % NORTH = ts_north
-      BC % ts % SOUTH = ts_south
-      BC % ts % WEST  = ts_west
+      BC % ts % EAST  = max(ts_east ,-1_2)
+      BC % ts % NORTH = max(ts_north,-1_2)
+      BC % ts % SOUTH = max(ts_south,-1_2)
+      BC % ts % WEST  = max(ts_west ,-1_2)
 !   vertical velocity (IGNORED anyway)
-      BC % velvert % EAST  = velvert_east
-      BC % velvert % NORTH = velvert_north
-      BC % velvert % SOUTH = velvert_south
-      BC % velvert % WEST  = velvert_west
+      BC % velvert % EAST  = max(velvert_east ,-1_2)
+      BC % velvert % NORTH = max(velvert_north,-1_2)
+      BC % velvert % SOUTH = max(velvert_south,-1_2)
+      BC % velvert % WEST  = max(velvert_west ,-1_2)
 !   turbulent parameters
-      BC % turb % EAST  = turb_east
-      BC % turb % NORTH = turb_north
-      BC % turb % SOUTH = turb_south
-      BC % turb % WEST  = turb_west
+      BC % turb % EAST  = max(turb_east ,-1_2)
+      BC % turb % NORTH = max(turb_north,-1_2)
+      BC % turb % SOUTH = max(turb_south,-1_2)
+      BC % turb % WEST  = max(turb_west ,-1_2)
 
       if ( INTERP_BRY ) N = 2
 
@@ -590,6 +606,34 @@ module bry
       fill_clim_v  % NORTH = 1
       fill_clim_v  % SOUTH = 1
       fill_clim_v  % WEST  = 1
+
+      if ( is_master ) then
+        print '(8x,4a6)', "NORTH", "EAST", "SOUTH", "WEST"
+        print '(a7,": ",4(xa4x))', "ELEV", bcTITLES(BC%zeta%NORTH)  &
+                                         , bcTITLES(BC%zeta%EAST)   &
+                                         , bcTITLES(BC%zeta%SOUTH)  &
+                                         , bcTITLES(BC%zeta%WEST)
+        print '(a7,": ",4(xa4x))', "UA_norm", bcTITLES(BC%vel2d%norm%NORTH)  &
+                                            , bcTITLES(BC%vel2d%norm%EAST)   &
+                                            , bcTITLES(BC%vel2d%norm%SOUTH)  &
+                                            , bcTITLES(BC%vel2d%norm%WEST)
+        print '(a7,": ",4(xa4x))', "UA_tang", bcTITLES(BC%vel2d%tang%NORTH)  &
+                                            , bcTITLES(BC%vel2d%tang%EAST)   &
+                                            , bcTITLES(BC%vel2d%tang%SOUTH)  &
+                                            , bcTITLES(BC%vel2d%tang%WEST)
+        print '(a7,": ",4(xa4x))', "U_norm", bcTITLES(BC%vel3d%norm%NORTH)  &
+                                           , bcTITLES(BC%vel3d%norm%EAST)   &
+                                           , bcTITLES(BC%vel3d%norm%SOUTH)  &
+                                           , bcTITLES(BC%vel3d%norm%WEST)
+        print '(a7,": ",4(xa4x))', "U_tang", bcTITLES(BC%vel3d%tang%NORTH)  &
+                                           , bcTITLES(BC%vel3d%tang%EAST)   &
+                                           , bcTITLES(BC%vel3d%tang%SOUTH)  &
+                                           , bcTITLES(BC%vel3d%tang%WEST)
+        print '(a7,": ",4(xa4x))', "TS", bcTITLES(BC%ts%NORTH)  &
+                                       , bcTITLES(BC%ts%EAST)   &
+                                       , bcTITLES(BC%ts%SOUTH)  &
+                                       , bcTITLES(BC%ts%WEST)
+      end if
 
       call msg_print("BRY MODULE INITIALIZED", 1, "")
 

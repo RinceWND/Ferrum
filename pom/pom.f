@@ -11,7 +11,6 @@
 
       use module_time
       use river
-      use tsforce
       use wind
       use assim
       use interp
@@ -50,7 +49,7 @@
         call msg_print("BEGIN NUMERICAL EXPERIMENT", 1, "")
         print '(" = ",a)', date2str( dtime )
       end if
-
+      
 ! main loop
       do iint = 1,iend
 
@@ -110,7 +109,7 @@
       call finalize_mpi
 
       if (is_master) print '(a,f7.2,a)',"Done in ",(tick1-tick0)," sec."
-
+      
       end program
 
 !______________________________________________________________________

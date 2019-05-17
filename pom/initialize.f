@@ -76,6 +76,9 @@
 ! Initialize modules
       call initialize_modules
 
+! read previous (initial) record [TODO: NOTE! This step should be done before update_initial for clim to get rmean. But what happens to boundary?]
+      call modules_initial_step( dtime )
+
 ! read initial and lateral boundary conditions
       call initial_conditions
 
@@ -84,9 +87,6 @@
 
 ! read M2 tidal amplitude & phase
       if ( calc_tide ) call read_tide      !fhx:tide
-
-! read previous (initial) record [TODO: NOTE! This step should be done before update_initial for clim to get rmean. But what happens to boundary?]
-      call modules_initial_step( dtime )
 
 ! update initial conditions and set the remaining conditions
       call update_initial

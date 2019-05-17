@@ -254,7 +254,7 @@ module config
 
 ! Thresholds for temperature and salinity
       t_hi =  999.
-      t_lo = -999.
+      t_lo = -2. !-999.
 !      s_hi =  999.
 !      s_lo = -999.
 
@@ -300,8 +300,8 @@ module config
       , horcon  , ispadv, mode  , nadv        &
       , nbcs    , nbct  , nitera, npg         &
       , ntp     , sbias , smoth , sw          &
-      , tbias   , tprni , umol  , vmaxl       &
-      , z0b
+      , t_hi    , t_lo  , tbias , tprni       &
+      , umol    , vmaxl , z0b
 
       namelist/output_nml/                                       &
         append_output, monthly_flag, netcdf_file  , output_flag  &
@@ -311,7 +311,6 @@ module config
         USE_AIR, USE_BRY, USE_ICE, USE_RIVER, USE_TIDE
 
       namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
-      namelist/misc_nml/ t_lo, t_hi
 
 
 !  Initialize parameters first.

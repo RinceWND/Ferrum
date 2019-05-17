@@ -495,7 +495,6 @@ module tide
       use glob_domain, only: im, jm, my_task, POM_COMM
       use glob_grid  , only: fsm, east_e, east_u, east_v, rot  &
                            , north_e, north_u, north_v
-      use io         , only: out_debug
       use air, only:e_atmos
       use module_time
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND

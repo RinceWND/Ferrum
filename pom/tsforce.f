@@ -1,11 +1,10 @@
       module tsforce
 
       use air        , only: wssurf, wtsurf
-      use clim       , only: tclim, sclim
+      use clim       , only: clim_path, tclim, sclim
       use glob_const , only: rk
       use glob_domain, only: im, jm, kb
       use glob_grid  , only: fsm
-      use io         , only: clim_path
       use glob_ocean , only: rho, s, sb, t, tb, u, v
       use wind
 

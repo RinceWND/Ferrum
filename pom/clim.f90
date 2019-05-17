@@ -361,29 +361,29 @@ module clim
 ! TODO: Gather stats from all processors
       if ( is_master ) then
         print '(/a,f7.3,a,f7.3,a)',"Background temperature:     ("  &
-                                 , minval(tm_int), ":"              &
-                                 , maxval(tm_int), ")"
+                                 , minval(tmean), ":"              &
+                                 , maxval(tmean), ")"
         print '(a,f7.3,a,f7.3,a)', "Background salinity:        ("  &
-                                 , minval(sm_int), ":"              &
-                                 , maxval(sm_int), ")"
+                                 , minval(smean), ":"              &
+                                 , maxval(smean), ")"
         print '(a,f7.3,a,f7.3,a)', "Climatological temperature: ("  &
-                                 , minval(tc_int), ":"              &
-                                 , maxval(tc_int), ")"
+                                 , minval(tclim), ":"              &
+                                 , maxval(tclim), ")"
         print '(a,f7.3,a,f7.3,a)', "Climatological salinity:    ("  &
-                                 , minval(sc_int), ":"              &
-                                 , maxval(sc_int), ")"
-        print '(a,f7.3,a,f7.3,a)', "Climatological x-current:   ("  &
-                                 , minval(uc_int), ":"              &
-                                 , maxval(uc_int), ")"
-        print '(a,f7.3,a,f7.3,a)', "Climatological y-current:   ("  &
-                                 , minval(vc_int), ":"              &
-                                 , maxval(vc_int), ")"
-        print '(a,f7.3,a,f7.3,a)', "Climatological 2D x-current:("  &
-                                 , minval(ua_int), ":"              &
-                                 , maxval(ua_int), ")"
-        print '(a,f7.3,a,f7.3,a)', "Climatological 2D y-current:("  &
-                                 , minval(va_int), ":"              &
-                                 , maxval(va_int), ")"
+                                 , minval(sclim), ":"              &
+                                 , maxval(sclim), ")"
+!        print '(a,f7.3,a,f7.3,a)', "Climatological x-current:   ("  &
+!                                 , minval(uc_int), ":"              &
+!                                 , maxval(uc_int), ")"
+!        print '(a,f7.3,a,f7.3,a)', "Climatological y-current:   ("  &
+!                                 , minval(vc_int), ":"              &
+!                                 , maxval(vc_int), ")"
+!        print '(a,f7.3,a,f7.3,a)', "Climatological 2D x-current:("  &
+!                                 , minval(ua_int), ":"              &
+!                                 , maxval(ua_int), ")"
+!        print '(a,f7.3,a,f7.3,a)', "Climatological 2D y-current:("  &
+!                                 , minval(va_int), ":"              &
+!                                 , maxval(va_int), ")"
       end if
 
       call msg_print("CLIM INITIALIZED", 2, "")
