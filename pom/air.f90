@@ -547,13 +547,12 @@ module air
 ! If solar radiation does not penetrate water
       if ( nbct == 1 ) wtsurf = wtsurf + swrad
 
-      if (.false.) call river_flux
-!      wssurf = wssurf - vfluxf
-
 ! Simple parameterizion
       swrad  =  swrad*(1.-icec)
       wtsurf = wtsurf*(1.-icec) + itsurf*icec
       wssurf = wssurf*(1.-icec)
+
+      if (.true.) call river_flux
 
       if ( READ_WIND ) then
 
@@ -587,7 +586,7 @@ module air
 !            wind_to_stress        [air]
 !______________________________________________________________________
 !
-!      use glob_domain, only: is_master
+      use glob_domain, only: is_master
       use clim       , only: relax_surface
       use config     , only: nbct
       use module_time
@@ -663,6 +662,13 @@ module air
             srad(:,:,2)  = srad(:,:,3)
           end if
         end if
+        if ( USE_BULK ) then
+          if ( INTERP_TAIR  ) temp(:,:,2)  = temp(:,:,3)
+          if ( INTERP_PRES  ) pres(:,:,2)  = pres(:,:,3)
+          if ( INTERP_CLOUD ) cloud(:,:,2) = cloud(:,:,3)
+          if ( INTERP_HUMID ) humid(:,:,2) = humid(:,:,3)
+          if ( INTERP_SST   ) sst(:,:,2)   = sst(:,:,3)
+        end if
       else
         ADVANCE_REC_INT = .false.
       end if
@@ -715,9 +721,6 @@ module air
 ! If solar radiation does not penetrate water
       if ( nbct == 1 ) wtsurf = wtsurf + swrad
 
-      if ( .false. ) call river_flux
-!      wssurf = wssurf - vfluxf
-
 ! Simple parameterizion
       swrad  =  swrad*(1.-icec)
       wtsurf = wtsurf*(1.-icec)! + itsurf*icec ! [TODO] itsurf is unstable after spinup for some reason
@@ -725,7 +728,10 @@ module air
 !      print *, minval(wtsurf), maxval(wtsurf)
 
       if ( TAPER_BRY ) call taper_forcing
+
+      if ( .true. ) call river_flux
 ! Relax to climatology
+
       call relax_surface( wssurf, wtsurf )
 
 
@@ -834,7 +840,6 @@ module air
 !
       implicit none
 
-
       if ( READ_BULK ) then
 
         if ( interp_cloud ) then
@@ -860,7 +865,7 @@ module air
       end if
 
 
-    end ! subroutine calculate_fluxs
+    end ! subroutine calculate_fluxes
 !
 !______________________________________________________________________
 !
@@ -1331,6 +1336,7 @@ module air
 
       use glob_domain, only: im, jm, i_global, j_global
       use glob_grid  , only: art
+      use glob_ocean , only: tsurf
       use model_run  , only: dtime
 
       implicit none
@@ -1348,39 +1354,59 @@ module air
                                                          ,125.0181446  &
                                                          , 50.4105421  &
                                                         /)             &
-                                          , amur_dis  = (/  1982.  &
-                                                         ,  1324.  &
-                                                         ,  1058.  &
-                                                         ,  3231.  &
-                                                         , 14094.  &
-                                                         , 15948.  &
-                                                         , 15553.  &
-                                                         , 19291.  &
-                                                         , 20813.  &
-                                                         , 16596.  &
-                                                         ,  6162.  &
-                                                         ,  2441.  &
+! Below is amur discharge estimated from precipitation
+!                                          , amur_dis  = (/  1982.  &
+!                                                         ,  1324.  &
+!                                                         ,  1058.  &
+!                                                         ,  3231.  &
+!                                                         , 14094.  &
+!                                                         , 15948.  &
+!                                                         , 15553.  &
+!                                                         , 19291.  &
+!                                                         , 20813.  &
+!                                                         , 16596.  &
+!                                                         ,  6162.  &
+!                                                         ,  2441.  &
+!                                                        /)
+! Below is Amur discharge estimated from Mozherovsky
+                                          , amur_dis  = (/  2480.  &
+                                                         ,  1900.  &
+                                                         ,  1620.  &
+                                                         ,  3130.  &
+                                                         , 15580.  &
+                                                         , 17370.  &
+                                                         , 15890.  &
+                                                         , 18970.  &
+                                                         , 22350.  &
+                                                         , 17900.  &
+                                                         ,  6850.  &
+                                                         ,  2750.  &
                                                         /)
 !      integer, parameter :: tumen_i = 7, tumen_j = 108
-      integer, parameter :: tumen_i = 5, tumen_j = 59
-      integer, parameter :: amur_i = 31, amur_j  = 233
+      integer, parameter :: tumen_i = 5, tumen_j = 59 ! jes403
+!      integer, parameter :: amur_i = 31, amur_j  = 233 ! jes403
+      integer, parameter :: amur_i = 36, amur_j  = 389 ! tat001
       integer i,j
 
 
-      if (     i_global(1) <= tumen_i .and. i_global(im) >= tumen_i  &
-         .and. j_global(1) <= tumen_j .and. j_global(jm) >= tumen_j ) then
-         i = tumen_i - i_global(1) + 1
-         j = tumen_j - j_global(1) + 1
-         vfluxf(i,j) = -tumen_dis( dtime%month ) / art(i,j)
-         print *, "Tumen discharge: ", vfluxf(i,j)
-      end if
+!      if (     i_global(1) <= tumen_i .and. i_global(im) >= tumen_i  &
+!         .and. j_global(1) <= tumen_j .and. j_global(jm) >= tumen_j ) then
+!         i = tumen_i - i_global(1) + 1
+!         j = tumen_j - j_global(1) + 1
+!         vfluxf(i,j) = -tumen_dis( dtime%month ) / art(i,j)
+!         tsurf(i,j) = max(temp(i,j,1),0.)
+!!         wtsurf(i,j) = vfluxf(i,j)*max(temp(i,j,1),0.)
+!         print *, "Tumen discharge: ", vfluxf(i,j), wtsurf(i,j),temp(i,j,1)
+!      end if
 
       if (     i_global(1) <= amur_i .and. i_global(im) >= amur_i  &
          .and. j_global(1) <= amur_j .and. j_global(jm) >= amur_j ) then
          i = amur_i - i_global(1) + 1
          j = amur_j - j_global(1) + 1
          vfluxf(i,j) = -amur_dis( dtime%month ) / art(i,j)
-         print *, "Amur discharge: ", vfluxf(i,j)
+         tsurf(i,j) = max(temp(i,j,1),0.)
+!         wtsurf(i,j) = vfluxf(i,j)*max(temp(i,j,1),0.)
+         print *, "Amur discharge: ", vfluxf(i,j), wtsurf(i,j),temp(i,j,1)
       end if
 
 
