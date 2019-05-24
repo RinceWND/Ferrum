@@ -70,9 +70,10 @@ module bry
   , bcRADIATION       = 5  & !  radiation condition
   , bcORLANSKI        = 6  & !  Orlanski internal normal velocity condition
   , bcRADIATION_ENH   = 7  & !  enhanced radiation condition
-  , bcGENFLATHER      = 8    !  generalized Flather (Oddo, Pinardi, 2010)
+  , bcGENFLATHER      = 8  & !  generalized Flather (Oddo, Pinardi, 2010)
+  , bcCHAPMAN         = 9    !  Chapman
 
-  character(32), dimension(-1:8), parameter :: & ! Boundary conditions name strings (first four characters are index keys)
+  character(32), dimension(-1:10), parameter :: & ! Boundary conditions name strings (first four characters are index keys)
     bcTITLES = [             &
       "NULL condition     "  &
     , "Zero gradient      "  &
@@ -84,6 +85,8 @@ module bry
     , "Orlanski           "  &
     , "Enhanced Radiation "  &
     , "Generalized Flather"  &
+    , "Chapman            "  &
+    , "TEST               "  &
     ]
 
 !----------------------------------------------------------------------
@@ -2058,7 +2061,7 @@ module bry
                              + (vaf(imm1,2:jmm1)-vaf(imm2,2:jmm1))  !&
 !                              *dx(imm1,2:jmm1)/dx(imm2,2:jmm1)
 
-            case ( 10 ) ! bcCHAPMAN
+            case ( bcCHAPMAN )
               cx(2:jmm1) = dte*.5*(1./dx(imm1,1:jmm2)+1./dx(imm1,2:jmm1))     &
                          * sqrt( .5*GRAV * (d(imm1,1:jmm2)+d(imm1,2:jmm1)) )
               vaf(im,2:jmm1) = (va(im,2:jmm1)+cx(2:jmm1)*vaf(imm1,2:jmm1))  &
@@ -2133,7 +2136,7 @@ module bry
                              + (vaf(2,2:jmm1)-vaf(3,2:jmm1))  !&
 !                              *dx(2,2:jmm1)/dx(3,2:jmm1)
 
-            case ( 10 ) ! bcCHAPMAN
+            case ( bcCHAPMAN )
               cx(2:jmm1) = dte*.5*(1./dx(3,1:jmm2)+1./dx(3,2:jmm1))     &
                          * sqrt( .5*GRAV * (d(3,1:jmm2)+d(3,2:jmm1)) )
               vaf(2,2:jmm1) = (va(2,2:jmm1)+cx(2:jmm1)*vaf(3,2:jmm1))  &
@@ -2229,7 +2232,7 @@ module bry
                              + (uaf(2:imm1,jmm1)-uaf(2:imm1,jmm2))  !&
 !                              *dy(2:imm1,jmm1)/dy(2:imm1,jmm2)
 
-            case ( 10 ) ! bcCHAPMAN
+            case ( bcCHAPMAN )
               ce(2:imm1) = dte*.5*(1./dy(1:imm2,jmm1)+1./dy(2:imm1,jmm1))     &
                          * sqrt( .5*GRAV * (d(1:imm2,jmm1)+d(2:imm1,jmm1)) )
               uaf(2:imm1,jm) = (ua(2:imm1,jm)+ce(2:imm1)*uaf(2:imm1,jmm1))  &
@@ -2304,7 +2307,7 @@ module bry
                              + (uaf(2:imm1,2)-uaf(2:imm1,3))  !&
 !                              *dy(2:imm1,2)/dy(2:imm1,3)
 
-            case ( 10 ) ! bcCHAPMAN
+            case ( bcCHAPMAN )
               ce(2:imm1) = dte*.5*(1./dy(1:imm2,2)+1./dy(2:imm1,2))     &
                          * sqrt( .5*GRAV * (d(1:imm2,2)+d(2:imm1,2)) )
               uaf(2:imm1,1) = (ua(2:imm1,1)+ce(2:imm1)*uaf(2:imm1,2))  &
@@ -2832,6 +2835,7 @@ module bry
 !   vf : salinity
 !______________________________________________________________________
 !
+      use glob_const , only: SMALL
       use glob_grid  , only: dx, dy, fsm, zz
       use glob_ocean , only: dt, s, t, u, uf, v, vf, w
       use model_run  , only: dti
@@ -2840,6 +2844,9 @@ module bry
 
       integer  ii, jj
       real(rk) u1, wm
+      real(rk), dimension(im,2) :: grdx
+      real(rk), dimension(2,jm) :: grdy
+      real(rk)                  :: cff, cx, cy, dvdt, dvdx, dvdy
 
 
 ! Apply periodic BC in x-dimension
@@ -2918,6 +2925,55 @@ module bry
                 end do
               end if
 
+            case ( bcRADIATION )
+              do k = 1,kbm1
+                do j = 2,jm
+                  grdy(1,j) = t(imm1,j,k)-t(imm1,j-1,k)
+                  grdy(2,j) = t(im  ,j,k)-t(im  ,j-1,k)
+                end do
+                do j = 2,jmm1
+                  dvdt =  t(imm1,j,k)-uf(imm1,j,k)
+                  dvdx = uf(imm1,j,k)-uf(imm2,j,k)
+                  if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
+                    dvdy = grdy(1,j  )
+                  else
+                    dvdy = grdy(1,j+1)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  uf(im,j,k) = ( cff*t(im,j,k) + cx*uf(imm1,j,k)      &
+                                - max(cy,0._rk)*grdy(2,j  )           &
+                                - min(cy,0._rk)*grdy(2,j+1) )         &
+                               / (cff+cx)
+                end do
+              end do
+
+              do k = 1,kbm1
+                do j = 2,jm
+                  grdy(1,j) = s(imm1,j,k)-s(imm1,j-1,k)
+                  grdy(2,j) = s(im  ,j,k)-s(im  ,j-1,k)
+                end do
+                do j = 2,jmm1
+                  dvdt =  s(imm1,j,k)-vf(imm1,j,k)
+                  dvdx = vf(imm1,j,k)-vf(imm2,j,k)
+                  if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
+                    dvdy = grdy(1,j  )
+                  else
+                    dvdy = grdy(1,j+1)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  vf(im,j,k) = ( cff*s(im,j,k) + cx*vf(imm1,j,k)      &
+                                - max(cy,0._rk)*grdy(2,j  )           &
+                                - min(cy,0._rk)*grdy(2,j+1) )         &
+                               / (cff+cx)
+                end do
+              end do
+
           end select
 
         end if
@@ -2989,6 +3045,55 @@ module bry
                   end do
                 end do
               end if
+
+            case ( bcRADIATION )
+              do k = 1,kbm1
+                do j = 2,jm
+                  grdy(1,j) = t(1,j,k)-t(1,j-1,k)
+                  grdy(2,j) = t(2,j,k)-t(2,j-1,k)
+                end do
+                do j = 2,jmm1
+                  dvdt =  t(2,j,k)-uf(2,j,k)
+                  dvdx = uf(2,j,k)-uf(3,j,k)
+                  if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
+                    dvdy = grdy(2,j  )
+                  else
+                    dvdy = grdy(2,j+1)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  uf(1,j,k) = ( cff*t(1,j,k) + cx*uf(2,j,k)      &
+                                - max(cy,0._rk)*grdy(1,j  )      &
+                                - min(cy,0._rk)*grdy(1,j+1) )    &
+                               / (cff+cx)
+                end do
+              end do
+
+              do k = 1,kbm1
+                do j = 2,jm
+                  grdy(1,j) = s(1,j,k)-s(1,j-1,k)
+                  grdy(2,j) = s(2,j,k)-s(2,j-1,k)
+                end do
+                do j = 2,jmm1
+                  dvdt =  s(2,j,k)-vf(2,j,k)
+                  dvdx = vf(2,j,k)-vf(3,j,k)
+                  if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
+                    dvdy = grdy(2,j  )
+                  else
+                    dvdy = grdy(2,j+1)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  vf(1,j,k) = ( cff*s(1,j,k) + cx*vf(2,j,k)      &
+                                - max(cy,0._rk)*grdy(1,j  )      &
+                                - min(cy,0._rk)*grdy(1,j+1) )    &
+                               / (cff+cx)
+                end do
+              end do
 
           end select
 
@@ -3072,6 +3177,55 @@ module bry
                 end do
               end if
 
+            case ( bcRADIATION )
+              do k = 1,kbm1
+                do i = 2,im
+                  grdx(i,1) = t(i,jmm1,k)-t(i-1,jmm1,k)
+                  grdx(i,2) = t(i,jm  ,k)-t(i-1,jm  ,k)
+                end do
+                do i = 2,imm1
+                  dvdt =  t(i,jmm1,k)-uf(i,jmm1,k)
+                  dvdy = uf(i,jmm1,k)-uf(i,jmm2,k)
+                  if ( dvdt*(grdx(i,1)+grdx(i+1,1)) > 0. ) then
+                    dvdx = grdx(i  ,1)
+                  else
+                    dvdx = grdx(i+1,1)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
+                  cx  = min(cff,max(dvdt*dvdx,-cff))
+                  cy  = dvdt*dvdy
+                  uf(i,jm,k) = ( cff*t(i,jm,k) + cy*uf(i,jmm1,k)  &
+                                - max(cx,0._rk)*grdx(i  ,2)       &
+                                - min(cx,0._rk)*grdx(i+1,2) )     &
+                               / (cff+cy)
+                end do
+              end do
+
+              do k = 1,kbm1
+                do i = 2,im
+                  grdx(i,1) = s(i,jmm1,k)-s(i-1,jmm1,k)
+                  grdx(i,2) = s(i,jm  ,k)-s(i-1,jm  ,k)
+                end do
+                do i = 2,imm1
+                  dvdt =  s(i,jmm1,k)-vf(i,jmm1,k)
+                  dvdy = vf(i,jmm1,k)-vf(i,jmm2,k)
+                  if ( dvdt*(grdx(i,1)+grdx(i+1,1)) > 0. ) then
+                    dvdx = grdx(i  ,1)
+                  else
+                    dvdx = grdx(i+1,1)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
+                  cx  = min(cff,max(dvdt*dvdx,-cff))
+                  cy  = dvdt*dvdy
+                  vf(i,jm,k) = ( cff*s(i,jm,k) + cy*vf(i,jmm1,k)  &
+                                - max(cx,0._rk)*grdx(i  ,2)       &
+                                - min(cx,0._rk)*grdx(i+1,2) )     &
+                               / (cff+cy)
+                end do
+              end do
+
           end select
 
         end if
@@ -3144,12 +3298,85 @@ module bry
                 end do
               end if
 
+            case ( bcRADIATION )
+              do k = 1,kbm1
+                do i = 2,im
+                  grdx(i,1) = t(i,1,k)-t(i-1,1,k)
+                  grdx(i,2) = t(i,2,k)-t(i-1,2,k)
+                end do
+                do i = 2,imm1
+                  dvdt =  t(i,2,k)-uf(i,2,k)
+                  dvdy = uf(i,2,k)-uf(i,3,k)
+                  if ( dvdt*(grdx(i,2)+grdx(i+1,2)) > 0. ) then
+                    dvdx = grdx(i  ,2)
+                  else
+                    dvdx = grdx(i+1,2)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
+                  cx  = min(cff,max(dvdt*dvdx,-cff))
+                  cy  = dvdt*dvdy
+                  uf(i,1,k) = ( cff*t(i,1,k) + cy*uf(i,2,k)      &
+                                - max(cx,0._rk)*grdx(i  ,1)      &
+                                - min(cx,0._rk)*grdx(i+1,1) )    &
+                               / (cff+cy)
+                end do
+              end do
+
+              do k = 1,kbm1
+                do i = 2,im
+                  grdx(i,1) = s(i,1,k)-s(i-1,1,k)
+                  grdx(i,2) = s(i,2,k)-s(i-1,2,k)
+                end do
+                do i = 2,imm1
+                  dvdt =  s(i,2,k)-vf(i,2,k)
+                  dvdy = vf(i,2,k)-vf(i,3,k)
+                  if ( dvdt*(grdx(i,2)+grdx(i+1,2)) > 0. ) then
+                    dvdx = grdx(i  ,2)
+                  else
+                    dvdx = grdx(i+1,2)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
+                  cx  = min(cff,max(dvdt*dvdx,-cff))
+                  cy  = dvdt*dvdy
+                  vf(i,1,k) = ( cff*s(i,1,k) + cy*vf(i,2,k)      &
+                                - max(cx,0._rk)*grdx(i  ,1)      &
+                                - min(cx,0._rk)*grdx(i+1,1) )    &
+                               / (cff+cy)
+                end do
+              end do
+
           end select
 
         end if
 
       end if ! periodic_y end
 
+
+      if ( .not.periodic_bc % x .or. .not.periodic_bc % y ) then
+
+        if ( hasSOUTH .and. hasWEST ) then
+          uf(1,1,:) = .5*( uf(2,1,:) + uf(1,2,:) )
+          vf(1,1,:) = .5*( vf(2,1,:) + vf(1,2,:) )
+        end if
+
+        if ( hasSOUTH .and. hasEAST ) then
+          uf(im,1,:) = .5*( uf(imm1,1,:) + uf(im,2,:) )
+          vf(im,1,:) = .5*( vf(imm1,1,:) + vf(im,2,:) )
+        end if
+
+        if ( hasNORTH .and. hasEAST ) then
+          uf(im,jm,:) = .5*( uf(imm1,jm,:) + uf(im,jmm1,:) )
+          vf(im,jm,:) = .5*( vf(imm1,jm,:) + vf(im,jmm1,:) )
+        end if
+
+        if ( hasNORTH .and. hasWEST ) then
+          uf(1,jm,:) = .5*( uf(2,jm,:) + uf(1,jmm1,:) )
+          vf(1,jm,:) = .5*( vf(2,jm,:) + vf(1,jmm1,:) )
+        end if
+
+      end if
 ! Allpy rho-mask
       do k = 1,kbm1
         uf(:,:,k) = uf(:,:,k)*fsm
