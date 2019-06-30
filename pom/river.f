@@ -4,13 +4,13 @@
       use config     , only: calc_river
       use glob_const , only: pi, rk
       use glob_domain, only: im, jm, master_task, my_task
-      use glob_grid  , only: art
+      use grid       , only: art
 
       implicit none
 
       private
       
-      public :: river_init, river_main, totq
+      public :: river_init, river_main, totq, river_flux
 
       integer, parameter :: nr_gom = 33 , nr_mab = 23
       
@@ -580,15 +580,72 @@
 !          if ( my_task == master_task )  print*,tt,riv_out
 
        return
-       end subroutine river_gen_mab
+       end !subroutine river_gen_mab
+
+      subroutine river_flux( month, tair, tsurf, ssurf )
+
+        use glob_domain, only: i_global, j_global
+
+        implicit none
+
+        integer                   , intent(in   ) :: month
+        real(rk), dimension(im,jm), intent(in   ) :: tair
+        real(rk), dimension(im,jm), intent(  out) :: ssurf, tsurf
+
+!        integer , parameter :: i_amur = 31, j_amur = 233
+        integer , parameter :: i_amur = 36, j_amur = 389
+        real(rk), dimension(12)
+     &          , parameter :: q_tumen = [                              &
+     &                             30.2463253                           &
+     &                         ,   44.2542105                           &
+     &                         ,  105.8621385                           &
+     &                         ,  156.2726807                           &
+     &                         ,  357.9148493                           &
+     &                         ,  526.118025                            &
+     &                         ,  584.7622891                           &
+     &                         ,  988.0466263                           &
+     &                         ,  593.8361866                           &
+     &                         ,  277.2579819                           &
+     &                         ,  125.0181446                           &
+     &                         ,   50.4105421                           &
+     &                         ]                                        &
+     &                       , q_amur = [                               &
+     &                             2470.                                &
+     &                         ,   1893.                                &
+     &                         ,   1611.                                &
+     &                         ,   3161.                                &
+     &                         ,  15593.                                &
+     &                         ,  17427.                                &
+     &                         ,  15916.                                &
+     &                         ,  19003.                                &
+     &                         ,  22409.                                &
+     &                         ,  17971.                                &
+     &                         ,   6876.                                &
+     &                         ,   2742. ]
+        integer i,j
+
+
+        if ( judge_inout( i_amur     , j_amur
+     &                   , i_global(1), i_global(im),
+     &                     j_global(1), j_global(jm) ) ) then
+          i = i_amur - i_global(1) + 1
+          j = j_amur - j_global(1) + 1
+          vfluxf(i,j) = -q_amur(month)/art(i,j)
+          tsurf(i,j)  = max( tair(i,j), 0._rk )
+          ssurf(i,j)  = 10.
+        end if
+
+
+      end !subroutine
 
 !=============================================================
 ! If the processor has ( i_in, j_in ) in its local domain.
 !-------------------------------------------------------------
-      logical function judge_inout( i_in, j_in, 
+      pure logical function judge_inout( i_in, j_in,
      $                              imin_in, imax_in, 
      $                              jmin_in, jmax_in ) 
-      integer :: i_in, j_in, imin_in, imax_in, jmin_in, jmax_in
+      integer, intent(in) :: i_in, j_in, imin_in
+     &                     , imax_in, jmin_in, jmax_in
       
       if ( ( i_in >= imin_in .and. i_in <= imax_in )
      $     .and.( j_in >= jmin_in .and. j_in <= jmax_in ) ) then
@@ -602,65 +659,6 @@
       endif
 
       end function judge_inout
-!-------------------------------------------------------------
-      subroutine river_flux
-
-      use glob_domain, only: im, jm, i_global, j_global
-      use glob_grid  , only: art
-      use model_run  , only: dtime
-
-      implicit none
-
-      real(rk), parameter, dimension(12) :: tumen_dis = (/ 30.2463253   &
-     $                                                   , 44.2542105   &
-     $                                                   ,105.8621385   &
-     $                                                   ,156.2726807   &
-     $                                                   ,357.9148493   &
-     $                                                   ,526.118025    &
-     $                                                   ,584.7622891   &
-     $                                                   ,988.0466263   &
-     $                                                   ,593.8361866   &
-     $                                                   ,277.2579819   &
-     $                                                   ,125.0181446   &
-     $                                                   , 50.4105421   &
-     $                                                  /)              &
-     $                                    , amur_dis  = (/  1982.       &
-     $                                                   ,  1324.       &
-     $                                                   ,  1058.       &
-     $                                                   ,  3231.       &
-     $                                                   , 14094.       &
-     $                                                   , 15948.       &
-     $                                                   , 15553.       &
-     $                                                   , 19291.       &
-     $                                                   , 20813.       &
-     $                                                   , 16596.       &
-     $                                                   ,  6162.       &
-     $                                                   ,  2441.       &
-     $                                                  /)
-!      integer, parameter :: tumen_i = 7, tumen_j = 108
-      integer, parameter :: tumen_i = 5, tumen_j = 59
-      integer, parameter :: amur_i = 31, amur_j  = 233
-      integer i,j
-
-
-      if (   i_global(1) <= tumen_i .and. i_global(im) >= tumen_i       &
-     $ .and. j_global(1) <= tumen_j .and. j_global(jm) >= tumen_j ) then
-         i = tumen_i - i_global(1) + 1
-         j = tumen_j - j_global(1) + 1
-         vfluxf(i,j) = -tumen_dis( dtime%month ) / art(i,j)
-         print *, "Tumen discharge: ", vfluxf(i,j)
-      end if
-
-      if (     i_global(1) <= amur_i .and. i_global(im) >= amur_i       &
-     $   .and. j_global(1) <= amur_j .and. j_global(jm) >= amur_j ) then
-         i = amur_i - i_global(1) + 1
-         j = amur_j - j_global(1) + 1
-         vfluxf(i,j) = -amur_dis( dtime%month ) / art(i,j)
-         print *, "Amur discharge: ", vfluxf(i,j)
-      end if
-
-
-      end ! subroutine
 !
 !______________________________________________________________________
 !

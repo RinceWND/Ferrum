@@ -11,11 +11,9 @@
 
       use module_time
       use river
-      use wind
       use assim
       use interp
       use mcsst        !fhx:mcsst
-      use uvforce      !eda:uvforce
       use seaice
 
       implicit none
@@ -23,7 +21,7 @@
       real(8), external :: realtime
 
       integer mb
-      real(8) tick0, tick1
+      character(19) timestamp
 
 
 ! initialize model
@@ -40,11 +38,15 @@
 !      call assim_init( dtime )
 !      if ( use_ice ) call ice_init( dtime )
 ! TODO: Move all of these to initialize?
-      call msg_print("INITIALIZATION COMPLETE", 1, "")
+      timestamp(:) = " "
+      call date_and_time(timestamp(1:8),timestamp(10:19))
 
-      if ( .not.do_restart ) call out_init( trim(netcdf_file) )
+      call msg_print("INITIALIZATION COMPLETE", 1, timestamp)
 
-      tick0 = realtime()
+      if ( .not.do_restart ) then
+        call out_init( "out/init."//trim(netcdf_file)//".nc" )
+      end if
+
       if ( is_master ) then
         call msg_print("BEGIN NUMERICAL EXPERIMENT", 1, "")
         print '(" = ",a)', date2str( dtime )
@@ -102,14 +104,13 @@
 
       end do
 
-      tick1 = realtime()
-      call msg_print("NUMERICAL EXPERIMENT FINISHED", 1, "")
+      call date_and_time(timestamp(1:8),timestamp(10:19))
+      call msg_print("NUMERICAL EXPERIMENT FINISHED", 1, timestamp)
 
 ! finalize mpi
       call finalize_mpi
 
-      if (is_master) print '(a,f7.2,a)',"Done in ",(tick1-tick0)," sec."
-      
+
       end program
 
 !______________________________________________________________________
@@ -452,7 +453,7 @@
         integer         , intent(in) :: status
 
         integer, parameter :: line_len = 56
-        integer*2, dimension(6), parameter :: chr =
+        integer(2), dimension(6), parameter :: chr =
 !     &                          (/ 9675  ! 1: white circle
      &                          (/ 79_2    ! 1: latin capital letter o
      &                           , 33_2    ! 2: exclamation mark

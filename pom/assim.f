@@ -3,7 +3,7 @@
       use config     , only: calc_interp
       use glob_const , only: rk
       use glob_domain, only: im, jm
-      use glob_grid  , only: east_e, north_e
+      use grid       , only: east_e, north_e
       use module_time
 
       implicit none
@@ -302,7 +302,7 @@
       use clim       , only: tclim
       use glob_domain, only: i_global, im, j_global, jm, kb, kbm1
      &                     , my_task, n_proc, n_south, n_west
-      use glob_grid  , only: h, zz
+      use grid       , only: h, zz
       use glob_ocean , only: t, tb
       use model_run  , only: iint
       use module_time

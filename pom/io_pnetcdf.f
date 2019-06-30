@@ -91,7 +91,7 @@
         use glob_domain, only: i_global, im, im_global, is_master
      &                       , j_global, jm, jm_global
      &                       , kb, POM_COMM
-        use glob_grid  , only: dum, dvm, dx, dy
+        use grid       , only: dum, dvm, dx, dy
      &                       , east_c, east_e, east_u, east_v
      &                       , fsm, h, north_c, north_e
      &                       , north_u, north_v, rot, z
@@ -1023,7 +1023,7 @@
 !______________________________________________________________________
 
         use air        , only: wusurf, wvsurf
-        use config     , only: restart_file
+        use config     , only: init_file
         use glob_const , only: rk
         use glob_domain
         use glob_ocean
@@ -1053,12 +1053,12 @@
         edge  = 1
 
 ! open netcdf restart file
-        write(netcdf_in_file,'(''in/'',a)') trim(restart_file)
+        write(netcdf_in_file,'(''in/'',a)') trim(init_file)
         if ( is_master )
      &       print '(/''reading file '',a)', trim(netcdf_in_file)
         status = nf90mpi_open( POM_COMM, netcdf_in_file, NF_NOWRITE
      &                       , MPI_INFO_NULL, ncid )
-        call handle_error_pnetcdf('nfmpi_open: '//trim(restart_file)
+        call handle_error_pnetcdf('nfmpi_open: '//trim(init_file)
      &                           , status )
 
 ! get variables
@@ -1263,7 +1263,7 @@
 
       use glob_const , only: rk
       use glob_domain
-      use glob_grid  , only: fsm
+      use grid       , only: fsm
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
 
@@ -1552,7 +1552,7 @@
 
         use glob_const , only: rk
         use glob_domain
-        use glob_grid  , only: fsm
+        use grid       , only: fsm
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf
 
@@ -1665,7 +1665,7 @@
 
         use glob_const , only: rk
         use glob_domain
-        use glob_grid  , only: fsm
+        use grid       , only: fsm
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
         use pnetcdf
 
@@ -2576,7 +2576,7 @@
 
       use glob_const , only: rk
       use glob_domain
-      use glob_grid  , only: fsm
+      use grid       , only: fsm
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
 
@@ -2996,7 +2996,7 @@
         use config     , only: use_ice, mode, title
         use glob_const , only: rk
         use glob_domain
-        use glob_grid
+        use grid
         use glob_misc
         use glob_ocean
         use glob_out
@@ -3666,7 +3666,7 @@
         use config     , only: title
         use glob_const , only: rk
         use glob_domain
-        use glob_grid
+        use grid
         use glob_out
         use model_run  , only: time, time_start
         use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
@@ -3892,7 +3892,7 @@
         use config     , only: title
         use glob_const , only: rk
         use glob_domain
-        use glob_grid
+        use grid
         use glob_misc
         use glob_ocean
         use model_run  , only: time, time_start
@@ -3938,10 +3938,6 @@
 !     netcdf_out_file='./out/out.init.nc' !lyo:20110224:alu:stcc:
         if ( is_master )
      &       write(*,'(/''writing file '',a)') trim(netcdf_out_file)
-        status = nf90mpi_create( POM_COMM, trim(netcdf_out_file)
-     &         , NF_CLOBBER+NF_64BIT_OFFSET, MPI_INFO_NULL, ncid )
-        call handle_error_pnetcdf( 'nf_create: '//netcdf_out_file
-     &                           , status )
 
 ! define global attributes
         status = nf90mpi_put_att( ncid, NF_GLOBAL

@@ -145,6 +145,10 @@
               ice(i,j) = ice(i,j) + (1.-ice(i,j))*.47
               hi(i,j)  = (1.-ice(i,j))*(ht(i,j)*dte/lhf/930.)
      &                   +   ice(i,j) * hi(i,j)
+              if ( abs(ui(i,j)) < SMALL .and. abs(vi(i,j)) < SMALL ) then
+                ui(i,j) = u(i,j,1)
+                vi(i,j) = v(i,j,1)
+              end if
             end if
           end do
         end do

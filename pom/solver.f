@@ -18,7 +18,7 @@
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1
      &                     , n_south, n_west
-      use glob_grid  , only: aru, arv, dx, dy
+      use grid       , only: aru, arv, dx, dy
       use glob_ocean , only: aam2d, advua, advva, cbc, d
      &                     , fluxua, fluxva, tps, ua, uab, va, vab
      &                     , wubot, wvbot
@@ -224,7 +224,7 @@
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
      &                     , n_south, n_west
-      use glob_grid  , only: aru, arv, dx, dy
+      use grid       , only: aru, arv, dx, dy
       use glob_ocean , only: aam, advx, advy, dt, u, ub, v, vb
 
       implicit none
@@ -438,7 +438,7 @@
 !
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
-      use glob_grid  , only: art, dum, dvm, dx, dy, dz, h
+      use grid       , only: art, dum, dvm, dx, dy, dz, h
       use glob_ocean , only: aam, dt, etb, etf, u, v, w
       use model_run  , only: dti2
 
@@ -515,9 +515,10 @@
 !
       use config     , only: tprni
       use glob_const , only: rk
-      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
-      use glob_grid  , only: art, dum, dvm, dx, dy, dz, h, zz
-      use glob_ocean , only: aam, dt, etb, etf, tsurf, u, v, w, zflux
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1,my_task
+      use grid       , only: art, dum, dvm, dx, dy, dz, h, zz
+      use glob_ocean , only: aam, dt, etb, etf, ssurf, tsurf, u, v, w
+     &                     , zflux
       use model_run  , only: dti2
 
       implicit none
@@ -549,6 +550,11 @@
           end do
         end do
       end do
+      if (my_task==0) then
+        !print *,"ADVT]: ", xflux(35,138,1), yflux(38,138,1)
+        print *,"FCLIM]: ", fclim(35,138,1), fb(38,138,1)
+        print *,"FSURF]: ", tsurf(35,138), ssurf(38,138)
+      end if
 
 ! add diffusive fluxes
       fb = fb - fclim
@@ -580,7 +586,7 @@
 !          zflux(i,j,1)=f(i,j,1)*w(i,j,1)*art(i,j)
 !     for rivers 2010/5/08 ayumi
            if ( var == 'T' ) zflux(i,j,1)=tsurf(i,j)*w(i,j,1)*art(i,j)
-           if ( var == 'S' ) zflux(i,j,1)=0.
+           if ( var == 'S' ) zflux(i,j,1)=ssurf(i,j)*w(i,j,1)*art(i,j)
            zflux(i,j,kb)=0.
         end do
       end do
@@ -643,8 +649,9 @@
       use config     , only: nitera, tprni
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1, master_task
-      use glob_grid  , only: art, dum, dvm, dx, dy, dz, h
-      use glob_ocean , only: aam, dt, etb, etf, tsurf, u, v, w, zflux
+      use grid       , only: art, dum, dvm, dx, dy, dz, h
+      use glob_ocean , only: aam, dt, etb, etf, ssurf, tsurf, u, v, w
+     &                     , zflux
       use model_run  , only: dti2
 
       implicit none
@@ -736,7 +743,7 @@
               if ( var == 'T' )
      $              zflux(i,j,1)=tsurf(i,j)*w(i,j,1)*art(i,j)
               if ( var == 'S' )
-     $              zflux(i,j,1)=0.
+     $              zflux(i,j,1)=ssurf(i,j)*w(i,j,1)*art(i,j)
             end if
             zflux(i,j,kb)=0.
           end do
@@ -837,7 +844,7 @@
 !
 !______________________________________________________________________
 !
-      subroutine advtC(cbm,cf)
+      subroutine advtC(cbm,cf,xflux,yflux)
 !----------------------------------------------------------------------
 !  Integrate conservative scalar equations.
 !  This is the 2-D modifiction of `advt2` for sea-ice concentration.
@@ -848,21 +855,20 @@
 !            smol_adifC     [solver.f]
 !______________________________________________________________________
 !
-      use config     , only: nitera
+      use config     , only: nitera, tprni
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1
-      use glob_grid  , only: art, dx, dy
-      use glob_misc  , only: ui, vi
+      use grid       , only: art, dx, dy, dum, dvm
+      use seaice     , only: iceu, icev
       use glob_ocean , only: etb, etf
       use model_run  , only: dti2
 
       implicit none
 
       real(rk), dimension(im,jm), intent(in)  :: cbm
-      real(rk), dimension(im,jm), intent(out) :: cf
+      real(rk), dimension(im,jm), intent(out) :: cf, xflux, yflux
 
-      real(rk), dimension(im,jm) :: cbmem, eta, xflux, yflux
-     &                            , xmassflux , ymassflux
+      real(rk), dimension(im,jm) :: cbmem, eta, xmassflux , ymassflux
 !      real(kind=rk) eps, epsval  ! rwnd: iteration check
       integer i,j,itera
 
@@ -873,13 +879,13 @@
 
       do j=2,jmm1
         do i=2,im
-          xmassflux(i,j)=.5*(dy(i-1,j)+dy(i,j))*ui(i,j)
+          xmassflux(i,j)=.5*(dy(i-1,j)+dy(i,j))*iceu(i,j)
         end do
       end do
 
       do j=2,jm
         do i=2,imm1
-          ymassflux(i,j)=.5*(dx(i,j-1)+dx(i,j))*vi(i,j)
+          ymassflux(i,j)=.5*(dx(i,j-1)+dx(i,j))*icev(i,j)
         end do
       end do
 
@@ -950,32 +956,32 @@
 !      write(*,*) my_task, ": ", var, ": nitera = ", itera  ! rwnd: iteration check
 
 ! add horizontal diffusive fluxes
-!      do j=2,jm
-!        do i=2,im
-!          xmassflux(i,j) = .5*(aam(i,j,1)+aam(i-1,j,1))
-!          ymassflux(i,j) = .5*(aam(i,j,1)+aam(i,j-1,1))
-!        end do
-!      end do
+      do j=2,jm
+        do i=2,im
+          xmassflux(i,j) = 0.!1.e6
+          ymassflux(i,j) = 0.!1.e6
+        end do
+      end do
 
-!      do j=2,jm
-!        do i=2,im
-!         xflux(i,j) = -10.e2*tprni !-xmassflux(i,j)*tprni
-!     $                   *(cb(i,j)-cb(i-1,j))*dum(i,j)
-!     $                   *(dy(i,j)+dy(i-1,j))*0.5/(dx(i,j)+dx(i-1,j))
-!         yflux(i,j) = -10.e2*tprni !-ymassflux(i,j)*tprni
-!     $                   *(cb(i,j)-cb(i,j-1))*dvm(i,j)
-!     $                   *(dx(i,j)+dx(i,j-1))*0.5/(dy(i,j)+dy(i,j-1))
-!        end do
-!      end do
+      do j=2,jm
+        do i=2,im
+         xflux(i,j) = -xmassflux(i,j)!*tprni
+     $                   *(cbm(i,j)-cbm(i-1,j))*dum(i,j)
+     $                   *(dy(i,j)+dy(i-1,j))*0.5/(dx(i,j)+dx(i-1,j))
+         yflux(i,j) = -ymassflux(i,j)!*tprni
+     $                   *(cbm(i,j)-cbm(i,j-1))*dvm(i,j)
+     $                   *(dx(i,j)+dx(i,j-1))*0.5/(dy(i,j)+dy(i,j-1))
+        end do
+      end do
 !
-!! add net horizontal fluxes and step forward in time
-!      do j=2,jmm1
-!        do i=2,imm1
-!          cf(i,j) = cf(i,j)-dti2*(xflux(i+1,j)-xflux(i,j)
-!     $                           +yflux(i,j+1)-yflux(i,j))
-!     $                          /art(i,j)
-!        end do
-!      end do
+! add net horizontal fluxes and step forward in time
+      do j=2,jmm1
+        do i=2,imm1
+          cf(i,j) = cf(i,j)-dti2*(xflux(i+1,j)-xflux(i,j)
+     $                           +yflux(i,j+1)-yflux(i,j))
+     $                          /art(i,j)
+        end do
+      end do
 
 
       end ! subroutine advtC
@@ -993,7 +999,7 @@
       use air        , only: e_atmos
       use glob_const , only: grav, rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
-      use glob_grid  , only: aru, cor, dy, dz, h
+      use grid       , only: aru, cor, dy, dz, h
       use glob_ocean , only: advx, drhox, dt, egb, egf, etb, etf
      &                     , u, ub, uf, v, w
       use model_run  , only: dti2
@@ -1065,7 +1071,7 @@
       use air        , only: e_atmos
       use glob_const , only: grav, rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
-      use glob_grid  , only: arv, cor, dx, dz, h
+      use grid       , only: arv, cor, dx, dz, h
       use glob_ocean , only: advy, drhoy, dt, egb, egf, etb, etf
      &                     , u, v, vb, vf, w
       use model_run  , only: dti2
@@ -1136,7 +1142,7 @@
       use clim       , only: rmean
       use glob_const , only: grav, rk
       use glob_domain, only: imm1, jmm1, kb, kbm1
-      use glob_grid  , only: dum, dvm, dx, dy, zz
+      use grid       , only: dum, dvm, dx, dy, zz
       use glob_ocean , only: drhox, drhoy, dt, rho
       use model_run  , only: ramp
 
@@ -1243,17 +1249,19 @@
       use glob_const , only: grav, rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
      &                     , n_south, n_west
-      use glob_grid  , only: dum, dvm, dx, dy, dzz, zz
-      use glob_ocean , only: d, drhox, drhoy, dt, rho
+      use grid       , only: dum, dvm, dx, dy, dzz, zz
+      use glob_ocean , only: d, drhox, drhoy, dt, rho!rho_model => rho
       use model_run  , only: ramp
 
       implicit none
 
       integer       i,j,k
-      real(kind=rk) d4(im,jm),ddx(im,jm),drho(im,jm,kb),rhou(im,jm,kb)
-      real(kind=rk) rho4th(0:im,0:jm,kb),d4th(0:im,0:jm)
+      real(rk), dimension(im,jm   ) :: d4, ddx
+      real(rk), dimension(im,jm,kb) :: drho, rhou!rho, rhou
+      real(rk) rho4th(0:im,0:jm,kb),d4th(0:im,0:jm)
 
 
+      !rho = rho_model! - rmean
       rho = rho - rmean
 
 ! convert a 2nd order matrices to special 4th order
@@ -1352,20 +1360,10 @@
       end do
 
 ! compute terms correct to 4th order
-      do i=1,im
-        do j=1,jm
-          ddx(i,j)=0.
-          d4(i,j)=0.
-        end do
-      end do
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            rhou(i,j,k)=0.
-            drho(i,j,k)=0.
-          end do
-        end do
-      end do
+      ddx = 0.
+      d4  = 0.
+      rhou = 0.
+      drho = 0.
 
 ! compute DRHO, RHOU, DDX and D4
       do j=2,jm
@@ -1467,13 +1465,7 @@
 !      end if
 !      if (iint > 10) call finalize_mpi
 
-      do k=1,kb
-        do j=1,jm
-          do i=1,im
-            rho(i,j,k)=rho(i,j,k)+rmean(i,j,k)
-          end do
-        end do
-      end do
+      rho = rho + rmean
 
 
       end ! subroutine baropg_mcc
@@ -1490,7 +1482,7 @@
 !
       use glob_const , only: grav, rk
       use glob_domain, only: im, jm, kb, kbm1
-      use glob_grid  , only: dum, dvm, dx, dy, dz, z
+      use grid       , only: dum, dvm, dx, dy, dz, z
       use glob_ocean , only: drhox, drhoy, dt, rho
       use model_run  , only: ramp
 
@@ -1616,7 +1608,7 @@
 !
       use glob_const , only: grav, rhoref, rk
       use glob_domain, only: im, jm, kbm1
-      use glob_grid  , only: dum, dvm, dx, dy, dz, z, zz
+      use grid       , only: dum, dvm, dx, dy, dz, z, zz
       use glob_ocean , only: d, drhox, drhoy, dt, rho
       use model_run  , only: ramp
 
@@ -1773,7 +1765,7 @@
 !
       use glob_const , only: grav, rhoref, rk
       use glob_domain, only: im, imm1, jm, jmm1, kb
-      use glob_grid  , only: dx, dy, dz, z, zz
+      use grid       , only: dx, dy, dz, z, zz
       use glob_ocean , only: d, drhox, drhoy, dt, rho
       use model_run  , only: ramp
 
@@ -2480,7 +2472,7 @@
       use config     , only: calc_tide, ntide
       use glob_const , only: grav, pi, rk, small
       use glob_domain
-      use glob_grid  , only: dx, dy, dum, dvm, fsm, h
+      use grid       , only: dx, dy, dum, dvm, fsm, h
       use glob_ocean , only: elf, s, t, u, uaf, uf, vaf, vf, w
       use model_run  , only: dti, ramp, time
       use river      , only: totq
@@ -2763,7 +2755,7 @@
       use bry
       use glob_bry
       use glob_const , only: grav, pi, rk, small
-      use glob_grid  , only: dum, dvm, dx, dy, fsm, h, zz
+      use grid       , only: dum, dvm, dx, dy, fsm, h, zz
       use glob_domain
       use glob_ocean , only: dt, el, elf, q2, q2l, s, t
      &                     , u, uaf, uf, v, va, vaf, vf, w
@@ -3072,7 +3064,7 @@
       use bry
       use glob_const , only: rk
       use glob_domain
-      use glob_grid  , only: dum, dvm, fsm
+      use grid       , only: dum, dvm, fsm
       use glob_ocean , only: elf, s, sb, t, tb
      &                     , u, ua, ub, uab, uaf, uf, vaf, vf, w
 
@@ -3306,7 +3298,7 @@
       use config     , only: sbias, tbias
       use glob_const , only: grav, rhoref, rk
       use glob_domain, only: im, jm, kb, kbm1
-      use glob_grid  , only: fsm, zz
+      use grid       , only: fsm, zz
       use glob_ocean , only: d
 
       implicit none
@@ -3318,9 +3310,11 @@
       real(rk) cr,p,rhor,sr,tr,tr2,tr3,tr4
 
 
-      do k=1,kbm1
-        do j=1,jm
-          do i=1,im
+      do k = 1,kbm1
+        do j = 1,jm
+          do i = 1,im
+
+            if ( fsm(i,j) == 0. ) cycle
 
             tr=ti(i,j,k)+tbias
             sr=si(i,j,k)+sbias
@@ -3331,22 +3325,22 @@
 ! approximate pressure in units of bars
             p=grav*rhoref*(-zz(k)*d(i,j))*1.e-5
 
-            rhor=-0.157406+6.793952e-2*tr
-     $           -9.095290e-3*tr2+1.001685e-4*tr3
-     $           -1.120083e-6*tr4+6.536332e-9*tr4*tr
+            rhor = -0.157406        + 6.793952e-2*tr
+     $             -9.095290e-3*tr2 + 1.001685e-4*tr3
+     $             -1.120083e-6*tr4 + 6.536332e-9*tr4*tr
 
-            rhor=rhor+(0.824493-4.0899e-3*tr
-     $               +7.6438e-5*tr2-8.2467e-7*tr3
-     $               +5.3875e-9*tr4)*sr
-     $               +(-5.72466e-3+1.0227e-4*tr
-     $               -1.6546e-6*tr2)*abs(sr)**1.5
-     $               +4.8314e-4*sr*sr
+            rhor = rhor + (  0.824493      - 4.0899e-3*tr
+     $                    +  7.6438e-5*tr2 - 8.2467e-7*tr3
+     $                    +  5.3875e-9*tr4 )*sr
+     $                  + ( -5.72466e-3    + 1.0227e-4*tr
+     $                    -  1.6546e-6*tr2 )*abs(sr)**1.5
+     $                  + 4.8314e-4*sr*sr
 
-            cr=1449.1+.0821*p+4.55*tr-.045*tr2
-     $                 +1.34*(sr-35.)
-            rhor=rhor+1.e5*p/(cr*cr)*(1.-2.*p/(cr*cr))
+            cr = 1449.1 + .0821*p + 4.55*tr - .045*tr2
+     $                  + 1.34*(sr-35.)
+            rhor = rhor + 1.e5*p/(cr*cr) * (1.-2.*p/(cr*cr))
 
-            rhoo(i,j,k)=rhor/rhoref*fsm(i,j)
+            rhoo(i,j,k) = fsm(i,j)*rhor/rhoref
 
           end do
         end do
@@ -3380,7 +3374,7 @@
       use glob_const , only: grav, kappa, rhoref, rk, small
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1!, kbm2
      &                     , n_east, n_north, n_south, n_west
-      use glob_grid  , only: dzz, dz, fsm, h, z, zz
+      use grid       , only: dzz, dz, fsm, h, z, zz
       use glob_ocean , only: a, c, dtef, ee, etf, gg, kh, km, kq, l
      &                     , q2, q2b, q2lb, rho, s, t
      &                     , u, uf, v, vf, wubot, wvbot
@@ -3711,8 +3705,8 @@
       use air        , only: swrad
       use config     , only: ntp, umol
       use glob_const , only: rk
-      use glob_domain, only: im, jm, kb, kbm1, kbm2, i_global, j_global
-      use glob_grid  , only: dz, dzz, h, z
+      use glob_domain, only: im, jm, kb, kbm1, kbm2!, i_global, j_global
+      use grid       , only: dz, dzz, h, z
       use glob_ocean , only: a, c, ee, etf, gg, kh
       use model_run  , only: dti2
 
@@ -3838,15 +3832,15 @@
         do j=1,jm
           do i=1,im
           f(i,j,ki)=(ee(i,j,ki)*f(i,j,ki+1)+gg(i,j,ki))
-              if (isnan(f(i,j,ki))) then
-                print *, "[ PROFT ]", i_global(i), j_global(j)
-                print *, " ee: ", ee(i,j,ki)
-                print *, " f+: ", f(i,j,ki+1)
-                print *, " gg: ", gg(i,j,ki)
-                print *, " sw: ", swrad(i,j)
-                print *, " wf: ", wfsurf(i,j)
-                stop
-              end if
+!              if (isnan(f(i,j,ki))) then
+!                print *, "[ PROFT ]", i_global(i), j_global(j)
+!                print *, " ee: ", ee(i,j,ki)
+!                print *, " f+: ", f(i,j,ki+1)
+!                print *, " gg: ", gg(i,j,ki)
+!                print *, " sw: ", swrad(i,j)
+!                print *, " wf: ", wfsurf(i,j)
+!                stop
+!              end if
           end do
         end do
       end do
@@ -3871,7 +3865,7 @@
       use config     , only: umol
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1, kbm2
-      use glob_grid  , only: dum, dz, dzz, h
+      use grid       , only: dum, dz, dzz, h
       use glob_ocean , only: a, c, cbc, ee, etf, gg, km, tps
      &                     , ub, uf, vb, wubot
       use model_run  , only: dti2
@@ -3979,7 +3973,7 @@
       use config     , only: umol
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1, kbm2
-      use glob_grid  , only: dvm, dz, dzz, h
+      use grid       , only: dvm, dz, dzz, h
       use glob_ocean , only: a, c, cbc, ee, etf, gg, km, tps
      &                     , vb, ub, vf, wvbot
       use model_run  , only: dti2
@@ -4085,7 +4079,7 @@
       use config     , only: sw
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
-      use glob_grid  , only: aru, arv, dzz, fsm
+      use grid       , only: aru, arv, dzz, fsm
       use glob_ocean , only: dt
       use model_run  , only: dti2
 
@@ -4204,7 +4198,7 @@
       use config     , only: sw
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb
-      use glob_grid  , only: aru, arv, fsm
+      use grid       , only: aru, arv, fsm
       use model_run  , only: dti2
 
       implicit none
@@ -4215,8 +4209,8 @@
       integer                i,j
       real(rk)               mol,abs_1,abs_2
       real(rk)               udx,u2dt,vdy,v2dt
-      real(rk), parameter :: value_min = 1.e-9
-     &                     , epsilon   = 1.e-14
+      real(rk), parameter :: value_min = 1.e-4 !9
+     &                     , epsilon   = 1.e-6 !14
 
 
 ! apply temperature and salinity mask
@@ -4276,7 +4270,7 @@
       use air        , only: vfluxb, vfluxf
       use glob_const , only: rk
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
-      use glob_grid  , only: dx, dy, dz
+      use grid       , only: dx, dy, dz
       use glob_ocean , only: dt, etb, etf, u, v, w
       use model_run  , only: dti2
 

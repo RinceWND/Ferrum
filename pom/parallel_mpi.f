@@ -74,7 +74,7 @@
 ! check number of processors
       if ( nproc /= n_proc ) then
         error_status = 1
-        if ( is_master ) print '(a,i3''/=''i3//a)'
+        if ( is_master ) print '(a,i3,"/=",i3//a)'
      &  , 'Incompatible number of processors',nproc,n_proc
      &  , 'POM terminated with error'
         call finalize_mpi

@@ -16,6 +16,7 @@ module config
   integer            &
     mode             & ! calculation mode
   , ntp              & ! water type
+  , init_record      & ! initial file record number to read from (ignored if do_restart)
   , ispadv           & ! step interval for updating external advective terms
   , nadv             & ! advection scheme
   , nbct             & ! surface temperature boundary condition
@@ -46,12 +47,16 @@ module config
 ! , period           & ! inertial period
 
   character(len=VAR_LEN)  &
-    source                & ! TODO: Remove; unused var
+    el_name               & ! elevation variable name for initial file
+  ,  s_name               & ! salinity variable name for initial file
+  ,  t_name               & ! temperature variable name for initial file
+  ,  u_name               & ! u-velocity variable name for initial file
+  ,  v_name               & ! v-velocity variable name for initial file
   , title
 
   character(len=PATH_LEN) &
     netcdf_file           & ! output netcdf filename
-  , restart_file            ! restart filename to read from
+  , init_file               ! initial or restart filename to read from
 
 
   parameter( lono=999.0,lato=999.0, xs=1.5,ys=1.5, fak=0.5)
@@ -238,6 +243,9 @@ module config
 ! Starting datetime string:
       time_start = "0001-01-01 00:00:00"
 
+! Initial filename (used for restart file as well):
+      init_file = "init/init.nc"
+
 ! Run duration (days):
       days = 0.
 
@@ -269,6 +277,13 @@ module config
       do_restart    = .false.
       append_output = .false.
 
+! Initial file variable names
+      el_name = 'e_init'
+       s_name = 's_init'
+       t_name = 't_init'
+       u_name = 'u_init'
+       v_name = 'v_init'
+
 
     end ! subroutine
 !
@@ -291,9 +306,15 @@ module config
 !      include 'io.h'
 !      include 'bulk.h'
 
-      namelist/run_nml/                          &
-        days      , dte  , do_restart  , isplit  &
-      , time_start, title, restart_file, spinup
+      namelist/run_nml/           &
+        days, dte, isplit, title
+
+      namelist/init/                                &
+        do_restart, init_file, init_record, spinup  &
+      , time_start
+
+      namelist/init_vars/                        &
+        el_name, s_name, t_name, u_name, v_name
 
       namelist/setup_nml/                     &
         aam_init, alpha , cbcmax, cbcmin      &
@@ -303,9 +324,9 @@ module config
       , t_hi    , t_lo  , tbias , tprni       &
       , umol    , vmaxl , z0b
 
-      namelist/output_nml/                                       &
-        append_output, monthly_flag, netcdf_file  , output_flag  &
-      , prtd1        , prtd2       , write_rst    , SURF_flag
+      namelist/output_nml/                                     &
+        append_output, monthly_flag, netcdf_file, output_flag  &
+      , prtd1        , prtd2       , write_rst  , SURF_flag
 
       namelist/modules_nml/                             &
         USE_AIR, USE_BRY, USE_ICE, USE_RIVER, USE_TIDE
@@ -320,15 +341,16 @@ module config
       open ( 73, file = config, status = 'old' )
       read ( 73, nml =     run_nml )
       rewind( 73 )
+      read ( 73, nml = init      )
+      rewind( 73 )
+      read ( 73, nml = init_vars )
+      rewind( 73 )
       read ( 73, nml =  output_nml )
       rewind( 73 )
       read ( 73, nml =   setup_nml )
       rewind( 73 )
       read ( 73, nml = modules_nml )
       close( 73 )
-
-!  Do some configuration management.
-      if ( .not. do_restart ) restart_file = ''
 
 ! End of input of constants
 

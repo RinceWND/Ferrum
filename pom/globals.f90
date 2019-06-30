@@ -19,6 +19,7 @@ module glob_const
   , kappa            & ! von Karman's constant
   , ohm              & ! Earth's rotation angular frequency 
   , pi               & ! pi
+  , rad2deg          & ! 180./pi
   , rhoref           & ! reference density
   , rho_cpw          & ! rho*Cpw
   , sec2day          & ! 1./86400.
@@ -36,6 +37,7 @@ module glob_const
       small   = 1.e-10       ! small value
       kappa   = 0.4          ! VonKarman's constant
       ohm     = 7.29e-5      ! angular frequency of Earth
+      rad2deg = 180./pi      ! radians to degrees conversion factor
       rhoref  = 1025.        ! recommended values: 1025 for seawater,
                              !                     1000 for freswater
       rho_cpw = rhoref*cpw   ! Seawater density times the specific heat of seawater
@@ -393,54 +395,6 @@ module model_run
 
 
 end module model_run
-
-
-module glob_grid
-
-  use glob_const, only: rk
-
-  implicit none
-
-  public
-
-!----------------------------------------------------------------------
-! Vertical discretization
-!----------------------------------------------------------------------
-  real(kind=rk)              &
-       , allocatable         &
-       , dimension(:)     :: &
-    dz               & ! z(k)-z(k+1)
-  , dzz              & ! zz(k)-zz(k+1)
-  , z                & ! sigma coordinate from z=0 (surface) to z=-1 (bottom)
-  , zz                 ! sigma coordinate, intermediate between z
-
-!----------------------------------------------------------------------
-! Horizontal discretization
-!----------------------------------------------------------------------
-  real(kind=rk)              &
-       , allocatable         &
-       , dimension(:,:)   :: &
-    art              & ! cell area centered on T grid points
-  , aru              & ! cell area centered on U grid points
-  , arv              & ! cell area centered on V grid points
-  , cor              & ! coriolis parameter
-  , dum              & ! mask for u velocity
-  , dvm              & ! mask for v velocity
-  , dx               & ! grid spacing in x
-  , dy               & ! grid spacing in y
-  , east_c           & ! horizontal coordinate of cell corner points in x
-  , east_e           & ! horizontal coordinate of elevation points in x
-  , east_u           & ! horizontal coordinate of U points in x
-  , east_v           & ! horizontal coordinate of V points in x
-  , fsm              & ! mask for scalar variables
-  , h                & ! bottom depth
-  , north_c          & ! horizontal coordinate of cell corner points in y
-  , north_e          & ! horizontal coordinate of elevation points in y
-  , north_u          & ! horizontal coordinate of U points in y
-  , north_v          & ! horizontal coordinate of V points in y
-  , rot                ! rotation angle
-
-end module glob_grid
 
 
 module glob_ocean
