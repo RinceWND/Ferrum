@@ -122,7 +122,7 @@ module clim
 !______________________________________________________________________
 !
       use glob_domain, only: is_master
-      use glob_grid  , only: h
+      use grid       , only: h
 
       implicit none
 
@@ -518,8 +518,8 @@ module clim
       if ( .not.RELAX_TS ) return
 
       where ( hz .gt. h_thres )
-        temp = ( tclim - temp ) / ( t_rel * 86400. )
-        salt = ( sclim - salt ) / ( t_rel * 86400. )
+        temp = temp + ( tclim - temp ) / ( t_rel * 86400. )
+        salt = salt + ( sclim - salt ) / ( t_rel * 86400. )
       end where
 
 
