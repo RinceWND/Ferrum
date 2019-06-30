@@ -25,9 +25,12 @@
 !            update_time       [globals.f90]
 !______________________________________________________________________
 !
+        use air      , only: swrad, uwnd, vwnd, wtsurf, wusurf, wvsurf
+     &                     , temp
         use config   , only: spinup, use_ice
-        use model_run, only: iext, isplit
+        use model_run, only: dtime, dte,dti, iext, isplit
      &                     , update_time
+        use glob_ocean, only: u, uab, v, vab
         use seaice
 
 ! advance POM 1 step in time
@@ -50,8 +53,14 @@
         do iext=1,isplit
           call mode_external
           call check_nan_2d  !fhx:tide:debug
-!          if (use_ice) call ice_advance
+          if ( use_ice ) then
+!            call ice_advance(wusurf,wvsurf,wtsurf,swrad,temp)
+            call advect_ice( dte, uwnd,vwnd, uab,vab
+     &                     , wtsurf,swrad,temp )
+          end if
         end do
+!        call advect_ice( dti, uwnd,vwnd, u(:,:,1),v(:,:,1)
+!     &                     , wtsurf,swrad,temp )
 
 ! internal (3-D) mode calculation
         call mode_internal
@@ -120,19 +129,25 @@
 !            step    [seaice]
 !______________________________________________________________________
 !
-      use air      , only: air_step => step
+      use air      , only: air_step => step, tair => temp
+     &                   , swrad, wtsurf, uwnd, vwnd
       use bry      , only: bry_step => step
       use clim     , only: clm_step => step
+      use river    , only: riv_step => river_flux
       use seaice   , only: ice_step => step
+      use tide     , only: tide_step=> step
       use model_run, only: dtime
+      use glob_ocean,only: ssurf, tsurf, u, ua, v, va
 
       implicit none
 
 
       call clm_step( dtime )
-      call ice_step( dtime )
+      call ice_step( dtime, uwnd, vwnd, ua, va, wtsurf, swrad, tair )
       call air_step( dtime )
       call bry_step( dtime )
+      call tide_step( dtime )
+      call riv_step( dtime%month, tair, tsurf, ssurf )
 
 
       end ! subroutine update_bc
@@ -153,7 +168,7 @@
       use config     , only: aam_init, horcon, mode, n1d, npg
       use bry        , only: aamfrz, USE_SPONGE
       use glob_domain, only: im, imm1, jm, jmm1, kbm1
-      use glob_grid  , only: dx, dy
+      use grid       , only: dx, dy
       use glob_misc  , only: aamfac
       use glob_ocean , only: a, aam, c, ee, u, v
 
@@ -232,7 +247,7 @@
 !
       use config     , only: mode
       use glob_domain, only: im, jm, kbm1
-      use glob_grid  , only: dz
+      use grid       , only: dz
       use glob_ocean
       use model_run  , only: isp2i, ispi
 
@@ -304,8 +319,8 @@
       use config     , only: alpha, cbcmax, cbcmin, ispadv, smoth
      &                     , use_tide, z0b
       use glob_const , only: grav, Kappa
-      use glob_domain, only: im, imm1, jm, jmm1, kbm1!, my_task
-      use glob_grid  , only: art, aru, arv, cor, dx, dy, fsm, h, zz
+      use glob_domain, only: im, imm1, jm, jmm1, kbm1,i_global,j_global!, my_task
+      use grid       , only: art, aru, arv, cor, dx, dy, fsm, h, zz
       use glob_ocean
       use tide       , only: tide_ua, tide_va, tide_advance => step
       use model_run  , only: dte, dte2, iext, isp2i, ispi, isplit,dtime
@@ -332,6 +347,18 @@
      $              +dte2*(-(fluxua(i+1,j)-fluxua(i,j)
      $                      +fluxva(i,j+1)-fluxva(i,j))/art(i,j)
      $                      -vfluxf(i,j))
+!        if (elf(i,j) == elf(i,j)+1) then
+        if ( abs(elf(i,j)) > 50. ) then
+          print *, "== ELF arithm.exception:", elf(i,j)
+          print *, "  location: ", i_global(i), j_global(j)
+          print *, "elb     : ", elb(i,j)
+          print *, "fluxua+0: ", fluxua(i+1,j)
+          print *, "fluxua00: ", fluxua(i,j)
+          print *, "fluxva0+: ", fluxua(i,j+1)
+          print *, "fluxva00: ", fluxua(i,j)
+          print *, "vfluxf  : ", vfluxf(i,j)
+          stop -100
+        end if
         end do
       end do
 
@@ -399,11 +426,11 @@
       call exchange2d_mpi(uaf,im,jm)
       call exchange2d_mpi(vaf,im,jm)
 
-      if ( use_tide ) then
-        call tide_advance( dtime + int(iext*dte) )
-        uaf = uaf + tide_ua! - tide_ua_b
-        vaf = vaf + tide_va! - tide_va_b
-      end if
+!      if ( use_tide ) then
+!        call tide_advance( dtime + int(iext*dte) )
+!        uaf = uaf + tide_ua! - tide_ua_b
+!        vaf = vaf + tide_va! - tide_va_b
+!      end if
 
       if     ( iext == (isplit-2) ) then
 
@@ -491,7 +518,7 @@
       use config     , only: mode, nadv, nbcs, nbct, do_restart
      &                     , smoth, t_lo, t_hi
       use glob_domain
-      use glob_grid  , only: dz, h
+      use grid       , only: dz, h
       use glob_ocean
       use model_run
 
@@ -501,8 +528,10 @@
 
 
       if ( mode /= 2 ) then
-      if ( ( iint>1 .and. .not.do_restart )
-     & .or.( iint>2 .and.      do_restart ) ) then
+!      if ( ( iint>1 .and. .not.do_restart )
+!     & .or.( iint>2 .and.      do_restart ) ) then
+      if ( ( iint>1 .and.      do_restart )
+     & .or.( iint>2 .and. .not.do_restart ) ) then
 
 ! adjust u(z) and v(z) such that depth average of (u,v) = (ua,va)
         tps = 0.
@@ -594,7 +623,7 @@
 
 ! calculate tf and sf using uf, vf, a and c as temporary variables
 !        if( mode /= 4 .and. ( iint > 2 .or. do_restart ) ) then
-        if( mode /= 4 ) then
+        if ( mode /= 4 ) then
 
           if     ( nadv == 1 ) then
 
@@ -731,7 +760,7 @@
         use glob_const , only: rk
         use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
      &                       , n_east, n_north, n_south, n_west
-        use glob_grid  , only: dx, dy, fsm, zz
+        use grid       , only: dx, dy, fsm, zz
         use glob_ocean , only: dt, et, etb, etf, tps, u, v, w, wr
         use model_run  , only: dti2
 
@@ -807,7 +836,7 @@
       use config     , only: sbias, tbias
       use glob_const , only: rk
       use glob_domain
-      use glob_grid  , only: art, dz, fsm
+      use grid       , only: art, dz, fsm
       use glob_ocean , only: et, dt, sb, tb
       use glob_out   , only: iprint
       use model_run
@@ -833,7 +862,7 @@
         if ( error_status /= 0 ) then
           if ( is_master ) print *, 'POM terminated with error'
           call finalize_mpi
-          stop
+          stop -1
         end if
 
 ! local averages
@@ -1147,7 +1176,7 @@
 !
       use glob_const , only: rk
       use glob_domain, only: i_global, im, j_global, jm, kb
-      use glob_grid  , only: h
+      use grid       , only: h
 
       implicit none
 
@@ -1162,7 +1191,7 @@
       do k=1,kb
         do j=1,jm
           do i=1,im
-            if ( isnan(var(i,j,k)) ) then
+            if ( var(i,j,k) == var(i,j,k) + 1 ) then
               print '(2a,3i4,2f12.4)'
      &            , "detect nan : ",varname
      &            , i_global(i), j_global(j), k
@@ -1178,8 +1207,8 @@
      &      , " detect_nan : ", varname
      &      , "j_global(1) = ", j_global(1)
      &      , ",   num_nan = ", num_nan
-!         call finalize_mpi
-        stop
+        call finalize_mpi
+        stop -3
       end if
 
 
@@ -1220,7 +1249,7 @@
       use air
       use glob_const , only: rk
       use glob_domain, only: i_global, im, j_global, jm
-      use glob_grid  , only: fsm, h
+      use grid       , only: h
       use model_run  , only: time
       use glob_ocean
 
@@ -1236,7 +1265,7 @@
 
       do j=1,jm
         do i=1,im
-          if ( isnan(var(i,j)) ) then
+          if ( var(i,j) == var(i,j) + 1 ) then
             print '(2a,2i4,3f12.4)',
      $            "detect nan : ",varname,
      $            i_global(i),j_global(j),
@@ -1247,12 +1276,12 @@
       end do
 
       if ( num_nan /= 0 ) then
-         print'(2a,2(a,i6))',
+        print'(2a,2(a,i6))',
      $        " detect_nan : ", varname,
      $        "j_global(1) = ", j_global(1),
      $        ",   num_nan = ", num_nan
-!         call finalize_mpi
-         stop
+        call finalize_mpi
+        stop -2
       endif
 
 

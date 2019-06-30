@@ -30,7 +30,7 @@ module tide
 !----------------------------------------------------------------------
   logical, private :: DISABLED ! Is set according to the external flag `use_air`.
 
-  real   , private :: a         ! time-interpolation factor
+!  real   , private :: a         ! time-interpolation factor
 
   character(len=10)                       &
        , parameter                        &
@@ -61,6 +61,7 @@ module tide
   , va_amp_name           & ! Atm. pressure
   , va_pha_name             ! Precipitation rate
 
+  logical, parameter :: INSET = .false.
 
 !----------------------------------------------------------------------
 ! Tide related arrays
@@ -340,8 +341,8 @@ module tide
 !  Allocate necessary variables.
 !______________________________________________________________________
 !
-      use glob_domain, only: im, jm, POM_COMM, my_task
-      use glob_grid  , only:  east_e,  east_u,  east_v  &
+      use glob_domain, only: im, jm, POM_COMM
+      use grid       , only:  east_e,  east_u,  east_v  &
                            , north_e, north_u, north_v
       use mpi        , only: MPI_INFO_NULL
       use pnetcdf
@@ -493,9 +494,10 @@ module tide
 !______________________________________________________________________
 !
       use glob_domain, only: im, jm, my_task, POM_COMM
-      use glob_grid  , only: fsm, east_e, east_u, east_v, rot  &
+      use grid       , only: fsm, east_e, east_u, east_v, rot  &
                            , north_e, north_u, north_v
-      use air, only:e_atmos
+!      use io         , only: out_debug
+!      use air, only:e_atmos
       use module_time
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -504,7 +506,7 @@ module tide
 
       type(date), intent(in) :: d_in
 
-      integer                                    ncid, varid, dimlen, i,j,k
+      integer                                    ncid, varid, i,j,k
       integer(MPI_OFFSET_KIND)                :: start(3), edge(3)
       real(rk), allocatable, dimension(:,:,:) :: tmp, var
 
@@ -514,44 +516,50 @@ module tide
 
 ! Expand free surface mask
       tide_mask = fsm
-      allocate( tmp(im,jm,1) )
-      do k = 1, 8
-        tmp(:,:,1) = tide_mask
-        do j = 2, jm-1
+
+      if ( INSET ) then
+
+        allocate( tmp(im,jm,1) )
+        do k = 1, 8
+          tmp(:,:,1) = tide_mask
+          do j = 2, jm-1
+            do i = 2, im-1
+              if ( (     tmp(i,j+1,1) < 1. .or. tmp(i+1,j,1) < 1.    &
+                    .or. tmp(i,j-1,1) < 1. .or. tmp(i-1,j,1) < 1. )  &
+                  .and. tmp(i,j,1) == 1. ) then
+                tide_mask(i,j) = 0. !real(k-1) / real(15-k)
+              end if
+            end do
+          end do
+          do j = 2, jm-1
+            if ( tmp(1,j,1) == 1.                                    &
+                 .and. (     tmp(1,j+1,1) < 1. .or. tmp(2,j,1) < 1.  &
+                        .or. tmp(1,j-1,1) < 1. ) ) then
+              tide_mask(1,j) = 0. !real(k-1) / real(15-k)
+            end if
+            if ( tmp(im,j,1) == 1.                                       &
+                 .and. (     tmp(im,j+1,1) < 1. .or. tmp(im-1,j,1) < 1.  &
+                        .or. tmp(im,j-1,1) < 1. ) ) then
+              tide_mask(im,j) = 0. !real(k-1) / real(15-k)
+            end if
+          end do
           do i = 2, im-1
-            if ( (     tmp(i,j+1,1) < 1. .or. tmp(i+1,j,1) < 1.    &
-                  .or. tmp(i,j-1,1) < 1. .or. tmp(i-1,j,1) < 1. )  &
-                .and. tmp(i,j,1) == 1. ) then
-              tide_mask(i,j) = 0. !real(k-1) / real(15-k)
+            if ( tmp(i,1,1) == 1.                                      &
+                 .and. (     tmp(i  ,2,1) < 1. .or. tmp(i+1,1,1) < 1.  &
+                        .or. tmp(i-1,1,1) < 1. ) ) then
+              tide_mask(i,1) = 0. !real(k-1) / real(15-k)
+            end if
+            if ( tmp(i,jm,1) == 1.                                       &
+                 .and. (     tmp(i,jm-1,1) < 1. .or. tmp(i+1,jm,1) < 1.  &
+                        .or. tmp(i-1,jm,1) < 1. ) ) then
+              tide_mask(i,jm) = 0. !real(k-1) / real(15-k)
             end if
           end do
         end do
-        do j = 2, jm-1
-          if ( tmp(1,j,1) == 1.                                    &
-               .and. (     tmp(1,j+1,1) < 1. .or. tmp(2,j,1) < 1.  &
-                      .or. tmp(1,j-1,1) < 1. ) ) then
-            tide_mask(1,j) = 0. !real(k-1) / real(15-k)
-          end if
-          if ( tmp(im,j,1) == 1.                                       &
-               .and. (     tmp(im,j+1,1) < 1. .or. tmp(im-1,j,1) < 1.  &
-                      .or. tmp(im,j-1,1) < 1. ) ) then
-            tide_mask(im,j) = 0. !real(k-1) / real(15-k)
-          end if
-        end do
-        do i = 2, im-1
-          if ( tmp(i,1,1) == 1.                                      &
-               .and. (     tmp(i  ,2,1) < 1. .or. tmp(i+1,1,1) < 1.  &
-                      .or. tmp(i-1,1,1) < 1. ) ) then
-            tide_mask(i,1) = 0. !real(k-1) / real(15-k)
-          end if
-          if ( tmp(i,jm,1) == 1.                                       &
-               .and. (     tmp(i,jm-1,1) < 1. .or. tmp(i+1,jm,1) < 1.  &
-                      .or. tmp(i-1,jm,1) < 1. ) ) then
-            tide_mask(i,jm) = 0. !real(k-1) / real(15-k)
-          end if
-        end do
-      end do
-      deallocate( tmp )
+        deallocate( tmp )
+
+      end if
+
 ! Read rho-values (and constituent names)
       call check( nf90mpi_open( POM_COMM, tide_el_path, NF_NOWRITE   &
                               , MPI_INFO_NULL, ncid )                &
@@ -604,10 +612,10 @@ module tide
 ! interpolate into the grid
       do i = 1, int(ncons)
         var(:,:,i) = transpose( tmp(:,:,i) )
-        call interpolate_2D( ie_rht-ie_lft+1, je_top-je_bot+1       &
-                           , lon   , lat    , var(:,:,i)            &
-                           , im             , jm                    &
-                           , east_e, north_e, el_amp(:,:,i), 'V' )
+          call interpolate_2D( ie_rht-ie_lft+1, je_top-je_bot+1       &
+                             , lon   , lat    , var(:,:,i)            &
+                             , im             , jm                    &
+                             , east_e, north_e, el_amp(:,:,i), 'V' )
       end do
 
       call check( nf90mpi_inq_varid( ncid, el_pha_name, varid )  &
@@ -785,11 +793,12 @@ module tide
 !  Reads forcing fields during experiment.
 !______________________________________________________________________
 !
+      use bry        , only: EL_bry, UA_bry, VA_bry
       use glob_const , only: DEG2RAD
-!      use glob_domain, only: is_master
+      use glob_domain, only: im, jm, n_east,n_north,n_south,n_west !,is_master
       use module_time
-      use model_run  , only: dti, iint, sec_of_year
-      use seaice     , only: icec
+!      use model_run  , only: dti!, iint, sec_of_year
+!      use seaice     , only: icec
 
       implicit none
 
@@ -811,15 +820,65 @@ module tide
       tide_ua = 0.
       tide_va = 0.
 
-      do i = 1, int(ncons)
-        this_con = get_constituent( constituent(i) )
-        tide_el   = tide_el + el_amp(:,:,i)*cos( this_con%freq*tick + el_pha(:,:,i)*DEG2RAD )
-        tide_ua = tide_ua + ua_amp(:,:,i)*cos( this_con%freq*tick + ua_pha(:,:,i)*DEG2RAD )
-        tide_va = tide_va + va_amp(:,:,i)*cos( this_con%freq*tick + va_pha(:,:,i)*DEG2RAD )
-      end do
-      tide_el = tide_el*tide_mask
-      tide_ua = tide_ua*tide_mask
-      tide_va = tide_va*tide_mask
+      if ( INSET ) then
+        do i = 1, int(ncons)
+          this_con = get_constituent( constituent(i) )
+          tide_el = tide_el + el_amp(:,:,i)*cos( this_con%freq*tick + el_pha(:,:,i)*DEG2RAD )
+          tide_ua = tide_ua + ua_amp(:,:,i)*cos( this_con%freq*tick + ua_pha(:,:,i)*DEG2RAD )
+          tide_va = tide_va + va_amp(:,:,i)*cos( this_con%freq*tick + va_pha(:,:,i)*DEG2RAD )
+        end do
+        tide_el = tide_el*tide_mask
+        tide_ua = tide_ua*tide_mask
+        tide_va = tide_va*tide_mask
+      else
+        do i = 1, int(ncons)
+          this_con = get_constituent( constituent(i) )
+        ! NORTH
+          if ( n_north == -1 ) then
+            tide_el(:,jm) = tide_el(:,jm) + el_amp(:,jm,i)*cos( this_con%freq*tick + el_pha(:,jm,i)*DEG2RAD )
+            tide_ua(:,jm) = tide_ua(:,jm) + ua_amp(:,jm,i)*cos( this_con%freq*tick + ua_pha(:,jm,i)*DEG2RAD )
+            tide_va(:,jm) = tide_va(:,jm) + va_amp(:,jm,i)*cos( this_con%freq*tick + va_pha(:,jm,i)*DEG2RAD )
+          end if
+        ! EAST
+          if ( n_east == -1 ) then
+            tide_el(im,:) = tide_el(im,:) + el_amp(im,:,i)*cos( this_con%freq*tick + el_pha(im,:,i)*DEG2RAD )
+            tide_ua(im,:) = tide_ua(im,:) + ua_amp(im,:,i)*cos( this_con%freq*tick + ua_pha(im,:,i)*DEG2RAD )
+            tide_va(im,:) = tide_va(im,:) + va_amp(im,:,i)*cos( this_con%freq*tick + va_pha(im,:,i)*DEG2RAD )
+          end if
+        ! SOUTH
+          if ( n_south == -1 ) then
+            tide_el(:, 1) = tide_el(:, 1) + el_amp(:, 1,i)*cos( this_con%freq*tick + el_pha(:, 1,i)*DEG2RAD )
+            tide_ua(:, 1) = tide_ua(:, 1) + ua_amp(:, 1,i)*cos( this_con%freq*tick + ua_pha(:, 1,i)*DEG2RAD )
+            tide_va(:, 1) = tide_va(:, 1) + va_amp(:, 1,i)*cos( this_con%freq*tick + va_pha(:, 1,i)*DEG2RAD )
+          end if
+        ! WEST
+          if ( n_west == -1 ) then
+            tide_el(1 ,:) = tide_el(1 ,:) + el_amp(1 ,:,i)*cos( this_con%freq*tick + el_pha(1 ,:,i)*DEG2RAD )
+            tide_ua(1 ,:) = tide_ua(1 ,:) + ua_amp(1 ,:,i)*cos( this_con%freq*tick + ua_pha(1 ,:,i)*DEG2RAD )
+            tide_va(1 ,:) = tide_va(1 ,:) + va_amp(1 ,:,i)*cos( this_con%freq*tick + va_pha(1 ,:,i)*DEG2RAD )
+          end if
+        end do
+        if ( n_north == -1 ) then
+          EL_bry % NTH = EL_bry % NTH + tide_el(:,jm:jm)
+          UA_bry % NTH = UA_bry % NTH + tide_ua(:,jm:jm)
+          VA_bry % NTH = VA_bry % NTH + tide_va(:,jm:jm)
+        end if
+        if ( n_east == -1 ) then
+          EL_bry % EST = EL_bry % EST + tide_el(im:im,:)
+          UA_bry % EST = UA_bry % EST + tide_ua(im:im,:)
+          VA_bry % EST = VA_bry % EST + tide_va(im:im,:)
+        end if
+        if ( n_south == -1 ) then
+          EL_bry % STH = EL_bry % STH + tide_el(:, 1:1 )
+          UA_bry % STH = UA_bry % STH + tide_ua(:, 1:1 )
+          VA_bry % STH = VA_bry % STH + tide_va(:, 1:1 )
+        end if
+        if ( n_west == -1 ) then
+          EL_bry % WST = EL_bry % WST + tide_el( 1:1 ,:)
+          UA_bry % WST = UA_bry % WST + tide_ua( 1:1 ,:)
+          VA_bry % WST = VA_bry % WST + tide_va( 1:1 ,:)
+        end if
+      end if
 
 
     end ! subroutine step
@@ -865,22 +924,22 @@ module tide
 !
 !______________________________________________________________________
 !
-    subroutine read_all( execute, n, year, record )
-
-      implicit none
-
-      logical              , intent(in) :: execute
-      integer              , intent(in) :: n
-      integer, dimension(3), intent(in) :: record, year
-
-      integer            ncid
-      character(len=128) desc
-
-
-      if ( .not. execute ) return
-
-
-    end ! subroutine read_all
+!    subroutine read_all( execute, n, year, record )
+!
+!      implicit none
+!
+!      logical              , intent(in) :: execute
+!      integer              , intent(in) :: n
+!      integer, dimension(3), intent(in) :: record, year
+!
+!      integer            ncid
+!      character(len=128) desc
+!
+!
+!      if ( .not. execute ) return
+!
+!
+!    end ! subroutine read_all
 !
 !______________________________________________________________________
 !
@@ -1053,7 +1112,8 @@ module tide
 !  Linearly interpolates 2D fields.
 !______________________________________________________________________
 !
-                             use glob_domain, only: my_task
+!      use glob_domain, only: my_task
+
       implicit none
 
       character                 , intent(in   ) :: flag
@@ -1067,8 +1127,9 @@ module tide
                                 , intent(  out) :: dst
 
       integer                  i, j
-      integer, dimension(2) :: x_bl, x_tl, x_tr, x_br  &
-                             , y_bl, y_tl, y_tr, y_br, pos
+!      integer, dimension(2) :: x_bl, x_tl, x_tr, x_br  &
+!                             , y_bl, y_tl, y_tr, y_br
+      integer, dimension(2) :: pos
 
 
       do j = 1, dst_y_n
@@ -1106,7 +1167,7 @@ module tide
 !  NOTE: geographical degrees are not converted to meters.
 !______________________________________________________________________
 !
-      use glob_domain, only: my_task
+!      use glob_domain, only: my_task
       implicit none
 
       integer                      , intent(in) :: x_n, y_n
@@ -1148,7 +1209,7 @@ module tide
       real(rk), intent(in) :: x,y, x1,x2,x3,x4, y1,y2,y3,y4, f1,f2,f3,f4, fill
       character, intent(in):: flag
 
-      integer  count
+!      integer  count
       real(rk) t,s, a1,a2,a3,a4, b1,b2,b3,b4, A,B,C, tot_w, w1,w2,w3,w4
       real(rk), parameter :: SMALL = 1.e-3_rk
 
