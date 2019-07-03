@@ -20,7 +20,8 @@ module air
 ! Constants
 !----------------------------------------------------------------------
   real(rk), parameter ::     & !
-    Cp     = 1005.           &  ! Specific heat capacity of air
+    CH     =     .66e-3      &  ! Sensible heat transfet coefficient (for stable case)
+  , Cp     = 1004.8          &  ! Specific heat capacity of air
   , emiss  =     .97         &  ! Ocean emissivity
   , expsi  =     .622        &  ! ???
   , Ps     = 1013.           &  ! Surface air pressure
@@ -70,7 +71,9 @@ module air
   , TAPER_BRY      & ! Apply tapering along boundaries
                      ! Treat surface forcing differently:
   , USE_BULK       & !  heat flux is estimated using bulk formulas
+  , USE_CALENDAR   & !  lookup for forcing file's record using model date (otherwise reading starts from the first record)
   , USE_COARE      & !  use COARE algorithm for bulk formulations
+  , USE_DQDSST     & !  use heat flux sensitivity to restore temperature
   , USE_FLUXES       !  momentum flux is read directly from files
 
   integer*1        &
@@ -188,8 +191,8 @@ module air
       , INTERP_PRES, INTERP_RAIN , INTERP_SST   , INTERP_STRESS  &
       , INTERP_TAIR, INTERP_WIND , READ_BULK    , READ_HEAT      &
       , READ_STRESS, READ_WIND   , TAPER_BRY    , USE_BULK       &
-      , USE_COARE  , USE_FLUXES  , LWRAD_FORMULA, bulk_path      &
-      , flux_path  , wind_path   , read_int
+      , USE_COARE  , USE_DQDSST  , USE_FLUXES   , LWRAD_FORMULA  &
+      , bulk_path  , flux_path   , wind_path    , read_int
 
       namelist/air_vars_nml/                           &
         dlrad_name, lheat_name,  lrad_name, rain_name  &
@@ -212,14 +215,16 @@ module air
 ! Initialize variables with their defaults
       read_int = 3600 * 6 ! 86400 / 4 (4xDaily)
 
-      CALC_SWR   = .true.
-      READ_HEAT  = .false.
-      READ_STRESS= .false.
-      READ_WIND  = .false.
-      TAPER_BRY  = .false.
-      USE_BULK   = .false.
-      USE_COARE  = .false.
-      USE_FLUXES = .false.
+      CALC_SWR     = .true.
+      READ_HEAT    = .false.
+      READ_STRESS  = .false.
+      READ_WIND    = .false.
+      TAPER_BRY    = .false.
+      USE_BULK     = .false.
+      USE_COARE    = .false.
+      USE_FLUXES   = .false.
+      USE_DQDSST   = .true.
+      USE_CALENDAR = .true.
 
       bulk_path = "in/surf/"
       flux_path = "in/surf/"
@@ -495,15 +500,24 @@ module air
       end if
       record(3) = record(2) + 1
 
-      if ( record(2) == 0 ) then
-        record(2) = max_in_prev ! TODO: [ NEEDS TESTING ]
-        year(2) = d_in%year - 1
-      elseif ( record(3) == max_in_this ) then
-        record(3) = 1
-        year(3) = d_in%year + 1
+      if ( USE_CALENDAR ) then
+
+        if ( record(2) == 0 ) then
+          record(2) = max_in_prev ! TODO: [ NEEDS TESTING ]
+          year(2) = d_in%year - 1
+        elseif ( record(3) == max_in_this ) then
+          record(3) = 1
+          year(3) = d_in%year + 1
+        end if
+
+      else
+
+        record(3) = record(3) - record(1) + 1
+        record(1) = 1
+
       end if
 
-      record(1) = record(1) + 1
+      record(2) = record(1) + 1
 
 ! Read wind if momentum flux is derived from wind
       call read_all( .true., 1, year, record )
@@ -867,7 +881,7 @@ module air
           temp(:,:,1) = ( 1. - a ) * temp(:,:,2) + a * temp(:,:,3)
         end if
 
-!        e_atmos = 0.01 * ( pres(:,:,1) - 1013. )
+        e_atmos = 0.01 * ( pres(:,:,1) - 1013. )
 
 ! Calculate fluxes
         if ( USE_BULK ) then
@@ -1287,6 +1301,15 @@ module air
             wtsurf(i,j) = wtsurf(i,j)*fsm(i,j)
             wssurf(i,j) = pme(i,j)*(s(i,j,1)+sbias)*fsm(i,j) ! sb? vf?
 
+            if ( USE_DQDSST ) then
+              wtsurf(i,j) = wtsurf(i,j)                                 &
+                          + ( 4.*tnowk**3 * (sstk-tnowk)                &
+                            + rhom*ch2*SP*Cp                            &
+                            + rhom*ce2*SP*heat_latent(sst_model)*2353.  &
+                             *log(10.)*humnow/tnowk**2                  &
+                            ) * (sst_model-sst(i,j,1))
+            end if
+
           end if
 
         end do
@@ -1618,9 +1641,13 @@ module air
       integer         , intent(in) :: year
 
 
-      write( get_filename, '( a, i4.4, a )' ) trim(path)      &
-                                            , year            &
-                                            , trim(FORMAT_EXT)
+      if ( path(len(path)-2:len(path)) == ".nc" ) then
+        get_filename = path
+      else
+        write( get_filename, '( a, i4.4, a )' ) trim(path)      &
+                                               , year            &
+                                               , trim(FORMAT_EXT)
+      end if
 
     end ! function get_filemname
 !
