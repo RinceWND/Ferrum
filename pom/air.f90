@@ -1642,12 +1642,12 @@ module air
       integer         , intent(in) :: year
 
 
-      if ( path(len(path)-2:len(path)) == ".nc" ) then
-        get_filename = path
-      else
+      if ( path(len(trim(path)):len(trim(path))) == "." ) then
         write( get_filename, '( a, i4.4, a )' ) trim(path)      &
                                                , year            &
                                                , trim(FORMAT_EXT)
+      else
+        get_filename = path
       end if
 
     end ! function get_filemname
