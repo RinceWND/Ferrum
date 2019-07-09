@@ -65,6 +65,7 @@ module air
   , INTERP_WIND    & !  wind
                      ! Read surface forcing:
   , READ_BULK      & !  bulk variables (even if not using bulk)
+  , READ_CLOUD     & !  total cloud cover to use in long- and shortwave radiation calculations
   , READ_HEAT      & !  heat fluxes
   , READ_STRESS    & !  momentum flux
   , READ_WIND      & !  wind (even if using wind stress)
@@ -186,14 +187,14 @@ module air
 
       integer pos
 
-      namelist/air_nml/                                          &
-        CALC_SWR     , INTERP_CLOUD, INTERP_HEAT, INTERP_HUMID   &
-      , INTERP_PRES  , INTERP_RAIN , INTERP_SST , INTERP_STRESS  &
-      , INTERP_TAIR  , INTERP_WIND , READ_BULK  , READ_HEAT      &
-      , READ_STRESS  , READ_WIND   , TAPER_BRY  , USE_BULK       &
-      , USE_CALENDAR , USE_COARE   , USE_DQDSST , USE_FLUXES     &
-      , LWRAD_FORMULA, bulk_path   , flux_path  , wind_path      &
-      , read_int
+      namelist/air_nml/                                         &
+        CALC_SWR   , INTERP_CLOUD , INTERP_HEAT, INTERP_HUMID   &
+      , INTERP_PRES, INTERP_RAIN  , INTERP_SST , INTERP_STRESS  &
+      , INTERP_TAIR, INTERP_WIND  , READ_BULK  , READ_CLOUD     &
+      , READ_HEAT  , READ_STRESS  , READ_WIND  , TAPER_BRY      &
+      , USE_BULK   , USE_CALENDAR , USE_COARE  , USE_DQDSST     &
+      , USE_FLUXES , LWRAD_FORMULA, bulk_path  , flux_path      &
+      , wind_path  , read_int
 
       namelist/air_vars_nml/                           &
         dlrad_name, lheat_name,  lrad_name, rain_name  &
@@ -221,6 +222,7 @@ module air
       READ_STRESS  = .false.
       READ_WIND    = .false.
       TAPER_BRY    = .false.
+      READ_CLOUD   = .true.
       USE_BULK     = .false.
       USE_COARE    = .false.
       USE_FLUXES   = .false.
@@ -1552,6 +1554,7 @@ module air
             end if
           end if
 
+          if ( READ_CLOUD ) then
           if ((     interp_cloud .and. n>=2) .or.       &
               (.not.interp_cloud .and. n==1)      ) then
             call read_var_nc( tcld_name, cloud(:,:,n), record(n), ncid )
@@ -1559,6 +1562,9 @@ module air
               cloud(:,:,n) = 0.
               call msg_print("", 2, "Cloud cover is set to zero.")
             end if
+          end if
+          else
+            cloud(:,:,n) = 0.
           end if
 
           call check( file_close_nc( ncid ), "nf_close" )
