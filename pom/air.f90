@@ -187,12 +187,13 @@ module air
       integer pos
 
       namelist/air_nml/                                          &
-        CALC_SWR   , INTERP_CLOUD, INTERP_HEAT  , INTERP_HUMID   &
-      , INTERP_PRES, INTERP_RAIN , INTERP_SST   , INTERP_STRESS  &
-      , INTERP_TAIR, INTERP_WIND , READ_BULK    , READ_HEAT      &
-      , READ_STRESS, READ_WIND   , TAPER_BRY    , USE_BULK       &
-      , USE_COARE  , USE_DQDSST  , USE_FLUXES   , LWRAD_FORMULA  &
-      , bulk_path  , flux_path   , wind_path    , read_int
+        CALC_SWR     , INTERP_CLOUD, INTERP_HEAT, INTERP_HUMID   &
+      , INTERP_PRES  , INTERP_RAIN , INTERP_SST , INTERP_STRESS  &
+      , INTERP_TAIR  , INTERP_WIND , READ_BULK  , READ_HEAT      &
+      , READ_STRESS  , READ_WIND   , TAPER_BRY  , USE_BULK       &
+      , USE_CALENDAR , USE_COARE   , USE_DQDSST , USE_FLUXES     &
+      , LWRAD_FORMULA, bulk_path   , flux_path  , wind_path      &
+      , read_int
 
       namelist/air_vars_nml/                           &
         dlrad_name, lheat_name,  lrad_name, rain_name  &
