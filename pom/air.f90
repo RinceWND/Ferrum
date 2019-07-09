@@ -650,21 +650,31 @@ module air
 
       secs = secs - int((real(record(1))+.5)*read_int)
 
-      if ( chunk - record(1) < .5 ) then ! TODO: test (real - int) = ?
-        record(2) = record(1)
-        a = chunk - record(1) + .5
-      else
-        record(2) = record(1) + 1
-        a = chunk - record(1) - .5
-      end if
-      record(3) = record(2) + 1
+      if ( USE_CALENDAR ) then
 
-      if ( record(2) == 0 ) then
-        record(2) = max_in_prev + 1 ! TODO: [ NEEDS TESTING ]
-        year(2) = d_in%year - 1
-      elseif ( record(3) == max_in_this + 1 ) then
-        record(3) = 1
-        year(3) = d_in%year + 1
+        if ( chunk - record(1) < .5 ) then ! TODO: test (real - int) = ?
+          record(2) = record(1)
+          a = chunk - record(1) + .5
+        else
+          record(2) = record(1) + 1
+          a = chunk - record(1) - .5
+        end if
+        record(3) = record(2) + 1
+
+        if ( record(2) == 0 ) then
+          record(2) = max_in_prev + 1 ! TODO: [ NEEDS TESTING ]
+          year(2) = d_in%year - 1
+        elseif ( record(3) == max_in_this + 1 ) then
+          record(3) = 1
+          year(3) = d_in%year + 1
+        end if
+
+      else
+
+        record(1) = ( iint*dti / read_int ) + 1
+        record(2) = record(1)
+        record(3) = record(2) + 1
+
       end if
 
       if ( secs >= 0 .and. secs < dti ) then
