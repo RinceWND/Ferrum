@@ -369,21 +369,26 @@ module air
       wusurf     = 0.
       wvsurf     = 0.
 
+! Allocate mandatory wind arrays
+      N = 1
+      if ( interp_wind ) N = 3
+      allocate(         &
+        uwnd(im,jm,N)   &
+      , vwnd(im,jm,N)   &
+       )
+      uwnd = 0.
+      vwnd = 0.
+
+      if ( interp_tair ) then
+        allocate( temp(im,jm,3) )
+      else
+        allocate( temp(im,jm,1) )
+      end if
+
 ! Quit if the module is not used.
       if ( DISABLED ) return
 
 ! Allocate optional arrays
-      if ( read_wind ) then
-        N = 1
-        if ( interp_wind ) N = 3
-        allocate(         &
-          uwnd(im,jm,N)   &
-        , vwnd(im,jm,N)   &
-         )
-        uwnd = 0.
-        vwnd = 0.
-      end if
-
       if ( read_stress ) then
         N = 1
         if ( interp_stress ) N = 3
@@ -419,11 +424,6 @@ module air
           allocate( rain(im,jm,3) )
         else
           allocate( rain(im,jm,1) )
-        end if
-        if ( interp_tair ) then
-          allocate( temp(im,jm,3) )
-        else
-          allocate( temp(im,jm,1) )
         end if
       end if
 

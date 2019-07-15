@@ -643,8 +643,13 @@
           end if
 
 
+          wtsurf = 0.
+          wssurf = 0.
+          tsurf = t(:,:,1)
+          ssurf = s(:,:,1)
           call proft(uf,wtsurf,tsurf,nbct,tps)
           call proft(vf,wssurf,ssurf,nbcs,tps)
+          vf = s
 
 
           if ( t_lo > -999. ) then

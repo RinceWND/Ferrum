@@ -1250,19 +1250,19 @@
       use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
      &                     , n_south, n_west
       use grid       , only: dum, dvm, dx, dy, dzz, zz
-      use glob_ocean , only: d, drhox, drhoy, dt, rho!rho_model => rho
+      use glob_ocean , only: d, drhox, drhoy, dt, rho_model => rho
       use model_run  , only: ramp
 
       implicit none
 
       integer       i,j,k
       real(rk), dimension(im,jm   ) :: d4, ddx
-      real(rk), dimension(im,jm,kb) :: drho, rhou!rho, rhou
+      real(rk), dimension(im,jm,kb) :: drho, rho, rhou
       real(rk) rho4th(0:im,0:jm,kb),d4th(0:im,0:jm)
 
 
-      !rho = rho_model! - rmean
-      rho = rho - rmean
+      rho = rho_model - rmean
+!      rho = rho - rmean
 
 ! convert a 2nd order matrices to special 4th order
 ! special 4th order case
@@ -1465,7 +1465,7 @@
 !      end if
 !      if (iint > 10) call finalize_mpi
 
-      rho = rho + rmean
+!      rho = rho + rmean
 
 
       end ! subroutine baropg_mcc
@@ -3297,7 +3297,7 @@
 !
       use config     , only: sbias, tbias
       use glob_const , only: grav, rhoref, rk
-      use glob_domain, only: im, jm, kb, kbm1
+      use glob_domain, only: im, jm, kb, kbm1, my_task
       use grid       , only: fsm, zz
       use glob_ocean , only: d
 
@@ -3314,7 +3314,7 @@
         do j = 1,jm
           do i = 1,im
 
-            if ( fsm(i,j) == 0. ) cycle
+!            if ( fsm(i,j) == 0. ) cycle
 
             tr=ti(i,j,k)+tbias
             sr=si(i,j,k)+sbias
@@ -3323,22 +3323,22 @@
             tr4=tr3*tr
 
 ! approximate pressure in units of bars
-            p=grav*rhoref*(-zz(k)*d(i,j))*1.e-5
+            p=grav*rhoref*(-zz(k)*d(i,j))*1.e-5_rk
 
-            rhor = -0.157406        + 6.793952e-2*tr
-     $             -9.095290e-3*tr2 + 1.001685e-4*tr3
-     $             -1.120083e-6*tr4 + 6.536332e-9*tr4*tr
+            rhor = -0.157406_rk        + 6.793952e-2_rk*tr
+     $             -9.095290e-3_rk*tr2 + 1.001685e-4_rk*tr3
+     $             -1.120083e-6_rk*tr4 + 6.536332e-9_rk*tr4*tr
 
-            rhor = rhor + (  0.824493      - 4.0899e-3*tr
-     $                    +  7.6438e-5*tr2 - 8.2467e-7*tr3
-     $                    +  5.3875e-9*tr4 )*sr
-     $                  + ( -5.72466e-3    + 1.0227e-4*tr
-     $                    -  1.6546e-6*tr2 )*abs(sr)**1.5
-     $                  + 4.8314e-4*sr*sr
+            rhor = rhor + (  0.824493_rk      - 4.0899e-3_rk*tr
+     $                    +  7.6438e-5_rk*tr2 - 8.2467e-7_rk*tr3
+     $                    +  5.3875e-9_rk*tr4 )*sr
+     $                  + ( -5.72466e-3_rk    + 1.0227e-4_rk*tr
+     $                    -  1.6546e-6_rk*tr2 )*abs(sr)**1.5_rk
+     $                  + 4.8314e-4_rk*sr*sr
 
-            cr = 1449.1 + .0821*p + 4.55*tr - .045*tr2
-     $                  + 1.34*(sr-35.)
-            rhor = rhor + 1.e5*p/(cr*cr) * (1.-2.*p/(cr*cr))
+            cr = 1449.1_rk + .0821_rk*p + 4.55_rk*tr - .045_rk*tr2
+     $                     + 1.34_rk*(sr-35._rk)
+            rhor = rhor + 1.e5_rk*p/(cr*cr) * (1._rk-2._rk*p/(cr*cr))
 
             rhoo(i,j,k) = fsm(i,j)*rhor/rhoref
 
