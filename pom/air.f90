@@ -215,7 +215,8 @@ module air
       end if
 
 ! Initialize variables with their defaults
-      read_int = 3600 * 6 ! 86400 / 4 (4xDaily)
+!      read_int = 3600 * 6 ! 86400 / 4 (4xDaily)
+      read_int = 3600 * 3 ! 8xDaily
 
       CALC_SWR     = .true.
       READ_HEAT    = .false.
@@ -573,7 +574,7 @@ module air
       wtsurf = wtsurf*(1.-icec)! + itsurf*icec
       wssurf = wssurf*(1.-icec)
 
-      if (.true.) call river_flux
+      if (.false.) call river_flux
 
       if ( READ_WIND ) then
 
@@ -683,6 +684,9 @@ module air
           uwnd(:,:,2) = uwnd(:,:,3)
           vwnd(:,:,2) = vwnd(:,:,3)
         end if
+        if ( .not.CALC_SWR .and. INTERP_HEAT ) then
+          srad(:,:,2)  = srad(:,:,3)
+        end if
         if ( USE_FLUXES ) then
           if ( INTERP_STRESS ) then
             ustr(:,:,2) = ustr(:,:,3)
@@ -707,7 +711,7 @@ module air
         ADVANCE_REC_INT = .false.
       end if
 
-      record(1) = record(1) + 1
+!      record(1) = record(1) + 1
 
 !      if ( is_master ) print *, "II"&!, uwnd(50,50,2), uwnd(50,50,3) &
 !                              , a, ADVANCE_REC_INT, ADVANCE_REC
@@ -725,6 +729,10 @@ module air
 ! TODO: Are these surface arrays even needed?
         uwsrf = uwnd(:,:,1)
         vwsrf = vwnd(:,:,1)
+
+        if ( .not.CALC_SWR ) then
+          swrad = ( 1. - a ) * srad(:,:,2) + a * srad(:,:,3)
+        end if
 
 ! Calculate wind stress
         if ( USE_BULK ) then
@@ -768,10 +776,11 @@ module air
 
       if ( TAPER_BRY ) call taper_forcing
 
-      if ( .true. ) call river_flux
+      if ( .false. ) call river_flux
 ! Relax to climatology
 
       call relax_surface( wssurf, wtsurf )
+
 
 
     end ! subroutine step
@@ -893,6 +902,10 @@ module air
         if ( interp_tair ) then
           temp(:,:,1) = ( 1. - a ) * temp(:,:,2) + a * temp(:,:,3)
         end if
+!        print *, "CLOUD: ", maxval(cloud(:,:,1))
+!        print *, "HUMID: ", maxval(humid(:,:,1))
+!        print *, "PRESS: ", maxval(pres(:,:,1))
+!        print *, "TEMPR: ", maxval(temp(:,:,1))
 
         e_atmos = 0.01 * ( pres(:,:,1) - 1013. )
 
@@ -1267,19 +1280,6 @@ module air
 ! --- calculates : Qu = Qb + QH + QE
 !
             QU = qbw + qh + qe
-!            if (isnan(QU).or.abs(QU).gt.2.e3) then
-!            print *, "[ HEAT ]", i,j,qbw, qh, qe, "@", my_task
-!            print *, "cloud:", cld
-!            print *, "tnowk:", tnowk
-!            print *, "ea12:", ea12
-!            print *, "evap: ", evap
-!            print *, "rhom: ", rhom
-!            print *, "cp: ", cp
-!            print *, "ch2: ", ch2
-!            print *, "sp: ", sp
-!            print *, "deltemp: ", deltemp
-!            stop
-!            end if
 !
 ! --- 1. Divide upward heat flux by rho*Cpw
 !
@@ -1313,6 +1313,10 @@ module air
             wvsurf(i,j) = wvsurf(i,j)*fsm(i,j)
             wtsurf(i,j) = wtsurf(i,j)*fsm(i,j)
             wssurf(i,j) = pme(i,j)*(s(i,j,1)+sbias)*fsm(i,j) ! sb? vf?
+            if ( abs(wssurf(i,j)).gt.1.e-2 ) then
+              print *, wssurf(i,j), pme(i,j), s(i,j,1)
+              stop
+            end if
 
             if ( USE_DQDSST ) then
               wtsurf(i,j) = wtsurf(i,j)                                 &
@@ -1724,9 +1728,9 @@ module air
             var = var - C2K
           case ( "Pa" )
             var = var/100.
-          case ( "W m**-2" )
+          case ( "W m**-2", "W m-2" )
             var = var/rho_cpw
-          case ( "N m**-2" )
+          case ( "N m**-2", "N m-2" )
             var = -var/rhoref
         end select
       end if
@@ -1801,11 +1805,10 @@ module air
 
 
       if ( status /= NF_NOERR ) then
-        error_status = 1
         if ( is_master ) then
           print '(/a,a)', 'IO error at module `AIR`: ', routine
           print '("[",i4,"] ",a)', status, nf90mpi_strerror(status)
-          stop
+!          stop
         end if
       end if
 

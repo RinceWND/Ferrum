@@ -1859,9 +1859,9 @@ module io
                 , "nfmpi_open: "//ic_path )
 
 !  Get variables. [ TODO: parameterize varnames ]
-      call check( nf90mpi_inq_varid( ncid, 't_init', tb_varid )  &
+      call check( nf90mpi_inq_varid( ncid, 'tclim', tb_varid )  &
                 , "nfmpi_inq_varid: t_init @ "//ic_path )
-      call check( nf90mpi_inq_varid( ncid, 's_init', sb_varid )  &
+      call check( nf90mpi_inq_varid( ncid, 'sclim', sb_varid )  &
                 , "nfmpi_inq_varid: s_init @ "//ic_path )
 
       status = nf90mpi_inq_varid( ncid, 'einit', el_varid )
@@ -2063,7 +2063,7 @@ module io
 !  Checks for NetCDF I/O error and exits with an error message if hits.
 !______________________________________________________________________
 !
-      use glob_domain, only: error_status, is_master
+      use glob_domain, only: error_status, my_task
       use pnetcdf    , only: nf90mpi_strerror, NF_NOERR
 
       implicit none
@@ -2074,11 +2074,8 @@ module io
 
       if ( status /= NF_NOERR ) then
         error_status = 1
-        if ( is_master ) then
-          print '(/a,a)', 'IO error: ', routine
-          print *, nf90mpi_strerror(status)
-          stop
-        end if
+        print '(/a,i4,a,a)', 'IO error @ ', my_task, ': ', routine
+        print *, nf90mpi_strerror(status)
       end if
 
 
