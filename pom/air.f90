@@ -671,7 +671,7 @@ module air
 
       else
 
-        record(1) = ( iint*dti / read_int ) + 1
+        record(1) = int( iint*dti / read_int ) + 1
         record(2) = record(1)
         record(3) = record(2) + 1
 
@@ -1497,12 +1497,11 @@ module air
 
           if ((     interp_wind .and. n>=2) .or.       &
               (.not.interp_wind .and. n==1)      ) then
-            call read_var_nc( uwnd_name, uwnd(:,:,n), record(n), ncid )
-            call read_var_nc( vwnd_name, vwnd(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc( uwnd_name, uwnd(:,:,n), record(n), ncid ) /= 0  &
+            .or. read_var_nc( vwnd_name, vwnd(:,:,n), record(n), ncid ) /= 0 ) then
               uwnd(:,:,n) = 0.
               vwnd(:,:,n) = 0.
-              call msg_print("", 2, "Wind is set to zero.")
+              call msg_print("", 2, "Wind is defaulted to zero.")
             end if
           end if
 
@@ -1521,56 +1520,50 @@ module air
 
           if ((     interp_humid .and. n>=2) .or.       &
               (.not.interp_humid .and. n==1)      ) then
-            call read_var_nc( humid_name, humid(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
-              humid(:,:,n) = 1.
-              call msg_print("", 2, "Humidity is set to 100%")
+            if ( read_var_nc( humid_name, humid(:,:,n), record(n), ncid ) /= 0 ) then
+              humid(:,:,n) = .85
+              call msg_print("", 2, "Humidity is defaulted to 85%")
             end if
           end if
 
           if ((     interp_rain .and. n>=2) .or.       &
               (.not.interp_rain .and. n==1)      ) then
-            call read_var_nc( rain_name,  rain(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc( rain_name,  rain(:,:,n), record(n), ncid ) /= 0 ) then
               rain(:,:,n) = 0.
-              call msg_print("", 2, "Precip.rate is set to zero.")
+              call msg_print("", 2, "Precip.rate is defaulted to zero.")
             end if
           end if
 
           if ((     interp_pres .and. n>=2) .or.       &
               (.not.interp_pres .and. n==1)      ) then
-            call read_var_nc( pres_name,  pres(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc( pres_name,  pres(:,:,n), record(n), ncid ) /= 0 ) then
               pres(:,:,n) = 1013.
-              call msg_print("", 2, "Atm.pressure is set to 1013 hPa.")
+              call msg_print("", 2, "Atm.pressure is defaulted to 1013 hPa.")
             end if
           end if
 
           if ((     interp_sst .and. n>=2) .or.       &
               (.not.interp_sst .and. n==1)      ) then
-            call read_var_nc( sst_name,   sst(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc( sst_name,   sst(:,:,n), record(n), ncid ) /= 0 ) then
               sst(:,:,n) = tb(:,:,1)
-              call msg_print("", 2, "SST is set to surf. level temp.")
+              call msg_print("", 2, "SST is defaulted to surf. level temp.")
             end if
           end if
 
           if ((     interp_tair .and. n>=2) .or.       &
               (.not.interp_tair .and. n==1)      ) then
-            call read_var_nc( tair_name,  temp(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc( tair_name,  temp(:,:,n), record(n), ncid ) /= 0 ) then
               temp(:,:,n) = tb(:,:,1)
-              call msg_print("", 2, "Tair is set to surf. level temp.")
+              call msg_print("", 2, "Tair is defaulted to surf. level temp.")
             end if
           end if
 
           if ( READ_CLOUD ) then
           if ((     interp_cloud .and. n>=2) .or.       &
               (.not.interp_cloud .and. n==1)      ) then
-            call read_var_nc( tcld_name, cloud(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc( tcld_name, cloud(:,:,n), record(n), ncid ) /= 0 ) then
               cloud(:,:,n) = 0.
-              call msg_print("", 2, "Cloud cover is set to zero.")
+              call msg_print("", 2, "Cloud cover is defaulted to zero.")
             end if
           end if
           else
@@ -1592,12 +1585,11 @@ module air
 
           if ((     interp_stress .and. n>=2) .or.       &
               (.not.interp_stress .and. n==1)      ) then
-            call read_var_nc( ustr_name, ustr(:,:,n), record(n), ncid )
-            call read_var_nc( vstr_name, vstr(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc( ustr_name, ustr(:,:,n), record(n), ncid ) /= 0  &
+            .or. read_var_nc( vstr_name, vstr(:,:,n), record(n), ncid ) /= 0 ) then
               ustr(:,:,n) = 0.
               vstr(:,:,n) = 0.
-              call msg_print("", 2, "Wind stress is set to zero.")
+              call msg_print("", 2, "Wind stress is defaulted to zero.")
             end if
           end if
 
@@ -1607,28 +1599,23 @@ module air
 
           if ((     interp_heat .and. n>=2) .or.       &
               (.not.interp_heat .and. n==1)      ) then
-            call read_var_nc( dlrad_name, dlrad(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc( dlrad_name, dlrad(:,:,n), record(n), ncid ) /= 0 ) then
               dlrad(:,:,n) = 370.
               call msg_print("", 2, "Downlonrad. is set to 370 W/m^2.")
             end if
-            call read_var_nc( lheat_name, lheat(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc( lheat_name, lheat(:,:,n), record(n), ncid ) /= 0 ) then
               lheat(:,:,n) = 0.
               call msg_print("", 2, "Latent heat is set to zero.")
             end if
-            call read_var_nc(  lrad_name,  lrad(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc(  lrad_name,  lrad(:,:,n), record(n), ncid ) /= 0 ) then
               lrad(:,:,n) = 0.
               call msg_print("", 2, "Net longrad. is set to zero.")
             end if
-            call read_var_nc( sheat_name, sheat(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc( sheat_name, sheat(:,:,n), record(n), ncid ) /= 0 ) then
               sheat(:,:,n) = 0.
               call msg_print("", 2, "Sensible heat is set to zero.")
             end if
-            call read_var_nc(  srad_name,  srad(:,:,n), record(n), ncid )
-            if ( ncid == -1 ) then
+            if ( read_var_nc(  srad_name,  srad(:,:,n), record(n), ncid ) /= 0 ) then
               srad(:,:,n) = 0.
               call msg_print("", 2, "Net shortrad. is set to zero.")
             end if
@@ -1672,7 +1659,7 @@ module air
 != I/O SECTION ========================================================
 !______________________________________________________________________
 !
-    subroutine read_var_nc( var_name, var, record, ncid )
+    integer(1) function read_var_nc( var_name, var, record, ncid )
 !----------------------------------------------------------------------
 !  Read a variable (NC format).
 !______________________________________________________________________
@@ -1686,8 +1673,7 @@ module air
 
       integer, external :: get_var_real_3d
 
-      integer                   , intent(inout) :: ncid
-      integer                   , intent(in   ) :: record
+      integer                   , intent(in   ) :: ncid, record
       real(rk), dimension(im,jm), intent(  out) :: var
       character(len=*)          , intent(in   ) :: var_name
 
@@ -1695,6 +1681,13 @@ module air
       integer(MPI_OFFSET_KIND) start(4), edge(4)
       character(len=64)        units
 
+
+      if ( var_name == '' ) then
+        read_var_nc = -1
+        return
+      end if
+
+      read_var_nc = 0
 
       start = 1
       edge  = 1
@@ -1718,16 +1711,19 @@ module air
 
 ! convert data if necessary
       status = nf90mpi_get_att( ncid, varid, "units", units )
+      if (var_name=='precip') print *, "!!!!", units
       if ( status == NF_NOERR ) then
         select case ( trim(units) )
           case ( "K" )
             var = var - C2K
           case ( "Pa" )
             var = var/100.
-          case ( "W m**-2" )
+          case ( "W m**-2", "W/m^2", "W/m2" )
             var = var/rho_cpw
-          case ( "N m**-2" )
+          case ( "N m**-2", "N/m^2", "N/m2" )
             var = -var/rhoref
+          case ( "mm/(3hours)", "mm/3hr", "mm/(3hr)")
+            var = var/10800000._rk
         end select
       end if
 

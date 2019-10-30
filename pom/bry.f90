@@ -474,10 +474,10 @@ module bry
       u_name = "u"
       v_name = "v"
       
-! [ NOT IMPLEMENTED ] Interpolate active boundary by default (ignored if DISABLED)
+! [ NOT IMPLEMENTED ] TODO: Interpolate active boundary by default (ignored if DISABLED)
       interp_bry = .true.
 
-! Default readint interval (daily)
+! Default read interval (daily)
       read_int = 86400
 
 ! Default BC types
@@ -1012,11 +1012,11 @@ module bry
         S_bry % WST(1:NFW,:,:) = sb(1:NFW,:,:)
         T_bry % WST(1:NFW,:,:) = tb(1:NFW,:,:)
 
-        U_bry % WST(1:NFW,:,:) = ub(1:NFW,:,:)
-        V_bry % WST(1:NFW,:,:) = vb(1:NFW,:,:)
-
         UA_bry % WST(1:NFW,:) = uab(1:NFW,:)
         VA_bry % WST(1:NFW,:) = vab(1:NFW,:)
+
+        U_bry % WST(1:NFW,:,:) = ub(1:NFW,:,:)
+        V_bry % WST(1:NFW,:,:) = vb(1:NFW,:,:)
 
       end if
 
@@ -1121,27 +1121,27 @@ module bry
 
       if ( hasEAST ) then
 
-        EL_bry % EST(1:NFE,:) =                          &
-          ( 1. - a ) * EL_int % EST(1:NFE,:,2)  &
+        EL_bry % EST(1:NFE,:) =                   &
+          ( 1. - a ) * EL_int % EST(1:NFE,:,2)    &
          +       a   * EL_int % EST(1:NFE,:,3)
-         S_bry % EST(1:NFE,:,:) =                          &
+         S_bry % EST(1:NFE,:,:) =                 &
           ( 1. - a ) *  S_int % EST(1:NFE,:,:,2)  &
          +       a   *  S_int % EST(1:NFE,:,:,3)
-         T_bry % EST(1:NFE,:,:) =                          &
+         T_bry % EST(1:NFE,:,:) =                 &
           ( 1. - a ) *  T_int % EST(1:NFE,:,:,2)  &
          +       a   *  T_int % EST(1:NFE,:,:,3)
-         U_bry % EST(1:NFE,:,:) =                          &
+         U_bry % EST(1:NFE,:,:) =                 &
           ( 1. - a ) *  U_int % EST(1:NFE,:,:,2)  &
          +       a   *  U_int % EST(1:NFE,:,:,3)
-         V_bry % EST(1:NFE,:,:) =                          &
+         V_bry % EST(1:NFE,:,:) =                 &
           ( 1. - a ) *  V_int % EST(1:NFE,:,:,2)  &
          +       a   *  V_int % EST(1:NFE,:,:,3)
 
         if ( .not.DERIVE_2D ) then
-          UA_bry % EST(1:NFE,:) =                           &
+          UA_bry % EST(1:NFE,:) =                  &
             ( 1. - a ) *  UA_int % EST(1:NFE,:,2)  &
            +       a   *  UA_int % EST(1:NFE,:,3)
-          VA_bry % EST(1:NFE,:) =                           &
+          VA_bry % EST(1:NFE,:) =                  &
             ( 1. - a ) *  VA_int % EST(1:NFE,:,2)  &
            +       a   *  VA_int % EST(1:NFE,:,3)
         end if
@@ -1150,27 +1150,27 @@ module bry
 
       if ( hasNORTH ) then
 
-        EL_bry % NTH(:,1:NFN) =                          &
-          ( 1. - a ) * EL_int % NTH(:,1:NFN,2)  &
+        EL_bry % NTH(:,1:NFN) =                   &
+          ( 1. - a ) * EL_int % NTH(:,1:NFN,2)    &
          +       a   * EL_int % NTH(:,1:NFN,3)
-         S_bry % NTH(:,1:NFN,:) =                          &
+         S_bry % NTH(:,1:NFN,:) =                 &
           ( 1. - a ) *  S_int % NTH(:,1:NFN,:,2)  &
          +       a   *  S_int % NTH(:,1:NFN,:,3)
-         T_bry % NTH(:,1:NFN,:) =                          &
+         T_bry % NTH(:,1:NFN,:) =                 &
           ( 1. - a ) *  T_int % NTH(:,1:NFN,:,2)  &
          +       a   *  T_int % NTH(:,1:NFN,:,3)
-         U_bry % NTH(:,1:NFN,:) =                          &
+         U_bry % NTH(:,1:NFN,:) =                 &
           ( 1. - a ) *  U_int % NTH(:,1:NFN,:,2)  &
          +       a   *  U_int % NTH(:,1:NFN,:,3)
-         V_bry % NTH(:,1:NFN,:) =                          &
+         V_bry % NTH(:,1:NFN,:) =                 &
           ( 1. - a ) *  V_int % NTH(:,1:NFN,:,2)  &
          +       a   *  V_int % NTH(:,1:NFN,:,3)
 
         if ( .not.DERIVE_2D ) then
-          UA_bry % NTH(:,1:NFN) =                           &
+          UA_bry % NTH(:,1:NFN) =                  &
             ( 1. - a ) *  UA_int % NTH(:,1:NFN,2)  &
            +       a   *  UA_int % NTH(:,1:NFN,3)
-          VA_bry % NTH(:,1:NFN) =                           &
+          VA_bry % NTH(:,1:NFN) =                  &
             ( 1. - a ) *  VA_int % NTH(:,1:NFN,2)  &
            +       a   *  VA_int % NTH(:,1:NFN,3)
         end if
@@ -1179,8 +1179,8 @@ module bry
 
       if ( hasSOUTH ) then
 
-        EL_bry % STH(:,1:NFS) =                 &
-          ( 1. - a ) * EL_int % STH(:,1:NFS,2)  &
+        EL_bry % STH(:,1:NFS) =                   &
+          ( 1. - a ) * EL_int % STH(:,1:NFS,2)    &
          +       a   * EL_int % STH(:,1:NFS,3)
          S_bry % STH(:,1:NFS,:) =                 &
           ( 1. - a ) *  S_int % STH(:,1:NFS,:,2)  &
@@ -1208,8 +1208,8 @@ module bry
 
       if ( hasWEST ) then
 
-        EL_bry % WST(1:NFW,:) =                 &
-          ( 1. - a ) * EL_int % WST(1:NFW,:,2)  &
+        EL_bry % WST(1:NFW,:) =                   &
+          ( 1. - a ) * EL_int % WST(1:NFW,:,2)    &
          +       a   * EL_int % WST(1:NFW,:,3)
          S_bry % WST(1:NFW,:,:) =                 &
           ( 1. - a ) *  S_int % WST(1:NFW,:,:,2)  &

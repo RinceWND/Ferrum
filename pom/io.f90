@@ -128,11 +128,11 @@ module io
 
 ! Print config
       if ( is_master ) then
-        print *, "--------------|----------------------------"
+        print *, "--------------+----------------------------"
         print *, " Grid         : ", trim(grid_path)
-        print *, "--------------|----------------------------"
+        print *, "--------------+----------------------------"
         print *, " Output to    : ", trim(out_path)
-        print *, "--------------|----------------------------"
+        print *, "--------------+----------------------------"
         call msg_print("CORE I/O MODULE INITIALIZED", 1, "")
       end if
 
@@ -1859,9 +1859,9 @@ module io
                 , "nfmpi_open: "//ic_path )
 
 !  Get variables. [ TODO: parameterize varnames ]
-      call check( nf90mpi_inq_varid( ncid, 't_init', tb_varid )  &
+      call check( nf90mpi_inq_varid( ncid, 'tclim', tb_varid )  &
                 , "nfmpi_inq_varid: t_init @ "//ic_path )
-      call check( nf90mpi_inq_varid( ncid, 's_init', sb_varid )  &
+      call check( nf90mpi_inq_varid( ncid, 'sclim', sb_varid )  &
                 , "nfmpi_inq_varid: s_init @ "//ic_path )
 
       status = nf90mpi_inq_varid( ncid, 'einit', el_varid )
