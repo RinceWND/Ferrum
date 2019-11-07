@@ -2468,6 +2468,31 @@ module bry
                 end do
               end do
 
+            case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do j = 1,jmm1
+                  grdy(1,j) = v(imm1,j+1,k)-v(imm1,j,k)
+                  grdy(2,j) = v(im  ,j+1,k)-v(im  ,j,k)
+                end do
+                do j = 2,jmm1
+                  dvdt =  v(imm1,j,k)-vf(imm1,j,k)
+                  dvdx = vf(imm1,j,k)-vf(imm2,j,k)
+                  if ( dvdt*(grdy(1,j-1)+grdy(1,j)) > 0. ) then
+                    dvdy = grdy(1,j-1)
+                  else
+                    dvdy = grdy(1,j  )
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  vf(im,j,k) = ( cff*v(im,j,k) + cx*vf(imm1,j,k)      &
+                                - max(cy,0.)*grdy(2,j-1)              &
+                                - min(cy,0.)*grdy(2,j  ) )            &
+                               / (cff+cx)
+                end do
+              end do
+
             case default
               vf(im,:,:) = 0.
 
@@ -2570,6 +2595,31 @@ module bry
                                    + 2.*u(2,j,k) + v(2,j+1,k) )   &
                                     + (1.-cff) * ( v(1,j-1,k)     &
                                    + 2.*u(1,j,k) + v(1,j+1,k) ) )
+                end do
+              end do
+
+            case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do j = 1,jmm1
+                  grdy(1,j) = v(1,j+1,k)-v(1,j,k)
+                  grdy(2,j) = v(2,j+1,k)-v(2,j,k)
+                end do
+                do j = 2,jmm1
+                  dvdt =  v(2,j,k)-vf(2,j,k)
+                  dvdx = vf(2,j,k)-vf(3,j,k)
+                  if ( dvdt*(grdy(2,j-1)+grdy(2,j)) > 0. ) then
+                    dvdy = grdy(2,j-1)
+                  else
+                    dvdy = grdy(2,j  )
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  vf(1,j,k) = ( cff*v(1,j,k) + cx*vf(2,j,k)           &
+                               - max(cy,0.)*grdy(1,j-1)               &
+                               - min(cy,0.)*grdy(1,j  ) )             &
+                              / (cff+cx)
                 end do
               end do
 
@@ -2703,6 +2753,31 @@ module bry
                 end do
               end do
 
+            case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do i = 1,imm1
+                  grdx(i,1) = u(i+1,jmm1,k)-u(i,jmm1,k)
+                  grdx(i,2) = u(i+1,jm  ,k)-u(i,jm  ,k)
+                end do
+                do i = 2,imm1
+                  dvdt =  u(i,jmm1,k)-uf(i,jmm1,k)
+                  dvdy = uf(i,jmm1,k)-uf(i,jmm2,k)
+                  if ( dvdt*(grdx(i-1,1)+grdx(i,1)) > 0. ) then
+                    dvdx = grdx(i-1,1)
+                  else
+                    dvdx = grdx(i  ,1)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
+                  cx  = min(cff,max(dvdt*dvdx,-cff))
+                  cy  = dvdt*dvdy
+                  uf(i,jm,k) = ( cff*u(i,jm,k) + cy*uf(i,jmm1,k)      &
+                                - max(cx,0.)*grdx(i-1,1)              &
+                                - min(cx,0.)*grdx(i  ,1) )            &
+                               / (cff+cy)
+                end do
+              end do
+
             case default
               uf(:,jm,:) = 0.
 
@@ -2807,6 +2882,31 @@ module bry
                 end do
               end do
 
+            case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do i = 2,imm1
+                  grdx(i,1) = u(i+1,1,k)-u(i,1,k)
+                  grdx(i,2) = u(i+1,2,k)-u(i,2,k)
+                end do
+                do i = 2,imm1
+                  dvdt =  u(i,2,k)-uf(i,2,k)
+                  dvdy = uf(i,2,k)-uf(i,3,k)
+                  if ( dvdt*(grdx(i-1,2)+grdx(i,2)) > 0. ) then
+                    dvdx = grdx(i-1,2)
+                  else
+                    dvdx = grdx(i  ,2)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
+                  cx  = min(cff,max(dvdt*dvdx,-cff))
+                  cy  = dvdt*dvdy
+                  uf(i,1,k) = ( cff*u(i,1,k) + cy*uf(i,2,k)           &
+                               - max(cx,0.)*grdx(i-1,1)               &
+                               - min(cx,0.)*grdx(i  ,1) )             &
+                              / (cff+cy)
+                end do
+              end do
+
             case default
               uf(:,1,:) = 0.
 
@@ -2862,24 +2962,24 @@ module bry
           select case ( BC % TS % EAST )
 
             case ( bc0GRADIENT )
-              uf(im,:,1:kbm1) = t(imm1,:,1:kbm1)
-              vf(im,:,1:kbm1) = s(imm1,:,1:kbm1)
+              uf(im,:,1:kbm1) = uf(imm1,:,1:kbm1)
+              vf(im,:,1:kbm1) = vf(imm1,:,1:kbm1)
 
             case ( bc3POINTSMOOTH )
-              uf(im,2:jmm1,1:kbm1) = ( t(imm1,1:jmm2,1:kbm1)       &
-                                     + t(imm1,2:jmm1,1:kbm1)       &
-                                     + t(imm1,3:jm  ,1:kbm1) )/3.
-              uf(im,1     ,1:kbm1) = ( t(imm1,1     ,1:kbm1)       &
-                                     + t(imm1,2     ,1:kbm1) )*.5
-              uf(im,  jm  ,1:kbm1) = ( t(imm1,  jmm1,1:kbm1)       &
-                                     + t(imm1,  jm  ,1:kbm1) )*.5
-              vf(im,2:jmm1,1:kbm1) = ( s(imm1,1:jmm2,1:kbm1)       &
-                                     + s(imm1,2:jmm1,1:kbm1)       &
-                                     + s(imm1,3:jm  ,1:kbm1) )/3.
-              vf(im,1     ,1:kbm1) = ( s(imm1,1     ,1:kbm1)       &
-                                     + s(imm1,2     ,1:kbm1) )*.5
-              vf(im,  jm  ,1:kbm1) = ( s(imm1,  jmm1,1:kbm1)       &
-                                     + s(imm1,  jm  ,1:kbm1) )*.5
+              uf(im,2:jmm1,1:kbm1) = ( uf(imm1,1:jmm2,1:kbm1)       &
+                                     + uf(imm1,2:jmm1,1:kbm1)       &
+                                     + uf(imm1,3:jm  ,1:kbm1) )/3.
+              uf(im,1     ,1:kbm1) = ( uf(imm1,1     ,1:kbm1)       &
+                                     + uf(imm1,2     ,1:kbm1) )*.5
+              uf(im,  jm  ,1:kbm1) = ( uf(imm1,  jmm1,1:kbm1)       &
+                                     + uf(imm1,  jm  ,1:kbm1) )*.5
+              vf(im,2:jmm1,1:kbm1) = ( vf(imm1,1:jmm2,1:kbm1)       &
+                                     + vf(imm1,2:jmm1,1:kbm1)       &
+                                     + vf(imm1,3:jm  ,1:kbm1) )/3.
+              vf(im,1     ,1:kbm1) = ( vf(imm1,1     ,1:kbm1)       &
+                                     + vf(imm1,2     ,1:kbm1) )*.5
+              vf(im,  jm  ,1:kbm1) = ( vf(imm1,  jmm1,1:kbm1)       &
+                                     + vf(imm1,  jm  ,1:kbm1) )*.5
 
             case ( bcCLAMPED )
               uf(im,:,1:kbm1) = T_bry%EST(1,:,1:kbm1)

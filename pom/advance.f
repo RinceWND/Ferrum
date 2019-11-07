@@ -517,6 +517,8 @@
 
         do k=1,kbm1
           do j=1,jm
+            u(1,j,k) = .5*( u(1,j,k) - tps(1,j) )
+     &               +    ( utb(1,j) + utf(1,j) )/dt(1,j)
             do i=2,im
               u(i,j,k)=(u(i,j,k)-tps(i,j))+
      $                 (utb(i,j)+utf(i,j))/(dt(i,j)+dt(i-1,j))
@@ -539,6 +541,10 @@
         end do
 
         do k=1,kbm1
+          do i=1,im
+            v(i,1,k) = .5*( v(i,1,k) - tps(i,1) )
+     &               +    ( vtb(i,1) + vtf(i,1) )/dt(i,1)
+          end do
           do j=2,jm
             do i=1,im
               v(i,j,k)=(v(i,j,k)-tps(i,j))+
