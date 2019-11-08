@@ -3844,47 +3844,47 @@ module bry
 != I/O SECTION ========================================================
 !______________________________________________________________________
 !
-    subroutine out_init_define( ncid, x_dimid, y_dimid )
-!----------------------------------------------------------------------
-!  Defines variables for initial output.
-!______________________________________________________________________
+!    subroutine out_init_define( ncid, x_dimid, y_dimid )
+!!----------------------------------------------------------------------
+!!  Defines variables for initial output.
+!!______________________________________________________________________
+!!
+!      use glob_const , only: rk
+!      use glob_domain
+!      use io         , only: var_define
+!      use mpi        , only: MPI_OFFSET_KIND
+!      use pnetcdf    , only: NF90_FLOAT
 !
-      use glob_const , only: rk
-      use glob_domain
-      use io         , only: var_define
-      use mpi        , only: MPI_OFFSET_KIND
-      use pnetcdf    , only: NF90_FLOAT
-
-      implicit none
-
-      integer, intent(in) :: ncid, x_dimid, y_dimid
-
-      integer varid
-
-
-      varid = var_define( ncid, 'ele', 1, [ y_dimid ], NF90_FLOAT  &
-                        , "East eleveation BC", "metre"            &
-                        , -1, 0., "east_e", .true. )
-      varid = var_define( ncid, 'eln', 1, [ x_dimid ], NF90_FLOAT  &
-                        , "North eleveation BC", "metre"           &
-                        , -1, 0., "east_e", .true. )
-      varid = var_define( ncid, 'els', 1, [ x_dimid ], NF90_FLOAT  &
-                        , "South eleveation BC", "metre"           &
-                        , -1, 0., "east_e", .true. )
-      varid = var_define( ncid, 'elw', 1, [ y_dimid ], NF90_FLOAT  &
-                        , "West eleveation BC", "metre"            &
-                        , -1, 0., "east_e(:,0)", .true. )
-
-      varid = var_define( ncid, 'frz', 2, [ x_dimid,y_dimid ], NF90_FLOAT  &
-                        , "flow relax coefficient", "dimensionless"                &
-                        , -1, 0., "north_e east_e", .true. )
-
-      varid = var_define( ncid, 'aamfrz', 2, [ x_dimid,y_dimid ], NF90_FLOAT  &
-                        , "sponge coefficient", "dimensionless"                       &
-                        , -1, 0., "north_e east_e", .true. )
-
-
-    end ! subroutine out_define_init
+!      implicit none
+!
+!      integer, intent(in) :: ncid, x_dimid, y_dimid
+!
+!      integer varid
+!
+!
+!      varid = var_define( ncid, 'ele', 1, [ y_dimid ], NF90_FLOAT  &
+!                        , "East eleveation BC", "metre"            &
+!                        , -1, 0., "east_e", .true. )
+!      varid = var_define( ncid, 'eln', 1, [ x_dimid ], NF90_FLOAT  &
+!                        , "North eleveation BC", "metre"           &
+!                        , -1, 0., "east_e", .true. )
+!      varid = var_define( ncid, 'els', 1, [ x_dimid ], NF90_FLOAT  &
+!                        , "South eleveation BC", "metre"           &
+!                        , -1, 0., "east_e", .true. )
+!      varid = var_define( ncid, 'elw', 1, [ y_dimid ], NF90_FLOAT  &
+!                        , "West eleveation BC", "metre"            &
+!                        , -1, 0., "east_e(:,0)", .true. )
+!
+!      varid = var_define( ncid, 'frz', 2, [ x_dimid,y_dimid ], NF90_FLOAT  &
+!                        , "flow relax coefficient", "dimensionless"                &
+!                        , -1, 0., "north_e east_e", .true. )
+!
+!      varid = var_define( ncid, 'aamfrz', 2, [ x_dimid,y_dimid ], NF90_FLOAT  &
+!                        , "sponge coefficient", "dimensionless"                       &
+!                        , -1, 0., "north_e east_e", .true. )
+!
+!
+!    end ! subroutine out_define_init
 !______________________________________________________________________
 !
     integer(1) function read_var_3d_nc( var_name, var        &
