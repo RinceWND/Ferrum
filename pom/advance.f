@@ -1168,7 +1168,7 @@
       do k=1,kb
         do j=1,jm
           do i=1,im
-            if ( isnan(var(i,j,k)) ) then
+            if ( var(i,j,k) == var(i,j,k)+1 ) then
               print '(2a,3i4,2f12.4)'
      &            , "detect nan : ",varname
      &            , i_global(i), j_global(j), k
@@ -1242,7 +1242,7 @@
 
       do j=1,jm
         do i=1,im
-          if ( isnan(var(i,j)) ) then
+          if ( var(i,j) == var(i,j)+1 ) then
             print '(2a,2i4,3f12.4)',
      $            "detect nan : ",varname,
      $            i_global(i),j_global(j),

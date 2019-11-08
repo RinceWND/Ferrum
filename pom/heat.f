@@ -378,7 +378,7 @@
 ! --- calculates : Qu = Qb + QH + QE
 !
             QU = qbw + qh + qe
-            if (isnan(QU).or.abs(QU).gt.1.e3) then
+            if ( QU==QU+1.or.abs(QU).gt.1.e3) then
             print *, "[ HEAT ]", i,j,qbw, qh, qe, "@", my_task
             print *, "cloud:", cld
             print *, "tnowk:", tnowk
@@ -1049,7 +1049,7 @@
 !
 !  Compute Monin-Obukhov stability parameter, Z/L.
 !
-          ZoQ = min( 1.15e-4, 5.5e-5/Rr**.6 )
+          ZoQ = min( 1.15e-4_rk, 5.5e-5_rk/Rr**.6 )
           ZoT = ZoQ
           ZoL = vonKar*g*blk_ZW*
      &             (Tstar*(1.+.61*Q)+
@@ -1252,7 +1252,7 @@
 
         include 'realkind'
 
-        integer*1, parameter :: jcool = 0
+        integer(1), parameter :: jcool = 0
 
         real(kind=rk), external :: grv, psit_26, psiu_26
      &                           , psiu_40, qsat26sea, RHcalc
@@ -1280,7 +1280,7 @@
      &              , UrfN2, usr, ut, visa, visw, von, wbar, wetc
      &              , xlamx, zet, zetu, zo, zo10, zoq, zoS, zot, zot10
      &              , zref, zrf_q, zrf_t, zrf_u
-        integer*1 nits, i
+        integer(1) nits, i
 
         logical waveage, seastate
 
@@ -1416,7 +1416,7 @@
           zo = charn*usr**2/grav + .11*visa/usr  ! surface roughness
 !          if (zo<1.d-10) zo = 1.d-10
           rr = zo*usr/visa
-          zoq= min(1.6e-4, 5.8e-5/rr**.72)       ! These thermal roughness lengths give Stanton and
+          zoq= min(1.6e-4_rk, 5.8e-5_rk/rr**.72)       ! These thermal roughness lengths give Stanton and
           zot= zoq                               ! Dalton numbers that closely approximate COARE 3.0
           cdhf = von    /(log(zu/zo) - psiu_26(zu/L))
           cqhf = von*fdg/(log(zq/zoq)- psit_26(zq/L))
@@ -1442,7 +1442,7 @@
             tkt   = xlamx*visw/(sqrt(rhoa/rhow)*usr)
           else
             xlamx= 6.
-            tkt = min(0.01, xlamx*visw/(sqrt(rhoa/rhow)*usr))
+            tkt = min(.01_rk, xlamx*visw/(sqrt(rhoa/rhow)*usr))
           end if
           dter = qcol*tkt/tcw
           dqer = wetc*dter
@@ -1469,7 +1469,7 @@
 !        hlb = hlb + hlwebb ! ?????? Webb correction to latent heat flux already in ef via zoq/rr function so return hlwebb
 
 !-----  compute transfer coeffs relative to ut @ meas. ht  --------------------
-        Cd = tau/rhoa/ut/max(.1,u)
+        Cd = tau/rhoa/ut/max(.1_rk,u)
         Ch =-usr*tsr/ut/(dt-dter*jcool)
         Ce =-usr*qsr/ut/(dq-dqer*jcool)
 
@@ -1661,7 +1661,7 @@
      &                 ,d =  .35
         real(kind=rk) dzet, f, psik, psic, x
 
-        dzet = min(50., 0.35*zet)             ! stable
+        dzet = min(50._rk, 0.35*zet)             ! stable
         psiu_40 = -(a*zet+b*(zet-c/d)*exp(-dzet)+b*c/d)
         if ( zet < 0. ) then                  ! unstable
           x = ( 1.-18.*zet)**.25
@@ -1692,7 +1692,7 @@
 
         real(kind=rk) dzet, f, psik, psic, x
 
-        dzet = min(50., 0.35*zet)               ! stable
+        dzet = min(50._rk, 0.35*zet)               ! stable
         if ( zet < 0. ) then                  ! unstable
           x = (1.-15.  *zet)**0.5
           psik = 2. *log((1+x     )/2.)
@@ -1729,7 +1729,7 @@
      &                 ,d =  .35
         real(kind=rk) dzet, f, psik, psic, x
 
-        dzet = min(50., 0.35*zet)               ! stable
+        dzet = min(50._rk, .35_rk*zet)               ! stable
         if ( zet < 0. ) then                   ! unstable
           x = (1.-15.  *zet)**0.25
           psik = 2. *log((1.+x     )/2.) + log((1.+x*x)/2.)
@@ -1823,7 +1823,7 @@
 !  Stable conditions.
 !
         else
-          cff = min( 50., .35*ZoL )
+          cff = min( 50._rk, .35_rk*ZoL )
           bulk_psiu = -((1.+ZoL)+.6667*(ZoL-14.28)/
      &            exp(cff)+8.525)
         end if
@@ -1885,7 +1885,7 @@
 !  Stable conditions.
 !
         else
-          cff = min( 50., .35*ZoL )
+          cff = min( 50._rk, .35_rk*ZoL )
           bulk_psit = -((1.+2.*ZoL)**1.5+
      &            0.6667*(ZoL-14.28)/EXP(cff)+8.525)
         end if

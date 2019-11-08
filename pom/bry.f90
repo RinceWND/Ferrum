@@ -61,7 +61,7 @@ module bry
 !----------------------------------------------------------------------
 ! Constants
 !----------------------------------------------------------------------
-  integer(2), parameter :: & ! Boundary conditions named constants
+  integer(1), parameter :: & ! Boundary conditions named constants
     bc0GRADIENT       = 0  & !  zero-gradient (free-slip) condition
   , bc3POINTSMOOTH    = 1  & !  smoothing with 3 interior points
   , bcCLAMPED         = 2  & !  forced value condition
@@ -71,7 +71,7 @@ module bry
   , bcORLANSKI        = 6  & !  Orlanski internal normal velocity condition
   , bcRADIATION_ENH   = 7  & !  enhanced radiation condition
   , bcGENFLATHER      = 8  & !  generalized Flather (Oddo, Pinardi, 2010)
-  , bcCHAPMAN         = 9    !  Chapman tangential velocity condition
+  , bcCHAPMAN         = 9    !  Chapman
 
   character(32), dimension(-1:10), parameter :: & ! Boundary conditions name strings (first four characters are index keys)
     bcTITLES = [             &
@@ -119,7 +119,7 @@ module bry
   end type
 
   type BC_TYPE_VAL     ! Value type for all boundaries.
-    integer(2) EAST  & !
+    integer(1) EAST  & !
             , NORTH  & !  ( self-explanatory )
             , SOUTH  & !
             , WEST     !
@@ -411,10 +411,10 @@ module bry
       , vel3d_tang_east, vel3d_tang_north, vel3d_tang_south, vel3d_tang_west &
       ,    velvert_east,    velvert_north,    velvert_south,    velvert_west
 
-      namelist/bry_nml/                                           &
-        bry_path  , CLIM_BRY  , DERIVE_2D , el_name   , Hmax      &
-      , interp_bry, MONTHLY   , periodic_x, periodic_y, read_int  &
-      , s_name    , t_name    , USE_SPONGE, u_name    , v_name
+      namelist/bry_nml/                                                &
+        bry_path, DERIVE_2D , el_name   , Hmax    , interp_bry         &
+      , MONTHLY , periodic_x, periodic_y, read_int, s_name             &
+      , t_name  , USE_SPONGE, u_name    , v_name
 
       namelist/bry_cond/                                                     &
                 el_east,         el_north,         el_south,         el_west &
@@ -571,15 +571,6 @@ module bry
 
       if ( INTERP_BRY ) N = 2
 
-      fill_clim_s % east  = 1
-      fill_clim_s % north = 1
-      fill_clim_s % south = 1
-      fill_clim_s % west  = 1
-      fill_clim_t % east  = 1
-      fill_clim_t % north = 1
-      fill_clim_t % south = 1
-      fill_clim_t % west  = 1
-
       pos = len(trim(bry_path))
       if ( bry_path(pos:pos) == "/" ) then
         bry_path = trim(bry_path)//"bry."
@@ -660,7 +651,7 @@ module bry
 !
       use glob_const , only: SEC2DAY
       use glob_domain, only: im, jm, n_east, n_north, n_south, n_west
-!      use grid       , only: fsm
+!      use glob_grid  , only: fsm
 !      use glob_ocean , only: elb, sclim, tclim
       use model_run  , only: dti
 
@@ -692,7 +683,7 @@ module bry
         frz = frz*rdisp !lyo:stcc:mar_:dec_:
 !     rdisp=1.;         frz(:,:)=frz(:,:)*rdisp !lyo:stcc:
 !     For aam is increased by (1.+aamfrz(i,j)) in subr lateral_viscosity
-        call bfrz(     4,     4,      7,      0   &
+        call bfrz(     7,     7,      7,      7   &
                  ,n_west,n_east,n_south,n_north   &
                  ,    im,    jm,      6, aamfrz)       !SPONGE:
 !        rdisp  = 0.
@@ -726,8 +717,8 @@ module bry
 !  Reads initial lateral boundary conditions.
 !______________________________________________________________________
 !
-      use config     , only: spinup
       use module_time
+!      use glob_grid  , only: dz
       use model_run  , only: mid_in_month, mid_in_nbr, sec_of_month
 
       type(date), intent(in) :: d_in
@@ -739,11 +730,7 @@ module bry
 
 
 ! Quit if the module is not used.
-      if ( DISABLED ) then
-! Fill in climate to boundaries no matter what
-        if ( CLIM_BRY ) call clim_to_bry
-        return
-      end if
+      if ( DISABLED ) return
 
       if ( MONTHLY ) then
 ! set year to -1 to denote climatology
@@ -796,8 +783,6 @@ module bry
 
       end if
 
-      if ( spinup ) record = 1
-
 ! Read boundary fields
       if ( INTERP_BRY ) then
         call read_all( .true., 2, year, record )
@@ -808,9 +793,6 @@ module bry
       end if
       
       if ( DERIVE_2D ) call derive_barotropic_velocities
-
-! Fill in climate to boundaries
-      if ( CLIM_BRY ) call clim_to_bry
 
       call msg_print("BRY INITIALIZED", 2, "")
 
@@ -823,6 +805,7 @@ module bry
 !  Reads lateral boundary conditions.
 !______________________________________________________________________
 !
+!      use glob_grid  , only: dz
 !      use glob_domain, only: is_master
       use model_run  , only: dti, iint, mid_in_month, mid_in_nbr      &
                            , secs => sec_of_year, sec_of_month
@@ -868,8 +851,7 @@ module bry
         if ( sec_of_month - mid_in_month <= dti .and.  &
              record(2) == record(1) ) then
           ADVANCE_REC_INT = .true.
-        else
-          ADVANCE_REC_INT = .false.
+          print *, "[!!!] ", sec_of_month, mid_in_month, dti
         end if
 
       else
@@ -967,7 +949,7 @@ module bry
 !
     subroutine init_to_bry
 !----------------------------------------------------------------------
-!  Gets boundary values from initial fields.
+!  Gets boundariy values from climatology.
 !______________________________________________________________________
 !
       use glob_ocean, only: elb, sb, tb, ub, uab, vb, vab
@@ -1044,7 +1026,7 @@ module bry
 !
     subroutine clim_to_bry
 !----------------------------------------------------------------------
-!  Gets boundary values from climatology.
+!  Gets boundariy values from climatology.
 !______________________________________________________________________
 !
       use clim, only: eclim, sclim, tclim, uclim, vclim
@@ -1882,6 +1864,7 @@ module bry
       real(rk), dimension(2,jm) :: grdy
       real(rk)                  :: cff, cx, cy, dvdt, dvdx, dvdy
 
+
 ! Apply periodic BC in x-dimension
       if ( periodic_bc % x ) then
 
@@ -1907,7 +1890,7 @@ module bry
                 else
                   dvdy = grdy(1,j+1)
                 end if
-                cff = max( dvdx*dvdx+dvdy*dvdy, small )
+                cff = max( dvdx*dvdx+dvdy*dvdy, SMALL )
                 if ( dvdt*dvdx < 0. ) dvdt = 0.
                 cx = dvdt*dvdx
                 cy = min( cff, max( dvdt*dvdy, -cff ) )
@@ -1929,6 +1912,7 @@ module bry
 
           end select
 
+
         end if
 ! WEST
         if ( hasWEST ) then
@@ -1949,7 +1933,7 @@ module bry
                 else
                   dvdy = grdy(2,j+1)
                 end if
-                cff = max( dvdx*dvdx+dvdy*dvdy, small )
+                cff = max( dvdx*dvdx+dvdy*dvdy, SMALL )
                 if ( dvdt*dvdx < 0. ) dvdt = 0.
                 cx = dvdt*dvdx
                 cy = min( cff, max( dvdt*dvdy, -cff ) )
@@ -1997,9 +1981,9 @@ module bry
                 dvdy = elf(i,jmm1) - elf(i,jmm2)
 
                 if ( (dvdt*(grdx(i,1)+grdx(i+1,1))) > 0. ) then
-                  dvdx = grdx(i  ,jmm1)
+                  dvdx = grdx(i  ,1)
                 else
-                  dvdx = grdx(i+1,jmm1)
+                  dvdx = grdx(i+1,1)
                 end if
                 cff = max( dvdx*dvdx+dvdy*dvdy, small )
                 if ( dvdt*dvdy < 0. ) dvdt = 0.
@@ -2043,16 +2027,16 @@ module bry
                 else
                   dvdx = grdx(i+1,2)
                 end if
-                cff = max( dvdx*dvdx+dvdy*dvdy, small )
+                cff = max( dvdx*dvdx+dvdy*dvdy, SMALL )
                 if ( dvdt*dvdy < 0. ) dvdt = 0.
                 cx = min( cff, max( dvdt*dvdx, -cff ) )
                 cy = dvdt*dvdy
                 elf(i,1) = ( cff*el(i,1) + cy*elf(i,2)  &
-                            - max( cx, 0._rk )*grdx(i  ,2)   &
-                            - min( cx, 0._rk )*grdx(i+1,2)   &
+                            - max( cx, 0._rk )*grdx(i  ,1)   &
+                            - min( cx, 0._rk )*grdx(i+1,1)   &
                             ) / ( cff + cy )
               end do
-
+ 
             case ( bcCHAPMAN )
               do i = 2,imm1
                 cff = dti/dy(i,2)
@@ -2065,27 +2049,6 @@ module bry
 
           end select
 
-        end if
-
-      end if
-
-
-      if ( .not. ( periodic_bc % x .and. periodic_bc % y ) ) then
-
-        if ( hasSOUTH .and. hasWEST ) then
-          elf( 1, 1) = .5*(elf(   2, 1)+elf( 1,   2))
-        end if
-
-        if ( hasSOUTH .and. hasEAST ) then
-          elf(im, 1) = .5*(elf(imm1, 1)+elf(im,   2))
-        end if
-
-        if ( hasNORTH .and. hasEAST ) then
-          elf(im,jm) = .5*(elf(imm1,jm)+elf(im,jmm1))
-        end if
-
-        if ( hasNORTH .and. hasWEST ) then
-          elf( 1,jm) = .5*(elf(   2,jm)+elf( 2,jmm1))
         end if
 
       end if
@@ -2104,14 +2067,13 @@ module bry
 !
       use glob_const , only: GRAV
       use glob_grid  , only: dum, dvm, h, dx, dy
-      use glob_ocean , only: d, el, ua, uaf, va, vaf
+      use glob_ocean , only: d, el, uaf, ua, vaf, va
       use model_run  , only: dte, ramp
 
       implicit none
 
       real(rk), dimension(im) :: ce
       real(rk), dimension(jm) :: cx
-
 
 ! Apply periodic BC in x-dimension
       if ( periodic_bc % x ) then
@@ -2443,8 +2405,6 @@ module bry
           uaf(1,1) = uaf(2,1)
           vaf(1,2) = .5*(vaf(2,2)+vaf(1,3))
           vaf(1,1) = vaf(1,2)
-!          print *, "UA: ", uaf(4,3), uaf(5,3)
-!          print *, "VA: ", vaf(4,3), vaf(4,4)
         end if
 
         if ( hasSOUTH .and. hasEAST ) then
@@ -2557,7 +2517,7 @@ module bry
                 end do
               end do
 
-            case ( bcRADIATION_ENH )
+              case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 2,jm
                   grdy(1,j) = u(imm1,j,k)-u(imm1,j-1,k)
@@ -2571,7 +2531,7 @@ module bry
                   else
                     dvdy = grdy(1,j+1)
                   end if
-                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  cff = max(dvdx*dvdx + dvdy*dvdy, SMALL)
                   if ( dvdt*dvdx < 0. ) dvdt = 0.
                   cx  = dvdt*dvdx
                   cy  = min(cff,max(dvdt*dvdy,-cff))
@@ -2701,7 +2661,7 @@ module bry
                     dvdy = grdy(2,j+1)
                   end if
                   cff = max(dvdx*dvdx + dvdy*dvdy, small)
-                  if ( (dvdt*dvdx) < 0. ) dvdt = 0.
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
                   cx  = dvdt*dvdx
                   cy  = min(cff,max(dvdt*dvdy,-cff))
                   uf(2,j,k) = ( cff*u(2,j,k) + cx*uf(3,j,k)           &
@@ -2851,13 +2811,13 @@ module bry
                 do i = 2,imm1
                   dvdt =  v(i,jmm1,k)-vf(i,jmm1,k)
                   dvdy = vf(i,jmm1,k)-vf(i,jmm2,k)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
                   if ( dvdt*(grdx(i,1)+grdx(i+1,1)) > 0. ) then
                     dvdx = grdx(i  ,1)
                   else
                     dvdx = grdx(i+1,1)
                   end if
                   cff = max(dvdx*dvdx + dvdy*dvdy, small)
-                  if ( dvdt*dvdy < 0. ) dvdt = 0.
                   cx  = min(cff,max(dvdt*dvdx,-cff))
                   cy  = dvdt*dvdy
                   vf(i,jm,k) = ( cff*v(i,jm,k) + cy*vf(i,jmm1,k)      &
@@ -2979,13 +2939,13 @@ module bry
                 do i = 2,imm1
                   dvdt =  v(i,3,k)-vf(i,3,k)
                   dvdy = vf(i,3,k)-vf(i,4,k)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
                   if ( dvdt*(grdx(i,2)+grdx(i+1,2)) > 0. ) then
                     dvdx = grdx(i  ,2)
                   else
                     dvdx = grdx(i+1,2)
                   end if
                   cff = max(dvdx*dvdx + dvdy*dvdy, small)
-                  if ( dvdt*dvdy < 0. ) dvdt = 0.
                   cx  = min(cff,max(dvdt*dvdx,-cff))
                   cy  = dvdt*dvdy
                   vf(i,2,k) = ( cff*v(i,2,k) + cy*vf(i,3,k)           &
@@ -3039,7 +2999,7 @@ module bry
                   else
                     dvdx = grdx(i  ,2)
                   end if
-                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  cff = max(dvdx*dvdx + dvdy*dvdy, SMALL)
                   if ( dvdt*dvdy < 0. ) dvdt = 0.
                   cx  = min(cff,max(dvdt*dvdx,-cff))
                   cy  = dvdt*dvdy
@@ -3087,7 +3047,8 @@ module bry
         end if
 
       end if
-! Apply u- and v-masks
+
+! Apply u- nd v-masks
       do k = 1,kbm1
         uf(:,:,k) = uf(:,:,k)*dum
         vf(:,:,k) = vf(:,:,k)*dvm
@@ -3113,10 +3074,10 @@ module bry
       implicit none
 
       integer  ii, jj
+      real(rk) u1, wm
       real(rk), dimension(im,2) :: grdx
       real(rk), dimension(2,jm) :: grdy
       real(rk)                  :: cff, cx, cy, dvdt, dvdx, dvdy
-      real(rk) u1, wm
 
 
 ! Apply periodic BC in x-dimension
@@ -3198,51 +3159,49 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = t(imm1,j,k) - t(imm1,j-1,k)
-                  grdy(2,j) = t(im  ,j,k) - t(im  ,j-1,k)
+                  grdy(1,j) = t(imm1,j,k)-t(imm1,j-1,k)
+                  grdy(2,j) = t(im  ,j,k)-t(im  ,j-1,k)
                 end do
                 do j = 2,jmm1
-                  dvdt =  t(imm1,j,k) - uf(imm1,j,k)
-                  dvdx = uf(imm1,j,k) - uf(imm2,j,k)
-
+                  dvdt =  t(imm1,j,k)-uf(imm1,j,k)
+                  dvdx = uf(imm1,j,k)-uf(imm2,j,k)
                   if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
                     dvdy = grdy(1,j  )
                   else
                     dvdy = grdy(1,j+1)
                   end if
-                  cff = max( dvdx*dvdx+dvdy*dvdy, small )
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
                   if ( dvdt*dvdx < 0. ) dvdt = 0.
-                  cx = dvdt*dvdx
-                  cy = min( cff, max( dvdt*dvdy, -cff ) )
-                  uf(im,j,k) = ( cff*t(im,j,k) + cx*uf(imm1,j,k)  &
-                                - max( cy, 0._rk )*grdy(2,j  )    &
-                                - min( cy, 0._rk )*grdy(2,j+1)    &
-                               ) / ( cff + cx )
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  uf(im,j,k) = ( cff*t(im,j,k) + cx*uf(imm1,j,k)      &
+                                - max(cy,0._rk)*grdy(2,j  )           &
+                                - min(cy,0._rk)*grdy(2,j+1) )         &
+                               / (cff+cx)
                 end do
               end do
 
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = s(imm1,j,k) - s(imm1,j-1,k)
-                  grdy(2,j) = s(im  ,j,k) - s(im  ,j-1,k)
+                  grdy(1,j) = s(imm1,j,k)-s(imm1,j-1,k)
+                  grdy(2,j) = s(im  ,j,k)-s(im  ,j-1,k)
                 end do
                 do j = 2,jmm1
-                  dvdt =  s(imm1,j,k) - vf(imm1,j,k)
-                  dvdx = vf(imm1,j,k) - vf(imm2,j,k)
-
+                  dvdt =  s(imm1,j,k)-vf(imm1,j,k)
+                  dvdx = vf(imm1,j,k)-vf(imm2,j,k)
                   if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
                     dvdy = grdy(1,j  )
                   else
                     dvdy = grdy(1,j+1)
                   end if
-                  cff = max( dvdx*dvdx+dvdy*dvdy, small )
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
                   if ( dvdt*dvdx < 0. ) dvdt = 0.
-                  cx = dvdt*dvdx
-                  cy = min( cff, max( dvdt*dvdy, -cff ) )
-                  vf(im,j,k) = ( cff*s(im,j,k) + cx*vf(imm1,j,k)  &
-                                - max( cy, 0._rk )*grdy(2,j  )    &
-                                - min( cy, 0._rk )*grdy(2,j+1)    &
-                               ) / ( cff + cx )
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  vf(im,j,k) = ( cff*s(im,j,k) + cx*vf(imm1,j,k)      &
+                                - max(cy,0._rk)*grdy(2,j  )           &
+                                - min(cy,0._rk)*grdy(2,j+1) )         &
+                               / (cff+cx)
                 end do
               end do
 
@@ -3321,51 +3280,49 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = t(1,j,k) - t(1,j-1,k)
-                  grdy(2,j) = t(2,j,k) - t(2,j-1,k)
+                  grdy(1,j) = t(1,j,k)-t(1,j-1,k)
+                  grdy(2,j) = t(2,j,k)-t(2,j-1,k)
                 end do
                 do j = 2,jmm1
-                  dvdt =  t(2,j,k) - uf(2,j,k)
-                  dvdx = uf(2,j,k) - uf(3,j,k)
-
+                  dvdt =  t(2,j,k)-uf(2,j,k)
+                  dvdx = uf(2,j,k)-uf(3,j,k)
                   if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
                     dvdy = grdy(2,j  )
                   else
                     dvdy = grdy(2,j+1)
                   end if
-                  cff = max( dvdx*dvdx+dvdy*dvdy, small )
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
                   if ( dvdt*dvdx < 0. ) dvdt = 0.
-                  cx = dvdt*dvdx
-                  cy = min( cff, max( dvdt*dvdy, -cff ) )
-                  uf(1,j,k) = ( cff*t(1,j,k) + cx*uf(2,j,k)    &
-                               - max( cy, 0._rk )*grdy(1,j  )  &
-                               - min( cy, 0._rk )*grdy(1,j+1)  &
-                              ) / ( cff + cx )
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  uf(1,j,k) = ( cff*t(1,j,k) + cx*uf(2,j,k)      &
+                                - max(cy,0._rk)*grdy(1,j  )      &
+                                - min(cy,0._rk)*grdy(1,j+1) )    &
+                               / (cff+cx)
                 end do
               end do
 
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = s(1,j,k) - s(1,j-1,k)
-                  grdy(2,j) = s(2,j,k) - s(2,j-1,k)
+                  grdy(1,j) = s(1,j,k)-s(1,j-1,k)
+                  grdy(2,j) = s(2,j,k)-s(2,j-1,k)
                 end do
                 do j = 2,jmm1
-                  dvdt =  s(2,j,k) - vf(2,j,k)
-                  dvdx = vf(2,j,k) - vf(3,j,k)
-
+                  dvdt =  s(2,j,k)-vf(2,j,k)
+                  dvdx = vf(2,j,k)-vf(3,j,k)
                   if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
                     dvdy = grdy(2,j  )
                   else
                     dvdy = grdy(2,j+1)
                   end if
-                  cff = max( dvdx*dvdx+dvdy*dvdy, small )
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
                   if ( dvdt*dvdx < 0. ) dvdt = 0.
-                  cx = dvdt*dvdx
-                  cy = min( cff, max( dvdt*dvdy, -cff ) )
-                  vf(1,j,k) = ( cff*s(1,j,k) + cx*vf(2,j,k)    &
-                               - max( cy, 0._rk )*grdy(1,j  )  &
-                               - min( cy, 0._rk )*grdy(1,j+1)  &
-                              ) / ( cff + cx )
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  vf(1,j,k) = ( cff*s(1,j,k) + cx*vf(2,j,k)      &
+                                - max(cy,0._rk)*grdy(1,j  )      &
+                                - min(cy,0._rk)*grdy(1,j+1) )    &
+                               / (cff+cx)
                 end do
               end do
 
@@ -3388,24 +3345,24 @@ module bry
           select case ( BC % TS % NORTH )
 
             case ( bc0GRADIENT )
-              uf(:,jm,1:kbm1) = t(:,jmm1,1:kbm1)
-              vf(:,jm,1:kbm1) = s(:,jmm1,1:kbm1)
+              uf(:,jm,1:kbm1) = uf(:,jmm1,1:kbm1)
+              vf(:,jm,1:kbm1) = vf(:,jmm1,1:kbm1)
 
             case ( bc3POINTSMOOTH )
-              uf(2:imm1,jm,1:kbm1) = ( t(1:imm2,jmm1,1:kbm1)       &
-                                     + t(2:imm1,jmm1,1:kbm1)       &
-                                     + t(3:im  ,jmm1,1:kbm1) )/3.
-              uf(1     ,jm,1:kbm1) = ( t(1     ,jmm1,1:kbm1)       &
-                                     + t(2     ,jmm1,1:kbm1) )*.5
-              uf(  im  ,jm,1:kbm1) = ( t(imm1  ,jmm1,1:kbm1)       &
-                                     + t(im    ,jmm1,1:kbm1) )*.5
-              vf(2:imm1,jm,1:kbm1) = ( s(1:imm2,jmm1,1:kbm1)       &
-                                     + s(2:imm1,jmm1,1:kbm1)       &
-                                     + s(3:im  ,jmm1,1:kbm1) )/3.
-              vf(1     ,jm,1:kbm1) = ( s(1     ,jmm1,1:kbm1)       &
-                                     + s(2     ,jmm1,1:kbm1) )*.5
-              vf(  im  ,jm,1:kbm1) = ( s(imm1  ,jmm1,1:kbm1)       &
-                                     + s(im    ,jmm1,1:kbm1) )*.5
+              uf(2:imm1,jm,1:kbm1) = ( uf(1:imm2,jmm1,1:kbm1)       &
+                                     + uf(2:imm1,jmm1,1:kbm1)       &
+                                     + uf(3:im  ,jmm1,1:kbm1) )/3.
+              uf(1     ,jm,1:kbm1) = ( uf(1     ,jmm1,1:kbm1)       &
+                                     + uf(2     ,jmm1,1:kbm1) )*.5
+              uf(  im  ,jm,1:kbm1) = ( uf(imm1  ,jmm1,1:kbm1)       &
+                                     + uf(im    ,jmm1,1:kbm1) )*.5
+              vf(2:imm1,jm,1:kbm1) = ( vf(1:imm2,jmm1,1:kbm1)       &
+                                     + vf(2:imm1,jmm1,1:kbm1)       &
+                                     + vf(3:im  ,jmm1,1:kbm1) )/3.
+              vf(1     ,jm,1:kbm1) = ( vf(1     ,jmm1,1:kbm1)       &
+                                     + vf(2     ,jmm1,1:kbm1) )*.5
+              vf(  im  ,jm,1:kbm1) = ( vf(imm1  ,jmm1,1:kbm1)       &
+                                     + vf(im    ,jmm1,1:kbm1) )*.5
 
             case ( bcCLAMPED )
               uf(:,jm,1:kbm1) = T_bry%NTH(:,1,1:kbm1)
@@ -3470,9 +3427,9 @@ module bry
                   cx  = min(cff,max(dvdt*dvdx,-cff))
                   cy  = dvdt*dvdy
                   uf(i,jm,k) = ( cff*t(i,jm,k) + cy*uf(i,jmm1,k)  &
-                                - max( cx, 0._rk )*grdx(i  ,2)    &
-                                - min( cx, 0._rk )*grdx(i+1,2)    &
-                               ) / ( cff + cy )
+                                - max(cx,0._rk)*grdx(i  ,2)       &
+                                - min(cx,0._rk)*grdx(i+1,2) )     &
+                               / (cff+cy)
                 end do
               end do
 
@@ -3494,9 +3451,9 @@ module bry
                   cx  = min(cff,max(dvdt*dvdx,-cff))
                   cy  = dvdt*dvdy
                   vf(i,jm,k) = ( cff*s(i,jm,k) + cy*vf(i,jmm1,k)  &
-                                - max( cx, 0._rk )*grdx(i  ,2)    &
-                                - min( cx, 0._rk )*grdx(i+1,2)    &
-                               ) / ( cff + cy )
+                                - max(cx,0._rk)*grdx(i  ,2)       &
+                                - min(cx,0._rk)*grdx(i+1,2) )     &
+                               / (cff+cy)
                 end do
               end do
 
@@ -3510,24 +3467,24 @@ module bry
           select case ( BC % TS % SOUTH )
 
             case ( bc0GRADIENT )
-              uf(:,1,1:kbm1) = t(:,2,1:kbm1)
-              vf(:,1,1:kbm1) = s(:,2,1:kbm1)
+              uf(:,1,1:kbm1) = uf(:,2,1:kbm1)
+              vf(:,1,1:kbm1) = vf(:,2,1:kbm1)
 
             case ( bc3POINTSMOOTH )
-              uf(2:imm1,1,1:kbm1) = ( t(1:imm2,2,1:kbm1)       &
-                                    + t(2:imm1,2,1:kbm1)       &
-                                    + t(3:im  ,2,1:kbm1) )/3.
-              uf(1     ,1,1:kbm1) = ( t(1     ,2,1:kbm1)       &
-                                    + t(2     ,2,1:kbm1) )*.5
-              uf(  im  ,1,1:kbm1) = ( t(imm1  ,2,1:kbm1)       &
-                                    + t(im    ,2,1:kbm1) )*.5
-              vf(2:imm1,1,1:kbm1) = ( s(1:imm2,2,1:kbm1)       &
-                                    + s(2:imm1,2,1:kbm1)       &
-                                    + s(3:im  ,2,1:kbm1) )/3.
-              vf(1     ,1,1:kbm1) = ( s(1     ,2,1:kbm1)       &
-                                    + s(2     ,2,1:kbm1) )*.5
-              vf(  im  ,1,1:kbm1) = ( s(imm1  ,2,1:kbm1)       &
-                                    + s(im    ,2,1:kbm1) )*.5
+              uf(2:imm1,1,1:kbm1) = ( uf(1:imm2,2,1:kbm1)       &
+                                    + uf(2:imm1,2,1:kbm1)       &
+                                    + uf(3:im  ,2,1:kbm1) )/3.
+              uf(1     ,1,1:kbm1) = ( uf(1     ,2,1:kbm1)       &
+                                    + uf(2     ,2,1:kbm1) )*.5
+              uf(  im  ,1,1:kbm1) = ( uf(imm1  ,2,1:kbm1)       &
+                                    + uf(im    ,2,1:kbm1) )*.5
+              vf(2:imm1,1,1:kbm1) = ( vf(1:imm2,2,1:kbm1)       &
+                                    + vf(2:imm1,2,1:kbm1)       &
+                                    + vf(3:im  ,2,1:kbm1) )/3.
+              vf(1     ,1,1:kbm1) = ( vf(1     ,2,1:kbm1)       &
+                                    + vf(2     ,2,1:kbm1) )*.5
+              vf(  im  ,1,1:kbm1) = ( vf(imm1  ,2,1:kbm1)       &
+                                    + vf(im    ,2,1:kbm1) )*.5
 
             case ( bcCLAMPED )
               uf(:,1,1:kbm1) = T_bry%STH(:,1,1:kbm1)
@@ -3586,14 +3543,14 @@ module bry
                   else
                     dvdx = grdx(i+1,2)
                   end if
-                  cff = max( dvdx*dvdx + dvdy*dvdy, small )
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
                   if ( dvdt*dvdy < 0. ) dvdt = 0.
                   cx  = min(cff,max(dvdt*dvdx,-cff))
                   cy  = dvdt*dvdy
-                  uf(i,1,k) = ( cff*t(i,1,k) + cy*uf(i,2,k)     &
-                               - max( cx, 0._rk )*grdx(i  ,1)   &
-                               - min( cx, 0._rk )*grdx(i+1,1)   &
-                              ) / ( cff + cy )
+                  uf(i,1,k) = ( cff*t(i,1,k) + cy*uf(i,2,k)      &
+                                - max(cx,0._rk)*grdx(i  ,1)      &
+                                - min(cx,0._rk)*grdx(i+1,1) )    &
+                               / (cff+cy)
                 end do
               end do
 
@@ -3614,10 +3571,10 @@ module bry
                   if ( dvdt*dvdy < 0. ) dvdt = 0.
                   cx  = min(cff,max(dvdt*dvdx,-cff))
                   cy  = dvdt*dvdy
-                  vf(i,1,k) = ( cff*s(i,1,k) + cy*vf(i,2,k)     &
-                                - max( cx, 0._rk )*grdx(i  ,1)  &
-                                - min( cx, 0._rk )*grdx(i+1,1)  &
-                              ) / ( cff + cy )
+                  vf(i,1,k) = ( cff*s(i,1,k) + cy*vf(i,2,k)      &
+                                - max(cx,0._rk)*grdx(i  ,1)      &
+                                - min(cx,0._rk)*grdx(i+1,1) )    &
+                               / (cff+cy)
                 end do
               end do
 
@@ -3628,16 +3585,16 @@ module bry
       end if ! periodic_y end
 
 
-      if ( .not. ( periodic_bc % x .and. periodic_bc % y ) ) then
+      if ( .not.periodic_bc % x .or. .not.periodic_bc % y ) then
 
         if ( hasSOUTH .and. hasWEST ) then
-          uf( 1, 1,:) = .5*( uf(   2, 1,:) + uf( 1,   2,:) )
-          vf( 1, 1,:) = .5*( vf(   2, 1,:) + vf( 1,   2,:) )
+          uf(1,1,:) = .5*( uf(2,1,:) + uf(1,2,:) )
+          vf(1,1,:) = .5*( vf(2,1,:) + vf(1,2,:) )
         end if
 
         if ( hasSOUTH .and. hasEAST ) then
-          uf(im, 1,:) = .5*( uf(imm1, 1,:) + uf(im,   2,:) )
-          vf(im, 1,:) = .5*( vf(imm1, 1,:) + vf(im,   2,:) )
+          uf(im,1,:) = .5*( uf(imm1,1,:) + uf(im,2,:) )
+          vf(im,1,:) = .5*( vf(imm1,1,:) + vf(im,2,:) )
         end if
 
         if ( hasNORTH .and. hasEAST ) then
@@ -3646,13 +3603,12 @@ module bry
         end if
 
         if ( hasNORTH .and. hasWEST ) then
-          uf( 1,jm,:) = .5*( uf(   2,jm,:) + uf( 1,jmm1,:) )
-          vf( 1,jm,:) = .5*( vf(   2,jm,:) + vf( 1,jmm1,:) )
+          uf(1,jm,:) = .5*( uf(2,jm,:) + uf(1,jmm1,:) )
+          vf(1,jm,:) = .5*( vf(2,jm,:) + vf(1,jmm1,:) )
         end if
 
       end if
-
-! Apply rho-mask
+! Allpy rho-mask
       do k = 1,kbm1
         uf(:,:,k) = uf(:,:,k)*fsm
         vf(:,:,k) = vf(:,:,k)*fsm
@@ -3675,7 +3631,7 @@ module bry
 
 ! Apply rho-mask
       do k = 1,kbm1
-        w(:,:,k) = fsm*.5*w(:,:,k)
+        w(:,:,k) = w(:,:,k)*fsm
       end do
 
 
@@ -3842,49 +3798,6 @@ module bry
     end ! function get_filename
 !
 != I/O SECTION ========================================================
-!______________________________________________________________________
-!
-!    subroutine out_init_define( ncid, x_dimid, y_dimid )
-!!----------------------------------------------------------------------
-!!  Defines variables for initial output.
-!!______________________________________________________________________
-!!
-!      use glob_const , only: rk
-!      use glob_domain
-!      use io         , only: var_define
-!      use mpi        , only: MPI_OFFSET_KIND
-!      use pnetcdf    , only: NF90_FLOAT
-!
-!      implicit none
-!
-!      integer, intent(in) :: ncid, x_dimid, y_dimid
-!
-!      integer varid
-!
-!
-!      varid = var_define( ncid, 'ele', 1, [ y_dimid ], NF90_FLOAT  &
-!                        , "East eleveation BC", "metre"            &
-!                        , -1, 0., "east_e", .true. )
-!      varid = var_define( ncid, 'eln', 1, [ x_dimid ], NF90_FLOAT  &
-!                        , "North eleveation BC", "metre"           &
-!                        , -1, 0., "east_e", .true. )
-!      varid = var_define( ncid, 'els', 1, [ x_dimid ], NF90_FLOAT  &
-!                        , "South eleveation BC", "metre"           &
-!                        , -1, 0., "east_e", .true. )
-!      varid = var_define( ncid, 'elw', 1, [ y_dimid ], NF90_FLOAT  &
-!                        , "West eleveation BC", "metre"            &
-!                        , -1, 0., "east_e(:,0)", .true. )
-!
-!      varid = var_define( ncid, 'frz', 2, [ x_dimid,y_dimid ], NF90_FLOAT  &
-!                        , "flow relax coefficient", "dimensionless"                &
-!                        , -1, 0., "north_e east_e", .true. )
-!
-!      varid = var_define( ncid, 'aamfrz', 2, [ x_dimid,y_dimid ], NF90_FLOAT  &
-!                        , "sponge coefficient", "dimensionless"                       &
-!                        , -1, 0., "north_e east_e", .true. )
-!
-!
-!    end ! subroutine out_define_init
 !______________________________________________________________________
 !
     integer(1) function read_var_3d_nc( var_name, var        &

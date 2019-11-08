@@ -153,7 +153,7 @@ module seaice
 
       implicit none
 
-      integer*1 N ! Interpolation array extension size
+      integer(1) N ! Interpolation array extension size
                   ! The structure is following:
                   !   var at n   step: var(:,:,1)
                   !   var at n-1 step: var(:,:,2)

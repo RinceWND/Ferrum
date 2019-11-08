@@ -3838,7 +3838,7 @@
         do j=1,jm
           do i=1,im
           f(i,j,ki)=(ee(i,j,ki)*f(i,j,ki+1)+gg(i,j,ki))
-              if (isnan(f(i,j,ki))) then
+              if ( f(i,j,ki) == f(i,j,ki)+1 ) then
                 print *, "[ PROFT ]", i_global(i), j_global(j)
                 print *, " ee: ", ee(i,j,ki)
                 print *, " f+: ", f(i,j,ki+1)

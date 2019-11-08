@@ -77,7 +77,7 @@ module air
   , USE_DQDSST     & !  use heat flux sensitivity to restore temperature
   , USE_FLUXES       !  momentum flux is read directly from files
 
-  integer*1        &
+  integer(1)        &
     LWRAD_FORMULA    ! Bulk formula to estimate longwave radiation
 
 !----------------------------------------------------------------------
@@ -344,11 +344,11 @@ module air
 
       implicit none
 
-      integer*1 N ! Interpolation array extension size
-                  ! The structure is following:
-                  !   var at n   step: var(:,:,1)
-                  !   var at n-1 step: var(:,:,2)
-                  !   var at n+1 step: var(:,:,3)
+      integer(1) N ! Interpolation array extension size
+                   ! The structure is following:
+                   !   var at n   step: var(:,:,1)
+                   !   var at n-1 step: var(:,:,2)
+                   !   var at n+1 step: var(:,:,3)
 
 
 ! Allocate core arrays
@@ -1456,7 +1456,7 @@ module air
          i = amur_i - i_global(1) + 1
          j = amur_j - j_global(1) + 1
          vfluxf(i,j) = -amur_dis( dtime%month ) / art(i,j)
-         tsurf(i,j) = max(temp(i,j,1),0.)
+         tsurf(i,j) = max(temp(i,j,1),0._rk)
 !         wtsurf(i,j) = vfluxf(i,j)*max(temp(i,j,1),0.)
          print *, "Amur discharge: ", vfluxf(i,j), wtsurf(i,j),temp(i,j,1)
       end if

@@ -452,7 +452,7 @@
         integer         , intent(in) :: status
 
         integer, parameter :: line_len = 56
-        integer*2, dimension(6), parameter :: chr =
+        integer(2), dimension(6), parameter :: chr =
 !     &                          (/ 9675  ! 1: white circle
      &                          (/ 79_2    ! 1: latin capital letter o
      &                           , 33_2    ! 2: exclamation mark
