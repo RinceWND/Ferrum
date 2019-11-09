@@ -11,11 +11,9 @@
 
       use module_time
       use river
-      use wind
       use assim
       use interp
       use mcsst        !fhx:mcsst
-      use uvforce      !eda:uvforce
       use seaice
 
       implicit none

@@ -4703,3 +4703,1373 @@
         end if
 
       end function
+!!
+!!______________________________________________________________________
+!!
+!    subroutine write_output_init_pnetcdf( out_file )
+!!----------------------------------------------------------------------
+!!  Write initial state output file.
+!!______________________________________________________________________
+!!
+!      use air        , only: wssurf, wtsurf, wusurf, wvsurf
+!      use bry        , only: aamfrz, el_bry, frz, USE_SPONGE
+!      use config     , only: mode, title, use_air
+!      use glob_const , only: rk
+!      use glob_domain
+!      use glob_grid
+!      use glob_misc
+!      use glob_ocean
+!      use model_run  , only: time, time_start
+!      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
+!      use pnetcdf    , only: nf90mpi_close     , nf90mpi_create     &
+!                           , nf90mpi_def_dim   , nf90mpi_enddef     &
+!                           , nf90mpi_get_att   , nf90mpi_inq_varid  &
+!                           , nf90mpi_open      , nf90mpi_put_att    &
+!                           , nfmpi_put_vara_all                     &
+!                           , nfmpi_put_vara_real_all                &
+!                           , NF_64BIT_OFFSET, NF_CLOBBER            &
+!                           , NF_FLOAT       , NF_GLOBAL             &
+!                           , NF_NOERR       , NF_NOWRITE            &
+!                           , NF_UNLIMITED   , NF_WRITE
+!
+!      implicit none
+!
+!      character(len=*), intent(in) :: out_file  ! Output filename
+!
+!      integer time_dimid, x_dimid, y_dimid, z_dimid
+!      integer  aamfrz_varid,    dum_varid,    dvm_varid,     dx_varid &
+!            ,      dy_varid, east_c_varid, east_e_varid, east_u_varid &
+!            ,  east_v_varid,    ele_varid,    eln_varid,    els_varid &
+!            ,     elw_varid,    frz_varid,    fsm_varid,      h_varid &
+!            ,      kh_varid,     km_varid,north_c_varid,north_e_varid &
+!            , north_u_varid,north_v_varid,    rho_varid,    rot_varid &
+!            ,       s_varid,      t_varid,   time_varid, wssurf_varid &
+!            ,  wtsurf_varid, wusurf_varid, wvsurf_varid,      z_varid &
+!            ,      zz_varid
+!
+!      integer, dimension(4)      :: vdims
+!      integer(MPI_OFFSET_KIND)                       &
+!             , dimension(4)      :: start(4),edge(4)
+!
+!      integer ncid
+!
+!      real(kind=4), dimension(im      ) :: out1x
+!      real(kind=4), dimension(   jm   ) :: out1y
+!      real(kind=4), dimension(      kb) :: out1z
+!      real(kind=4), dimension(im,jm   ) :: out2
+!      real(kind=4), dimension(im,jm,kb) :: out3
+!
+!
+!      out1x = 0.
+!      out1y = 0.
+!      out1z = 0.
+!      out2 = 0.
+!      out3 = 0.
+!
+!      call msg_print("", 6, "Writing file `"//trim(out_file)//"`")
+!
+!      call check( nf90mpi_create                  &
+!                    ( POM_COMM, trim(out_file)    &
+!                    , NF_CLOBBER+NF_64BIT_OFFSET  &
+!                    , MPI_INFO_NULL, ncid )       &
+!                , 'nf_create: '//out_file )
+!
+!! define global attributes
+!      call check( nf90mpi_put_att                            &
+!                  ( ncid, NF_GLOBAL, 'title', trim(title) )  &
+!                , 'nf_put_att: title @ '//out_file )
+!
+!      call check( nf90mpi_put_att                                  &
+!                  ( ncid, NF_GLOBAL, 'description', 'Init file' )  &
+!                , 'nf_put_att: description @ '//out_file )
+!
+!! define dimensions
+!      call check( nf90mpi_def_dim                                   &
+!                  ( ncid, 'time', int(NF_UNLIMITED,8), time_dimid ) &
+!                , 'nf_def_dim: time @ '//out_file )
+!      call check( nf90mpi_def_dim                                   &
+!                  ( ncid,    'z', int(          kb,8),    z_dimid ) &
+!                , 'nf_def_dim: z @ '//out_file )
+!      call check( nf90mpi_def_dim                                   &
+!                  ( ncid,    'y', int(   jm_global,8),    y_dimid ) &
+!                , 'nf_def_dim: y @ '//out_file )
+!      call check( nf90mpi_def_dim                                   &
+!                  ( ncid,    'x', int(   im_global,8),    x_dimid ) &
+!                , 'nf_def_dim: x @ '//out_file )
+!
+!! define variables and their attributes
+!      vdims(1) = time_dimid
+!      time_varid = def_var_pnetcdf(ncid,'time',1,vdims,NF_FLOAT  &
+!                              ,'time','days since '//time_start  &
+!                              ,-1,0.,' ',.false.)
+!
+!! Skip baroclinic output if model run is barotropic
+!      if ( mode /= 2 ) then
+!
+!        vdims(1) = z_dimid
+!        z_varid = def_var_pnetcdf(ncid,'sigma',1,vdims,NF_FLOAT  &
+!                            ,'sigma of cell face','sigma_level'  &
+!                            ,-1,0.,' ',.false.)
+!        call check( nf90mpi_put_att( ncid, z_varid               &
+!                                   , 'standard_name'             &
+!                                   , 'ocean_sigma_coordinate' )  &
+!                  , 'nf_put_att: stdname @ z @ '//out_file )
+!        call check( nf90mpi_put_att( ncid, z_varid                  &
+!                                   , 'formula_terms'                &
+!                                   , 'sigma: z eta: elb depth: h' ) &
+!                  , 'nf_put_att: formterms @ z @ '//out_file )
+!
+!        zz_varid = def_var_pnetcdf(ncid,'zz',1,vdims,NF_FLOAT  &
+!                        ,'sigma of cell centre','sigma_level'  &
+!                        ,-1,0.,' ',.false.)
+!        call check( nf90mpi_put_att( ncid, zz_varid              &
+!                                   , 'standard_name'             &
+!                                   , 'ocean_sigma_coordinate' )  &
+!                  , 'nf_put_att: stdname @ zz @ '//out_file )
+!        call check( nf90mpi_put_att( ncid, zz_varid                  &
+!                                   , 'formula_terms'                 &
+!                                   , 'sigma: zz eta: elb depth: h' ) &
+!                  , 'nf_put_att: formterms @ zz @ '//out_file )
+!
+!      end if
+!
+!
+!      vdims(1) = x_dimid
+!      els_varid = def_var_pnetcdf(ncid,'els',1,vdims,NF_FLOAT  &
+!                                ,'South elevation BC','meter'  &
+!                                ,-1,0.,'east_e',.true.)
+!      eln_varid = def_var_pnetcdf(ncid,'eln',1,vdims,NF_FLOAT  &
+!                                ,'North elevation BC','meter'  &
+!                                ,-1,0.,'east_e',.true.)
+!      vdims(1) = y_dimid
+!      ele_varid = def_var_pnetcdf(ncid,'ele',1,vdims,NF_FLOAT  &
+!                                 ,'East elevation BC','meter'  &
+!                                 ,-1,0.,'north_e',.true.)
+!      elw_varid = def_var_pnetcdf(ncid,'elw',1,vdims,NF_FLOAT  &
+!                                 ,'West elevation BC','meter'  &
+!                                 ,-1,0.,'north_e',.true.)
+!
+!
+!      vdims(1) = x_dimid
+!      vdims(2) = y_dimid
+!      dx_varid = def_var_pnetcdf(ncid,'dx',2,vdims,NF_FLOAT  &
+!                             ,'grid increment in x','meter'  &
+!                             ,-1,0.,'east_e north_e',.true.)
+!      dy_varid = def_var_pnetcdf(ncid,'dy',2,vdims,NF_FLOAT  &
+!                             ,'grid increment in y','meter'  &
+!                             ,-1,0.,'east_e north_e',.true.)
+!! TODO: Make units of easting and northing flexible (degree/meter)
+!      east_u_varid = def_var_pnetcdf(ncid,'east_u',2,vdims,NF_FLOAT  &
+!                                    ,'easting of u-points','degree'  &
+!                                    ,-1,0.,'east_u north_u',.true.)
+!      east_v_varid = def_var_pnetcdf(ncid,'east_v',2,vdims,NF_FLOAT  &
+!                                    ,'easting of v-points','degree'  &
+!                                    ,-1,0.,'east_v north_v',.true.)
+!      east_e_varid = def_var_pnetcdf(ncid,'east_e',2,vdims,NF_FLOAT  &
+!                            ,'easting of elevation points','degree'  &
+!                            ,-1,0.,'east_e north_e',.true.)
+!      east_c_varid = def_var_pnetcdf(ncid,'east_c',2,vdims,NF_FLOAT  &
+!                                ,'easting of cell corners','degree'  &
+!                                ,-1,0.,'east_c north_c',.true.)
+!      north_u_varid= def_var_pnetcdf(ncid,'north_u',2,vdims,NF_FLOAT &
+!                                    ,'northing of u-points','degree' &
+!                                    ,-1,0.,'east_u north_u',.true.)
+!      north_v_varid= def_var_pnetcdf(ncid,'north_v',2,vdims,NF_FLOAT &
+!                                    ,'northing of v-points','degree' &
+!                                    ,-1,0.,'east_v north_v',.true.)
+!      north_e_varid= def_var_pnetcdf(ncid,'north_e',2,vdims,NF_FLOAT &
+!                            ,'northing of elevation points','degree' &
+!                            ,-1,0.,'east_e north_e',.true.)
+!      north_c_varid= def_var_pnetcdf(ncid,'north_c',2,vdims,NF_FLOAT &
+!                                ,'northing of cell corners','degree' &
+!                                ,-1,0.,'east_c north_c',.true.)
+!      rot_varid = def_var_pnetcdf(ncid,'rot',2,vdims,NF_FLOAT  &
+!               ,'Rotation angle of x-axis wrt. east','degree'  &
+!               ,-1,0.,'east_e north_e',.true.)
+!      h_varid = def_var_pnetcdf(ncid,'h',2,vdims,NF_FLOAT  &
+!                       ,'undisturbed water depth','metre'  &
+!                       ,-1,0.,'east_e north_e',.true.)
+!      fsm_varid = def_var_pnetcdf(ncid,'fsm',2,vdims,NF_FLOAT  &
+!                         ,'free surface mask','dimensionless'  &
+!                         ,-1,0.,'east_e north_e',.true.)
+!      dum_varid = def_var_pnetcdf(ncid,'dum',2,vdims,NF_FLOAT  &
+!                           ,'u-velocity mask','dimensionless'  &
+!                           ,-1,0.,'east_u north_u',.true.)
+!      dvm_varid = def_var_pnetcdf(ncid,'dvm',2,vdims,NF_FLOAT  &
+!                           ,'v-velocity mask','dimensionless'  &
+!                           ,-1,0.,'east_v north_v',.true.)
+!      frz_varid = def_var_pnetcdf(ncid,'frz',2,vdims,NF_FLOAT  &
+!                                ,'frz coeffi','dimensionless'  &
+!                                ,-1,0.,'east_v north_v',.true.)
+!      aamfrz_varid = def_var_pnetcdf(ncid,'aamfrz',2,vdims,NF_FLOAT  &
+!                             ,'aamfrz coefficients','dimensionless'  &
+!                             ,-1,0.,'east_v north_v',.true.)
+!
+!! If atmospheric forcing is enabled...
+!      if ( use_air ) then
+!        vdims(1) = x_dimid
+!        vdims(2) = y_dimid
+!        vdims(3) = time_dimid
+!        wusurf_varid=def_var_pnetcdf(ncid,'wusurf',3,vdims,NF_FLOAT  &
+!                                 ,'x-momentum flux','metre^2/sec^2'  &
+!                                 ,-1,0.,'east_u north_u',.true.)
+!        wvsurf_varid=def_var_pnetcdf(ncid,'wvsurf',3,vdims,NF_FLOAT  &
+!                                 ,'y-momentum flux','metre^2/sec^2'  &
+!                                 ,-1,0.,'east_v north_v',.true.)
+!        wtsurf_varid=def_var_pnetcdf(ncid,'wtsurf',3,vdims,NF_FLOAT  &
+!                                     ,'temperature flux','deg m/s'   &
+!                                     ,-1,0.,'east_e north_e',.true.)
+!        wssurf_varid=def_var_pnetcdf(ncid,'wssurf',3,vdims,NF_FLOAT  &
+!                                     ,'salinity flux','psu m/s'      &
+!                                     ,-1,0.,'east_e north_e',.true.)
+!      end if
+!
+!! Skip baroclinic output...
+!      if ( mode /= 2 ) then
+!
+!        vdims(1) = x_dimid
+!        vdims(2) = y_dimid
+!        vdims(3) = z_dimid
+!        vdims(4) = time_dimid
+!        t_varid = def_var_pnetcdf(ncid,'t',4,vdims,NF_FLOAT  &
+!                          ,'potential temperature','degC'    &
+!                          ,-1,0.,'east_e north_e zz',.true.)
+!        s_varid = def_var_pnetcdf(ncid,'s',4,vdims,NF_FLOAT  &
+!                          ,'salinity x rho / rhoref','PSS'   &
+!                          ,-1,0.,'east_e north_e zz',.true.)
+!        rho_varid = def_var_pnetcdf(ncid,'rho',4,vdims,NF_FLOAT  &
+!                       ,'(density-1000)/rhoref','dimensionless'  &
+!                       ,-1,0.,'east_e north_e zz',.true.)
+!        kh_varid = def_var_pnetcdf(ncid,'kh',4,vdims,NF_FLOAT  &
+!                         ,'vertical diffusivity','metre2/sec'  &
+!                         ,-1,0.,'east_e north_e zz',.true.)
+!        km_varid = def_var_pnetcdf(ncid,'km',4,vdims,NF_FLOAT  &
+!                           ,'vertical viscosity','metre2/sec'  &
+!                           ,-1,0.,'east_e north_e zz',.true.)
+!
+!      end if
+!
+!! end definitions
+!      call check( nf90mpi_enddef(ncid)                     &
+!                , 'nf_enddef: init file @ '//out_file )
+!
+!
+!! write data
+!      start(1) = 1
+!      edge(1) = 1
+!      out1z = real(time,4)
+!      call check( nfmpi_put_vara_real_all                  &
+!                  ( ncid,time_varid,start,edge,out1z )     &
+!                , 'nf_put_vara_real:time @ '//out_file )
+!
+!! Skip baroclinic output...
+!      if ( mode /= 2 ) then
+!        start(1) = 1
+!        edge(1) = kb
+!        out1z = real(z,4)
+!        call check( nfmpi_put_vara_real_all               &
+!                    ( ncid,z_varid,start,edge,out1z )      &
+!                  , 'nf_put_var_real: z @ '//out_file )
+!        out1z = real(zz,4)
+!        call check( nfmpi_put_vara_real_all                &
+!                    ( ncid,zz_varid,start,edge,out1z )      &
+!                  , 'nf_put_var_real: zz @ '//out_file )
+!      end if
+!
+!! East
+!      if ( n_east == -1 ) then
+!        start(1) = j_global(1)
+!        edge(1) = jm
+!        print *, "!!!", shape(el_bry%est), shape(out1y)
+!        out1y = real(el_bry%est(1,:),4)
+!        call check( nfmpi_put_vara_real_all              &
+!                    ( ncid,ele_varid,start,edge,out1y )  &
+!                  , 'nf_put_var_real: ele @ '//out_file )
+!      else
+!        start(1) = 1
+!        edge(1) = 0
+!        out1y = 0.
+!        call check( nfmpi_put_vara_real_all              &
+!                    ( ncid,ele_varid,start,edge,out1y )  &
+!                  , 'nf_put_var_real: ele (dummy) @ '//out_file )
+!      end if
+!! West
+!      if ( n_west == -1 ) then
+!        start(1) = j_global(1)
+!        edge(1) = jm
+!        out1y = real(el_bry%wst(1,:),4)
+!        call check( nfmpi_put_vara_real_all              &
+!                    ( ncid,elw_varid,start,edge,out1y )  &
+!                  , 'nf_put_var_real: elw @ '//out_file )
+!      else
+!        start(1) = 1
+!        edge(1) = 0
+!        out1y = 0.
+!        call check( nfmpi_put_vara_real_all              &
+!                    ( ncid,elw_varid,start,edge,out1y )  &
+!                  , 'nf_put_var_real: elw (dummy) @ '//out_file )
+!      end if
+!! South
+!      if ( n_south == -1 ) then
+!        start(1) = i_global(1)
+!        edge(1) = im
+!        out1x = real(el_bry%sth(:,1),4)
+!        call check( nfmpi_put_vara_real_all              &
+!                    ( ncid,els_varid,start,edge,out1x )  &
+!                  , 'nf_put_var_real: els @ '//out_file )
+!      else
+!        start(1) = 1
+!        edge(1) = 0
+!        out1x = 0.
+!        call check( nfmpi_put_vara_real_all              &
+!                    ( ncid,els_varid,start,edge,out1x )  &
+!                  , 'nf_put_var_real: els (dummy) @ '//out_file )
+!      end if
+!! North
+!      if ( n_north == -1 ) then
+!        start(1) = i_global(1)
+!        edge(1) = im
+!        out1x = real(el_bry%nth(:,1),4)
+!        call check( nfmpi_put_vara_real_all              &
+!                    ( ncid,eln_varid,start,edge,out1x )  &
+!                  , 'nf_put_var_real: eln @ '//out_file )
+!      else
+!        start(1) = 1
+!        edge(1) = 0
+!        out1x = 0.
+!        call check( nfmpi_put_vara_real_all              &
+!                    ( ncid,eln_varid,start,edge,out1x )  &
+!                  , 'nf_put_var_real: eln @ (dummy)'//out_file )
+!      end if
+!
+!
+!      start(1) = i_global(1)
+!      start(2) = j_global(1)
+!      edge(1) = im
+!      edge(2) = jm
+!      out2 = real(dx,4)
+!      call check( nfmpi_put_vara_real_all                &
+!                  ( ncid,dx_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: dx @ '//out_file )
+!      out2 = real(dy,4)
+!      call check( nfmpi_put_vara_real_all                &
+!                  ( ncid,dy_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: dy @ '//out_file )
+!      out2 = real(east_u,4)
+!      call check( nfmpi_put_vara_real_all                    &
+!                  ( ncid,east_u_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: east_u @ '//out_file )
+!      out2 = real(east_v,4)
+!      call check( nfmpi_put_vara_real_all                    &
+!                  ( ncid,east_v_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: east_v @ '//out_file )
+!      out2 = real(east_e,4)
+!      call check( nfmpi_put_vara_real_all                    &
+!                  ( ncid,east_e_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: east_e @ '//out_file )
+!      out2 = real(east_c,4)
+!      call check( nfmpi_put_vara_real_all                    &
+!                  ( ncid,east_c_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: east_c @ '//out_file )
+!      out2 = real(north_u,4)
+!      call check( nfmpi_put_vara_real_all                     &
+!                  ( ncid,north_u_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: north_u @ '//out_file )
+!      out2 = real(north_v,4)
+!      call check( nfmpi_put_vara_real_all                     &
+!                  ( ncid,north_v_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: north_v @ '//out_file )
+!      out2 = real(north_e,4)
+!      call check( nfmpi_put_vara_real_all                     &
+!                  ( ncid,north_e_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: north_e @ '//out_file )
+!      out2 = real(north_c,4)
+!      call check( nfmpi_put_vara_real_all                     &
+!                  ( ncid,north_c_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: north_c @ '//out_file )
+!      out2 = real(rot,4)
+!      call check( nfmpi_put_vara_real_all                 &
+!                  ( ncid,rot_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: rot @ '//out_file )
+!      out2 = real(h,4)
+!      call check( nfmpi_put_vara_real_all               &
+!                  ( ncid,h_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: h @ '//out_file )
+!      out2 = real(fsm,4)
+!      call check( nfmpi_put_vara_real_all                 &
+!                  ( ncid,fsm_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: fsm @ '//out_file )
+!      out2 = real(dum,4)
+!      call check( nfmpi_put_vara_real_all                 &
+!                  ( ncid,dum_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: dum @ '//out_file )
+!      out2 = real(dvm,4)
+!      call check( nfmpi_put_vara_real_all                 &
+!                  ( ncid,dvm_varid,start,edge,out2 )      &
+!                , 'nf_put_var_real: dvm @ '//out_file )
+!
+!      if ( USE_SPONGE ) then
+!        out2 = real(frz,4)
+!        call check( nfmpi_put_vara_real_all                 &
+!                    ( ncid,frz_varid,start,edge,out2 )      &
+!                  , 'nf_put_var_real: frz @ '//out_file )
+!        out2 = real(aamfrz,4)
+!        call check( nfmpi_put_vara_real_all                    &
+!                    ( ncid,aamfrz_varid,start,edge,out2 )      &
+!                  , 'nf_put_var_real: aamfrz @ '//out_file )
+!      end if
+!
+!! Write only if atmospheric forcing is enabled.
+!      if ( use_air ) then
+!
+!        start(1) = i_global(1)
+!        start(2) = j_global(1)
+!        start(3) = 1
+!        edge(1) = im
+!        edge(2) = jm
+!        edge(3) = 1
+!        out2 = real(wusurf,4)
+!        call check( nfmpi_put_vara_real_all                     &
+!                    ( ncid,wusurf_varid,start,edge,out2 )       &
+!                  , 'nf_put_vara_real: wusurf @ '//out_file )
+!        out2 = real(wvsurf,4)
+!        call check( nfmpi_put_vara_real_all                     &
+!                    ( ncid,wvsurf_varid,start,edge,out2 )       &
+!                  , 'nf_put_vara_real: wvsurf @ '//out_file )
+!        out2 = real(wtsurf,4)
+!        call check( nfmpi_put_vara_real_all                     &
+!                    ( ncid,wtsurf_varid,start,edge,out2 )       &
+!                  , 'nf_put_vara_real: wtsurf @ '//out_file )
+!        out2 = real(wssurf,4)
+!        call check( nfmpi_put_vara_real_all                     &
+!                    ( ncid,wssurf_varid,start,edge,out2 )       &
+!                  , 'nf_put_vara_real: wssurf @ '//out_file )
+!
+!      end if
+!
+!! Skip baroclinic output...
+!      if ( mode /= 2 ) then
+!
+!        start(1) = i_global(1)
+!        start(2) = j_global(1)
+!        start(3) = 1
+!        start(4) = 1
+!        edge(1) = im
+!        edge(2) = jm
+!        edge(3) = kb
+!        edge(4) = 1
+!        out3 = real(tb,4)
+!        call check( nfmpi_put_vara_real_all               &
+!                    ( ncid,t_varid,start,edge,out3 )      &
+!                  , 'nf_put_vara_real: t @ '//out_file )
+!        out3 = real(sb,4)
+!        call check( nfmpi_put_vara_real_all               &
+!                    ( ncid,s_varid,start,edge,out3 )      &
+!                  , 'nf_put_vara_real: s @ '//out_file )
+!        out3 = real(rho,4)
+!        call check( nfmpi_put_vara_real_all                 &
+!                    ( ncid,rho_varid,start,edge,out3 )      &
+!                  , 'nf_put_vara_real: rho @ '//out_file )
+!        out3 = real(kh,4)
+!        call check( nfmpi_put_vara_real_all                &
+!                    ( ncid,kh_varid,start,edge,out3 )      &
+!                  , 'nf_put_vara_real: kh @ '//out_file )
+!        out3 = real(km,4)
+!        call check( nfmpi_put_vara_real_all                &
+!                    ( ncid,km_varid,start,edge,out3 )      &
+!                  , 'nf_put_vara_real: km @ '//out_file )
+!
+!      end if
+!
+!! close file
+!      call check( nf90mpi_close(ncid)                   &
+!                , 'nf_close: output:  @ '//out_file )
+!
+!
+!    end ! subroutine write_output_init_pnetcdf
+!
+!______________________________________________________________________
+!
+      subroutine write_debug_pnetcdf( out_file )
+!----------------------------------------------------------------------
+!  Write initial state output file.
+!______________________________________________________________________
+!
+!      use air        , only: wssurf, wtsurf, wusurf, wvsurf
+      use air        , only: e_atmos
+      use bry        , only: el_bry, s_bry, t_bry, ua_bry, va_bry
+      use config     , only: mode, title, use_air
+      use glob_const , only: rk
+      use glob_domain
+      use glob_grid
+      use glob_misc
+      use glob_ocean
+      use io
+      use tide
+      use model_run  , only: time, time_start
+      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
+      use pnetcdf    , only: nf90mpi_close     , nf90mpi_create         &
+     &                     , nf90mpi_def_dim   , nf90mpi_enddef         &
+     &                     , nf90mpi_get_att   , nf90mpi_inq_varid      &
+     &                     , nf90mpi_open      , nf90mpi_put_att        &
+     &                     , nfmpi_put_vara_all                         &
+     &                     , nfmpi_put_vara_real_all                    &
+     &                     , NF_64BIT_OFFSET, NF_CLOBBER                &
+     &                     , NF_FLOAT       , NF_GLOBAL                 &
+     &                     , NF_NOERR       , NF_NOWRITE                &
+     &                     , NF_UNLIMITED   , NF_WRITE
+
+      implicit none
+
+      character(len=*), intent(in) :: out_file  ! Output filename
+
+      integer time_dimid, x_dimid, y_dimid, z_dimid, cons_dimid
+      integer  aam2d_varid,    aam_varid,  advua_varid, advva_varid     &
+     &      ,   advx_varid,   advy_varid,  adx2d_varid, ady2d_varid     &
+     &      ,  drhox_varid,  drhoy_varid,  drx2d_varid, dry2d_varid     &
+     &      ,e_atmos_varid,    egb_varid,    egf_varid,    el_varid     &
+     &      ,    elb_varid,    ele_varid,    eln_varid,   elf_varid     &
+     &      ,    els_varid,    elw_varid,     et_varid,   etb_varid     &
+     &      ,    etf_varid, fluxua_varid, fluxva_varid,    kh_varid     &
+     &      ,     km_varid,     kq_varid,      l_varid,    q2_varid     &
+     &      ,    q2b_varid,    q2l_varid,   q2lb_varid,   rho_varid     &
+     &      ,      s_varid,     sb_varid,      t_varid,  time_varid     &
+     &      ,     tb_varid,      u_varid,     ua_varid,   uab_varid     &
+     &      ,    uaf_varid,     ub_varid,     uf_varid,     v_varid     &
+     &      ,     va_varid,     vb_varid,    vab_varid,   vaf_varid     &
+     &      ,     vf_varid,      w_varid,     wr_varid,     z_varid     &
+     &      ,     zz_varid, el_amp_varid,   uabe_varid,  uabn_varid     &
+     &      ,   uabs_varid,   uabw_varid,   vabe_varid,  vabn_varid     &
+     &      ,   vabs_varid,   vabw_varid,    tbe_varid,   tbn_varid     &
+     &      ,    tbs_varid,    tbw_varid,    sbe_varid,   sbn_varid     &
+     &      ,    sbs_varid,    sbw_varid
+
+      integer, dimension(4)      :: vdims
+      integer(MPI_OFFSET_KIND)                                          &
+     &       , dimension(4)      :: start(4),edge(4)
+
+      integer ncid
+
+      real(kind=4), dimension(im      ) :: out1x
+      real(kind=4), dimension(   jm   ) :: out1y
+      real(kind=4), dimension(      kb) :: out1z
+      real(kind=4), dimension(im,jm   ) :: out2
+      real(kind=4), dimension(im,jm,kb) :: out3
+
+
+      out1x = 0.
+      out1y = 0.
+      out1z = 0.
+      out2 = 0.
+      out3 = 0.
+
+      call msg_print("", 6, "Writing debug `"//trim(out_file)//"`")
+
+      call check( nf90mpi_create                                        &
+     &              ( POM_COMM, trim(out_file)                          &
+     &              , NF_CLOBBER+NF_64BIT_OFFSET                        &
+     &              , MPI_INFO_NULL, ncid )                             &
+     &          , 'nf_create: '//out_file )
+
+! define global attributes
+      call check( nf90mpi_put_att                                       &
+     &            ( ncid, NF_GLOBAL, 'title', trim(title) )             &
+     &          , 'nf_put_att: title @ '//out_file )
+
+      call check( nf90mpi_put_att                                       &
+     &            ( ncid, NF_GLOBAL, 'description', 'Debug file' )      &
+     &          , 'nf_put_att: description @ '//out_file )
+
+! define dimensions
+      call check( nf90mpi_def_dim                                       &
+     &            ( ncid, 'time', int(NF_UNLIMITED,8), time_dimid )     &
+     &          , 'nf_def_dim: time @ '//out_file )
+      call check( nf90mpi_def_dim                                       &
+     &            ( ncid,  'nct', int(       ncons,8), cons_dimid )     &
+     &          , 'nf_def_dim: constituents @ '//out_file )
+      call check( nf90mpi_def_dim                                       &
+     &            ( ncid,    'z', int(          kb,8),    z_dimid )     &
+     &          , 'nf_def_dim: z @ '//out_file )
+      call check( nf90mpi_def_dim                                       &
+     &            ( ncid,    'y', int(   jm_global,8),    y_dimid )     &
+     &          , 'nf_def_dim: y @ '//out_file )
+      call check( nf90mpi_def_dim                                       &
+     &            ( ncid,    'x', int(   im_global,8),    x_dimid )     &
+     &          , 'nf_def_dim: x @ '//out_file )
+
+! define variables and their attributes
+      vdims(1) = time_dimid
+      time_varid = def_var_pnetcdf(ncid,'time',1,vdims,NF_FLOAT         &
+     &                        ,'time','days since '//time_start         &
+     &                        ,-1,0.,' ',.false.)
+
+      vdims(1) = z_dimid
+      z_varid = def_var_pnetcdf(ncid,'sigma',1,vdims,NF_FLOAT           &
+     &                    ,'sigma of cell face','sigma_level'           &
+     &                    ,-1,0.,' ',.false.)
+      call check( nf90mpi_put_att( ncid, z_varid                        &
+     &                           , 'standard_name'                      &
+     &                           , 'ocean_sigma_coordinate' )           &
+     &          , 'nf_put_att: stdname @ z @ '//out_file )
+      call check( nf90mpi_put_att( ncid, z_varid                        &
+     &                           , 'formula_terms'                      &
+     &                           , 'sigma: z eta: elb depth: h' )       &
+     &          , 'nf_put_att: formterms @ z @ '//out_file )
+
+      zz_varid = def_var_pnetcdf(ncid,'zz',1,vdims,NF_FLOAT             &
+     &                ,'sigma of cell centre','sigma_level'             &
+     &                ,-1,0.,' ',.false.)
+      call check( nf90mpi_put_att( ncid, zz_varid                       &
+     &                           , 'standard_name'                      &
+     &                           , 'ocean_sigma_coordinate' )           &
+     &          , 'nf_put_att: stdname @ zz @ '//out_file )
+      call check( nf90mpi_put_att( ncid, zz_varid                       &
+     &                           , 'formula_terms'                      &
+     &                           , 'sigma: zz eta: elb depth: h' )      &
+     &          , 'nf_put_att: formterms @ zz @ '//out_file )
+
+
+      vdims(1) = x_dimid
+      els_varid = def_var_pnetcdf(ncid,'els',1,vdims,NF_FLOAT           &
+     &                          ,'South elevation BC','meter'           &
+     &                          ,-1,0.,'east_e',.true.)
+      eln_varid = def_var_pnetcdf(ncid,'eln',1,vdims,NF_FLOAT           &
+     &                          ,'North elevation BC','meter'           &
+     &                          ,-1,0.,'east_e',.true.)
+      vdims(1) = y_dimid
+      ele_varid = def_var_pnetcdf(ncid,'ele',1,vdims,NF_FLOAT           &
+     &                           ,'East elevation BC','meter'           &
+     &                           ,-1,0.,'north_e',.true.)
+      elw_varid = def_var_pnetcdf(ncid,'elw',1,vdims,NF_FLOAT           &
+     &                           ,'West elevation BC','meter'           &
+     &                           ,-1,0.,'north_e',.true.)
+
+      vdims(1) = x_dimid
+      vdims(2) = z_dimid
+      uabs_varid = def_var_pnetcdf(ncid,'uabs',1,vdims,NF_FLOAT         &
+     &                            ,'South u-velocity BC','m/s'          &
+     &                            ,-1,0.,'east_u',.true.)
+      uabn_varid = def_var_pnetcdf(ncid,'uabn',1,vdims,NF_FLOAT         &
+     &                            ,'North u-velocity BC','m/s'          &
+     &                            ,-1,0.,'east_u',.true.)
+      vabs_varid = def_var_pnetcdf(ncid,'vabs',1,vdims,NF_FLOAT         &
+     &                            ,'South v-velocity BC','m/s'          &
+     &                            ,-1,0.,'east_v',.true.)
+      vabn_varid = def_var_pnetcdf(ncid,'vabn',1,vdims,NF_FLOAT         &
+     &                            ,'North v-velocity BC','m/s'          &
+     &                            ,-1,0.,'east_v',.true.)
+      sbs_varid = def_var_pnetcdf(ncid,'sbs',2,vdims,NF_FLOAT           &
+     &                           ,'South salinity BC','psu'             &
+     &                           ,-1,0.,'east_e',.true.)
+      sbn_varid = def_var_pnetcdf(ncid,'sbn',2,vdims,NF_FLOAT           &
+     &                           ,'North salinity BC','psu'             &
+     &                           ,-1,0.,'east_e',.true.)
+      tbs_varid = def_var_pnetcdf(ncid,'tbs',2,vdims,NF_FLOAT           &
+     &                          ,'South temperature BC','degC'          &
+     &                          ,-1,0.,'east_e',.true.)
+      tbn_varid = def_var_pnetcdf(ncid,'tbn',2,vdims,NF_FLOAT           &
+     &                          ,'North temperature BC','degC'          &
+     &                          ,-1,0.,'east_e',.true.)
+      vdims(1) = y_dimid
+      uabe_varid = def_var_pnetcdf(ncid,'uabe',1,vdims,NF_FLOAT         &
+     &                            ,'East u-velocity BC','m/s'           &
+     &                            ,-1,0.,'east_u',.true.)
+      uabw_varid = def_var_pnetcdf(ncid,'uabw',1,vdims,NF_FLOAT         &
+     &                            ,'West u-velocity BC','m/s'           &
+     &                            ,-1,0.,'east_u',.true.)
+      vabe_varid = def_var_pnetcdf(ncid,'vabe',1,vdims,NF_FLOAT         &
+     &                            ,'East v-velocity BC','m/s'           &
+     &                            ,-1,0.,'east_v',.true.)
+      vabw_varid = def_var_pnetcdf(ncid,'vabw',1,vdims,NF_FLOAT         &
+     &                            ,'West v-velocity BC','m/s'           &
+     &                            ,-1,0.,'east_v',.true.)
+      sbe_varid = def_var_pnetcdf(ncid,'sbe',2,vdims,NF_FLOAT           &
+     &                           ,'East salinity BC','psu'              &
+     &                           ,-1,0.,'east_e',.true.)
+      sbw_varid = def_var_pnetcdf(ncid,'sbw',2,vdims,NF_FLOAT           &
+     &                           ,'West salinity BC','psu'              &
+     &                           ,-1,0.,'east_e',.true.)
+      tbe_varid = def_var_pnetcdf(ncid,'tbe',2,vdims,NF_FLOAT           &
+     &                           ,'East temperature BC','degC'          &
+     &                           ,-1,0.,'east_e',.true.)
+      tbw_varid = def_var_pnetcdf(ncid,'tbw',2,vdims,NF_FLOAT           &
+     &                           ,'West temperature BC','degC'          &
+     &                           ,-1,0.,'east_e',.true.)
+
+      vdims(1) = x_dimid
+      vdims(2) = y_dimid
+      aam2d_varid = def_var_pnetcdf(ncid,'aam2d',2,vdims,NF_FLOAT       &
+     &                       ,'vertical average of aam',''              &
+     &                       ,-1,0.,'east_e north_e',.true.)
+      advua_varid = def_var_pnetcdf(ncid,'advua',2,vdims,NF_FLOAT       &
+     &             ,'sum of the 2nd, 3rd and 4th terms in eq (18)',''   &
+     &             ,-1,0.,'east_e north_e',.true.)
+      advva_varid = def_var_pnetcdf(ncid,'advva',2,vdims,NF_FLOAT       &
+     &             ,'sum of the 2nd, 3rd and 4th terms in eq (19)',''   &
+     &             ,-1,0.,'east_u north_u',.true.)
+      adx2d_varid = def_var_pnetcdf(ncid,'adx2d',2,vdims,NF_FLOAT       &
+     &                             ,'vertical integral of advx',''      &
+     &                             ,-1,0.,'east_v north_v',.true.)
+      ady2d_varid = def_var_pnetcdf(ncid,'ady2d',2,vdims,NF_FLOAT       &
+     &                             ,'vertical integral of advy',''      &
+     &                             ,-1,0.,'east_e north_e',.true.)
+      drx2d_varid = def_var_pnetcdf(ncid,'drx2d',2,vdims,NF_FLOAT       &
+     &                             ,'vertical integral of drhox',''     &
+     &                             ,-1,0.,'east_c north_c',.true.)
+      dry2d_varid = def_var_pnetcdf(ncid,'dry2d',2,vdims,NF_FLOAT       &
+     &                             ,'vertical integral of drhoy',''     &
+     &                             ,-1,0.,'east_u north_u',.true.)
+      e_atmos_varid = def_var_pnetcdf(ncid,'e_atmos',2,vdims,NF_FLOAT   &
+     &                               ,'atmospheric pressure',''         &
+     &                               ,-1,0.,'east_v north_v',.true.)
+      egb_varid = def_var_pnetcdf(ncid,'egb',2,vdims,NF_FLOAT           &
+     &   ,'surface elevation use for pressure gradient at time n-1',''  &
+     &   ,-1,0.,'east_e north_e',.true.)
+      egf_varid = def_var_pnetcdf(ncid,'egf',2,vdims,NF_FLOAT           &
+     &   ,'surface elevation use for pressure gradient at time n+1',''  &
+     &   ,-1,0.,'east_c north_c',.true.)
+      el_varid = def_var_pnetcdf(ncid,'el',2,vdims,NF_FLOAT             &
+     &   ,'surface elevation used in the external mode at time n',''    &
+     &   ,-1,0.,'east_e north_e',.true.)
+      elb_varid = def_var_pnetcdf(ncid,'elb',2,vdims,NF_FLOAT           &
+     &   ,'surface elevation used in the external mode at time n-1',''  &
+     &   ,-1,0.,'east_e north_e',.true.)
+      elf_varid = def_var_pnetcdf(ncid,'elf',2,vdims,NF_FLOAT           &
+     &   ,'surface elevation used in the external mode at time n+1',''  &
+     &   ,-1,0.,'east_e north_e',.true.)
+      et_varid = def_var_pnetcdf(ncid,'et',2,vdims,NF_FLOAT             &
+     &   ,'surface elevation used in the internal mode at time n',''    &
+     &   ,-1,0.,'east_u north_u',.true.)
+      etb_varid = def_var_pnetcdf(ncid,'etb',2,vdims,NF_FLOAT           &
+     &   ,'surface elevation used in the internal mode at time n-1',''  &
+     &   ,-1,0.,'east_v north_v',.true.)
+      etf_varid = def_var_pnetcdf(ncid,'etf',2,vdims,NF_FLOAT           &
+     &   ,'surface elevation used in the internal mode at time n+1',''  &
+     &   ,-1,0.,'east_v north_v',.true.)
+      fluxua_varid = def_var_pnetcdf(ncid,'fluxua',2,vdims,NF_FLOAT     &
+     &                       ,'fluxua','dimensionless'                  &
+     &                       ,-1,0.,'east_v north_v',.true.)
+      fluxva_varid = def_var_pnetcdf(ncid,'fluxva',2,vdims,NF_FLOAT     &
+     &                       ,'fluxva','dimensionless'                  &
+     &                       ,-1,0.,'east_v north_v',.true.)
+      ua_varid = def_var_pnetcdf(ncid,'ua',2,vdims,NF_FLOAT             &
+     &                          ,'vertical mean of u at time n',''      &
+     &                          ,-1,0.,'east_v north_v',.true.)
+      uab_varid = def_var_pnetcdf(ncid,'uab',2,vdims,NF_FLOAT           &
+     &                           ,'vertical mean of u at time n-1',''   &
+     &                           ,-1,0.,'east_v north_v',.true.)
+      uaf_varid = def_var_pnetcdf(ncid,'uaf',2,vdims,NF_FLOAT           &
+     &                           ,'vertical mean of u at time n+1',''   &
+     &                           ,-1,0.,'east_v north_v',.true.)
+      va_varid = def_var_pnetcdf(ncid,'va',2,vdims,NF_FLOAT             &
+     &                          ,'vertical mean of v at time n',''      &
+     &                          ,-1,0.,'east_v north_v',.true.)
+      vab_varid = def_var_pnetcdf(ncid,'vab',2,vdims,NF_FLOAT           &
+     &                           ,'vertical mean of v at time n-1',''   &
+     &                           ,-1,0.,'east_v north_v',.true.)
+      vaf_varid = def_var_pnetcdf(ncid,'vaf',2,vdims,NF_FLOAT           &
+     &                           ,'vertical mean of v at time n+1',''   &
+     &                           ,-1,0.,'east_v north_v',.true.)
+
+      vdims(1) = x_dimid
+      vdims(2) = y_dimid
+      vdims(3) = cons_dimid
+      el_amp_varid = def_var_pnetcdf(ncid,'el_amp',3,vdims,NF_FLOAT     &
+     &                           ,'elevation amplitude',''              &
+     &                           ,-1,0.,'east_e north_e nct',.true.)
+
+      vdims(1) = x_dimid
+      vdims(2) = y_dimid
+      vdims(3) = z_dimid
+      vdims(4) = time_dimid
+      aam_varid = def_var_pnetcdf(ncid,'aam',4,vdims,NF_FLOAT           &
+     &                    ,'horizontal kinematic viscosity',''          &
+     &                    ,-1,0.,'east_e north_e zz',.true.)
+      advx_varid = def_var_pnetcdf(ncid,'advx',4,vdims,NF_FLOAT         &
+     &            ,'x-horizontal advection and diffusion terms',''      &
+     &            ,-1,0.,'east_e north_e zz',.true.)
+      advy_varid = def_var_pnetcdf(ncid,'advy',4,vdims,NF_FLOAT         &
+     &            ,'y-horizontal advection and diffusion terms',''      &
+     &            ,-1,0.,'east_e north_e zz',.true.)
+      drhox_varid = def_var_pnetcdf(ncid,'drhox',4,vdims,NF_FLOAT       &
+     &         ,'x-component of the internal baroclinic pressure',''    &
+     &         ,-1,0.,'east_e north_e zz',.true.)
+      drhoy_varid = def_var_pnetcdf(ncid,'drhoy',4,vdims,NF_FLOAT       &
+     &         ,'y-component of the internal baroclinic pressure',''    &
+     &         ,-1,0.,'east_e north_e zz',.true.)
+      kq_varid = def_var_pnetcdf(ncid,'kq',4,vdims,NF_FLOAT             &
+     &          ,'vertical turbulent something',''                      &
+     &          ,-1,0.,'east_e north_e zz',.true.)
+      l_varid = def_var_pnetcdf(ncid,'l',4,vdims,NF_FLOAT               &
+     &          ,'turbulence length scale',''                           &
+     &          ,-1,0.,'east_e north_e zz',.true.)
+      q2b_varid = def_var_pnetcdf(ncid,'q2b',4,vdims,NF_FLOAT           &
+     &          ,'twice the turbulent kinetic energy at time n-1',''    &
+     &          ,-1,0.,'east_e north_e zz',.true.)
+      q2_varid = def_var_pnetcdf(ncid,'q2',4,vdims,NF_FLOAT             &
+     &          ,'twice the turbulent kinetic energy at time n',''      &
+     &          ,-1,0.,'east_e north_e zz',.true.)
+      q2lb_varid = def_var_pnetcdf(ncid,'q2lb',4,vdims,NF_FLOAT         &
+     &          ,'q2 x l at time n-1',''                                &
+     &          ,-1,0.,'east_e north_e zz',.true.)
+      q2l_varid = def_var_pnetcdf(ncid,'q2l',4,vdims,NF_FLOAT           &
+     &          ,'q2 x l at time n',''                                  &
+     &          ,-1,0.,'east_e north_e zz',.true.)
+      t_varid = def_var_pnetcdf(ncid,'t',4,vdims,NF_FLOAT               &
+     &                  ,'potential temperature','degC'                 &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+      tb_varid = def_var_pnetcdf(ncid,'tb',4,vdims,NF_FLOAT             &
+     &                  ,'potential temperature at n-1','degC'          &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+      s_varid = def_var_pnetcdf(ncid,'s',4,vdims,NF_FLOAT               &
+     &                  ,'salinity x rho / rhoref','PSS'                &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+      sb_varid = def_var_pnetcdf(ncid,'sb',4,vdims,NF_FLOAT             &
+     &                  ,'salinity x rho / rhoref at n-1','PSS'         &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+      rho_varid = def_var_pnetcdf(ncid,'rho',4,vdims,NF_FLOAT           &
+     &               ,'(density-1000)/rhoref','dimensionless'           &
+     &               ,-1,0.,'east_e north_e zz',.true.)
+      kh_varid = def_var_pnetcdf(ncid,'kh',4,vdims,NF_FLOAT             &
+     &                 ,'vertical diffusivity','metre2/sec'             &
+     &                 ,-1,0.,'east_e north_e zz',.true.)
+      km_varid = def_var_pnetcdf(ncid,'km',4,vdims,NF_FLOAT             &
+     &                   ,'vertical viscosity','metre2/sec'             &
+     &                   ,-1,0.,'east_e north_e zz',.true.)
+      u_varid = def_var_pnetcdf(ncid,'u',4,vdims,NF_FLOAT               &
+     &                  ,'horizontal velocity in x at time n',''        &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+      ub_varid = def_var_pnetcdf(ncid,'ub',4,vdims,NF_FLOAT             &
+     &                  ,'horizontal velocity in x at time n-1',''      &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+      uf_varid = def_var_pnetcdf(ncid,'uf',4,vdims,NF_FLOAT             &
+     &                  ,'horizontal velocity in x at time n-1',''      &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+      v_varid = def_var_pnetcdf(ncid,'v',4,vdims,NF_FLOAT               &
+     &                  ,'horizontal velocity in x at time n',''        &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+      vb_varid = def_var_pnetcdf(ncid,'vb',4,vdims,NF_FLOAT             &
+     &                  ,'horizontal velocity in x at time n-1',''      &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+      vf_varid = def_var_pnetcdf(ncid,'vf',4,vdims,NF_FLOAT             &
+     &                  ,'horizontal velocity in x at time n-1',''      &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+      w_varid = def_var_pnetcdf(ncid,'w',4,vdims,NF_FLOAT               &
+     &                  ,'sigma coordinate vertical velocity',''        &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+      wr_varid = def_var_pnetcdf(ncid,'wr',4,vdims,NF_FLOAT             &
+     &                  ,'real (z coordinate) vertical velocity',''     &
+     &                  ,-1,0.,'east_e north_e zz',.true.)
+
+! end definitions
+      call check( nf90mpi_enddef(ncid)                                  &
+     &          , 'nf_enddef: debug file @ '//out_file )
+
+
+! write data
+      start(1) = 1
+      edge(1) = 1
+      out1z = real(time,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,time_varid,start,edge,out1z )                  &
+     &          , 'nf_put_vara_real:time @ '//out_file )
+
+      start(1) = 1
+      edge(1) = kb
+      out1z = real(z,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,z_varid,start,edge,out1z )                     &
+     &          , 'nf_put_var_real: z @ '//out_file )
+      out1z = real(zz,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,zz_varid,start,edge,out1z )                    &
+     &          , 'nf_put_var_real: zz @ '//out_file )
+
+! East
+      if ( n_east == -1 ) then
+        start(1) = j_global(1)
+        edge(1) = jm
+        out1y = real(el_bry%est(1,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,ele_varid,start,edge,out1y )                 &
+     &            , 'nf_put_var_real: ele @ '//out_file )
+        out1y = real(ua_bry%est(1,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,uabe_varid,start,edge,out1y )                &
+     &            , 'nf_put_var_real: uabe @ '//out_file )
+        out1y = real(va_bry%est(1,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,vabe_varid,start,edge,out1y )                &
+     &            , 'nf_put_var_real: vabe @ '//out_file )
+        start(2) = 1
+        edge(2) = kb
+        out3(1,:,:) = real(s_bry%est(1,:,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,sbe_varid,start,edge,out3(1,:,:) )           &
+     &            , 'nf_put_var_real: sbe @ '//out_file )
+        out3(1,:,:) = real(t_bry%est(1,:,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,tbe_varid,start,edge,out3(1,:,:) )           &
+     &            , 'nf_put_var_real: tbe @ '//out_file )
+      else
+        start(1) = 1
+        edge(1) = 0
+        out1y = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,ele_varid,start,edge,out1y )                 &
+     &            , 'nf_put_var_real: ele (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,uabe_varid,start,edge,out1y )                &
+     &            , 'nf_put_var_real: uabe (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,vabe_varid,start,edge,out1y )                &
+     &            , 'nf_put_var_real: vabe (dummy) @ '//out_file )
+        start(2) = 1
+        edge(2) = 0
+        out3(1,:,:) = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,sbe_varid,start,edge,out3(1,:,:) )           &
+     &            , 'nf_put_var_real: sbe (dummy) @ '//out_file )
+        out3(1,:,:) = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,tbe_varid,start,edge,out3(1,:,:) )           &
+     &            , 'nf_put_var_real: tbe (dummy) @ '//out_file )
+      end if
+! West
+      if ( n_west == -1 ) then
+        start(1) = j_global(1)
+        edge(1) = jm
+        out1y = real(el_bry%wst(1,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,elw_varid,start,edge,out1y )                 &
+     &            , 'nf_put_var_real: elw @ '//out_file )
+        out1y = real(ua_bry%wst(1,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,uabw_varid,start,edge,out1y )                &
+     &            , 'nf_put_var_real: uabw @ '//out_file )
+        out1y = real(va_bry%wst(1,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,vabw_varid,start,edge,out1y )                &
+     &            , 'nf_put_var_real: vabw @ '//out_file )
+        start(2) = 1
+        edge(2) = kb
+        out3(1,:,:) = real(s_bry%wst(1,:,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,sbw_varid,start,edge,out3(1,:,:) )           &
+     &            , 'nf_put_var_real: sbw @ '//out_file )
+        out3(1,:,:) = real(t_bry%wst(1,:,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,tbw_varid,start,edge,out3(1,:,:) )           &
+     &            , 'nf_put_var_real: tbw @ '//out_file )
+      else
+        start(1) = 1
+        edge(1) = 0
+        out1y = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,elw_varid,start,edge,out1y )                 &
+     &            , 'nf_put_var_real: elw (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,uabw_varid,start,edge,out1y )                &
+     &            , 'nf_put_var_real: uabw (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,vabw_varid,start,edge,out1y )                &
+     &            , 'nf_put_var_real: vabw (dummy) @ '//out_file )
+        start(2) = 1
+        edge(2) = 0
+        out3(1,:,:) = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,sbw_varid,start,edge,out3(1,:,:) )           &
+     &            , 'nf_put_var_real: sbw (dummy) @ '//out_file )
+        out3(1,:,:) = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,tbw_varid,start,edge,out3(1,:,:) )           &
+     &            , 'nf_put_var_real: tbw (dummy) @ '//out_file )
+      end if
+! South
+      if ( n_south == -1 ) then
+        start(1) = i_global(1)
+        edge(1) = im
+        out1x = real(el_bry%sth(:,1),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,els_varid,start,edge,out1x )                 &
+     &            , 'nf_put_var_real: els @ '//out_file )
+        out1x = real(ua_bry%sth(:,1),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,uabs_varid,start,edge,out1x )                &
+     &            , 'nf_put_var_real: uabs @ '//out_file )
+        out1x = real(va_bry%sth(:,1),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,vabs_varid,start,edge,out1x )                &
+     &            , 'nf_put_var_real: vabs @ '//out_file )
+        start(2) = 1
+        edge(2) = kb
+        out3(:,1,:) = real(s_bry%sth(:,1,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,sbs_varid,start,edge,out3(:,1,:) )           &
+     &            , 'nf_put_var_real: sbs @ '//out_file )
+        out3(:,1,:) = real(t_bry%sth(:,1,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,tbs_varid,start,edge,out3(:,1,:) )           &
+     &            , 'nf_put_var_real: tbs @ '//out_file )
+      else
+        start(1) = 1
+        edge(1) = 0
+        out1x = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,els_varid,start,edge,out1x )                 &
+     &            , 'nf_put_var_real: els (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,uabs_varid,start,edge,out1x )                &
+     &            , 'nf_put_var_real: uabs (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,vabs_varid,start,edge,out1x )                &
+     &            , 'nf_put_var_real: vabs (dummy) @ '//out_file )
+        start(2) = 1
+        edge(2) = 0
+        out3(:,1,:) = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,sbs_varid,start,edge,out3(:,1,:) )           &
+     &            , 'nf_put_var_real: sbs (dummy) @ '//out_file )
+        out3(:,1,:) = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,tbs_varid,start,edge,out3(:,1,:) )           &
+     &            , 'nf_put_var_real: tbs (dummy) @ '//out_file )
+      end if
+! North
+      if ( n_north == -1 ) then
+        start(1) = i_global(1)
+        edge(1) = im
+        out1x = real(el_bry%nth(:,1),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,eln_varid,start,edge,out1x )                 &
+     &            , 'nf_put_var_real: eln @ '//out_file )
+        out1x = real(ua_bry%nth(:,1),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,uabn_varid,start,edge,out1x )                &
+     &            , 'nf_put_var_real: uabn @ '//out_file )
+        out1x = real(va_bry%nth(:,1),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,vabn_varid,start,edge,out1x )                &
+     &            , 'nf_put_var_real: vabn @ '//out_file )
+        start(2) = 1
+        edge(2) = kb
+        out3(:,1,:) = real(s_bry%nth(:,1,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,sbn_varid,start,edge,out3(:,1,:) )           &
+     &            , 'nf_put_var_real: sbn @ '//out_file )
+        out3(:,1,:) = real(t_bry%nth(:,1,:),4)
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,tbn_varid,start,edge,out3(:,1,:) )           &
+     &            , 'nf_put_var_real: tbn @ '//out_file )
+      else
+        start(1) = 1
+        edge(1) = 0
+        out1x = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,eln_varid,start,edge,out1x )                 &
+     &            , 'nf_put_var_real: eln @ (dummy)'//out_file )
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,uabn_varid,start,edge,out1x )                &
+     &            , 'nf_put_var_real: uabn (dummy) @ '//out_file )
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,vabn_varid,start,edge,out1x )                &
+     &            , 'nf_put_var_real: vabn (dummy) @ '//out_file )
+        start(2) = 1
+        edge(2) = 0
+        out3(:,1,:) = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,sbn_varid,start,edge,out3(:,1,:) )           &
+     &            , 'nf_put_var_real: sbn (dummy) @ '//out_file )
+        out3(:,1,:) = 0.
+        call check( nfmpi_put_vara_real_all                             &
+     &              ( ncid,tbn_varid,start,edge,out3(:,1,:) )           &
+     &            , 'nf_put_var_real: tbn (dummy) @ '//out_file )
+      end if
+
+      call exchange2d_mpi(aam2d,im,jm)
+      call exchange2d_mpi(advua,im,jm)
+      call exchange2d_mpi(advva,im,jm)
+      call exchange2d_mpi(adx2d,im,jm)
+      call exchange2d_mpi(ady2d,im,jm)
+      call exchange2d_mpi(drx2d,im,jm)
+      call exchange2d_mpi(dry2d,im,jm)
+      call exchange2d_mpi(e_atmos,im,jm)
+      call exchange2d_mpi(egb,im,jm)
+      call exchange2d_mpi(egf,im,jm)
+      call exchange2d_mpi(el,im,jm)
+      call exchange2d_mpi(elb,im,jm)
+      call exchange2d_mpi(elf,im,jm)
+      call exchange2d_mpi(et,im,jm)
+      call exchange2d_mpi(etb,im,jm)
+      call exchange2d_mpi(etb,im,jm)
+      call exchange2d_mpi(fluxua,im,jm)
+      call exchange2d_mpi(fluxva,im,jm)
+      call exchange2d_mpi(ua,im,jm)
+      call exchange2d_mpi(uab,im,jm)
+      call exchange2d_mpi(uaf,im,jm)
+      call exchange2d_mpi(va,im,jm)
+      call exchange2d_mpi(vab,im,jm)
+      call exchange2d_mpi(vaf,im,jm)
+
+      call exchange3d_mpi(aam,im,jm,kb)
+      call exchange3d_mpi(advx,im,jm,kb)
+      call exchange3d_mpi(advy,im,jm,kb)
+      call exchange3d_mpi(drhox,im,jm,kb)
+      call exchange3d_mpi(drhoy,im,jm,kb)
+      call exchange3d_mpi(kq,im,jm,kb)
+      call exchange3d_mpi(l,im,jm,kb)
+      call exchange3d_mpi(q2b,im,jm,kb)
+      call exchange3d_mpi(q2,im,jm,kb)
+      call exchange3d_mpi(q2l,im,jm,kb)
+      call exchange3d_mpi(q2lb,im,jm,kb)
+      call exchange3d_mpi(t,im,jm,kb)
+      call exchange3d_mpi(tb,im,jm,kb)
+      call exchange3d_mpi(s,im,jm,kb)
+      call exchange3d_mpi(sb,im,jm,kb)
+      call exchange3d_mpi(rho,im,jm,kb)
+      call exchange3d_mpi(kh,im,jm,kb)
+      call exchange3d_mpi(km,im,jm,kb)
+      call exchange3d_mpi(u,im,jm,kb)
+      call exchange3d_mpi(ub,im,jm,kb)
+      call exchange3d_mpi(uf,im,jm,kb)
+      call exchange3d_mpi(v,im,jm,kb)
+      call exchange3d_mpi(vb,im,jm,kb)
+      call exchange3d_mpi(vf,im,jm,kb)
+      call exchange3d_mpi(w,im,jm,kb)
+      call exchange3d_mpi(wr,im,jm,kb)
+
+      call exchange3d_mpi(el_amp,im,jm,ncons)
+
+      start(1) = i_global(1)
+      start(2) = j_global(1)
+      edge(1) = im
+      edge(2) = jm
+      out2 = real(aam2d,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,aam2d_varid,start,edge,out2 )                  &
+     &          , 'nf_put_var_real: aam2d @ '//out_file )
+      out2 = real(advua,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,advua_varid,start,edge,out2 )                  &
+     &          , 'nf_put_var_real: advua @ '//out_file )
+      out2 = real(advva,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,advva_varid,start,edge,out2 )                  &
+     &          , 'nf_put_var_real: advva @ '//out_file )
+      out2 = real(adx2d,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,adx2d_varid,start,edge,out2 )                  &
+     &          , 'nf_put_var_real: adx2d @ '//out_file )
+      out2 = real(ady2d,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,ady2d_varid,start,edge,out2 )                  &
+     &          , 'nf_put_var_real: ady2d @ '//out_file )
+      out2 = real(drx2d,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,drx2d_varid,start,edge,out2 )                  &
+     &          , 'nf_put_var_real: drx2d @ '//out_file )
+      out2 = real(dry2d,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,dry2d_varid,start,edge,out2 )                  &
+     &          , 'nf_put_var_real: dry2d @ '//out_file )
+      out2 = real(e_atmos,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,e_atmos_varid,start,edge,out2 )                &
+     &          , 'nf_put_var_real: e_atmos @ '//out_file )
+      out2 = real(egb,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,egb_varid,start,edge,out2 )                    &
+     &          , 'nf_put_var_real: egb @ '//out_file )
+      out2 = real(egf,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,egf_varid,start,edge,out2 )                    &
+     &          , 'nf_put_var_real: egf @ '//out_file )
+      out2 = real(el,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,el_varid,start,edge,out2 )                     &
+     &          , 'nf_put_var_real: el @ '//out_file )
+      out2 = real(elb,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,elb_varid,start,edge,out2 )                    &
+     &          , 'nf_put_var_real: elb @ '//out_file )
+      out2 = real(elf,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,elf_varid,start,edge,out2 )                    &
+     &          , 'nf_put_var_real: elf @ '//out_file )
+      out2 = real(et,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,et_varid,start,edge,out2 )                     &
+     &          , 'nf_put_var_real: et @ '//out_file )
+      out2 = real(etb,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,etb_varid,start,edge,out2 )                    &
+     &          , 'nf_put_var_real: etb @ '//out_file )
+      out2 = real(etf,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,etf_varid,start,edge,out2 )                    &
+     &          , 'nf_put_var_real: etf @ '//out_file )
+      out2 = real(fluxua,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,fluxua_varid,start,edge,out2 )                 &
+     &          , 'nf_put_var_real: fluxua @ '//out_file )
+      out2 = real(fluxva,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,fluxva_varid,start,edge,out2 )                 &
+     &          , 'nf_put_var_real: fluxva @ '//out_file )
+      out2 = real(ua,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,ua_varid,start,edge,out2 )                     &
+     &          , 'nf_put_var_real: ua @ '//out_file )
+      out2 = real(uab,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,uab_varid,start,edge,out2 )                    &
+     &          , 'nf_put_var_real: uab @ '//out_file )
+      out2 = real(uaf,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,uaf_varid,start,edge,out2 )                    &
+     &          , 'nf_put_var_real: uaf @ '//out_file )
+      out2 = real(va,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,va_varid,start,edge,out2 )                     &
+     &          , 'nf_put_var_real: va @ '//out_file )
+      out2 = real(vab,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,vab_varid,start,edge,out2 )                    &
+     &          , 'nf_put_var_real: vab @ '//out_file )
+      out2 = real(vaf,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,vaf_varid,start,edge,out2 )                    &
+     &          , 'nf_put_var_real: vaf @ '//out_file )
+
+      start(1) = i_global(1)
+      start(2) = j_global(1)
+      start(3) = 1
+      start(4) = 1
+      edge(1) = im
+      edge(2) = jm
+      edge(3) = ncons
+      edge(4) = 1
+      out3 = real(el_amp,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,el_amp_varid,start,edge,out3 )                 &
+     &          , 'nf_put_var_real: el_amp @ '//out_file )
+
+      start(1) = i_global(1)
+      start(2) = j_global(1)
+      start(3) = 1
+      start(4) = 1
+      edge(1) = im
+      edge(2) = jm
+      edge(3) = kb
+      edge(4) = 1
+      out3 = real(aam,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,aam_varid,start,edge,out3 )                    &
+     &          , 'nf_put_vara_real: aam @ '//out_file )
+      out3 = real(advx,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,advx_varid,start,edge,out3 )                   &
+     &          , 'nf_put_vara_real: advx @ '//out_file )
+      out3 = real(advy,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,advy_varid,start,edge,out3 )                   &
+     &          , 'nf_put_vara_real: advy @ '//out_file )
+      out3 = real(drhox,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,drhox_varid,start,edge,out3 )                  &
+     &          , 'nf_put_vara_real: drhox @ '//out_file )
+      out3 = real(drhoy,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,drhoy_varid,start,edge,out3 )                  &
+     &          , 'nf_put_vara_real: drhoy @ '//out_file )
+      out3 = real(kq,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,kq_varid,start,edge,out3 )                     &
+     &          , 'nf_put_vara_real: kq @ '//out_file )
+      out3 = real(l,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,l_varid,start,edge,out3 )                      &
+     &          , 'nf_put_vara_real: l @ '//out_file )
+      out3 = real(q2b,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,q2b_varid,start,edge,out3 )                    &
+     &          , 'nf_put_vara_real: q2b @ '//out_file )
+      out3 = real(q2,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,q2_varid,start,edge,out3 )                     &
+     &          , 'nf_put_vara_real: q2 @ '//out_file )
+      out3 = real(q2lb,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,q2lb_varid,start,edge,out3 )                   &
+     &          , 'nf_put_vara_real: q2lb @ '//out_file )
+      out3 = real(q2l,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,q2l_varid,start,edge,out3 )                    &
+     &          , 'nf_put_vara_real: q2l @ '//out_file )
+      out3 = real(t,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,t_varid,start,edge,out3 )                      &
+     &          , 'nf_put_vara_real: t @ '//out_file )
+      out3 = real(tb,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,tb_varid,start,edge,out3 )                     &
+     &          , 'nf_put_vara_real: tb @ '//out_file )
+      out3 = real(s,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,s_varid,start,edge,out3 )                      &
+     &          , 'nf_put_vara_real: s @ '//out_file )
+      out3 = real(sb,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,sb_varid,start,edge,out3 )                     &
+     &          , 'nf_put_vara_real: sb @ '//out_file )
+      out3 = real(rho,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,rho_varid,start,edge,out3 )                    &
+     &          , 'nf_put_vara_real: rho @ '//out_file )
+      out3 = real(kh,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,kh_varid,start,edge,out3 )                     &
+     &          , 'nf_put_vara_real: kh @ '//out_file )
+      out3 = real(km,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,km_varid,start,edge,out3 )                     &
+     &          , 'nf_put_vara_real: km @ '//out_file )
+      out3 = real(ub,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,ub_varid,start,edge,out3 )                     &
+     &          , 'nf_put_vara_real: ub @ '//out_file )
+      out3 = real(u,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,u_varid,start,edge,out3 )                      &
+     &          , 'nf_put_vara_real: u @ '//out_file )
+      out3 = real(uf,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,uf_varid,start,edge,out3 )                     &
+     &          , 'nf_put_vara_real: uf @ '//out_file )
+      out3 = real(vb,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,vb_varid,start,edge,out3 )                     &
+     &          , 'nf_put_vara_real: vb @ '//out_file )
+      out3 = real(v,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,v_varid,start,edge,out3 )                      &
+     &          , 'nf_put_vara_real: v @ '//out_file )
+      out3 = real(vf,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,vf_varid,start,edge,out3 )                     &
+     &          , 'nf_put_vara_real: vf @ '//out_file )
+      out3 = real(w,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,w_varid,start,edge,out3 )                      &
+     &          , 'nf_put_vara_real: w @ '//out_file )
+      out3 = real(wr,4)
+      call check( nfmpi_put_vara_real_all                               &
+     &            ( ncid,wr_varid,start,edge,out3 )                     &
+     &          , 'nf_put_vara_real: wr @ '//out_file )
+
+! close file
+      call check( nf90mpi_close(ncid)                                   &
+     &          , 'nf_close: output:  @ '//out_file )
+
+
+      end ! subroutine write_debug_pnetcdf

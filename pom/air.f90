@@ -20,8 +20,7 @@ module air
 ! Constants
 !----------------------------------------------------------------------
   real(rk), parameter ::     & !
-    CH     =     .66e-3      &  ! Sensible heat transfet coefficient (for stable case)
-  , Cp     = 1004.8          &  ! Specific heat capacity of air
+    Cp     = 1005.           &  ! Specific heat capacity of air
   , emiss  =     .97         &  ! Ocean emissivity
   , expsi  =     .622        &  ! ???
   , Ps     = 1013.           &  ! Surface air pressure
@@ -71,12 +70,10 @@ module air
   , TAPER_BRY      & ! Apply tapering along boundaries
                      ! Treat surface forcing differently:
   , USE_BULK       & !  heat flux is estimated using bulk formulas
-  , USE_CALENDAR   & !  lookup for forcing file's record using model date (otherwise reading starts from the first record)
   , USE_COARE      & !  use COARE algorithm for bulk formulations
-  , USE_DQDSST     & !  use heat flux sensitivity to restore temperature
   , USE_FLUXES       !  momentum flux is read directly from files
 
-  integer*1        &
+  integer(1)       &
     LWRAD_FORMULA    ! Bulk formula to estimate longwave radiation
 
 !----------------------------------------------------------------------
@@ -135,7 +132,7 @@ module air
 ! Private variables
 !----------------------------------------------------------------------
   real(kind=rk)              &
-       , private             &
+!       , private             &
        , allocatable         &
        , dimension(:,:,:) :: &
     cloud                    & ! Total cloud cover [fraction 0..1]
@@ -191,8 +188,8 @@ module air
       , INTERP_PRES, INTERP_RAIN , INTERP_SST   , INTERP_STRESS  &
       , INTERP_TAIR, INTERP_WIND , READ_BULK    , READ_HEAT      &
       , READ_STRESS, READ_WIND   , TAPER_BRY    , USE_BULK       &
-      , USE_COARE  , USE_DQDSST  , USE_FLUXES   , LWRAD_FORMULA  &
-      , bulk_path  , flux_path   , wind_path    , read_int
+      , USE_COARE  , USE_FLUXES  , LWRAD_FORMULA, bulk_path      &
+      , flux_path  , wind_path   , read_int
 
       namelist/air_vars_nml/                           &
         dlrad_name, lheat_name,  lrad_name, rain_name  &
@@ -215,16 +212,14 @@ module air
 ! Initialize variables with their defaults
       read_int = 3600 * 6 ! 86400 / 4 (4xDaily)
 
-      CALC_SWR     = .true.
-      READ_HEAT    = .false.
-      READ_STRESS  = .false.
-      READ_WIND    = .false.
-      TAPER_BRY    = .false.
-      USE_BULK     = .false.
-      USE_COARE    = .false.
-      USE_FLUXES   = .false.
-      USE_DQDSST   = .true.
-      USE_CALENDAR = .true.
+      CALC_SWR   = .true.
+      READ_HEAT  = .false.
+      READ_STRESS= .false.
+      READ_WIND  = .false.
+      TAPER_BRY  = .false.
+      USE_BULK   = .false.
+      USE_COARE  = .false.
+      USE_FLUXES = .false.
 
       bulk_path = "in/surf/"
       flux_path = "in/surf/"
@@ -335,16 +330,15 @@ module air
 !______________________________________________________________________
 !
 !      use config     , only: calc_wind
-      use glob_domain, only: im, jm, n_south
-      use glob_grid  , only: fsm
+      use glob_domain, only: im, jm!, n_south
 
       implicit none
 
-      integer*1 N ! Interpolation array extension size
-                  ! The structure is following:
-                  !   var at n   step: var(:,:,1)
-                  !   var at n-1 step: var(:,:,2)
-                  !   var at n+1 step: var(:,:,3)
+      integer(1) N ! Interpolation array extension size
+                   ! The structure is following:
+                   !   var at n   step: var(:,:,1)
+                   !   var at n-1 step: var(:,:,2)
+                   !   var at n+1 step: var(:,:,3)
 
 
 ! Allocate core arrays
@@ -375,21 +369,26 @@ module air
       wusurf     = 0.
       wvsurf     = 0.
 
+! Allocate mandatory wind arrays
+      N = 1
+      if ( interp_wind ) N = 3
+      allocate(         &
+        uwnd(im,jm,N)   &
+      , vwnd(im,jm,N)   &
+       )
+      uwnd = 0.
+      vwnd = 0.
+
+      if ( interp_tair ) then
+        allocate( temp(im,jm,3) )
+      else
+        allocate( temp(im,jm,1) )
+      end if
+
 ! Quit if the module is not used.
       if ( DISABLED ) return
 
 ! Allocate optional arrays
-      if ( read_wind ) then
-        N = 1
-        if ( interp_wind ) N = 3
-        allocate(         &
-          uwnd(im,jm,N)   &
-        , vwnd(im,jm,N)   &
-         )
-        uwnd = 0.
-        vwnd = 0.
-      end if
-
       if ( read_stress ) then
         N = 1
         if ( interp_stress ) N = 3
@@ -426,11 +425,6 @@ module air
         else
           allocate( rain(im,jm,1) )
         end if
-        if ( interp_tair ) then
-          allocate( temp(im,jm,3) )
-        else
-          allocate( temp(im,jm,1) )
-        end if
       end if
 
       if ( read_heat ) then
@@ -463,9 +457,9 @@ module air
 !
 !      use glob_domain, only: is_master
       use module_time
-      use glob_grid  , only: fsm
-      use config     , only: nbct
-      use seaice     , only: icec, itsurf
+      use config     , only: nbct, spinup
+      use seaice     , only: icec!, itsurf
+      use glob_ocean , only: s, ssurf, t, tsurf
 
       implicit none
 
@@ -475,6 +469,10 @@ module air
       integer, dimension(3)  :: record, year
       real(rk)                  a, chunk
 
+
+! Initialize mandatory arrays
+      tsurf = t(:,:,1)
+      ssurf = s(:,:,1)
 
 ! Quit if the module is not used.
       if ( DISABLED ) return
@@ -500,24 +498,17 @@ module air
       end if
       record(3) = record(2) + 1
 
-      if ( USE_CALENDAR ) then
-
-        if ( record(2) == 0 ) then
-          record(2) = max_in_prev ! TODO: [ NEEDS TESTING ]
-          year(2) = d_in%year - 1
-        elseif ( record(3) == max_in_this ) then
-          record(3) = 1
-          year(3) = d_in%year + 1
-        end if
-
-      else
-
-        record(3) = record(3) - record(1) + 1
-        record(1) = 1
-
+      if ( record(2) == 0 ) then
+        record(2) = max_in_prev ! TODO: [ NEEDS TESTING ]
+        year(2) = d_in%year - 1
+      elseif ( record(3) == max_in_this ) then
+        record(3) = 1
+        year(3) = d_in%year + 1
       end if
 
-      record(2) = record(1) + 1
+      record(1) = record(1) + 1
+
+      if ( spinup ) record = 1
 
 ! Read wind if momentum flux is derived from wind
       call read_all( .true., 1, year, record )
@@ -570,21 +561,19 @@ module air
       wtsurf = wtsurf*(1.-icec)! + itsurf*icec
       wssurf = wssurf*(1.-icec)
 
-      if (.true.) call river_flux
-
-      if ( READ_WIND ) then
-
-! TODO: Are these surface arrays even needed?
-        uwsrf = uwnd(:,:,1)
-        vwsrf = vwnd(:,:,1)
-
-! Calculate wind stress
-        call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
-!        call calculate_fluxes
-
+      if ( spinup ) then
+        swrad  = 0.
+        wssurf = 0.
+        wtsurf = 0.
       end if
 
       if ( TAPER_BRY ) call taper_forcing
+
+      print *, "Wind speed:  ", min( minval(uwnd), minval(vwnd) )  &
+                              , max( maxval(uwnd), maxval(vwnd) )
+
+      print *, "Wind stress: ", min( minval(wusurf), minval(wvsurf) )  &
+                              , max( maxval(wusurf), maxval(wvsurf) )
 
       call msg_print("AIR INITIALIZED", 2, "")
 
@@ -606,13 +595,12 @@ module air
 !            wind_to_stress        [air]
 !______________________________________________________________________
 !
-      use glob_domain, only: is_master
+!      use glob_domain, only: is_master
       use clim       , only: relax_surface
-      use glob_grid  , only: fsm
       use config     , only: nbct
       use module_time
-      use model_run  , only: dti, iint, sec_of_year
-      use seaice     , only: icec, itsurf
+      use model_run  , only: dti, sec_of_year
+      use seaice     , only: icec!, itsurf
 
       implicit none
 
@@ -755,7 +743,6 @@ module air
 
       if ( TAPER_BRY ) call taper_forcing
 
-      if ( .true. ) call river_flux
 ! Relax to climatology
 
       call relax_surface( wssurf, wtsurf )
@@ -794,9 +781,9 @@ module air
 !______________________________________________________________________
 !
       use glob_const , only: rhow => rhoref
-      use glob_domain, only: im, jm
+      use glob_domain, only: im, jm, kb, my_task, i_global,j_global
       use glob_ocean , only: t, u, v
-      use seaice     , only: icec
+!      use seaice     , only: icec, tau_iw_u, tau_iw_v
 
       implicit none
 
@@ -826,7 +813,7 @@ module air
               elseif ( uvabs <=  19. ) then
                 cda = .00049  + uvabs* .000065
               elseif ( uvabs <= 100. ) then
-                cda = .001364 + uvabs*(.0000234 - uvabs*2.31579e-7)
+                cda = .001364 + uvabs*.0000234 - uvabs*uvabs*2.31579e-7
               else
                 cda = .00138821
               end if
@@ -842,8 +829,12 @@ module air
 
           end select
 
-          ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-u(i,j,1)) *(1.-icec(i,j))
-          vstr(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j)-v(i,j,1)) *(1.-icec(i,j))
+          ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-u(i,j,1))! *(1.-icec(i,j)) - icec(i,j)*tau_iw_u(i,j)/rhow
+          vstr(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j)-v(i,j,1))! *(1.-icec(i,j)) - icec(i,j)*tau_iw_v(i,j)/rhow
+!          ustr(i,j) = -tau_iw_u(i,j)/rhow
+!          vstr(i,j) = -tau_iw_v(i,j)/rhow
+!          u(i,j,kb) = tau_iw_u(i,j)/rhow
+!          v(i,j,kb) = tau_iw_v(i,j)/rhow
 
         end do
       end do
@@ -971,7 +962,7 @@ module air
 !______________________________________________________________________
 !
       use glob_const , only: C2K, DEG2RAD, rhoref, Rho_Cpw, rk
-      use glob_domain, only: im, jm     , my_task
+      use glob_domain, only: im, jm!, my_task
       use glob_grid  , only: east_e, fsm, north_e
       use glob_ocean , only: rho, s, t, u, v
       use config     , only: tbias, sbias
@@ -1126,9 +1117,10 @@ module air
 ! Reed, R.K.,1977: On estimating insolation over the ocean, J.Phys.
 ! Oceanogr. 17, 854-871.
 
-              call sol_rad( sol_net, cld, east_e(i,j), north_e(i,j)  &
-                          , dtime%year, dtime%month, dtime%day       &
-                          , dtime%hour, dtime%min )
+              sol_net = sol_rad( dtime%year, dtime%month, dtime%day  &
+                               , dtime%hour, dtime%min               &
+                               , DEG2RAD*east_e(i,j)                 &
+                               , DEG2RAD*north_e(i,j), cld )
 
 ! --- 1. Divide net solar radiation flux by rho*Cpw and reverse sign
               swrad(i,j) = -sol_net/rho_cpw
@@ -1301,15 +1293,6 @@ module air
             wtsurf(i,j) = wtsurf(i,j)*fsm(i,j)
             wssurf(i,j) = pme(i,j)*(s(i,j,1)+sbias)*fsm(i,j) ! sb? vf?
 
-            if ( USE_DQDSST ) then
-              wtsurf(i,j) = wtsurf(i,j)                                 &
-                          + ( 4.*tnowk**3 * (sstk-tnowk)                &
-                            + rhom*ch2*SP*Cp                            &
-                            + rhom*ce2*SP*heat_latent(sst_model)*2353.  &
-                             *log(10.)*humnow/tnowk**2                  &
-                            ) * (sst_model-sst(i,j,1))
-            end if
-
           end if
 
         end do
@@ -1367,85 +1350,728 @@ module air
 !
 !______________________________________________________________________
 !
-    subroutine river_flux
+    real(rk) function qsat26sea(T,P)
+!----------------------------------------------------------------------
+!  Computes surface saturation specific humidity [g/kg]
+! given T [degC] and P [mb]
+!______________________________________________________________________
+!
+      implicit none
 
-      use glob_domain, only: im, jm, i_global, j_global
-      use glob_grid  , only: art
-      use glob_ocean , only: tsurf
-      use model_run  , only: dtime
+      real(rk), intent(in) :: T, P
+      real(rk) ex, es
+
+
+      ex = bucksat(T,P)
+      es = .98 * ex ! reduction at sea surface
+      qsat26sea = 622.*es/( P - 0.378*es )
+
+
+    end !function qsat26sea
+!
+!______________________________________________________________________
+!
+    pure real(rk) function bucksat(T,P)
+!----------------------------------------------------------------------
+! computes saturation vapor pressure [mb]
+! given T [degC] and P [mb]
+!______________________________________________________________________
+!
+      implicit none
+
+      real(rk), intent(in) :: T, P
+
+
+      bucksat = 6.1121*exp(17.502*T/(T+240.97))*(1.0007+3.46e-6*P)
+
+
+    end ! function bucksat
+!
+!______________________________________________________________________
+!
+    real(rk) function grv(lat)
+!----------------------------------------------------------------------
+! computes g [m/sec^2] given lat in deg
+!______________________________________________________________________
+!
+      use glob_const, only: DEG2RAD
 
       implicit none
 
-      real(rk), parameter, dimension(12) :: tumen_dis = (/ 30.2463253  &
-                                                         , 44.2542105  &
-                                                         ,105.8621385  &
-                                                         ,156.2726807  &
-                                                         ,357.9148493  &
-                                                         ,526.118025   &
-                                                         ,584.7622891  &
-                                                         ,988.0466263  &
-                                                         ,593.8361866  &
-                                                         ,277.2579819  &
-                                                         ,125.0181446  &
-                                                         , 50.4105421  &
-                                                        /)             &
-! Below is amur discharge estimated from precipitation
-!                                          , amur_dis  = (/  1982.  &
-!                                                         ,  1324.  &
-!                                                         ,  1058.  &
-!                                                         ,  3231.  &
-!                                                         , 14094.  &
-!                                                         , 15948.  &
-!                                                         , 15553.  &
-!                                                         , 19291.  &
-!                                                         , 20813.  &
-!                                                         , 16596.  &
-!                                                         ,  6162.  &
-!                                                         ,  2441.  &
-!                                                        /)
-! Below is Amur discharge estimated from Mozherovsky
-                                          , amur_dis  = (/  2480.  &
-                                                         ,  1900.  &
-                                                         ,  1620.  &
-                                                         ,  3130.  &
-                                                         , 15580.  &
-                                                         , 17370.  &
-                                                         , 15890.  &
-                                                         , 18970.  &
-                                                         , 22350.  &
-                                                         , 17900.  &
-                                                         ,  6850.  &
-                                                         ,  2750.  &
-                                                        /)
-!      integer, parameter :: tumen_i = 7, tumen_j = 108
-      integer, parameter :: tumen_i = 5, tumen_j = 59 ! jes403
-!      integer, parameter :: amur_i = 31, amur_j  = 233 ! jes403
-      integer, parameter :: amur_i = 36, amur_j  = 389 ! tat001
-      integer i,j
+      real(rk), intent(in) :: lat
+
+      real(rk), parameter  ::  &
+        gamma = 9.7803267715   &
+      , c1    =  .0052790414   &
+      , c2    =  .0000232718   &
+      , c3    =  .0000001262   &
+      , c4    =  .0000000007
+      real(rk) phi, x, x2, x3, x4
 
 
-!      if (     i_global(1) <= tumen_i .and. i_global(im) >= tumen_i  &
-!         .and. j_global(1) <= tumen_j .and. j_global(jm) >= tumen_j ) then
-!         i = tumen_i - i_global(1) + 1
-!         j = tumen_j - j_global(1) + 1
-!         vfluxf(i,j) = -tumen_dis( dtime%month ) / art(i,j)
-!         tsurf(i,j) = max(temp(i,j,1),0.)
-!!         wtsurf(i,j) = vfluxf(i,j)*max(temp(i,j,1),0.)
-!         print *, "Tumen discharge: ", vfluxf(i,j), wtsurf(i,j),temp(i,j,1)
-!      end if
+      phi = lat*DEG2RAD
+      x   = sin(phi)**2
+      x2  = x*x
+      x3  = x*x2
+      x4  = x*x3
+      grv = gamma*( 1 + x*c1 + x2*c2 + x3*c3 + x4*c4 )
 
-      if (     i_global(1) <= amur_i .and. i_global(im) >= amur_i  &
-         .and. j_global(1) <= amur_j .and. j_global(jm) >= amur_j ) then
-         i = amur_i - i_global(1) + 1
-         j = amur_j - j_global(1) + 1
-         vfluxf(i,j) = -amur_dis( dtime%month ) / art(i,j)
-         tsurf(i,j) = max(temp(i,j,1),0.)
-!         wtsurf(i,j) = vfluxf(i,j)*max(temp(i,j,1),0.)
-         print *, "Amur discharge: ", vfluxf(i,j), wtsurf(i,j),temp(i,j,1)
+
+    end ! function grv
+!
+!______________________________________________________________________
+!
+    real(rk) function psiu_40(zet)
+!----------------------------------------------------------------------
+! computes velocity structure function
+!______________________________________________________________________
+!
+      implicit none
+
+      real(rk), intent(in) :: zet
+
+      real(rk), parameter :: a = 1.     &
+                           , b = 3./4.  &
+                           , c = 5.     &
+                           , d =  .35
+      real(rk) dzet, f, psik, psic, x
+
+
+      dzet = min( 50._rk, .35_rk*zet )  ! stable
+      psiu_40 = -(a*zet+b*(zet-c/d)*exp(-dzet)+b*c/d)
+      if ( zet < 0. ) then                  ! unstable
+        x = ( 1.-18.*zet)**.25
+        psik = 2. *log((1.+x     )/2.) + log((1.+x*x)/2.)  &
+                                 - 2.*atan(x)+2.*atan(1.)
+        x = ( 1.-10.*zet)**0.3333
+        psic = 1.5*log((1.+x+x**2)/3.) - sqrt(3.)*                &
+                                        atan((1.+2.*x)/sqrt(3.))  &
+                                       + 4.*atan(1.)/sqrt(3.)
+        f = zet**2 / ( 1+zet**2 )
+        psiu_40 = (1-f)*psik + f*psic
       end if
 
 
-    end ! subroutine
+    end !function psiu_40
+!
+!______________________________________________________________________
+!
+    real(rk) function psit_26(zet)
+!----------------------------------------------------------------------
+! computes temperature structure function
+!______________________________________________________________________
+!
+      implicit none
+
+      real(rk), intent(in) :: zet
+
+      real(rk) dzet, f, psik, psic, x
+
+
+      dzet = min( 50._rk, .35_rk*zet )      ! stable
+      if ( zet < 0. ) then                  ! unstable
+        x = (1.-15.  *zet)**0.5
+        psik = 2. *log((1+x     )/2.)
+        x = (1.-34.15*zet)**0.3333
+        psic = 1.5*log((1+x+x**2)/3.) - sqrt(3.)*                &
+                                       atan((1.+2.*x)/sqrt(3.))  &
+                                      + 4.*atan(1.)/sqrt(3.)
+        f = zet**2/(1.+zet**2)
+        psit_26 = (1-f)*psik + f*psic
+      else
+        psit_26 = -( (1+0.6667*zet)**1.5                 &
+              + 0.6667*(zet-14.28)*exp(-dzet) + 8.525 )
+      end if
+
+
+    end ! function psit_26
+!
+!______________________________________________________________________
+!
+    real(rk) function psiu_26(zet)
+!----------------------------------------------------------------------
+! computes velocity structure function
+!______________________________________________________________________
+!
+      implicit none
+
+      real(rk), intent(in) :: zet
+
+      real(rk), parameter :: a =  .7    &
+                           , b = 3./4.  &
+                           , c = 5.     &
+                           , d =  .35
+      real(rk) dzet, f, psik, psic, x
+
+
+      dzet = min( 50._rk, .35_rk*zet )       ! stable
+      if ( zet < 0. ) then                   ! unstable
+        x = (1.-15.  *zet)**0.25
+        psik = 2. *log((1.+x     )/2.) + log((1.+x*x)/2.)  &
+                                 - 2.*atan(x)+2.*atan(1.)
+        x = (1.-10.15*zet)**0.3333
+        psic = 1.5*log((1.+x+x**2)/3.) - sqrt(3.)*                &
+                                        atan((1.+2.*x)/sqrt(3.))  &
+                                       + 4.*atan(1.)/sqrt(3.)
+        f = zet**2 / ( 1+zet**2 )
+        psiu_26 = (1.-f)*psik + f*psic
+      else
+        psiu_26 =-(a*zet+b*(zet-c/d)*exp(-dzet)+b*c/d)
+      end if
+
+
+    end !function psiu_26
+!
+!______________________________________________________________________
+!
+    real(rk) function RHcalc(T,P,Q)
+!----------------------------------------------------------------------
+!  Computes relative humidity given T,P, & Q.
+!______________________________________________________________________
+!
+      implicit none
+
+      real(rk), intent(in) :: T, P, Q
+
+      real(rk) es, em
+
+
+      es = 6.1121*exp(17.502*T/(T+240.97))*(1.0007+3.46e-6*P)
+      em = Q*P/(0.378*Q+0.622)
+      RHcalc = 100.*em/es
+
+
+    end ! function RHcalc
+!
+!______________________________________________________________________
+!
+    subroutine qsat26air(T,P,rh,q,em)
+!----------------------------------------------------------------------
+!  Computes surface saturation specific humidity [g/kg]
+! given T [degC] and P [mb]
+!______________________________________________________________________
+!
+      implicit none
+
+      real(rk), intent(in   ) :: T, P, rh
+      real(rk), intent(  out) :: q, em
+
+      real(rk) es
+
+
+      es = bucksat(T,P)
+      em = .01 * rh * es
+      q  = 622.*es/( P - 0.378*es )
+
+
+    end ! function qsat26sea
+!
+!______________________________________________________________________
+!
+    real(rk) function sol_rad( iyr,imt,idy,ihr,ime, alat,alon, acl )
+!----------------------------------------------------------------------
+!  Computes net shortwave radiation [W/m^2] at sea surface.
+!______________________________________________________________________
+!
+      use glob_const, only: DEG2RAD, RAD2DEG
+
+      implicit none
+
+      real(rk), intent(in)  :: alat, alon, acl
+      integer , intent(in)  :: iyr, imt, idy, ihr, ime
+
+      integer imt1, iyr1, intT1, intT2, jab
+      real(rk)                               &
+        albedo, alpha, bb1, bb2              &
+      , capC, capG, capL, cosZen, DEC, dZen  &
+      , eclips, epsiln, g360, gha, gha360    &
+      , SHA, SMLT, SolAlt, SunBet, SunDec    &
+      , ThSun, TRM111, TRM112, TRM11, UT     &
+      , qatten, qdiff, qdir, qtot, qzer      &
+      , xl360, XLCT, zen
+!
+! ---   alat,alon - (lat, lon)  in radians !!
+!
+      real(rk), parameter ::  &
+        aozone =     .09      &
+      , solar  = 1350.        &
+      , tau    =     .7       &
+      , yrdays =  365.
+
+      real(rk), parameter, dimension(20) ::  &
+        alb1 = [ .719, .656, .603, .480      &
+               , .385, .300, .250, .193      &
+               , .164, .131, .103, .084      &
+               , .071, .061, .054, .039      &
+               , .036, .032, .031, .030 ]
+
+! --- albedo monthly values from Payne (1972) as means of the values
+! --- at 40N and 30N for the Atlantic Ocean ( hence the same latitudinal
+! --- band of the Mediterranean Sea ) :
+      real(rk), parameter, dimension(12) ::      &
+        alpham = [ .09, .08, .06, .06, .06, .06  &
+                 , .06, .06, .06, .07, .09, .10 ]
+
+      real(rk), parameter, dimension(19) ::             &
+        dza = [  2.,  2.,  2.,  2.,  2.,  2.,  2.,  2.  &
+              ,  4.,  4.,  4.,  4.,  4.,  4.            &
+              , 10., 10., 10., 10., 10.                ]
+
+      real(rk), parameter, dimension(20) ::  &
+        za = [ 90., 88., 86., 84., 82.       &
+             , 80., 78., 76., 74., 70.       &
+             , 66., 62., 58., 54., 50.       &
+             , 40., 30., 20., 10.,  0. ]
+
+
+! Prepare variables
+      eclips = 23.439*DEG2RAD
+!
+!--------------------- calculations start -----------------------------
+!
+! --- sun hour angle :
+!
+      XLCT = ( 1.*ihr ) + ( 1.*ime / 60. )
+      UT   = XLCT
+
+      if ( imt > 2 ) then
+        iyr1 = iyr
+        imt1 = imt-3
+      else
+        iyr1 = iyr-1
+        imt1 = imt+9
+      end if
+
+      intT1 = int(  30.6 * imt1      + 0.5 )
+      intT2 = int( 365.25*(iyr1-1976)      )
+      SMLT  = ( (UT/24.) + idy + intT1 + intT2 - 8707.5) / 36525.
+      epsiln=  23.4393 -     0.013*SMLT
+      capG  = 357.528  + 35999.050*SMLT
+
+      if ( capG > 360. ) then
+        g360 = capG - int( capG/360. )*360.
+      else
+        g360 = capG
+      end if
+
+      capC = 1.915*sin( g360*DEG2RAD ) + .020*sin( 2.*g360*DEG2RAD )
+      capL = 280.46 + 36000.770*SMLT + capC
+
+      if ( capL > 360. ) then
+        xl360 = capL - int( capL/360. ) *360.
+      else
+        xl360 = capL
+      end if
+
+      alpha = xl360 - 2.466*sin( 2.*xl360*DEG2RAD )  &
+                    +  .053*sin( 4.*xl360*DEG2RAD )
+      gha = 15.*UT - 180.- capC + xl360 - alpha
+
+      if ( gha > 360. ) then
+        gha360 = gha - int( gha/360. )*360.
+      else
+        gha360 = gha
+      end if
+
+      DEC = atan( tan( epsiln*DEG2RAD ) * sin( alpha*DEG2RAD ) )/DEG2RAD
+
+!     Calculate Solar Hour Angle
+      ThSun = ( GHA360 + alon*RAD2DEG )*DEG2RAD
+      SHA = GHA360 + ( alon*RAD2DEG )
+
+
+! --- sun declination :
+      SUNDEC = DEC * DEG2RAD
+
+      TRM111 = sin( alat ) * sin( SUNDEC )
+      TRM112 =-cos( alat ) * cos( SUNDEC )
+      TRM11  = TRM111 - TRM112
+
+! --- solar noon altitude in degrees :
+      SolAlt = asin( TRM11 ) / DEG2RAD
+      SunBet = SolAlt
+
+!
+! --- cosine of the solar zenith angle :
+!
+      coszen = sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(ThSun)
+!
+      if ( coszen <= 1.d-4 ) then
+        coszen = 0.
+        qatten = 0.
+      else
+        qatten = tau**(1./coszen)
+      end if
+      qzer  = coszen * solar
+      qdir  = qzer * qatten
+      qdiff = ((1.-aozone)*qzer - qdir) * .5
+      qtot  =  qdir + qdiff
+!
+! --- ( radiation as from Reed(1977), Simpson and Paulson(1979) )
+!
+!
+!-----------------------------------------------------------------------
+! --- calculates the albedo as a function of the solar zenith angle :
+! --- ( after Payne jas 1972 )
+!-----------------------------------------------------------------------
+!
+! --- solar zenith angle in degrees :
+!
+      zen = RAD2DEG*acos(coszen)
+!
+      if ( zen >= 74. ) then
+        jab = int( .5 *(90.-zen) +  1. )
+      elseif ( zen >= 50. ) then
+        jab = int( .23*(74.-zen) +  9. )
+      else
+        jab = int( .10*(50.-zen) + 15. )
+      end if
+!
+      dzen = ( za(jab) - zen ) / dza(jab)
+!
+      albedo=alb1(jab)+dzen*(alb1(jab+1)-alb1(jab))
+!
+! --- calculates SHORT WAVE FLUX ( watt/m*m )
+! --- ( Rosati,Miyakoda 1988 ; eq. 3.8 )
+!
+!
+      bb1=0.62      ! Reed
+      bb2=0.636     ! Isemer et al. (1989)
+!
+      sol_rad = qtot*(1. - bb1*acl + 0.0019*sunbet)*(1. - albedo)
+      if ( sol_rad > qtot ) sol_rad = qtot
+
+
+    end ! funtion sol_rad
+!
+!______________________________________________________________________
+!
+    subroutine coare35vn(  u, zu, t, zt, rh, zq, P, ts, Rs, Rl, lat  &
+                        , zi, rain, cp, sigH, hsb, hlb, Evap )
+!----------------------------------------------------------------------
+! Input:
+!
+!     u = relative wind speed (m/s) at height zu(m)
+!     t = bulk air temperature (degC) at height zt(m)
+!    rh = relative humidity (%) at height zq(m)
+!     P = surface air pressure (mb) (default = 1015)
+!    ts = water temperature (degC) see jcool below
+!    Rs = downward shortwave radiation (W/m^2) (default = 150)
+!    Rl = downward longwave radiation (W/m^2) (default = 370)
+!   lat = latitude (default = +45 N)
+!    zi = PBL height (m) (default = 600m)
+!  rain = rain rate (mm/hr)
+!    cp = phase speed of dominant waves (m/s)
+!  sigH =  significant wave height (m)
+!
+!
+! Reference:
+!
+!  Fairall, C.W., E.F. Bradley, J.E. Hare, A.A. Grachev, and J.B. Edson (2003),
+!  Bulk parameterization of air sea fluxes: updates and verification for the
+!  COARE algorithm, J. Climate, 16, 571-590.
+!______________________________________________________________________
+!
+      implicit none
+
+      integer(1), parameter :: jcool = 0
+
+      real(rk), intent(in) ::  u,zu, t,zt, rh,zq, P, ts      &
+                            , Rs,Rl, lat, zi, rain, cp,sigH
+      real(rk) A, a1, a2, ad, Al, alfac, alq                      &
+             , B, Bd, be, Bf, Beta, bigc                          &
+             , CC, Cd, Cd10, cdhf, Cdn_10, Ce, Cen_10, Ch, Ch10   &
+             , charn, charnC, charnS, charnW, Chn_10, cpa, cpv    &
+             , cpw, cqhf, Ct, Ct10, cthf                          &
+             , dels, dq, dqer, dqs_dt, dt, dter, dtmp, dwat       &
+             , Evap, fdg, gf, grav                                &
+             , hbb, hlb, hlwebb, hsb, hsbb                        &
+             , L, L10, lapse, Le                                  &
+             , psi, psi10, psi10T, psirf, psirfQ, psirfT, psiT    &
+             , Pv, Q, Q10, Q10N, Q10N2, qcol, QN, QN2, qout       &
+             , Qrf, QrfN, QrfN2, Qs, qsr                          &
+             , RF, Rgas, RH10, rhoa, RHrf, rhodry, rhow           &
+             , Ribcu, Ribu, Rnl, Rns, rr, S, S10, SSQ, SST        &
+             , T10, T10N, T10N2, ta, tau, tcw, tdk, tkt, TN, TN2  &
+             , Trf, TrfN, TrfN2, tsr, tssr, tvsr                  &
+             , u10, u10N, U10N2, ug, umax, UN, UN2, Urf, UrfN     &
+             , UrfN2, usr, ut, visa, visw, von, wbar, wetc        &
+             , xlamx, zet, zetu, zo, zo10, zoq, zoS, zot, zot10   &
+             , zref, zrf_q, zrf_t, zrf_u
+      integer(1) nits, i
+
+      logical waveage, seastate
+
+
+      waveage  = .false.
+      seastate = .false.
+
+      L = 1.  ! compiler warning bypass
+
+! convert rh to specific humidity (the functions below return g/kg)
+      Qs = qsat26sea(ts,P)/1000.          ! surface water specific humidity [kg/kg]
+      call qsat26air(t,P,rh, Q, Pv)       ! specific humidity of air [kg/kg]
+      Q = Q/1000.
+
+!-----------  set constants ----------------------------------------------
+      zref = 10.
+      Beta =  1.2                         ! Given as 1.25 in Fairall et al.(1996)
+      von  =   .4                         ! Von Karman's "number"
+      fdg  = 1.                           ! Turbulent Prandtl number
+      tdk  = 273.16
+      grav = grv(lat)
+
+!-----------  air constants ----------------------------------------------
+      Rgas   = 287.1                      ! Gas const. dry air [J/kg/K]
+      Le     = ( 2.501 - .00237*ts )*1.e6 ! Latent Heat of vaporization [J/kg]
+      cpa    = 1004.67                    ! Specific heat of dry air [J/kg/K] (Businger 1982)
+      cpv    = cpa*( 1. + 0.84*Q )        ! Moist air - currently not used (Businger 1982)
+      rhoa   =  P    *100./( Rgas*(t+tdk) * (1.+0.61*Q) ) ! Moist air density [kg/m^3]
+      rhodry = (P-Pv)*100./( Rgas*(t+tdk)              )
+      visa   = 1.326e-5*( 1.+t*(6.542e-3+t*(8.301e-6-4.84e-9*t)) ) !  Kinematic viscosity of dry air [m2/s], Andreas (1989).
+
+!-----------  cool skin constants  ---------------------------------------
+      Al   = 2.1e-5*( ts+3.2 )**0.79      ! Water thermal expansion coef.
+      be   =  .026                        ! Salinity expansion coef.
+      cpw  = 4000.                        ! Specific heat of water [J/kg/K]
+      rhow = 1025.                        ! Seawater density
+      visw = 1.e-6                        ! Kinematic viscosity of water [m^2/s]
+      tcw  =  .6                          ! Thermal conductivity of water [W/m/K]
+      bigc = 16.*grav*cpw*(rhow*visw)**3 / (tcw**2 * rhoa**2)
+      wetc =  .622*Le*Qs / ( Rgas*(ts+tdk)**2 ) !correction for dq;slope of sat. vap.
+
+!-----------  net radiation fluxes ---------------------------------------
+      Rns =  .945 * Rs                    ! albedo correction
+      Rnl =  .97*( 5.67e-8*( ts-.3*jcool+tdk )**4 - Rl) ! initial value
+
+!----------------  begin bulk loop --------------------------------------------
+
+!-----------  first guess ------------------------------------------------
+!        du = u-us                          ! u is already relative to surface speed
+      dt = ts-t-.0098*zt
+      dq = Qs-Q
+      ta = t+tdk
+      ug = 0.5
+      dter  = 0.3
+      dqer  = 0.
+      ut    = sqrt( u**2 + ug**2 )
+      u10   = ut * log(10./1.e-4) / log(zu/1.e-4)
+      usr   = 0.035 * u10
+      zo10  = 0.011*usr**2/grav + 0.11*visa/usr
+      Cd10  = ( von / log(10./zo10) )**2
+      Ch10  = 0.00115
+      Ct10  = Ch10 / sqrt(Cd10)
+      zot10 = 10. / exp(von/Ct10)
+      Cd    = ( von / log(zu/zo10) )**2
+      Ct    =   von / log(zt/zot10)
+      CC    =   von * Ct/Cd
+      Ribcu = -250.*zu/(zi*Beta**3) ! 1./.004 = 250. I just like multiplication better
+      Ribu  = -grav*zu/ta*( (dt-dter*jcool)+.61*ta*dq )/ut**2
+      if ( Ribu < 0. ) then
+        zetu = CC*Ribu/( 1. + Ribu/Ribcu )
+      else
+        zetu = CC*Ribu*( 1. + 3.*Ribu/CC )
+      end if
+      L10 = zu/zetu                         ! Monin-Obukhov length
+      gf  = ut/u
+      usr = ut*von / ( log(zu/zo10) - psiu_40(zu/L10) )
+      tsr = -(dt-     dter*jcool)*von*fdg                          &
+                                 /(log(zt/zot10)-psit_26(zt/L10))
+      qsr = -(dq-wetc*dter*jcool)*von*fdg                          &
+                                 /(log(zq/zot10)-psit_26(zq/L10))
+      tkt = 0.001
+
+!----------------------------------------------------------
+!  The following gives the new formulation for the
+!  Charnock variable
+!----------------------------------------------------------
+
+      charnC = 0.011
+      umax   = 22.     ! 19.
+      a1     =   .0016 !   .0017
+      a2     =-  .0035 !-  .0050
+
+      charnC = a1*u10 + a2
+      if ( u10 > umax ) charnC = a1*umax+a2
+      if ( charnC < 0.011 ) charnC = 0.011
+
+      A = 0.114   ! wave-age dependent coefficients
+      B = 0.622
+
+      Ad= 0.091   ! Sea-state/wave-age dependent coefficients
+      Bd= 2.0
+
+      charnW = A*(usr/cp)**B
+      zoS    = sigH*Ad*(usr/cp)**Bd
+      charnS = zoS*grav/usr/usr
+
+      charn = 0.011 !*ones(N,1);
+      if ( ut > 18. ) then
+        charn = .018
+      elseif ( ut > 10. ) then
+        charn = 0.011 + (ut-10.)/(18.-10.)*(0.018-0.011)
+      end if
+!        charnC = charn ! Fix?
+
+      nits = 10   ! number of iterations
+
+      if ( zetu > 50. ) nits = 1
+!--------------  bulk loop --------------------------------------------------
+
+      do i = 1, nits
+
+        zet = von*grav*zu/ta*(tsr+.61*ta*qsr)/(usr**2)
+!          zet = von*grav*zu*(tsr*(1.+.61*Q))
+        if (waveage) then
+          if (seastate) then
+            charn = charnS
+          else
+            charn = charnW
+          end if
+        else
+          charn = charnC
+        end if
+        L  = zu/zet
+        zo = charn*usr**2/grav + .11*visa/usr  ! surface roughness
+!          if (zo<1.d-10) zo = 1.d-10
+        rr = zo*usr/visa
+        zoq= min( 1.6e-4_rk, 5.8e-5_rk/rr**.72_rk) ! These thermal roughness lengths give Stanton and
+        zot= zoq                                   ! Dalton numbers that closely approximate COARE 3.0
+        cdhf = von    /(log(zu/zo) - psiu_26(zu/L))
+        cqhf = von*fdg/(log(zq/zoq)- psit_26(zq/L))
+        cthf = von*fdg/(log(zt/zot)- psit_26(zt/L))
+        usr  = ut*cdhf
+        qsr  =-(dq-wetc*dter*jcool)*cqhf
+        tsr  =-(dt-dter*jcool)*cthf
+        tvsr = tsr+0.61*ta*qsr
+        tssr = tsr+0.51*ta*qsr
+        Bf   =-grav/ta*usr*tvsr
+        ug   = 0.2
+        if ( Bf > 0. ) ug = Beta*(Bf*zi)**.333
+        ut = sqrt(u**2 + ug**2)
+        gf = ut/u
+        hsb=-rhoa*cpa*usr*tsr
+        hlb=-rhoa*Le*usr*qsr
+        qout = Rnl+hsb+hlb
+        dels = Rns*(0.065+11.*tkt-6.6e-5/tkt*(1.-exp(-tkt/8.0e-4))) ! 1./0.0008 = 1250.
+        qcol = qout-dels
+        alq  = Al*qcol + be*hlb*cpw/Le
+        if ( alq > 0. ) then
+          xlamx = 6./(1.+(bigc*alq/usr**4)**0.75)**0.333
+          tkt   = xlamx*visw/(sqrt(rhoa/rhow)*usr)
+        else
+          xlamx= 6.
+          tkt = min(0.01_rk, xlamx*visw/(sqrt(rhoa/rhow)*usr))
+        end if
+        dter = qcol*tkt/tcw
+        dqer = wetc*dter
+        Rnl  = 0.97*(5.67e-8*(ts-dter*jcool+tdk)**4-Rl) ! update dter
+        u10N = usr/von/gf*log(10./zo)
+        charnC = a1*u10N+a2
+        if ( u10N > umax ) charnC = a1*umax+a2
+        charnW = A*(usr/cp)**B
+        zoS = sigH*Ad*(usr/cp)**Bd - .11*visa/usr
+        charnS = zoS*grav/usr/usr
+        if ( charnC < 0.011 ) charnC = 0.011
+
+      end do
+
+!----------------  compute fluxes  --------------------------------------------
+      tau = rhoa*usr*usr/gf       ! wind stress [N/m^2]
+      hsb =-rhoa*cpa*usr*tsr      ! sensible heat flux [W/m^2]
+      hlb =-rhoa*Le*usr*qsr       ! latent heat flux [W/m^2]
+      hbb =-rhoa*cpa*usr*tvsr     ! buoyancy flux
+      hsbb=-rhoa*cpa*usr*tssr     ! sonic heat flux
+      wbar=1.61*hlb/Le/(1.+1.61*Q)/rhoa + hsb/rhoa/cpa/ta
+      hlwebb = hlb + rhoa*wbar*Q*Le
+      Evap   = hlwebb/Le          ! evaporation rate [kg/m^2/s]
+!        hlb = hlb + hlwebb ! ?????? Webb correction to latent heat flux already in ef via zoq/rr function so return hlwebb
+
+!-----  compute transfer coeffs relative to ut @ meas. ht  --------------------
+      Cd = tau/rhoa/ut/max(.1_rk,u)
+      Ch =-usr*tsr/ut/(dt-dter*jcool)
+      Ce =-usr*qsr/ut/(dq-dqer*jcool)
+
+!---  compute 10-m neutral coeff relative to ut (output if needed) ------------
+      Cdn_10 = 1000.*von**2     / log(10./zo)**2
+      Chn_10 = 1000.*von**2*fdg / log(10./zo)/log(10./zot)
+      Cen_10 = 1000.*von**2*fdg / log(10./zo)/log(10./zoq)
+
+!---  compute 10-m neutral coeff relative to ut (output if needed) ------------
+!  Find the stability functions
+!---------------------------------
+      zrf_u = 10.             ! User defined reference heights
+      zrf_t = 10.
+      zrf_q = 10.
+      psi   = psiu_26(zu/L)
+      psi10 = psiu_26(10./L)
+      psirf = psiu_26(zrf_u/L)
+      psiT  = psit_26(zt/L)
+      psi10T= psit_26(10./L)
+      psirfT= psit_26(zrf_t/L)
+      psirfQ= psit_26(zrf_q/L)
+      gf    = ut/u
+
+!---------------------------------------------------------
+!  Determine the wind speeds relative to ocean surface
+!  Note that usr is the friction velocity that includes
+!  gustiness usr = sqrt(Cd) S, which is equation (18) in
+!  Fairall et al. (1996)
+!---------------------------------------------------------
+      S = ut
+      S10 = S + usr/von*(log(10./zu)-psi10+psi)
+      U10 = S10/gf
+! or U10 = U + usr/von/gf*(log(10./zu)-psi10+psi)
+      Urf  = U   + usr/von/gf*(log(zrf_u/zu)-psirf+psi)
+      UN   = U   + psi*usr/von/gf
+      U10N = U10 + psi10*usr/von/gf
+      UrfN = Urf + psirf*usr/von/gf
+
+      UN2 = usr/von/gf*log(zu/zo)
+      U10N2 = usr/von/gf*log(10./zo)
+      UrfN2 = usr/von/gf*log(zrf_u/zo)
+
+!******** rain heat flux (save to use if desired) *****************************
+      dwat = 2.11e-5*((t+tdk)/tdk)**1.94  ! water vapour diffusivity
+      dtmp =(1. + 3.309e-3*t - 1.44e-6*t*t)*0.02411/(rhoa*cpa) ! heat diffusivity
+      dqs_dt = Q*Le/(Rgas*(t+tdk)**2.)  ! Clausius-Clapeyron
+      alfac= 1./(1.+0.622*(dqs_dt*Le*dwat)/(cpa*dtmp))  ! wet bulb factor
+      RF = rain*alfac*cpw*                                    &
+          ((ts-t-dter*jcool)+(Qs-Q-dqer*jcool)*Le/cpa)/3600. ! [W/m2]??? 1/3600 here is to convert rain in mm/h to kg/m2/s.
+      hsb = hsb+RF
+
+      lapse = grav/cpa
+      SST   = ts-dter*jcool
+
+      T10 = T + tsr/von*(log(10./zt)-psi10T+psiT) + lapse*(zt-10.)
+      Trf = T + tsr/von*(log(zrf_t/zt)-psirfT+psiT) + lapse*(zt-zrf_t)
+      TN  = T + psiT*tsr/von
+      T10N = T10 + psi10T*tsr/von
+      TrfN = Trf + psirfT*tsr/von
+
+      TN2   = SST + tsr/von*log(zt/zot)-lapse*zt
+      T10N2 = SST + tsr/von*log(10./zot)-lapse*10
+      TrfN2 = SST + tsr/von*log(zrf_t/zot)-lapse*zrf_t
+
+      dqer = wetc*dter*jcool
+      SSQ  = Qs-dqer
+      SSQ  = SSQ*1000.
+      Q   = Q*1000.
+      qsr = qsr*1000.
+      Q10 = Q + qsr/von*(log(10./zq)-psi10T+psiT)
+      Qrf = Q + qsr/von*(log(zrf_q/zq)-psirfQ+psiT)
+      QN  = Q + psiT*qsr/von/sqrt(gf)
+      Q10N = Q10 + psi10T*qsr/von
+      QrfN = Qrf + psirfQ*qsr/von
+
+      QN2 = SSQ + qsr/von*log(zq/zoq)
+      Q10N2 = SSQ + qsr/von*log(10./zoq)
+      QrfN2 = SSQ + qsr/von*log(zrf_q/zoq)
+      RHrf  = RHcalc(Trf,P,Qrf/1000.)
+      RH10  = RHcalc(T10,P,Q10/1000.)
+
+
+    end ! subroutine coare35vn
 !
 !______________________________________________________________________
 !
@@ -1641,18 +2267,72 @@ module air
       integer         , intent(in) :: year
 
 
-      if ( path(len(path)-2:len(path)) == ".nc" ) then
-        get_filename = path
-      else
+      if ( path(len(trim(path)):len(trim(path))) == '.' ) then
         write( get_filename, '( a, i4.4, a )' ) trim(path)      &
-                                               , year            &
-                                               , trim(FORMAT_EXT)
+                                              , year            &
+                                              , trim(FORMAT_EXT)
+      else
+        get_filename = path
       end if
+
 
     end ! function get_filemname
 !
 !
 != I/O SECTION ========================================================
+!______________________________________________________________________
+!
+    subroutine out_init_define( ncid, x_dimid, y_dimid, t_dimid )
+!----------------------------------------------------------------------
+!  Defines variables for initial output.
+! Can be customized. Just calls `out_define` at the moment.
+!______________________________________________________________________
+!
+      implicit none
+
+      integer, intent(in) :: ncid, t_dimid, x_dimid, y_dimid
+
+
+      call out_define( ncid, x_dimid, y_dimid, t_dimid )
+
+
+    end ! subroutine out_init_define
+!______________________________________________________________________
+!
+    subroutine out_define( ncid, x_dimid, y_dimid, t_dimid )
+!----------------------------------------------------------------------
+!  Defines variables for output.
+!______________________________________________________________________
+!
+      use io     , only: var_define
+      use pnetcdf, only: NF90_FLOAT
+
+      implicit none
+
+      integer, intent(in) :: ncid, t_dimid, x_dimid, y_dimid
+
+      integer               :: varid
+      integer, dimension(3) :: vdims
+
+
+      vdims = (/ x_dimid, y_dimid, t_dimid /)
+
+      varid = var_define( ncid, 'wusurf', 3, vdims, NF90_FLOAT  &
+                        , "x-momentum flux", "m^2 s^-2"         &
+                        , -1, 0., "east_e north_e", .true. )
+      varid = var_define( ncid, 'wvsurf', 3, vdims, NF90_FLOAT  &
+                        , "y-momentum flux", "m^2 s^-2"         &
+                        , -1, 0., "east_e north_e", .true. )
+      varid = var_define( ncid, 'wtsurf', 3, vdims, NF90_FLOAT  &
+                        , "temperature flux", "K m s^-1"        &
+                        , -1, 0., "east_e north_e", .true. )
+      varid = var_define( ncid, 'wssurf', 3, vdims, NF90_FLOAT  &
+                        , "salinity flux", "psu m s^-1"         &
+                        , -1, 0., "east_e north_e", .true. )
+
+
+    end ! subroutine out_define
+!
 !______________________________________________________________________
 !
     subroutine read_var_nc( var_name, var, record, ncid )

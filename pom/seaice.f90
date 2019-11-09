@@ -153,11 +153,11 @@ module seaice
 
       implicit none
 
-      integer*1 N ! Interpolation array extension size
-                  ! The structure is following:
-                  !   var at n   step: var(:,:,1)
-                  !   var at n-1 step: var(:,:,2)
-                  !   var at n+1 step: var(:,:,3)
+      integer(1) N ! Interpolation array extension size
+                   ! The structure is following:
+                   !   var at n   step: var(:,:,1)
+                   !   var at n-1 step: var(:,:,2)
+                   !   var at n+1 step: var(:,:,3)
 
 
 ! Allocate core arrays

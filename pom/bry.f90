@@ -119,7 +119,7 @@ module bry
   end type
 
   type BC_TYPE_VAL     ! Value type for all boundaries.
-    integer*2  EAST  & !
+    integer(2) EAST  & !
             , NORTH  & !  ( self-explanatory )
             , SOUTH  & !
             , WEST     !
@@ -612,30 +612,30 @@ module bry
 
       if ( is_master ) then
         print '(8x,4a6)', "NORTH", "EAST", "SOUTH", "WEST"
-        print '(a7,": ",4(xa4x))', "ELEV", bcTITLES(BC%zeta%NORTH)  &
-                                         , bcTITLES(BC%zeta%EAST)   &
-                                         , bcTITLES(BC%zeta%SOUTH)  &
-                                         , bcTITLES(BC%zeta%WEST)
-        print '(a7,": ",4(xa4x))', "UA_norm", bcTITLES(BC%vel2d%norm%NORTH)  &
-                                            , bcTITLES(BC%vel2d%norm%EAST)   &
-                                            , bcTITLES(BC%vel2d%norm%SOUTH)  &
-                                            , bcTITLES(BC%vel2d%norm%WEST)
-        print '(a7,": ",4(xa4x))', "UA_tang", bcTITLES(BC%vel2d%tang%NORTH)  &
-                                            , bcTITLES(BC%vel2d%tang%EAST)   &
-                                            , bcTITLES(BC%vel2d%tang%SOUTH)  &
-                                            , bcTITLES(BC%vel2d%tang%WEST)
-        print '(a7,": ",4(xa4x))', "U_norm", bcTITLES(BC%vel3d%norm%NORTH)  &
-                                           , bcTITLES(BC%vel3d%norm%EAST)   &
-                                           , bcTITLES(BC%vel3d%norm%SOUTH)  &
-                                           , bcTITLES(BC%vel3d%norm%WEST)
-        print '(a7,": ",4(xa4x))', "U_tang", bcTITLES(BC%vel3d%tang%NORTH)  &
-                                           , bcTITLES(BC%vel3d%tang%EAST)   &
-                                           , bcTITLES(BC%vel3d%tang%SOUTH)  &
-                                           , bcTITLES(BC%vel3d%tang%WEST)
-        print '(a7,": ",4(xa4x))', "TS", bcTITLES(BC%ts%NORTH)  &
-                                       , bcTITLES(BC%ts%EAST)   &
-                                       , bcTITLES(BC%ts%SOUTH)  &
-                                       , bcTITLES(BC%ts%WEST)
+        print '(a7,": ",4(1x,a,4x))', "ELEV", bcTITLES(BC%zeta%NORTH)  &
+                                            , bcTITLES(BC%zeta%EAST)   &
+                                            , bcTITLES(BC%zeta%SOUTH)  &
+                                            , bcTITLES(BC%zeta%WEST)
+        print '(a7,": ",4(1x,a,4x))', "UA_norm", bcTITLES(BC%vel2d%norm%NORTH)  &
+                                               , bcTITLES(BC%vel2d%norm%EAST)   &
+                                               , bcTITLES(BC%vel2d%norm%SOUTH)  &
+                                               , bcTITLES(BC%vel2d%norm%WEST)
+        print '(a7,": ",4(1x,a,4x))', "UA_tang", bcTITLES(BC%vel2d%tang%NORTH)  &
+                                               , bcTITLES(BC%vel2d%tang%EAST)   &
+                                               , bcTITLES(BC%vel2d%tang%SOUTH)  &
+                                               , bcTITLES(BC%vel2d%tang%WEST)
+        print '(a7,": ",4(1x,a,4x))', "U_norm", bcTITLES(BC%vel3d%norm%NORTH)  &
+                                              , bcTITLES(BC%vel3d%norm%EAST)   &
+                                              , bcTITLES(BC%vel3d%norm%SOUTH)  &
+                                              , bcTITLES(BC%vel3d%norm%WEST)
+        print '(a7,": ",4(1x,a,4x))', "U_tang", bcTITLES(BC%vel3d%tang%NORTH)  &
+                                              , bcTITLES(BC%vel3d%tang%EAST)   &
+                                              , bcTITLES(BC%vel3d%tang%SOUTH)  &
+                                              , bcTITLES(BC%vel3d%tang%WEST)
+        print '(a7,": ",4(1x,a,4x))', "TS", bcTITLES(BC%ts%NORTH)  &
+                                          , bcTITLES(BC%ts%EAST)   &
+                                          , bcTITLES(BC%ts%SOUTH)  &
+                                          , bcTITLES(BC%ts%WEST)
       end if
 
       call msg_print("BRY MODULE INITIALIZED", 1, "")

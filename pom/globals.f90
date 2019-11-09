@@ -19,6 +19,7 @@ module glob_const
   , kappa            & ! von Karman's constant
   , ohm              & ! Earth's rotation angular frequency 
   , pi               & ! pi
+  , rad2deg          & ! 180./pi
   , rhoref           & ! reference density
   , rho_cpw          & ! rho*Cpw
   , sec2day          & ! 1./86400.
@@ -36,6 +37,7 @@ module glob_const
       small   = 1.e-10       ! small value
       kappa   = 0.4          ! VonKarman's constant
       ohm     = 7.29e-5      ! angular frequency of Earth
+      rad2deg = 180./pi      ! radians to degrees conversion factor
       rhoref  = 1025.        ! recommended values: 1025 for seawater,
                              !                     1000 for freswater
       rho_cpw = rhoref*cpw   ! Seawater density times the specific heat of seawater
