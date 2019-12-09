@@ -494,7 +494,7 @@ module air
 
 ! Decide on the record to read
       if ( USE_CALENDAR ) then
-        
+
         chunk     = chunk_of_year( d_in, read_int )
         record(1) = int(chunk)
 
@@ -678,7 +678,7 @@ module air
           record(3) = 1
           year(3) = d_in%year + 1
         end if
-        
+
         if ( secs >= 0 .and. secs < dti ) ADVANCE_REC_INT = .true.
 
       else
@@ -686,8 +686,7 @@ module air
         record(1) = int( iint*dti / read_int ) + 1
         record(2) = record(1)
         record(3) = record(2) + 1
-        print *, ">>>", record
-        
+
         a = modulo( real(iint*dti), real(read_int) )
         if ( a < dti ) then
           if ( a >= 0. ) then
@@ -695,7 +694,7 @@ module air
           end if
         end if
         a = a / read_int
-        print *, "A: ", a
+!        print *, "A: ", a
 
       end if
 
@@ -731,8 +730,8 @@ module air
 
 !      record(1) = record(1) + 1
 
-      if ( is_master ) print *, "II", uwnd(50,50,2), uwnd(50,50,3) &
-                              , a, ADVANCE_REC_INT, ADVANCE_REC
+!      if ( is_master ) print *, "II", uwnd(50,50,2), uwnd(50,50,3) &
+!                              , a, ADVANCE_REC_INT, ADVANCE_REC
 
       call read_all( ADVANCE_REC_INT, 3, year, record )
       call read_all( ADVANCE_REC    , 1, year, record )
