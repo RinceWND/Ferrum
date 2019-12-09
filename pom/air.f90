@@ -75,7 +75,8 @@ module air
   , USE_CALENDAR   & !  lookup for forcing file's record using model date (otherwise reading starts from the first record)
   , USE_COARE      & !  use COARE algorithm for bulk formulations
   , USE_DQDSST     & !  use heat flux sensitivity to restore temperature
-  , USE_FLUXES       !  momentum flux is read directly from files !TODO: if set to false, wtsurf crashes the calculations
+  , USE_FLUXES     & !  momentum flux is read directly from files !TODO: if set to false, wtsurf crashes the calculations
+  , USE_RAMP         !  use temporal linear damping on wind stress
 
   integer(1)        &
     LWRAD_FORMULA    ! Bulk formula to estimate longwave radiation
@@ -229,6 +230,7 @@ module air
       USE_FLUXES   = .false.
       USE_DQDSST   = .true.
       USE_CALENDAR = .true.
+      USE_RAMP     = .false.
 
       bulk_path = "in/surf/"
       flux_path = "in/surf/"
@@ -819,14 +821,20 @@ module air
 ! called by: step [air]
 !______________________________________________________________________
 !
+      use model_run, only: iint, iend
+
       implicit none
 
+      real(rk) ramp
+
+
+      if ( USE_RAMP ) ramp = iint/iend
 
       swrad  = swrad *taper_mask
       wssurf = wssurf*taper_mask
       wtsurf = wtsurf*taper_mask
-      wusurf = wusurf*taper_mask
-      wvsurf = wvsurf*taper_mask
+      wusurf = ramp*wusurf*taper_mask
+      wvsurf = ramp*wvsurf*taper_mask
 
 
     end ! subroutine
