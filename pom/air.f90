@@ -467,6 +467,7 @@ module air
 !
 !      use glob_domain, only: is_master
       use module_time
+      use glob_domain, only: im, jm
       use glob_grid  , only: fsm
       use config     , only: nbct
       use seaice     , only: icec, itsurf
@@ -475,9 +476,9 @@ module air
 
       type(date), intent(in) :: d_in
 
-      integer                   max_in_prev, max_in_this, ncid
-      integer, dimension(3)  :: record, year
-      real(rk)                  a, chunk
+      integer                       max_in_prev, max_in_this, ncid
+      integer, dimension(3)      :: record, year
+      real(rk)                      a, chunk
 
 
 ! Quit if the module is not used.
@@ -492,19 +493,19 @@ module air
       max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
 
 ! Decide on the record to read
-      chunk     = chunk_of_year( d_in, read_int )
-      record(1) = int(chunk)
-
-      if ( chunk - record(1) < .5 ) then
-        record(2) = record(1)
-        a = chunk - record(1) + .5
-      else
-        record(2) = record(1) + 1
-        a = chunk - record(1) - .5
-      end if
-      record(3) = record(2) + 1
-
       if ( USE_CALENDAR ) then
+        
+        chunk     = chunk_of_year( d_in, read_int )
+        record(1) = int(chunk)
+
+        if ( chunk - record(1) < .5 ) then
+          record(2) = record(1)
+          a = chunk - record(1) + .5
+        else
+          record(2) = record(1) + 1
+          a = chunk - record(1) - .5
+        end if
+        record(3) = record(2) + 1
 
         if ( record(2) == 0 ) then
           record(2) = max_in_prev ! TODO: [ NEEDS TESTING ]
@@ -516,13 +517,16 @@ module air
 
       else
 
-        record(3) = record(3) - record(1) + 1
-        record(1) = 1
+        record = [ 1, 1, 2 ]
 
       end if
 
-      record(2) = record(1) + 1
+! HARDCODED!!! TODO: Remove
+!      record(1) = d_in%month
+!      record(2) = d_in%month
+!      record(3) = d_in%month+1
 
+      print *, ">>>", record
 ! Read wind if momentum flux is derived from wind
       call read_all( .true., 1, year, record )
       call read_all( .true., 2, year, record )
@@ -531,8 +535,11 @@ module air
       if ( READ_WIND ) then
 
         if ( interp_wind ) then
-          uwnd(:,:,1) = ( 1. - a ) * uwnd(:,:,2) + a * uwnd(:,:,3)
-          vwnd(:,:,1) = ( 1. - a ) * vwnd(:,:,2) + a * vwnd(:,:,3)
+          call linint_vec( uwnd(:,:,2), vwnd(:,:,2)  &
+                         , uwnd(:,:,3), vwnd(:,:,3)  &
+                         , a                         &
+                         , uwnd(:,:,1), vwnd(:,:,1)  &
+                         )
         end if
 
 ! TODO: Are these surface arrays even needed?
@@ -626,7 +633,7 @@ module air
       integer            max_in_prev, max_in_this, secs
       integer                          &
       , dimension(3)  :: record, year
-      real               chunk
+      real(rk)           a, chunk
 
 
 ! Quit if the module is not used.
@@ -639,19 +646,21 @@ module air
       max_in_this = max_chunks_in_year( d_in%year  , read_int )
       max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
 
+      ADVANCE_REC_INT = .false.
+
 ! Decide on the record to read
-      chunk     = chunk_of_year( d_in, read_int )
-      record(1) = int(chunk)
-
-      if ( secs - int(real(record(1))*read_int) < dti ) then ! TODO: test this one as well.
-        ADVANCE_REC = .true.
-      else
-        ADVANCE_REC = .false.
-      end if
-
-      secs = secs - int((real(record(1))+.5)*read_int)
-
       if ( USE_CALENDAR ) then
+
+        chunk     = chunk_of_year( d_in, read_int )
+        record(1) = int(chunk)
+
+        if ( secs - int(real(record(1))*read_int) < dti ) then ! TODO: test this one as well.
+          ADVANCE_REC = .true.
+        else
+          ADVANCE_REC = .false.
+        end if
+
+        secs = secs - int((real(record(1))+.5)*read_int)
 
         if ( chunk - record(1) < .5 ) then ! TODO: test (real - int) = ?
           record(2) = record(1)
@@ -669,17 +678,28 @@ module air
           record(3) = 1
           year(3) = d_in%year + 1
         end if
+        
+        if ( secs >= 0 .and. secs < dti ) ADVANCE_REC_INT = .true.
 
       else
 
         record(1) = int( iint*dti / read_int ) + 1
         record(2) = record(1)
         record(3) = record(2) + 1
+        print *, ">>>", record
+        
+        a = modulo( real(iint*dti), real(read_int) )
+        if ( a < dti ) then
+          if ( a >= 0. ) then
+            ADVANCE_REC_INT = .true.
+          end if
+        end if
+        a = a / read_int
+        print *, "A: ", a
 
       end if
 
-      if ( secs >= 0 .and. secs < dti ) then
-        ADVANCE_REC_INT = .true.
+      if ( ADVANCE_REC_INT ) then
         if ( interp_wind ) then
           uwnd(:,:,2) = uwnd(:,:,3)
           vwnd(:,:,2) = vwnd(:,:,3)
@@ -707,14 +727,12 @@ module air
           if ( INTERP_HUMID ) humid(:,:,2) = humid(:,:,3)
           if ( INTERP_SST   ) sst(:,:,2)   = sst(:,:,3)
         end if
-      else
-        ADVANCE_REC_INT = .false.
       end if
 
 !      record(1) = record(1) + 1
 
-!      if ( is_master ) print *, "II"&!, uwnd(50,50,2), uwnd(50,50,3) &
-!                              , a, ADVANCE_REC_INT, ADVANCE_REC
+      if ( is_master ) print *, "II", uwnd(50,50,2), uwnd(50,50,3) &
+                              , a, ADVANCE_REC_INT, ADVANCE_REC
 
       call read_all( ADVANCE_REC_INT, 3, year, record )
       call read_all( ADVANCE_REC    , 1, year, record )
@@ -722,8 +740,11 @@ module air
       if ( READ_WIND ) then
 
         if ( interp_wind ) then
-          uwnd(:,:,1) = ( 1. - a ) * uwnd(:,:,2) + a * uwnd(:,:,3)
-          vwnd(:,:,1) = ( 1. - a ) * vwnd(:,:,2) + a * vwnd(:,:,3)
+          call linint_vec( uwnd(:,:,2), vwnd(:,:,2)  &
+                         , uwnd(:,:,3), vwnd(:,:,3)  &
+                         , a                         &
+                         , uwnd(:,:,1), vwnd(:,:,1)  &
+                         )
         end if
 
 ! TODO: Are these surface arrays even needed?
@@ -1463,6 +1484,35 @@ module air
 
 
     end ! subroutine
+!
+!______________________________________________________________________
+!
+    subroutine linint_vec( u1, v1, u2, v2, a, u_int, v_int )
+
+      use glob_domain, only: im, jm
+
+      implicit none
+
+      real(rk), dimension(im,jm), intent(in   ) :: u1, u2, v1, v2
+      real(rk), dimension(im,jm), intent(  out) :: u_int, v_int
+      real(rk)                  , intent(in   ) :: a
+      real(rk), dimension(im,jm)                :: dir, spd
+
+
+      u_int = ( 1. - a ) * u1 + a * u2
+      v_int = ( 1. - a ) * v1 + a * v2
+! Do not interpolate wind linearly with rough temporal resolution or quite variable wind direction.
+! First, get the "correct" direction from linear interpolation, and then recalculate the absolute value.
+! The obvious caveat is when w(n+1) and w(n) are perfectly in opposite to one another the resulted direction defaults to zero.
+      dir = atan2(v_int,u_int)
+!          where ( dir /= 0. ) ! TODO: Catch opposites with a condition, maybe?
+      spd = ( 1. - a ) * sqrt( u1*u1 + v1*v1 )  &
+           +       a   * sqrt( u2*u2 + v2*v2 )
+      u_int = spd * cos( dir )
+      v_int = spd * sin( dir )
+
+
+    end ! subroutine linint_vec
 !
 !______________________________________________________________________
 !
