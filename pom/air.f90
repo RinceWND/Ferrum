@@ -828,6 +828,7 @@ module air
       real(rk) ramp
 
 
+      ramp = 1.
       if ( USE_RAMP ) ramp = iint/iend
 
       swrad  = swrad *taper_mask
