@@ -75,7 +75,7 @@ module air
   , USE_CALENDAR   & !  lookup for forcing file's record using model date (otherwise reading starts from the first record)
   , USE_COARE      & !  use COARE algorithm for bulk formulations
   , USE_DQDSST     & !  use heat flux sensitivity to restore temperature
-  , USE_FLUXES       !  momentum flux is read directly from files
+  , USE_FLUXES       !  momentum flux is read directly from files !TODO: if set to false, wtsurf crashes the calculations
 
   integer(1)        &
     LWRAD_FORMULA    ! Bulk formula to estimate longwave radiation
@@ -518,6 +518,7 @@ module air
       else
 
         record = [ 1, 1, 2 ]
+        a = 0._rk
 
       end if
 
@@ -646,6 +647,7 @@ module air
       max_in_this = max_chunks_in_year( d_in%year  , read_int )
       max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
 
+      ADVANCE_REC     = .false.
       ADVANCE_REC_INT = .false.
 
 ! Decide on the record to read
@@ -687,14 +689,17 @@ module air
         record(2) = record(1)
         record(3) = record(2) + 1
 
+! TODO: right now it interpolates between records (edges of rec1-rec2 span). Implement interpolation between the centers of record spans.
         a = modulo( real(iint*dti), real(read_int) )
         if ( a < dti ) then
           if ( a >= 0. ) then
-            ADVANCE_REC_INT = .true.
+            ADVANCE_REC = .true.
           end if
         end if
         a = a / read_int
 !        print *, "A: ", a
+
+        ADVANCE_REC_INT = ADVANCE_REC
 
       end if
 
