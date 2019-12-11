@@ -59,6 +59,7 @@ module air
   , INTERP_HUMID   & !  humidity
   , INTERP_PRES    & !  atm. pressure
   , INTERP_RAIN    & !  precipitation rate
+  , INTERP_SSS     & !  sea surface salinity
   , INTERP_SST     & !  sea surface temperature
   , INTERP_STRESS  & !  momentum flux
   , INTERP_TAIR    & !  air temperature
@@ -101,6 +102,7 @@ module air
   ,  rain_name       & ! Precipitation rate
   , sheat_name       & ! Sensible heat flux
   ,  srad_name       & ! Shortwave net radiation
+  ,   sss_name       & ! Sea surface salinity
   ,   sst_name       & ! Sea surface temperature
   ,  tair_name       & ! Air temperature
   ,  tcld_name       & ! Total cloud cover
@@ -150,6 +152,7 @@ module air
   , rain                     & ! Precipetation rate [m/s]
   , sheat                    & ! Sensible heat flux [W/m^2]
   , srad                     & ! Net shortwave radiation [W/m^2]
+  , sss                      & ! Sea surface salinity [psu]
   , sst                      & ! Sea surface temperature [K] [degC]
   , temp                     & ! Air temperature (@2m) [K] [degC]
   , ustr                     & ! U-component of momentum flux
@@ -188,14 +191,14 @@ module air
 
       integer pos
 
-      namelist/air_nml/                                           &
-        CALC_SWR   , INTERP_CLOUD , INTERP_HEAT  , INTERP_HUMID   &
-      , INTERP_PRES, INTERP_RAIN  , INTERP_SST   , INTERP_STRESS  &
-      , INTERP_TAIR, INTERP_WIND  , READ_BULK    , READ_CLOUD     &
-      , READ_HEAT  , READ_STRESS  , READ_WIND    , TAPER_BRY      &
-      , USE_BULK   , USE_CALENDAR , USE_COARE    , USE_DQDSST     &
-      , USE_FLUXES , USE_RAMP     , LWRAD_FORMULA, bulk_path      &
-      , flux_path  , wind_path    , read_int
+      namelist/air_nml/                                             &
+        CALC_SWR     , INTERP_CLOUD , INTERP_HEAT  , INTERP_HUMID   &
+      , INTERP_PRES  , INTERP_RAIN  , INTERP_SSS   , INTERP_SST     &
+      , INTERP_STRESS, INTERP_TAIR  , INTERP_WIND  , READ_BULK      &
+      , READ_CLOUD   , READ_HEAT    , READ_STRESS  , READ_WIND      &
+      , TAPER_BRY    , USE_BULK     , USE_CALENDAR , USE_COARE      &
+      , USE_DQDSST   , USE_FLUXES   , USE_RAMP     , LWRAD_FORMULA  &
+      , bulk_path    , flux_path    , wind_path    , read_int
 
       namelist/air_vars_nml/                           &
         dlrad_name, lheat_name,  lrad_name, rain_name  &
@@ -243,6 +246,7 @@ module air
       pres_name  = "pres"
       humid_name = "rhum"
       sheat_name = "sht"
+      sss_name   = ""
       sst_name   = "sst"
       srad_name  = "swr"
       tair_name  = "tair"
@@ -422,6 +426,11 @@ module air
           allocate( pres(im,jm,1) )
         end if
         pres = Ps
+        if ( interp_sss ) then
+          allocate( sss(im,jm,3) )
+        else
+          allocate( sss(im,jm,1) )
+        end if
         if ( interp_sst ) then
           allocate( sst(im,jm,3) )
         else
@@ -804,10 +813,9 @@ module air
       if ( TAPER_BRY ) call taper_forcing
 
       if ( .false. ) call river_flux
-! Relax to climatology
 
-      call relax_surface( wssurf, wtsurf )
-
+! Relax surface to climatology
+      call relax_surface( wssurf, wtsurf, sss, sst )
 
 
     end ! subroutine step

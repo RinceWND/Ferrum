@@ -44,8 +44,8 @@ module bry
   character(len=10)                       &
        , parameter                        &
        , private   :: FORMAT_EXT = ".nc"
-       
-       
+
+
   integer                        &
        , parameter               &
        , private   :: bcNTH = 0  & ! id for northern boundary
@@ -429,8 +429,6 @@ module bry
 
 ! Do not read boundary fields by default
       DISABLED = .true.
-! Check for active boundary
-      if ( use_bry ) DISABLED = .false.
 
 ! Set max depth
       hmax = 4500. !8000.
@@ -461,6 +459,9 @@ module bry
       DERIVE_2D  = .true.
       CLIM_BRY   = .true.
 
+! Check for active boundary
+      if ( use_bry ) DISABLED = .false.
+
 ! Default periodic
       periodic_x = .false.
       periodic_y = .false.
@@ -473,7 +474,7 @@ module bry
       t_name = "temp"
       u_name = "u"
       v_name = "v"
-      
+
 ! [ NOT IMPLEMENTED ] TODO: Interpolate active boundary by default (ignored if DISABLED)
       interp_bry = .true.
 
@@ -791,7 +792,7 @@ module bry
       else
         call read_all( .true., 1, year, record )
       end if
-      
+
       if ( DERIVE_2D ) call derive_barotropic_velocities
 
       call msg_print("BRY INITIALIZED", 2, "")

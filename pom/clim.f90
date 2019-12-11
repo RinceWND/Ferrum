@@ -20,15 +20,23 @@ module clim
 !----------------------------------------------------------------------
 ! Configuration variables
 !----------------------------------------------------------------------
-  real(rk), private :: a   & ! time-interpolation factor
-                     , ct    ! relaxation inverse period
+  real(rk), private :: a          & ! time-interpolation factor
+                     , deep_rel   & ! relaxation period for deep cells
+                     , h_thres    & ! apply TS relaxation to cells deeper than set threshold
+                     , surf_rel     ! relaxation period for surface
+
+  integer(1)                            & ! Surface relaxation
+       , private    :: RELAX_SURF_TEMP  & !  for temperature
+                     , RELAX_SURF_SALT    !  for salinity
+                                          ! 0 - no relaxation
+                                          ! 1 - relax to climatology
+                                          ! 2 - relax to sst/sss
 
   character(len=10)                       &
        , parameter                        &
        , private   :: FORMAT_EXT = ".nc"
 
   logical, private :: INTERP_CLIM  & ! Interpolation flag
-                    , RELAX_SURF   & ! Surface relaxation flag
                     , RELAX_TS       ! Deep cells relaxation flag
 !----------------------------------------------------------------------
 ! Climatology time mode
@@ -62,12 +70,6 @@ module clim
   ,  v_clim_name          & ! Y-velocity
   , va_clim_name            ! Vertically integrated y-velocity
 
-  real(rk)              &
-       , private        &
-       , parameter ::   &
-    h_thres = 1000.     &  ! apply TS relaxation to cells deeper than set threshold
-  , t_rel   = 30.          ! relaxation period (days)
-
 !----------------------------------------------------------------------
 ! Climatological arrays
 !----------------------------------------------------------------------
@@ -75,8 +77,8 @@ module clim
        , allocatable         &
        , dimension(:,:)   :: &
      eclim                   &
-  , s_relx                   &
-  , t_relx                   &
+  , s_relx                   & ! mask for salinity surface relaxation
+  , t_relx                   & ! mask for temperature surface relaxation
   , uaclim                   &
   , vaclim
   real(kind=rk)              &
@@ -130,9 +132,10 @@ module clim
 
       integer pos
 
-      namelist/clim/                                            &
-        CLIM_MODE, ct, INTERP_CLIM, ts_clim_path, ts_mean_path  &
-      , uv_clim_path
+      namelist/clim/                                                  &
+        CLIM_MODE      , deep_rel       , h_thres     , INTERP_CLIM   &
+      , RELAX_SURF_SALT, RELAX_SURF_TEMP, RELAX_TS    , surf_rel      &
+      , ts_clim_path   , ts_mean_path   , uv_clim_path
 
       namelist/clim_vars/                        &
         el_clim_name, s_clim_name,  s_mean_name  &
@@ -143,11 +146,14 @@ module clim
 ! Initialize with default values
       INTERP_CLIM = .true.
       RELAX_TS    = .true.
-      RELAX_SURF = .false.
+      RELAX_SURF_SALT = 0
+      RELAX_SURF_TEMP = 0
+
+      h_thres  = 1000._rk
+      deep_rel = 15._rk
+      surf_rel =  2._rk
 
       CLIM_MODE = 2
-
-      ct = 1. / (15.*86400.)  ! 15-days surface relaxation period
 
       ts_clim_path = "in/clim/"
       ts_mean_path = "in/clim/"
@@ -179,7 +185,7 @@ module clim
       if ( ts_mean_path(pos:pos) == "/" ) then
         ts_mean_path = trim(ts_mean_path)//"mean."
       end if
-      
+
       pos = len(trim(uv_clim_path))
       if ( uv_clim_path(pos:pos) == "/" ) then
         uv_clim_path = trim(uv_clim_path)//"clim."
@@ -194,10 +200,18 @@ module clim
 ! Allocate necessary arrays
       call allocate_arrays
 
-      if ( RELAX_SURF ) then
-        s_relx = ( 1. + tanh( .002*(h-1000.) ) )*.5
-        t_relx = ( 1. + tanh( .002*(h-1000.) ) )*.5
+! Always allow surface relaxation only over deep ocean > 1000m (TODO: Is it really necessary?)
+      if ( RELAX_SURF_SALT > 0 ) then
+        s_relx = ( 1._rk + tanh( .002_rk*(h-1000._rk) ) )*.5_rk
       end if
+
+      if ( RELAX_SURF_TEMP > 0 ) then
+        t_relx = ( 1._rk + tanh( .002_rk*(h-1000._rk) ) )*.5_rk
+      end if
+
+! Convert relaxation periods to frequencies
+      deep_rel = 1._rk / (deep_rel*86400._rk)
+      surf_rel = 1._rk / (surf_rel*86400._rk)
 
       call msg_print("CLIM MODULE INITIALIZED", 1, "")
 
@@ -258,12 +272,17 @@ module clim
       , va_int(im,jm,   2:N+1)  &
       , vc_int(im,jm,kb,2:N+1)  &
        )
-       
+
 ! Allocate depth-relaxation arrays
-      if ( RELAX_SURF ) then
+      if ( RELAX_SURF_SALT > 0 ) then
         allocate(        &
           s_relx(im,jm)  &
-        , t_relx(im,jm)  &
+         )
+      end if
+
+      if ( RELAX_SURF_TEMP > 0 ) then
+        allocate(        &
+          t_relx(im,jm)  &
          )
       end if
 
@@ -518,8 +537,8 @@ module clim
       if ( .not.RELAX_TS ) return
 
       where ( hz .gt. h_thres )
-        temp = ( tclim - temp ) / ( t_rel * 86400. )
-        salt = ( sclim - salt ) / ( t_rel * 86400. )
+        temp = deep_rel * ( tclim - temp )
+        salt = deep_rel * ( sclim - salt )
       end where
 
 
@@ -527,7 +546,7 @@ module clim
 !
 !______________________________________________________________________
 !
-    subroutine relax_surface( wssurf, wtsurf )
+    subroutine relax_surface( wssurf, wtsurf, sss, sst )
 !----------------------------------------------------------------------
 !  Relax surface fluxes to climatologies
 !______________________________________________________________________
@@ -536,13 +555,27 @@ module clim
 
       implicit none
 
+      real(rk), dimension(im,jm), intent(in   ) :: sss, sst
       real(rk), dimension(im,jm), intent(inout) :: wssurf, wtsurf
 
 
-      if ( .not.RELAX_SURF ) return
+      select case ( RELAX_SURF_SALT )
+        case ( 0 )
+          return
+        case ( 1 )
+          wssurf = wssurf + surf_rel*s_relx*( sb(:,:,1) - sclim(:,:,1) )
+        case ( 2 )
+          wssurf = wssurf + surf_rel * ( sb(:,:,1) - sss )
+      end select
 
-      wtsurf = wtsurf + ct * t_relx * ( tb(:,:,1) - tclim(:,:,1) )
-      wssurf = wssurf + ct * s_relx * ( sb(:,:,1) - sclim(:,:,1) )
+      select case ( RELAX_SURF_TEMP )
+        case ( 0 )
+          return
+        case ( 1 )
+          wtsurf = wtsurf + surf_rel*t_relx*( tb(:,:,1) - tclim(:,:,1) )
+        case ( 2 )
+          wtsurf = wtsurf + surf_rel * ( tb(:,:,1) - sst )
+      end select
 
 
     end ! subroutine relax_surface
@@ -551,7 +584,7 @@ module clim
 !
     pure character(len=256) function get_filename( path, year )
 !----------------------------------------------------------------------
-!  Costructs filename string in `<path>YYYY<FORMAT_EXT>` format.
+!  Constructs filename string in `<path>YYYY<FORMAT_EXT>` format.
 !______________________________________________________________________
 !
       implicit none
