@@ -563,7 +563,7 @@ module clim
         case ( 0 )
           return
         case ( 1 )
-          wssurf = wssurf + surf_rel*s_relx*( sb(:,:,1) - sclim(:,:,1) )
+          wssurf = wssurf + deep_rel*s_relx*( sb(:,:,1) - sclim(:,:,1) )
         case ( 2 )
           wssurf = wssurf + surf_rel * ( sb(:,:,1) - sss )
       end select
@@ -572,7 +572,7 @@ module clim
         case ( 0 )
           return
         case ( 1 )
-          wtsurf = wtsurf + surf_rel*t_relx*( tb(:,:,1) - tclim(:,:,1) )
+          wtsurf = wtsurf + deep_rel*t_relx*( tb(:,:,1) - tclim(:,:,1) )
         case ( 2 )
           wtsurf = wtsurf + surf_rel * ( tb(:,:,1) - sst )
       end select
