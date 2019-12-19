@@ -125,6 +125,7 @@ module clim
 !
       use glob_domain, only: is_master
       use glob_grid  , only: h
+      use model_run  , only: dti
 
       implicit none
 
@@ -191,10 +192,16 @@ module clim
         uv_clim_path = trim(uv_clim_path)//"clim."
       end if
 
+      deep_rel = max( deep_rel, dti/86400._rk )
+      surf_rel = max( surf_rel, dti/86400._rk )
+
       if ( is_master ) then
         print *, "Climatology TS: ", trim(ts_clim_path)
         print *, "Background TS : ", trim(ts_mean_path)
         print *, "Climatology UV: ", trim(uv_clim_path)
+        print *, "-----"
+        print '(a,e7.3)', "Deep (slow) relaxation period:    ", deep_rel
+        print '(a,e7.3)', "Surface (fast) relaxation period: ", surf_rel
       end if
 
 ! Allocate necessary arrays
@@ -561,7 +568,6 @@ module clim
 
       select case ( RELAX_SURF_SALT )
         case ( 0 )
-          return
         case ( 1 )
           wssurf = wssurf + deep_rel*s_relx*( sb(:,:,1) - sclim(:,:,1) )
         case ( 2 )
@@ -570,7 +576,6 @@ module clim
 
       select case ( RELAX_SURF_TEMP )
         case ( 0 )
-          return
         case ( 1 )
           wtsurf = wtsurf + deep_rel*t_relx*( tb(:,:,1) - tclim(:,:,1) )
         case ( 2 )
