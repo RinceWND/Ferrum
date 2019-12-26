@@ -538,7 +538,6 @@ module air
 !      record(2) = d_in%month
 !      record(3) = d_in%month+1
 
-      print *, ">>>", record
 ! Read wind if momentum flux is derived from wind
       call read_all( .true., 1, year, record )
       call read_all( .true., 2, year, record )
@@ -800,7 +799,7 @@ module air
 ! If solar radiation does not penetrate water
       if ( nbct == 1 ) wtsurf = wtsurf + swrad
 
-! Simple parameterizion
+! Simple parameterization
       swrad  =  swrad*(1.-icec)
       wtsurf = wtsurf*(1.-icec)! + itsurf*icec ! [TODO] itsurf is unstable after spinup for some reason
       wssurf = wssurf*(1.-icec)
@@ -1078,7 +1077,7 @@ module air
             rnow      =  rho(i,j,1)*rhoref + 1000.
             humnow    = humid(i,j,1)
             precip    = rain(i,j,1)/1000. ! rwnd: precipitation rate from kg/(m2*s) to m/s
-            cld       = cloud(i,j,1)/100. ! rwnd: total cloud cover from % to tenths
+            cld       = maxval((/0._rk,cloud(i,j,1)/100._rk/)) ! rwnd: total cloud cover from % to tenths
             sst_model = t(i,j,1) + tbias
 
             if ( i < im ) then
@@ -1366,7 +1365,7 @@ module air
                             + rhom*ch2*SP*Cp                            &
                             + rhom*ce2*SP*heat_latent(sst_model)*2353.  &
                              *log(10.)*humnow/tnowk**2                  &
-                            ) * (sst_model-sst(i,j,1))
+                            ) * (sst_model-sst(i,j,1)) / rho_cpw
             end if
 
           end if
