@@ -706,7 +706,7 @@ module seaice
 !
     pure character(len=256) function get_filename( path, year )
 !----------------------------------------------------------------------
-!  Costructs filename string in `<path>YYYY<FORMAT_EXT>` format.
+!  Constructs filename string in `<path>YYYY<FORMAT_EXT>` format.
 !______________________________________________________________________
 !
       implicit none
@@ -715,11 +715,15 @@ module seaice
       integer         , intent(in) :: year
 
 
-      write( get_filename, '( a, i4.4, a )' ) trim(path)      &
-                                            , year            &
-                                            , trim(FORMAT_EXT)
+      if ( path(len(trim(path)):len(trim(path))) == "." ) then
+        write( get_filename, '( a, i4.4, a )' ) trim(path)      &
+                                               , year            &
+                                               , trim(FORMAT_EXT)
+      else
+        get_filename = path
+      end if
 
-    end ! function get_filemname
+    end ! function get_filename
 !
 !
 != I/O SECTION ========================================================
