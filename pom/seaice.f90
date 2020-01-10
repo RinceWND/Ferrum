@@ -40,7 +40,8 @@ module seaice
        , private   :: FORMAT_EXT = ".nc"
 
   logical          &
-    interp_ice       ! Interpolate in time
+    interp_ice     & ! Interpolate in time
+  , use_calendar     ! Use calendar to offset read record number from the start of a year
 
 !----------------------------------------------------------------------
 ! Paths configuration
@@ -95,8 +96,8 @@ module seaice
 
       integer pos
 
-      namelist/ice/           &
-        ice_path, read_int
+      namelist/ice/                       &
+        ice_path, read_int, use_calendar
 
       namelist/ice_vars/      &
         icec_name, iceh_name
@@ -114,14 +115,16 @@ module seaice
 
       icec_name = "icec"
       iceh_name = "iceh"
-      
-      interp_ice = .true.
+
+      interp_ice   = .true.
+      USE_CALENDAR = .true.
 
 ! Override configuration
-      open ( 73, file = config_file, status = 'old' )
-      read ( 73, nml = ice )
-      read ( 73, nml = ice_vars )
-      close( 73 )
+      open  ( 73, file = config_file, status = 'old' )
+      read  ( 73, nml = ice )
+      rewind( 73 )
+      read  ( 73, nml = ice_vars )
+      close ( 73 )
 
 ! Variables management
       pos = len(trim(ice_path))
@@ -217,30 +220,39 @@ module seaice
       ncid = -1
 
       year = d_in%year
-
-      max_in_this = max_chunks_in_year( d_in%year  , read_int )
-      max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
-
+      
 ! Decide on the record to read
-      chunk     = chunk_of_year( d_in, read_int )
-      record(1) = int(chunk)
+      if ( USE_CALENDAR ) then
 
-      if ( chunk - record(1) < .5 ) then
-        record(2) = record(1)
+        max_in_this = max_chunks_in_year( d_in%year  , read_int )
+        max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
+
+        chunk     = chunk_of_year( d_in, read_int )
+        record(1) = int(chunk)
+
+        if ( chunk - record(1) < .5 ) then
+          record(2) = record(1)
+        else
+          record(2) = record(1) + 1
+        end if
+        record(3) = record(2) + 1
+
+        if ( record(2) == 0 ) then
+          record(2) = max_in_prev ! TODO: [ NEEDS TESTING ]
+          year(2) = d_in%year - 1
+        elseif ( record(3) == max_in_this ) then
+          record(3) = 1
+          year(3) = d_in%year + 1
+        end if
+
+        record(1) = record(1) + 1
+
       else
-        record(2) = record(1) + 1
-      end if
-      record(3) = record(2) + 1
 
-      if ( record(2) == 0 ) then
-        record(2) = max_in_prev ! TODO: [ NEEDS TESTING ]
-        year(2) = d_in%year - 1
-      elseif ( record(3) == max_in_this ) then
-        record(3) = 1
-        year(3) = d_in%year + 1
-      end if
+        record = [ 1, 1, 2 ]
+        a = 0._rk
 
-      record(1) = record(1) + 1
+      end if
 
 ! Read ice fields
       if ( interp_ice ) then
@@ -266,7 +278,7 @@ module seaice
       use config     , only: tbias
 !      use glob_domain, only: is_master
       use module_time
-      use model_run  , only: dti, sec_of_year
+      use model_run  , only: dti, iint, sec_of_year
       use glob_ocean , only: t
 
       implicit none
@@ -287,49 +299,71 @@ module seaice
 
       year = d_in%year
 
-      max_in_this = max_chunks_in_year( d_in%year  , read_int )
-      max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
+      ADVANCE_REC     = .false.
+      ADVANCE_REC_INT = .false.
 
 ! Decide on the record to read
-      chunk     = chunk_of_year( d_in, read_int )
-      record(1) = int(chunk)
+      if ( USE_CALENDAR ) then
 
-      if ( secs - int(real(record(1))*read_int) < dti ) then ! TODO: test this one as well.
-        ADVANCE_REC = .true.
-      else
-        ADVANCE_REC = .false.
-      end if
+        max_in_this = max_chunks_in_year( d_in%year  , read_int )
+        max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
 
-      secs = secs - int((real(record(1))+.5)*read_int)
+! Decide on the record to read
+        chunk     = chunk_of_year( d_in, read_int )
+        record(1) = int(chunk)
 
-      if ( chunk - record(1) < .5 ) then ! TODO: test (real - int) = ?
-        record(2) = record(1)
-        a = chunk - record(1) + .5
-      else
-        record(2) = record(1) + 1
-        a = chunk - record(1) - .5
-      end if
-      record(3) = record(2) + 1
-
-      if ( record(2) == 0 ) then
-        record(2) = max_in_prev + 1 ! TODO: [ NEEDS TESTING ]
-        year(2) = d_in%year - 1
-      elseif ( record(3) == max_in_this + 1 ) then
-        record(3) = 1
-        year(3) = d_in%year + 1
-      end if
-
-      if ( secs >= 0 .and. secs < dti ) then
-        ADVANCE_REC_INT = .true.
-        if ( interp_ice ) then
-          icec_int(:,:,2) = icec_int(:,:,3)
-          iceh_int(:,:,2) = iceh_int(:,:,3)
+        if ( secs - int(real(record(1))*read_int) < dti ) then ! TODO: test this one as well.
+          ADVANCE_REC = .true.
         end if
-      else
-        ADVANCE_REC_INT = .false.
-      end if
 
-      record(1) = record(1) + 1
+        secs = secs - int((real(record(1))+.5)*read_int)
+
+        if ( chunk - record(1) < .5 ) then ! TODO: test (real - int) = ?
+          record(2) = record(1)
+          a = chunk - record(1) + .5
+        else
+          record(2) = record(1) + 1
+          a = chunk - record(1) - .5
+        end if
+        record(3) = record(2) + 1
+
+        if ( record(2) == 0 ) then
+          record(2) = max_in_prev + 1 ! TODO: [ NEEDS TESTING ]
+          year(2) = d_in%year - 1
+        elseif ( record(3) == max_in_this + 1 ) then
+          record(3) = 1
+          year(3) = d_in%year + 1
+        end if
+
+        if ( secs >= 0 .and. secs < dti ) then
+          ADVANCE_REC_INT = .true.
+          if ( interp_ice ) then
+            icec_int(:,:,2) = icec_int(:,:,3)
+            iceh_int(:,:,2) = iceh_int(:,:,3)
+          end if
+        end if
+
+        record(1) = record(1) + 1
+
+      else
+
+        record(1) = int( iint*dti / read_int ) + 1
+        record(2) = record(1)
+        record(3) = record(2) + 1
+
+! TODO: right now it interpolates between records (edges of rec1-rec2 span). Implement interpolation between the centers of record spans.
+        a = modulo( real(iint*dti), real(read_int) )
+        if ( a < dti ) then
+          if ( a >= 0. ) then
+            ADVANCE_REC = .true.
+          end if
+        end if
+        a = a / read_int
+!        print *, "A: ", a
+
+        ADVANCE_REC_INT = ADVANCE_REC
+
+      end if
 
       if ( interp_ice ) then
         call read_all( ADVANCE_REC_INT, 3, year, record )
