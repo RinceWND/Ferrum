@@ -3112,12 +3112,12 @@
 
           vdims(1) = x_dimid
           vdims(2) = y_dimid
-          call def_var_pnetcdf(ncid,'dx',2,vdims,dx_varid,NF_FLOAT
-     &                        ,'grid increment in x','metre'
-     &                        ,-1,0.,'east_e north_e',.true.)
-          call def_var_pnetcdf(ncid,'dy',2,vdims,dy_varid,NF_FLOAT
-     &                        ,'grid increment in y','metre'
-     &                        ,-1,0.,'east_e north_e',.true.)
+!          call def_var_pnetcdf(ncid,'dx',2,vdims,dx_varid,NF_FLOAT
+!     &                        ,'grid increment in x','metre'
+!     &                        ,-1,0.,'east_e north_e',.true.)
+!          call def_var_pnetcdf(ncid,'dy',2,vdims,dy_varid,NF_FLOAT
+!     &                        ,'grid increment in y','metre'
+!     &                        ,-1,0.,'east_e north_e',.true.)
           call def_var_pnetcdf(ncid,'east_u',2,vdims
      &                        ,east_u_varid,NF_FLOAT
      &                        ,'easting of u-points','degree'
@@ -3130,10 +3130,10 @@
      &                        ,east_e_varid,NF_FLOAT
      &                        ,'easting of elevation points','degree'
      &                        ,-1,0.,'east_e north_e',.true.)
-          call def_var_pnetcdf(ncid,'east_c',2,vdims
-     &                        ,east_c_varid,NF_FLOAT
-     &                        ,'easting of cell corners','degree'
-     &                        ,-1,0.,'east_c north_c',.true.)
+!          call def_var_pnetcdf(ncid,'east_c',2,vdims
+!     &                        ,east_c_varid,NF_FLOAT
+!     &                        ,'easting of cell corners','degree'
+!     &                        ,-1,0.,'east_c north_c',.true.)
           call def_var_pnetcdf(ncid,'north_u',2,vdims
      &                        ,north_u_varid,NF_FLOAT
      &                        ,'northing of u-points','degree'
@@ -3146,10 +3146,10 @@
      &                        ,north_e_varid,NF_FLOAT
      &                        ,'northing of elevation points','degree'
      &                        ,-1,0.,'east_e north_e',.true.)
-          call def_var_pnetcdf(ncid,'north_c',2,vdims
-     &                        ,north_c_varid,NF_FLOAT
-     &                        ,'northing of cell corners','degree'
-     &                        ,-1,0.,'east_c north_c',.true.)
+!          call def_var_pnetcdf(ncid,'north_c',2,vdims
+!     &                        ,north_c_varid,NF_FLOAT
+!     &                        ,'northing of cell corners','degree'
+!     &                        ,-1,0.,'east_c north_c',.true.)
           call def_var_pnetcdf(ncid,'rot',2,vdims
      &                        ,rot_varid,NF_FLOAT
      &                        ,'Rotation angle of x-axis wrt. east'
@@ -3163,14 +3163,14 @@
      &                        ,fsm_varid,NF_FLOAT
      &                        ,'free surface mask','dimensionless'
      &                        ,-1,0.,'east_e north_e',.true.)
-          call def_var_pnetcdf(ncid,'dum',2,vdims
-     &                        ,dum_varid,NF_FLOAT
-     &                        ,'u-velocity mask','dimensionless'
-     &                        ,-1,0.,'east_u north_u',.true.)
-          call def_var_pnetcdf(ncid,'dvm',2,vdims
-     &                        ,dvm_varid,NF_FLOAT
-     &                        ,'v-velocity mask','dimensionless'
-     &                        ,-1,0.,'east_v north_v',.true.)
+!          call def_var_pnetcdf(ncid,'dum',2,vdims
+!     &                        ,dum_varid,NF_FLOAT
+!     &                        ,'u-velocity mask','dimensionless'
+!     &                        ,-1,0.,'east_u north_u',.true.)
+!          call def_var_pnetcdf(ncid,'dvm',2,vdims
+!     &                        ,dvm_varid,NF_FLOAT
+!     &                        ,'v-velocity mask','dimensionless'
+!     &                        ,-1,0.,'east_v north_v',.true.)
 
           vdims(1) = x_dimid
           vdims(2) = y_dimid
@@ -3213,14 +3213,14 @@
      &                          ,'sea ice concentration'
      &                          ,'fraction'
      &                          ,0,0.,'east_e north_e',.true.)
-            call def_var_pnetcdf(ncid,'ui',3,vdims
-     &                          ,ui_varid,NF_FLOAT
-     &                          ,'sea ice x-velocity','m/s'
-     &                          ,-1,0.,'east_u north_u',.true.)
-            call def_var_pnetcdf(ncid,'vi',3,vdims
-     &                         ,vi_varid,NF_FLOAT
-     &                         ,'sea ice y-velocity','m/s'
-     &                         ,-1,0.,'east_v north_v',.true.)
+!            call def_var_pnetcdf(ncid,'ui',3,vdims
+!     &                          ,ui_varid,NF_FLOAT
+!     &                          ,'sea ice x-velocity','m/s'
+!     &                          ,-1,0.,'east_u north_u',.true.)
+!            call def_var_pnetcdf(ncid,'vi',3,vdims
+!     &                         ,vi_varid,NF_FLOAT
+!     &                         ,'sea ice y-velocity','m/s'
+!     &                         ,-1,0.,'east_v north_v',.true.)
           end if
 
           if ( mode/= 2 ) then
@@ -3253,14 +3253,14 @@
      &                          ,'(density-1000)/rhoref'
      &                          ,'dimensionless'
      &                          ,-1,0.,'east_e north_e zz',.true.)
-            call def_var_pnetcdf(ncid,'kh',4,vdims
-     &                          ,kh_varid,NF_FLOAT
-     &                          ,'vertical diffusivity','metre2/sec'
-     &                          ,-1,0.,'east_e north_e zz',.true.)
-            call def_var_pnetcdf(ncid,'km',4,vdims
-     &                          ,km_varid,NF_FLOAT
-     &                          ,'vertical viscosity','metre2/sec'
-     &                          ,-1,0.,'east_e north_e zz',.true.)
+!            call def_var_pnetcdf(ncid,'kh',4,vdims
+!     &                          ,kh_varid,NF_FLOAT
+!     &                          ,'vertical diffusivity','metre2/sec'
+!     &                          ,-1,0.,'east_e north_e zz',.true.)
+!            call def_var_pnetcdf(ncid,'km',4,vdims
+!     &                          ,km_varid,NF_FLOAT
+!     &                          ,'vertical viscosity','metre2/sec'
+!     &                          ,-1,0.,'east_e north_e zz',.true.)
           end if
 
 ! end definitions
@@ -3290,12 +3290,12 @@
           edge(1) = im
           edge(2) = jm
 
-          out2 = real(dx,4)
-          status=nfmpi_put_vara_real_all(ncid,dx_varid,start,edge,out2)
-          call handle_error_pnetcdf('nf_put_var_real: dx',status)
-          out2 = real(dy,4)
-          status=nfmpi_put_vara_real_all(ncid,dy_varid,start,edge,out2)
-          call handle_error_pnetcdf('nf_put_var_real: dy',status)
+!          out2 = real(dx,4)
+!          status=nfmpi_put_vara_real_all(ncid,dx_varid,start,edge,out2)
+!          call handle_error_pnetcdf('nf_put_var_real: dx',status)
+!          out2 = real(dy,4)
+!          status=nfmpi_put_vara_real_all(ncid,dy_varid,start,edge,out2)
+!          call handle_error_pnetcdf('nf_put_var_real: dy',status)
           out2 = real(east_u,4)
           status=nfmpi_put_vara_real_all(ncid,east_u_varid,start,edge
      &                                                           ,out2)
@@ -3308,10 +3308,10 @@
           status=nfmpi_put_vara_real_all(ncid,east_e_varid,start,edge
      &                                                           ,out2)
           call handle_error_pnetcdf('nf_put_var_real: east_e',status)
-          out2 = real(east_c,4)
-          status=nfmpi_put_vara_real_all(ncid,east_c_varid,start,edge
-     &                                                           ,out2)
-          call handle_error_pnetcdf('nf_put_var_real: east_c',status)
+!          out2 = real(east_c,4)
+!          status=nfmpi_put_vara_real_all(ncid,east_c_varid,start,edge
+!     &                                                           ,out2)
+!          call handle_error_pnetcdf('nf_put_var_real: east_c',status)
           out2 = real(north_u,4)
           status=nfmpi_put_vara_real_all(ncid,north_u_varid,start,edge
      &                                                           ,out2)
@@ -3324,10 +3324,10 @@
           status=nfmpi_put_vara_real_all(ncid,north_e_varid,start,edge
      &                                                           ,out2)
           call handle_error_pnetcdf('nf_put_var_real: north_e',status)
-          out2 = real(north_c,4)
-          status=nfmpi_put_vara_real_all(ncid,north_c_varid,start,edge
-     &                                                           ,out2)
-          call handle_error_pnetcdf('nf_put_var_real: north_c',status)
+!          out2 = real(north_c,4)
+!          status=nfmpi_put_vara_real_all(ncid,north_c_varid,start,edge
+!     &                                                           ,out2)
+!          call handle_error_pnetcdf('nf_put_var_real: north_c',status)
           out2 = real(rot,4)
           status=nfmpi_put_vara_real_all(ncid,rot_varid,start,edge
      &                                                           ,out2)
@@ -3339,14 +3339,14 @@
           status=nfmpi_put_vara_real_all(ncid,fsm_varid,start,edge
      &                                                           ,out2)
           call handle_error_pnetcdf('nf_put_var_real: fsm',status)
-          out2 = real(dum,4)
-          status=nfmpi_put_vara_real_all(ncid,dum_varid,start,edge
-     &                                                           ,out2)
-          call handle_error_pnetcdf('nf_put_var_real: dum',status)
-          out2 = real(dvm,4)
-          status=nfmpi_put_vara_real_all(ncid,dvm_varid,start,edge
-     &                                                           ,out2)
-          call handle_error_pnetcdf('nf_put_var_real: dvm',status)
+!          out2 = real(dum,4)
+!          status=nfmpi_put_vara_real_all(ncid,dum_varid,start,edge
+!     &                                                           ,out2)
+!          call handle_error_pnetcdf('nf_put_var_real: dum',status)
+!          out2 = real(dvm,4)
+!          status=nfmpi_put_vara_real_all(ncid,dvm_varid,start,edge
+!     &                                                           ,out2)
+!          call handle_error_pnetcdf('nf_put_var_real: dvm',status)
 
 
         else
@@ -3406,12 +3406,12 @@
             status = nf90mpi_inq_varid(ncid,'icec',icec_varid)
             call handle_error_pnetcdf('nfmpi_inq_varid: icec'
      &                               , status )
-            status = nf90mpi_inq_varid(ncid,'ui',ui_varid)
-            call handle_error_pnetcdf('nfmpi_inq_varid: ui'
-     &                               , status )
-            status = nf90mpi_inq_varid(ncid,'vi',vi_varid)
-            call handle_error_pnetcdf('nfmpi_inq_varid: vi'
-     &                               , status )
+!            status = nf90mpi_inq_varid(ncid,'ui',ui_varid)
+!            call handle_error_pnetcdf('nfmpi_inq_varid: ui'
+!     &                               , status )
+!            status = nf90mpi_inq_varid(ncid,'vi',vi_varid)
+!            call handle_error_pnetcdf('nfmpi_inq_varid: vi'
+!     &                               , status )
           end if
           
           if ( mode /= 2 ) then
@@ -3433,12 +3433,12 @@
             status = nf90mpi_inq_varid(ncid,'rho',rho_varid)
             call handle_error_pnetcdf('nfmpi_inq_varid: rho'
      &                               , status )
-            status = nf90mpi_inq_varid(ncid,'kh',kh_varid)
-            call handle_error_pnetcdf('nfmpi_inq_varid: kh'
-     &                               , status )
-            status = nf90mpi_inq_varid(ncid,'km',km_varid)
-            call handle_error_pnetcdf('nfmpi_inq_varid: km'
-     &                               , status )
+!            status = nf90mpi_inq_varid(ncid,'kh',kh_varid)
+!            call handle_error_pnetcdf('nfmpi_inq_varid: kh'
+!     &                               , status )
+!            status = nf90mpi_inq_varid(ncid,'km',km_varid)
+!            call handle_error_pnetcdf('nfmpi_inq_varid: km'
+!     &                               , status )
           end if
 
         end if !if ( iout == 1  ) then...
@@ -3494,14 +3494,14 @@
             status=nfmpi_put_vara_real_all(ncid,icec_varid,start,edge
      &                                                            ,out2)
             call handle_error_pnetcdf('nf_put_vara_real: icec',status)
-            out2 = real(iceu,4)
-            status=nfmpi_put_vara_real_all(ncid,ui_varid,start,edge
-     &                                                            ,out2)
-            call handle_error_pnetcdf('nf_put_vara_real: ui',status)
-            out2 = real(icev,4)
-            status=nfmpi_put_vara_real_all(ncid,vi_varid,start,edge
-     &                                                            ,out2)
-            call handle_error_pnetcdf('nf_put_vara_real: vi',status)
+!            out2 = real(iceu,4)
+!            status=nfmpi_put_vara_real_all(ncid,ui_varid,start,edge
+!     &                                                            ,out2)
+!            call handle_error_pnetcdf('nf_put_vara_real: ui',status)
+!            out2 = real(icev,4)
+!            status=nfmpi_put_vara_real_all(ncid,vi_varid,start,edge
+!     &                                                            ,out2)
+!            call handle_error_pnetcdf('nf_put_vara_real: vi',status)
           end if
 
 
@@ -3535,14 +3535,14 @@
             status=nfmpi_put_vara_real_all(ncid,rho_varid,start,edge
      &                                                            ,out3)
             call handle_error_pnetcdf('nf_put_vara_real: rho',status)
-            out3 = real(kh,4)
-            status=nfmpi_put_vara_real_all(ncid,kh_varid,start,edge
-     &                                                            ,out3)
-            call handle_error_pnetcdf('nf_put_vara_real: kh',status)
-            out3 = real(km,4)
-            status=nfmpi_put_vara_real_all(ncid,km_varid,start,edge
-     &                                                            ,out3)
-            call handle_error_pnetcdf('nf_put_vara_real: km',status)
+!            out3 = real(kh,4)
+!            status=nfmpi_put_vara_real_all(ncid,kh_varid,start,edge
+!     &                                                            ,out3)
+!            call handle_error_pnetcdf('nf_put_vara_real: kh',status)
+!            out3 = real(km,4)
+!            status=nfmpi_put_vara_real_all(ncid,km_varid,start,edge
+!     &                                                            ,out3)
+!            call handle_error_pnetcdf('nf_put_vara_real: km',status)
 
           end if
 
@@ -3597,14 +3597,14 @@
             status=nfmpi_put_vara_real_all(ncid,icec_varid,start,edge
      &                                                            ,out2)
             call handle_error_pnetcdf('nf_put_vara_real: icec',status)
-            out2 = real(iceu,4)
-            status=nfmpi_put_vara_real_all(ncid,ui_varid,start,edge
-     &                                                            ,out2)
-            call handle_error_pnetcdf('nf_put_vara_real: ui',status)
-            out2 = real(icev,4)
-            status=nfmpi_put_vara_real_all(ncid,vi_varid,start,edge
-     &                                                            ,out2)
-            call handle_error_pnetcdf('nf_put_vara_real: vi',status)
+!            out2 = real(iceu,4)
+!            status=nfmpi_put_vara_real_all(ncid,ui_varid,start,edge
+!     &                                                            ,out2)
+!            call handle_error_pnetcdf('nf_put_vara_real: ui',status)
+!            out2 = real(icev,4)
+!            status=nfmpi_put_vara_real_all(ncid,vi_varid,start,edge
+!     &                                                            ,out2)
+!            call handle_error_pnetcdf('nf_put_vara_real: vi',status)
           end if
 
           if ( mode /= 2 ) then
@@ -3636,14 +3636,14 @@
             status=nfmpi_put_vara_real_all(ncid,rho_varid,start,edge
      &                                                            ,out3)
             call handle_error_pnetcdf('nf_put_vara_real: rho',status)
-            out3 = real(kh_mean,4)
-            status=nfmpi_put_vara_real_all(ncid,kh_varid,start,edge
-     &                                                            ,out3)
-            call handle_error_pnetcdf('nf_put_vara_real: kh',status)
-            out3 = real(km_mean,4)
-            status=nfmpi_put_vara_real_all(ncid,km_varid,start,edge
-     &                                                            ,out3)
-            call handle_error_pnetcdf('nf_put_vara_real: km',status)
+!            out3 = real(kh_mean,4)
+!            status=nfmpi_put_vara_real_all(ncid,kh_varid,start,edge
+!     &                                                            ,out3)
+!            call handle_error_pnetcdf('nf_put_vara_real: kh',status)
+!            out3 = real(km_mean,4)
+!            status=nfmpi_put_vara_real_all(ncid,km_varid,start,edge
+!     &                                                            ,out3)
+!            call handle_error_pnetcdf('nf_put_vara_real: km',status)
           end if
 
       end if !if ( iout == 1  ) then... !lyo:20110224:stcc:
