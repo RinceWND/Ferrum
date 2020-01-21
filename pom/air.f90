@@ -876,7 +876,7 @@ module air
 
           select case ( mode )
 
-! Standard POM formula (LY Oey?)
+! mpiPOM formula with high wind-speed limit (XQ Yin, LY Oey, 2007)
             case ( 1 )
 
               if (     uvabs <=  11. ) then
