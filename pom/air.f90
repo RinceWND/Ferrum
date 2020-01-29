@@ -1350,10 +1350,10 @@ module air
         wvsurf(i,j) = wvsurf(i,j)*fsm(i,j)
         wtsurf(i,j) = wtsurf(i,j)*fsm(i,j)
         wssurf(i,j) = pme(i,j)*(s(i,j,1)+sbias)*fsm(i,j) ! sb? vf?
-        if ( abs(wssurf(i,j)).gt.1.e-2 ) then
-          print *, wssurf(i,j), pme(i,j), s(i,j,1)
-          stop
-        end if
+!        if ( abs(wssurf(i,j)).gt.1.e-2 ) then
+!          print *, wssurf(i,j), pme(i,j), s(i,j,1)
+!          stop
+!        end if
 
         if ( USE_DQDSST ) then ! From Roms_tools (Penven, Pierrick, et al. "Software tools for pre-and post-processing of oceanic regional simulations." Environmental Modelling & Software 23.5 (2008): 660-662.)
           wtsurf(i,j) = wtsurf(i,j)                                 &
