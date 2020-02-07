@@ -413,9 +413,9 @@ module bry
       ,    velvert_east,    velvert_north,    velvert_south,    velvert_west
 
       namelist/bry_nml/                                                &
-        bry_path, DERIVE_2D , el_name   , Hmax    , interp_bry         &
-      , MONTHLY , periodic_x, periodic_y, read_int, s_name             &
-      , t_name  , USE_SPONGE, u_name    , v_name
+        bry_path, DERIVE_2D   , el_name   , Hmax    , interp_bry       &
+      , MONTHLY , periodic_x  , periodic_y, read_int, s_name           &
+      , t_name  , USE_CALENDAR, USE_SPONGE, u_name  , v_name
 
       namelist/bry_cond/                                                     &
                 el_east,         el_north,         el_south,         el_west &
