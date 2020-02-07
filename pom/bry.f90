@@ -22,7 +22,7 @@ module bry
 !----------------------------------------------------------------------
   logical           &
        , private :: &
-    DERIVE_2D       & ! average 3D boudaries and use 2D only
+    DERIVE_2D       & ! average 3D boundaries and use 2D only
   , DISABLED        & ! active (read from file) boundaries
   , CLIM_BRY        & ! derive boundary values from climatology
   , hasEAST         & ! eastern boundary present
@@ -30,7 +30,8 @@ module bry
   , hasSOUTH        & ! southern boundary present
   , hasWEST         & ! western boundary present
   , INTERP_BRY      & ! active boundary interpolation [IMPLEMENTED PARTIALLY]
-  , MONTHLY           ! flag to read monthly
+  , MONTHLY         & ! flag to read monthly
+  , USE_CALENDAR
 
   integer           &
        , private :: &
@@ -454,10 +455,11 @@ module bry
       if ( n_west  == -1 ) hasWEST  = .true.
 
 ! Default configuration flags
-      USE_SPONGE = .false.
-      MONTHLY    = .true.
-      DERIVE_2D  = .true.
-      CLIM_BRY   = .true.
+      USE_SPONGE   = .false.
+      MONTHLY      = .true.
+      DERIVE_2D    = .true.
+      CLIM_BRY     = .true.
+      USE_CALENDAR = .true.
 
 ! Check for active boundary
       if ( use_bry ) DISABLED = .false.
@@ -754,7 +756,7 @@ module bry
 
         record(3) = mod( record(2), 12 ) + 1
 
-      else
+      elseif ( USE_CALENDAR ) then
 
         year = d_in%year
 
@@ -781,6 +783,11 @@ module bry
         end if
 
         record(1) = record(1) + 1
+
+      else
+
+        record = [ 1, 1, 2 ]
+        a = 0._rk
 
       end if
 
@@ -855,24 +862,42 @@ module bry
           print *, "[!!!] ", sec_of_month, mid_in_month, dti
         end if
 
-      else
+        elseif ( USE_CALENDAR ) then
 
-        year = d_in%year
+          year = d_in%year
 
-        max_in_this = max_chunks_in_year( d_in%year  , read_int )
-        max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
+          max_in_this = max_chunks_in_year( d_in%year  , read_int )
+          max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
 
 ! Decide on the record to read
-        chunk     = chunk_of_year( d_in, read_int )
-        record(1) = int(chunk)
+          chunk     = chunk_of_year( d_in, read_int )
+          record(1) = int(chunk)
 
-        if ( secs - record(1)*read_int < dti ) then ! TODO: test this one as well.
-          ADVANCE_REC = .true.
-        end if
+          if ( secs - record(1)*read_int < dti ) then ! TODO: test this one as well.
+            ADVANCE_REC = .true.
+          end if
 
 !      if ( is_master ) print *, "III", secs-record(1)*read_int, dti, ADVANCE_REC
 
-        record(1) = record(1) + 1
+          record(1) = record(1) + 1
+
+        else
+
+          record(1) = int( iint*dti / read_int ) + 1
+          record(2) = record(1)
+          record(3) = record(2) + 1
+
+! TODO: right now it interpolates between records (edges of rec1-rec2 span). Implement interpolation between the centers of record spans.
+          a = modulo( real(iint*dti), real(read_int) )
+          if ( a < dti ) then
+            if ( a >= 0. ) then
+              ADVANCE_REC = .true.
+            end if
+          end if
+          a = a / read_int
+!        print *, "A: ", a
+
+          ADVANCE_REC_INT = ADVANCE_REC
 
       end if
 
