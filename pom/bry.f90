@@ -2653,7 +2653,6 @@ module bry
                                    + 2.*u(3,j,k) + u(3,j+1,k) )   &
                                     + (1.-cff) * ( u(2,j-1,k)     &
                                    + 2.*u(2,j,k) + u(2,j+1,k) ) )
-                  uf(1,j,k) = uf(2,j,k)
                 end do
               end do
 
@@ -2668,7 +2667,6 @@ module bry
                   uf(2,j,k) = ( (1.-cff)*ub(2,j,k)    &
                                + 2.*cff * u(3,j,k) )  &
                               / (1.+cff)
-                  uf(1,j,k) = uf(2,j,k)
                 end do
               end do
 
@@ -2694,14 +2692,15 @@ module bry
                                - max(cy,0._rk)*grdy(1,j  )            &
                                - min(cy,0._rk)*grdy(1,j+1) )          &
                               / (cff+cx)
-                  uf(1,j,k) = uf(2,j,k)
                 end do
               end do
 
             case default
-              uf(1:2,:,:) = 0.
+              uf(2,:,:) = 0.
 
           end select
+
+          uf(1,:,:) = uf(2,:,:) ! Fill up unused cells
 
           select case ( BC % VEL3D % TANG % WEST )
 
@@ -2952,7 +2951,6 @@ module bry
                   vf(i,2,k) = ( (1.-cff)*vb(i,2,k)    &
                                + 2.*cff * v(i,3,k) )  &
                               / (1.+cff)
-                  vf(i,1,k) = vf(i,2,k)
                 end do
               end do
 
@@ -2978,7 +2976,6 @@ module bry
                                - max(cx,0._rk)*grdx(i  ,1)            &
                                - min(cx,0._rk)*grdx(i+1,1) )          &
                               / (cff+cy)
-                  vf(i,1,k) = vf(i,2,k)
                 end do
               end do
 
@@ -2986,6 +2983,8 @@ module bry
               vf(:,1:2,:) = 0.
 
           end select
+
+          vf(:,1,:) = vf(:,2,:) ! Fill up unused cells
 
           select case ( BC % VEL3D % TANG % SOUTH )
 
