@@ -434,6 +434,9 @@ module bry
 ! Set max depth
       hmax = 4500. !8000.
 
+! Set nudging timescale
+      tau = 2./86400. ! Half a day
+
 ! Set default relaxation thickness
       NFE = 1
       NFN = 1
