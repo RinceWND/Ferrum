@@ -97,7 +97,6 @@ module bry
 
   real(kind=rk)      &
     hmax             & ! maximal water depth
-  , tau              & ! nudging period
   , rfe              & ! flag for eastern open boundary
   , rfn              & ! flag for northern open boundary
   , rfs              & ! flag for southern open boundary
@@ -182,7 +181,7 @@ module bry
 !----------------------------------------------------------------------
 ! configuration vars
   type (BC_PERIODIC) periodic_bc
-  type (BC_TYPE)     BC, NUDGE
+  type (BC_TYPE)     BC
 ! data vars
   type (bry_2d) el_bry, ua_bry, va_bry
   type (bry_3d) s_bry, t_bry, u_bry, v_bry
@@ -539,71 +538,39 @@ module bry
       BC % zeta % NORTH = max(el_north,-1_1)
       BC % zeta % SOUTH = max(el_south,-1_1)
       BC % zeta % WEST  = max(el_west ,-1_1)
-      NUDGE % zeta % EAST  = 1
-      NUDGE % zeta % NORTH = 1
-      NUDGE % zeta % SOUTH = 1
-      NUDGE % zeta % WEST  = 1
 !   external velocity
       BC % vel2d % NORM % EAST  = max(vel2d_norm_east ,-1_1)
       BC % vel2d % NORM % NORTH = max(vel2d_norm_north,-1_1)
       BC % vel2d % NORM % SOUTH = max(vel2d_norm_south,-1_1)
       BC % vel2d % NORM % WEST  = max(vel2d_norm_west ,-1_1)
-      NUDGE % vel2d % NORM % EAST  = 1
-      NUDGE % vel2d % NORM % NORTH = 1
-      NUDGE % vel2d % NORM % SOUTH = 1
-      NUDGE % vel2d % NORM % WEST  = 1
       BC % vel2d % TANG % EAST  = max(vel2d_tang_east ,-1_1)
       BC % vel2d % TANG % NORTH = max(vel2d_tang_north,-1_1)
       BC % vel2d % TANG % SOUTH = max(vel2d_tang_south,-1_1)
       BC % vel2d % TANG % WEST  = max(vel2d_tang_west ,-1_1)
-      NUDGE % vel2d % TANG % EAST  = 1
-      NUDGE % vel2d % TANG % NORTH = 1
-      NUDGE % vel2d % TANG % SOUTH = 1
-      NUDGE % vel2d % TANG % WEST  = 1
 !   internal velocity
       BC % vel3d % NORM % EAST  = max(vel3d_norm_east ,-1_1)
       BC % vel3d % NORM % NORTH = max(vel3d_norm_north,-1_1)
       BC % vel3d % NORM % SOUTH = max(vel3d_norm_south,-1_1)
       BC % vel3d % NORM % WEST  = max(vel3d_norm_west ,-1_1)
-      NUDGE % vel3d % NORM % EAST  = 1
-      NUDGE % vel3d % NORM % NORTH = 1
-      NUDGE % vel3d % NORM % SOUTH = 1
-      NUDGE % vel3d % NORM % WEST  = 1
       BC % vel3d % TANG % EAST  = max(vel3d_tang_east ,-1_1)
       BC % vel3d % TANG % NORTH = max(vel3d_tang_north,-1_1)
       BC % vel3d % TANG % SOUTH = max(vel3d_tang_south,-1_1)
       BC % vel3d % TANG % WEST  = max(vel3d_tang_east ,-1_1)
-      NUDGE % vel3d % TANG % EAST  = 1
-      NUDGE % vel3d % TANG % NORTH = 1
-      NUDGE % vel3d % TANG % SOUTH = 1
-      NUDGE % vel3d % TANG % WEST  = 1
 !   temp and salt
       BC % ts % EAST  = max(ts_east ,-1_1)
       BC % ts % NORTH = max(ts_north,-1_1)
       BC % ts % SOUTH = max(ts_south,-1_1)
       BC % ts % WEST  = max(ts_west ,-1_1)
-      NUDGE % ts % EAST  = 1
-      NUDGE % ts % NORTH = 1
-      NUDGE % ts % SOUTH = 1
-      NUDGE % ts % WEST  = 1
 !   vertical velocity (IGNORED anyway)
       BC % velvert % EAST  = max(velvert_east ,-1_1)
       BC % velvert % NORTH = max(velvert_north,-1_1)
       BC % velvert % SOUTH = max(velvert_south,-1_1)
       BC % velvert % WEST  = max(velvert_west ,-1_1)
-      NUDGE % velvert % EAST  = 1
-      NUDGE % velvert % NORTH = 1
-      NUDGE % velvert % SOUTH = 1
-      NUDGE % velvert % WEST  = 1
 !   turbulent parameters
       BC % turb % EAST  = max(turb_east ,-1_1)
       BC % turb % NORTH = max(turb_north,-1_1)
       BC % turb % SOUTH = max(turb_south,-1_1)
       BC % turb % WEST  = max(turb_west ,-1_1)
-      NUDGE % turb % EAST  = 1
-      NUDGE % turb % NORTH = 1
-      NUDGE % turb % SOUTH = 1
-      NUDGE % turb % WEST  = 1
 
       if ( INTERP_BRY ) N = 2
 
@@ -1921,7 +1888,7 @@ module bry
 
       real(rk), dimension(im,2) :: grdx
       real(rk), dimension(2,jm) :: grdy
-      real(rk)                  :: cff, ct, cx, cy, dvdt, dvdx, dvdy
+      real(rk)                  :: cff, cx, cy, dvdt, dvdx, dvdy
 
 
 ! Apply periodic BC in x-dimension
@@ -1944,14 +1911,6 @@ module bry
                 dvdt =  el(imm1,j) - elf(imm1,j)
                 dvdx = elf(imm1,j) - elf(imm2,j)
 
-                if ( NUDGE % zeta % east > 0. ) then
-                  if ( dvdt*dvdx < 0. ) then
-                    ct = dti*tau*1.25
-                  else
-                    ct = dti*tau*0.8
-                  end if
-                end if
-
                 if ( (dvdt*(grdy(1,j)+grdy(1,j+1))) > 0. ) then
                   dvdy = grdy(1,j  )
                 else
@@ -1965,11 +1924,6 @@ module bry
                              - max( cy, 0._rk )*grdy(2,j  )  &
                              - min( cy, 0._rk )*grdy(2,j+1)  &
                              ) / ( cff + cx )
-
-                if ( NUDGE % zeta % east > 0. ) then
-                  elf(im,j) = elf(im,j)                          &
-                            + ct*( EL_bry%EST(1,j) - el(im,j) )
-                end if
               end do
 
             case ( bcCHAPMAN )
@@ -2000,14 +1954,6 @@ module bry
                 dvdt =  el(2,j) - elf(2,j)
                 dvdx = elf(2,j) - elf(3,j)
 
-                if ( NUDGE % zeta % west > 0. ) then
-                  if ( dvdt*dvdx < 0. ) then
-                    ct = dti*tau*1.25
-                  else
-                    ct = dti*tau*0.8
-                  end if
-                end if
-
                 if ( (dvdt*(grdy(2,j)+grdy(2,j+1))) > 0. ) then
                   dvdy = grdy(2,j  )
                 else
@@ -2021,11 +1967,6 @@ module bry
                             - max( cy, 0._rk )*grdy(1,j  )  &
                             - min( cy, 0._rk )*grdy(1,j+1)  &
                             ) / ( cff + cx )
-
-                if ( NUDGE % zeta % west > 0. ) then
-                  elf(1,j) = elf(1,j)                          &
-                           + ct*( EL_bry%WST(1,j) - el(1,j) )
-                end if
               end do
 
             case ( bcCHAPMAN )
@@ -2065,14 +2006,6 @@ module bry
                 dvdt =  el(i,jmm1) - elf(i,jmm1)
                 dvdy = elf(i,jmm1) - elf(i,jmm2)
 
-                if ( NUDGE % zeta % north > 0. ) then
-                  if ( dvdt*dvdy < 0. ) then
-                    ct = dti*tau*1.25
-                  else
-                    ct = dti*tau*0.8
-                  end if
-                end if
-
                 if ( (dvdt*(grdx(i,1)+grdx(i+1,1))) > 0. ) then
                   dvdx = grdx(i  ,1)
                 else
@@ -2086,11 +2019,6 @@ module bry
                             - max( cx, 0._rk )*grdx(i  ,2)   &
                             - min( cx, 0._rk )*grdx(i+1,2)   &
                             ) / ( cff + cy )
-
-                if ( NUDGE % zeta % north > 0. ) then
-                  elf(i,jm) = elf(i,jm)                          &
-                            + ct*( EL_bry%NTH(i,1) - el(i,jm) )
-                end if
               end do
 
             case ( bcCHAPMAN )
@@ -2120,14 +2048,6 @@ module bry
                 dvdt =  el(i,2) - elf(i,2)
                 dvdy = elf(i,2) - elf(i,3)
 
-                if ( NUDGE % zeta % south > 0. ) then
-                  if ( dvdt*dvdy < 0. ) then
-                    ct = dti*tau*1.25
-                  else
-                    ct = dti*tau*0.8
-                  end if
-                end if
-
                 if ( (dvdt*(grdx(i,2)+grdx(i+1,2))) > 0. ) then
                   dvdx = grdx(i  ,2)
                 else
@@ -2141,11 +2061,6 @@ module bry
                             - max( cx, 0._rk )*grdx(i  ,1)   &
                             - min( cx, 0._rk )*grdx(i+1,1)   &
                             ) / ( cff + cy )
-
-                if ( NUDGE % zeta % south > 0. ) then
-                  elf(i,1) = elf(i,1)                          &
-                           + ct*( EL_bry%STH(i,1) - el(i,1) )
-                end if
               end do
  
             case ( bcCHAPMAN )
