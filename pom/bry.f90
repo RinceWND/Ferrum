@@ -97,6 +97,7 @@ module bry
 
   real(kind=rk)      &
     hmax             & ! maximal water depth
+  , tau              & ! nudging timescale
   , rfe              & ! flag for eastern open boundary
   , rfn              & ! flag for northern open boundary
   , rfs              & ! flag for southern open boundary
