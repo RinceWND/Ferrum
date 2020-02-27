@@ -1885,8 +1885,8 @@ module bry
 !
       use glob_const, only: g => GRAV, SMALL
       use glob_grid , only: dx, dy, fsm
-      use glob_ocean, only: dt, el, elf!, uab, uaf, vab, vaf
-      use model_run , only: dti
+      use glob_ocean, only: d, el, elf!, uab, uaf, vab, vaf
+      use model_run , only: dte
 
       implicit none
 
@@ -1932,8 +1932,8 @@ module bry
 
             case ( bcCHAPMAN )
               do j = 2,jmm1
-                cff = dti/dx(imm1,j)
-                cx  = cff*sqrt( g*dt(imm1,j) )
+                cff = dte/dx(imm1,j)
+                cx  = cff*sqrt( g*d(imm1,j) )
                 elf(im,j) = ( el(im,j) + cx*elf(imm1,j) )/(1.+cx)
               end do
 
@@ -1975,8 +1975,8 @@ module bry
 
             case ( bcCHAPMAN )
               do j = 2,jmm1
-                cff = dti/dx(2,j)
-                cx  = cff*sqrt( g*dt(2,j) )
+                cff = dte/dx(2,j)
+                cx  = cff*sqrt( g*d(2,j) )
                 elf(1,j) = ( el(1,j) + cx*elf(2,j) )/(1.+cx)
               end do
 
@@ -2027,8 +2027,8 @@ module bry
 
             case ( bcCHAPMAN )
               do i = 2,imm1
-                cff = dti/dy(i,jmm1)
-                cy  = cff*sqrt( g*dt(i,jmm1) )
+                cff = dte/dy(i,jmm1)
+                cy  = cff*sqrt( g*d(i,jmm1) )
                 elf(i,jm) = ( el(i,jm) + cy*elf(i,jmm1) )/(1.+cy)
               end do
 
@@ -2069,8 +2069,8 @@ module bry
  
             case ( bcCHAPMAN )
               do i = 2,imm1
-                cff = dti/dy(i,2)
-                cy  = cff*sqrt( g*dt(i,2) )
+                cff = dte/dy(i,2)
+                cy  = cff*sqrt( g*d(i,2) )
                 elf(i,1) = ( el(i,1) + cy*elf(i,2) )/(1.+cy)
               end do
 
