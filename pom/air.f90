@@ -459,7 +459,7 @@ module air
         end if
       end if
 
-      if ( read_heat ) then
+      if ( read_heat .or. use_fluxes ) then
         N = 1
         if ( interp_heat ) N = 3
         allocate(         &
@@ -568,6 +568,9 @@ module air
 
 ! Calculate wind stress
         if ( USE_BULK ) then
+          if ( READ_HEAT ) then
+            dlrad(:,:,1) = ( 1. - a ) * dlrad(:,:,2) + a * dlrad(:,:,3)
+          end if
           call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
           call calculate_fluxes
         end if
@@ -945,9 +948,9 @@ module air
         e_atmos = 0.01 * ( pres(:,:,1) - 1013. )
 
 ! Calculate fluxes
-        if ( USE_BULK ) then
+!        if ( USE_BULK ) then
           call bulk_fluxes
-        end if
+!        end if
 
       end if
 
@@ -1075,6 +1078,7 @@ module air
         precip    = rain(i,j,1)/1000._rk ! rwnd: precipitation rate from kg/(m2*s) to m/s
         cld       = maxval((/0._rk,cloud(i,j,1)/100._rk/)) ! rwnd: total cloud cover from % to tenths
         sst_model = t(i,j,1) + tbias
+        lwrd      = dlrad(i,j,1)
 
         if ( i < im ) then
           usrf = .5_rk*(u(i+1,j,1)+u(i,j,1))
@@ -1099,7 +1103,7 @@ module air
 ! --- TNOW is already in Kelvin
 !
         sstk  = sst_model + C2K
-        tnowk = tnow + C2K
+        tnowk = tnow      + C2K
 !
 !
 ! ---calculates the Saturation Vapor Pressure at air temp. and at sea temp.
