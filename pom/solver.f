@@ -1258,7 +1258,7 @@
 
 ! convert a 2nd order matrices to special 4th order
 ! special 4th order case
-      call order2d_mpi(d,d4th,im,jm)
+      call order2d_mpi(dt,d4th,im,jm)
       call order3d_mpi(rho,rho4th,im,jm,kb)
 
 ! compute terms correct to 4th order
@@ -1274,8 +1274,8 @@
             drho(i,j,k)=   (rho(i,j,k)-rho(i-1,j,k))*dum(i,j)
             rhou(i,j,k)=.5*(rho(i,j,k)+rho(i-1,j,k))*dum(i,j)
           end do
-          ddx(i,j)=   (d(i,j)-d(i-1,j))*dum(i,j)
-          d4(i,j) =.5*(d(i,j)+d(i-1,j))*dum(i,j)
+          ddx(i,j)=   (dt(i,j)-dt(i-1,j))*dum(i,j)
+          d4(i,j) =.5*(dt(i,j)+dt(i-1,j))*dum(i,j)
         end do
       end do
 
@@ -1292,12 +1292,12 @@
      $                    dum(i-1,j)*(rho(i-1,j,k)-rho(i-2,j,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dum(i+1,j)*(d(i+1,j)-d(i,j))-
-     $               2.*(d(i,j)-d(i-1,j))+
-     $               dum(i-1,j)*(d(i-1,j)-d(i-2,j)))
+     $               (dum(i+1,j)*(dt(i+1,j)-dt(i,j))-
+     $               2.*(dt(i,j)-dt(i-1,j))+
+     $               dum(i-1,j)*(dt(i-1,j)-dt(i-2,j)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dum(i+1,j)*(d(i,j)-d(i+1,j))+
-     $              dum(i-1,j)*(d(i-1,j)-d(i-2,j)))
+     $              (dum(i+1,j)*(dt(i,j)-dt(i+1,j))+
+     $              dum(i-1,j)*(dt(i-1,j)-dt(i-2,j)))
           end do
         end do
       else
@@ -1313,12 +1313,12 @@
      $                    dum(i-1,j)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dum(i+1,j)*(d(i+1,j)-d(i,j))-
-     $               2.*(d(i,j)-d(i-1,j))+
-     $               dum(i-1,j)*(d(i-1,j)-d4th(i-2,j)))
+     $               (dum(i+1,j)*(dt(i+1,j)-dt(i,j))-
+     $               2.*(dt(i,j)-dt(i-1,j))+
+     $               dum(i-1,j)*(dt(i-1,j)-d4th(i-2,j)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dum(i+1,j)*(d(i,j)-d(i+1,j))+
-     $              dum(i-1,j)*(d(i-1,j)-d4th(i-2,j)))
+     $              (dum(i+1,j)*(dt(i,j)-dt(i+1,j))+
+     $              dum(i-1,j)*(dt(i-1,j)-d4th(i-2,j)))
           end do
         end do
       end if
@@ -1374,8 +1374,8 @@
             drho(i,j,k)=   (rho(i,j,k)-rho(i,j-1,k))*dvm(i,j)
             rhou(i,j,k)=.5*(rho(i,j,k)+rho(i,j-1,k))*dvm(i,j)
           end do
-          ddx(i,j)=   (d(i,j)-d(i,j-1))*dvm(i,j)
-          d4(i,j) =.5*(d(i,j)+d(i,j-1))*dvm(i,j)
+          ddx(i,j)=   (dt(i,j)-dt(i,j-1))*dvm(i,j)
+          d4(i,j) =.5*(dt(i,j)+dt(i,j-1))*dvm(i,j)
         end do
       end do
 
@@ -1392,12 +1392,12 @@
      $                    dvm(i,j-1)*(rho(i,j-1,k)-rho(i,j-2,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dvm(i,j+1)*(d(i,j+1)-d(i,j))-
-     $               2.*(d(i,j)-d(i,j-1))+
-     $               dvm(i,j-1)*(d(i,j-1)-d(i,j-2)))
+     $               (dvm(i,j+1)*(dt(i,j+1)-dt(i,j))-
+     $               2.*(dt(i,j)-dt(i,j-1))+
+     $               dvm(i,j-1)*(dt(i,j-1)-dt(i,j-2)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dvm(i,j+1)*(d(i,j)-d(i,j+1))+
-     $              dvm(i,j-1)*(d(i,j-1)-d(i,j-2)))
+     $              (dvm(i,j+1)*(dt(i,j)-dt(i,j+1))+
+     $              dvm(i,j-1)*(dt(i,j-1)-dt(i,j-2)))
           end do
         end do
       else
@@ -1413,12 +1413,12 @@
      $                    dvm(i,j-1)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dvm(i,j+1)*(d(i,j+1)-d(i,j))-
-     $               2.*(d(i,j)-d(i,j-1))+
-     $               dvm(i,j-1)*(d(i,j-1)-d4th(i,j-2)))
+     $               (dvm(i,j+1)*(dt(i,j+1)-dt(i,j))-
+     $               2.*(dt(i,j)-dt(i,j-1))+
+     $               dvm(i,j-1)*(dt(i,j-1)-d4th(i,j-2)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dvm(i,j+1)*(d(i,j)-d(i,j+1))+
-     $              dvm(i,j-1)*(d(i,j-1)-d4th(i,j-2)))
+     $              (dvm(i,j+1)*(dt(i,j)-dt(i,j+1))+
+     $              dvm(i,j-1)*(dt(i,j-1)-d4th(i,j-2)))
           end do
         end do
       end if
@@ -1776,6 +1776,7 @@
       use glob_grid  , only: dx, dy, dz, z, zz
       use glob_ocean , only: d, drhox, drhoy, dt, rho
       use model_run  , only: ramp
+      use clim       , only: rmean
 
       implicit none
 
@@ -1790,7 +1791,7 @@
       real(kind=rk), dimension(im,jm)   :: fc, aux, idRx, idZx
 
 
-!      rho = rho-rmean
+      rho = rho-rmean
 
 !
 !-----------------------------------------------------------------------
@@ -1970,7 +1971,7 @@
       drhox = - ramp*drhox
       drhoy = - ramp*drhoy
 
-!      rho = rho+rmean
+      rho = rho+rmean
 
 
       end ! subroutine baropg_shch
@@ -3838,15 +3839,15 @@
         do j=1,jm
           do i=1,im
           f(i,j,ki)=(ee(i,j,ki)*f(i,j,ki+1)+gg(i,j,ki))
-              if ( f(i,j,ki) == f(i,j,ki)+1 ) then
-                print *, "[ PROFT ]", i_global(i), j_global(j)
-                print *, " ee: ", ee(i,j,ki)
-                print *, " f+: ", f(i,j,ki+1)
-                print *, " gg: ", gg(i,j,ki)
-                print *, " sw: ", swrad(i,j)
-                print *, " wf: ", wfsurf(i,j)
-                stop
-              end if
+!              if ( f(i,j,ki) == f(i,j,ki)+1 ) then
+!                print *, "[ PROFT ]", i_global(i), j_global(j)
+!                print *, " ee: ", ee(i,j,ki)
+!                print *, " f+: ", f(i,j,ki+1)
+!                print *, " gg: ", gg(i,j,ki)
+!                print *, " sw: ", swrad(i,j)
+!                print *, " wf: ", wfsurf(i,j)
+!                stop
+!              end if
           end do
         end do
       end do
