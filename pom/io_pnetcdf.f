@@ -1284,7 +1284,7 @@
       write(netcdf_file,'(a)') filepath
 
       if ( is_master )
-     &     print '(/''reading file '',a)', trim(netcdf_file)
+     &     print '(/"reading file ",a," @ ",i2)', trim(netcdf_file), n
       status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE
      &                     , MPI_INFO_NULL, ncid )
       call handle_error_pnetcdf( 'nfmpi_open: '//netcdf_file
@@ -1360,7 +1360,7 @@
       write(netcdf_file,'(a)') filepath
 
       if ( is_master )
-     &     print '(/''reading file '',a)', trim(netcdf_file)
+     &     print '(/"reading file ",a," @ ",i2)', trim(netcdf_file), n
       status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE
      &                     , MPI_INFO_NULL, ncid )
       call handle_error_pnetcdf( 'nfmpi_open: '//netcdf_file
