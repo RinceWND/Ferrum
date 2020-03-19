@@ -638,7 +638,8 @@ module air
       use config     , only: nbct
       use module_time
       use model_run  , only: dti, iint, sec_of_year
-      use seaice     , only: icec!, itsurf
+!      use glob_const , only: rhoref
+!      use seaice     , only: icec, tauiwu, tauiwv!, itsurf
 
       implicit none
 
@@ -804,9 +805,11 @@ module air
       if ( nbct == 1 ) wtsurf = wtsurf + swrad
 
 ! Simple parameterisation
-      swrad  =  swrad*(1.-icec)
+      swrad  =  swrad*(1.-icec*0.9)
       wtsurf = wtsurf*(1.-icec)! + itsurf*icec ! [TODO] itsurf is unstable after spinup for some reason
       wssurf = wssurf*(1.-icec)
+!      wusurf = icec*tauiwu/rhoref + (1.-icec)*wusurf
+!      wvsurf = icec*tauiwv/rhoref + (1.-icec)*wvsurf
 !      print *, "WT:", minval(wtsurf), maxval(wtsurf)
 !      print *, "WS:", minval(wssurf), maxval(wssurf)
 !      print *, "IT:", minval(itsurf), maxval(itsurf)
