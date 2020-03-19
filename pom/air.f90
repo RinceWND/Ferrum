@@ -463,7 +463,6 @@ module air
       if ( read_heat .or. use_fluxes ) then
         if ( interp_heat ) N = 3
         allocate(         &
-          dlrad(im,jm,N)  &
         , sheat(im,jm,N)  &
         , srad(im,jm,N)   &
         , lheat(im,jm,N)  &
