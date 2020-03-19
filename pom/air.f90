@@ -639,7 +639,7 @@ module air
       use module_time
       use model_run  , only: dti, iint, sec_of_year
 !      use glob_const , only: rhoref
-!      use seaice     , only: icec, tauiwu, tauiwv!, itsurf
+      use seaice     , only: icec!, tauiwu, tauiwv!, itsurf
 
       implicit none
 
