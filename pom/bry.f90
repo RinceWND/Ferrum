@@ -3637,7 +3637,7 @@ module bry
         end if
 
       end if
-! Allpy rho-mask
+! Apply rho-mask
       do k = 1,kbm1
         uf(:,:,k) = uf(:,:,k)*fsm
         vf(:,:,k) = vf(:,:,k)*fsm

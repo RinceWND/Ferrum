@@ -459,8 +459,8 @@ module air
         end if
       end if
 
+      N = 1
       if ( read_heat .or. use_fluxes ) then
-        N = 1
         if ( interp_heat ) N = 3
         allocate(         &
           dlrad(im,jm,N)  &
@@ -470,6 +470,8 @@ module air
         , lrad(im,jm,N)   &
          )
       end if
+      allocate( dlrad(im,jm,N) )
+      dlrad = 370.
 
 
     end ! subroutine allocate_arrays
@@ -600,7 +602,12 @@ module air
       if ( nbct == 1 ) wtsurf = wtsurf + swrad
 
 ! Simple parameterisation
-      swrad  =  swrad*(1.-icec)
+!  Assume that at least 10% solar penetration exists even at 10/10 sea ice concentration.
+! Scale linearly the rest.
+!  Assume that there is no thermal radiation from sea at 10/10 concentrations.
+! To adjust subice sea temperature surface relaxation is being used at the moment.
+!  Assume that there is no salt exchange at 10/10 concentrations.
+      swrad  =  swrad*(1.-icec*0.9)
       wtsurf = wtsurf*(1.-icec)! + itsurf*icec
       wssurf = wssurf*(1.-icec)
 
@@ -903,8 +910,10 @@ module air
 
           end select
 
-          ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-u(i,j,1)) *(1.-icec(i,j))
-          vstr(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j)-v(i,j,1)) *(1.-icec(i,j))
+!  Assume that free moving ice packs even at 10/10 concentrations pass at least half the momentum from atmosphere.
+! TODO: If info about fast ice is available, damp any momentum flux over such areas to zero.
+          ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-u(i,j,1)) *(1.-icec(i,j)*0.5)
+          vstr(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j)-v(i,j,1)) *(1.-icec(i,j)*0.5)
 
         end do
       end do

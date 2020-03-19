@@ -200,8 +200,8 @@ module clim
         print *, "Background TS : ", trim(ts_mean_path)
         print *, "Climatology UV: ", trim(uv_clim_path)
         print *, "-----"
-        print '(a,e7.3)', "Deep (slow) relaxation period:    ", deep_rel
-        print '(a,e7.3)', "Surface (fast) relaxation period: ", surf_rel
+        print '(a,f8.2)', "Deep (slow) relaxation period:    ", deep_rel
+        print '(a,f8.2)', "Surface (fast) relaxation period: ", surf_rel
       end if
 
 ! Allocate necessary arrays

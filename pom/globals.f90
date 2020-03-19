@@ -11,7 +11,7 @@ module glob_const
   integer, parameter :: PATH_LEN = 120  &
                       ,  VAR_LEN =  40
 
-  real(kind=rk)      &
+  real(rk)           &
     c2k              & ! Celcius to Kelvin
   , cpw              & ! seawater specific heat
   , deg2rad          & ! pi/180.
@@ -28,18 +28,18 @@ module glob_const
 
     subroutine initialize_constants !( constants_override_nml ) : TODO
 
-      c2k     = 273.16       ! Celcius to Kelvin offset
-      cpw     = 3986.        ! Specific heat of water (J/kg)
-      pi      = atan(1.)*4.  ! PI
-      deg2rad = pi/180.      ! degrees to radians conversion factor
-      grav    = 9.806        ! gravity constant (m/s^2)
-      small   = 1.e-10       ! small value
-      kappa   = 0.4          ! VonKarman's constant
-      ohm     = 7.29e-5      ! angular frequency of Earth
-      rhoref  = 1025.        ! recommended values: 1025 for seawater,
-                             !                     1000 for freswater
-      rho_cpw = rhoref*cpw   ! Seawater density times the specific heat of seawater
-      sec2day = 1./86400.    ! seconds to days conversion factor
+      c2k     = 273.16        _rk  ! Celcius to Kelvin offset
+      cpw     = 3986.         _rk  ! Specific heat of water (J/kg)
+      pi      = atan(1._rk)*4._rk  ! PI
+      deg2rad = pi/180._rk         ! degrees to radians conversion factor
+      grav    = 9.806         _rk  ! gravity constant (m/s^2)
+      small   = 1.e-10        _rk  ! small value
+      kappa   = 0.4           _rk  ! VonKarman's constant
+      ohm     = 7.29e-5       _rk  ! angular frequency of Earth
+      rhoref  = 1025.         _rk  ! recommended values: 1025 for seawater,
+                                   !                     1000 for freshwater
+      rho_cpw = rhoref*cpw         ! Seawater density times the specific heat of seawater
+      sec2day = 1._rk/86400._rk    ! seconds to days conversion factor
 
     end subroutine
 
@@ -80,7 +80,7 @@ module glob_domain
 ! in initialize.f won't work
 
 !----------------------------------------------------------------------
-! Efective grid size
+! Effective grid size
 !----------------------------------------------------------------------
   integer            &
     im               & ! number of grid points used in local x domains
@@ -119,10 +119,10 @@ module glob_domain
   integer               &
       , allocatable     &
       , dimension(:) :: & 
-    i_global        & ! global i index for each point in local domain
-  , i_global_coarse & ! global i index for each point in local domain
-  , j_global        & ! global j index for each point in local domain
-  , j_global_coarse   ! global j index for each point in local domain
+    i_global            & ! global i index for each point in local domain
+  , i_global_coarse     & ! global i index for each point in local domain
+  , j_global            & ! global j index for each point in local domain
+  , j_global_coarse       ! global j index for each point in local domain
 
 
   contains
@@ -164,10 +164,10 @@ module glob_domain
 
       if ( im_global_coarse == 0 ) im_global_coarse = im_global
       if ( jm_global_coarse == 0 ) jm_global_coarse = jm_global
-      if ( im_local_coarse == 0 ) im_local_coarse = im_local
-      if ( jm_local_coarse == 0 ) jm_local_coarse = jm_local
+      if ( im_local_coarse  == 0 ) im_local_coarse  = im_local
+      if ( jm_local_coarse  == 0 ) jm_local_coarse  = jm_local
 
-! allocate vriables for domain distribution
+! allocate variables for domain distribution
       allocate(                          &
        i_global(im_local)                &
      , j_global(jm_local)                &
@@ -198,7 +198,7 @@ module glob_out
   , irestart       & ! restart file writing time step [in iint]
   , iouts
 
-  real(kind=rk)    &
+  real(rk)         &
     prtd1          & ! output interval (days)
   , prtd2          & ! output interval for SURF.* file (days)
   , write_rst        ! restart output interval [days]
@@ -206,7 +206,7 @@ module glob_out
 !----------------------------------------------------------------------
 ! Averages for 2D variables' output
 !----------------------------------------------------------------------
-  real(kind=rk)              &
+  real(rk)                   &
        , allocatable         &
        , dimension(:,:)   :: &
 ! Standard output
@@ -228,7 +228,7 @@ module glob_out
 !----------------------------------------------------------------------
 ! Averages for 3D variables' output
 !----------------------------------------------------------------------
-  real(kind=rk)              &
+  real(rk)                   &
        , allocatable         &
        , dimension(:,:,:) :: &
     kh_mean          &
@@ -268,7 +268,7 @@ module model_run
   , sec_of_month     & ! current second of a month (s)
   , sec_of_year        ! seconds since the beginning of year
 
-  real(kind=rk)      &
+  real(rk)           &
     days             & ! run duration in days
   , dte              & ! external (2-D) time step (s)
   , dte2             & ! 2*dte
@@ -280,7 +280,7 @@ module model_run
   , time             & ! model time (days)
   , time0              ! initial time (days)
 
-  character(len=26)  &
+  character(26)      &
     time_start       & ! date and time of start of initial run of model
   , datetime           ! current model datetime string
 
@@ -311,17 +311,17 @@ module model_run
 
 ! Determine internal timestep
       dti  = dte*real(isplit)
-      dte2 = dte*2
-      dti2 = dti*2
+      dte2 = dte*2._rk
+      dti2 = dti*2._rk
 
 ! Define number of steps and output intervals
-      iend    = max( nint(       days*24.*3600./dti), 2 )
-      iprint  = max( nint(      prtd1*24.*3600./dti), 1 )
-      irestart= max( nint(  write_rst*24.*3600./dti), 1 )
-      iprints = max( nint(      prtd2*24.*3600./dti), 1 )
+      iend    = max( nint(       days*86400._rk/dti), 2 )
+      iprint  = max( nint(      prtd1*86400._rk/dti), 1 )
+      irestart= max( nint(  write_rst*86400._rk/dti), 1 )
+      iprints = max( nint(      prtd2*86400._rk/dti), 1 )
 
-      ispi = 1./    real(isplit)
-      isp2i= 1./(2.*real(isplit))
+      ispi = 1._rk/       real(isplit)
+      isp2i= 1._rk/(2._rk*real(isplit))
 
 ! Initialize time
 ! Do not offset time if not restarting
@@ -330,13 +330,13 @@ module model_run
         dtime_offset = str2date(  time_start(1:19) )
         dtime        = str2date( time_string(1:19) )
 
-        time0 = real( (dtime-dtime_offset)/86400 )
+        time0 = real( (dtime-dtime_offset)/86400 ) ! Why should this be integer division?
 
       else
 
         dtime = str2date( time_start )
 
-        time0 = 0.
+        time0 = 0._rk
 
       end if
 
@@ -351,7 +351,7 @@ module model_run
 
       implicit none
 
-      time = dti*real(iint)/86400. + time0
+      time = dti*real(iint)/86400._rk + time0
 
       if( is_leap( dtime%year ) ) then
         days_in_month(2) = 29
@@ -404,9 +404,9 @@ module glob_grid
   public
 
 !----------------------------------------------------------------------
-! Vertical discretization
+! Vertical discretisation
 !----------------------------------------------------------------------
-  real(kind=rk)              &
+  real(rk)                   &
        , allocatable         &
        , dimension(:)     :: &
     dz               & ! z(k)-z(k+1)
@@ -415,15 +415,15 @@ module glob_grid
   , zz                 ! sigma coordinate, intermediate between z
 
 !----------------------------------------------------------------------
-! Horizontal discretization
+! Horizontal discretisation
 !----------------------------------------------------------------------
-  real(kind=rk)              &
+  real(rk)                   &
        , allocatable         &
        , dimension(:,:)   :: &
     art              & ! cell area centered on T grid points
   , aru              & ! cell area centered on U grid points
   , arv              & ! cell area centered on V grid points
-  , cor              & ! coriolis parameter
+  , cor              & ! Coriolis parameter
   , dum              & ! mask for u velocity
   , dvm              & ! mask for v velocity
   , dx               & ! grid spacing in x
@@ -454,7 +454,7 @@ module glob_ocean
 !----------------------------------------------------------------------
 ! Ocean state 2D arrays
 !----------------------------------------------------------------------
-  real(kind=rk)              &
+  real(rk)                   &
        , allocatable         &
        , dimension(:,:)   :: &
     aam2d            & ! vertical average of aam
@@ -497,7 +497,7 @@ module glob_ocean
 !----------------------------------------------------------------------
 ! Ocean state 3D arrays
 !----------------------------------------------------------------------
-  real(kind=rk)              &
+  real(rk)                   &
        , allocatable         &
        , dimension(:,:,:) :: &
     aam              & ! horizontal kinematic viscosity
@@ -549,7 +549,7 @@ module glob_misc
 !----------------------------------------------------------------------
 ! 2-D arrays
 !----------------------------------------------------------------------
-  real(kind=rk)              &
+  real(rk)                   &
        , allocatable         &
        , dimension(:,:)   :: &
     aamfac           & ! aam factor for subroutine incmix
@@ -584,7 +584,7 @@ module glob_bry
 !----------------------------------------------------------------------
 ! 1D boundary arrays
 !----------------------------------------------------------------------
-  real(kind=rk)              &
+  real(rk)                   &
        , allocatable         &
        , dimension(:)     :: &
     cibe      & ! sea ice concentration at the eastern open boundary
@@ -595,7 +595,7 @@ module glob_bry
 !----------------------------------------------------------------------
 ! 2D boundary arrays
 !----------------------------------------------------------------------
-  real(kind=rk)              &
+  real(rk)                   &
        , allocatable         &
        , dimension(:,:)   :: &
     ampe      & ! M2/K1 eta amplitude at the eastern open boundary

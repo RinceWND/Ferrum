@@ -1258,7 +1258,7 @@
 !
       subroutine read_clim_ts_pnetcdf(temp,salt,filepath,n)
 !----------------------------------------------------------------------
-!  Read montly climatology of temperature and salinity
+!  Read monthly climatology of temperature and salinity
 !______________________________________________________________________
 
       use glob_const , only: rk
