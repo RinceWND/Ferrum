@@ -341,8 +341,9 @@ module tide
 !______________________________________________________________________
 !
       use glob_domain, only: im, jm, POM_COMM, my_task
-      use glob_grid  , only:  east_e,  east_u,  east_v  &
+      use grid       , only:  east_e,  east_u,  east_v  &
                            , north_e, north_u, north_v
+      use io
       use mpi        , only: MPI_INFO_NULL
       use pnetcdf
 
@@ -493,9 +494,9 @@ module tide
 !______________________________________________________________________
 !
       use glob_domain, only: im, jm, my_task, POM_COMM
-      use glob_grid  , only: fsm, east_e, east_u, east_v, rot  &
+      use grid       , only: fsm, east_e, east_u, east_v, rot  &
                            , north_e, north_u, north_v
-      use air, only:e_atmos
+      use io
       use module_time
       use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
       use pnetcdf
@@ -901,148 +902,7 @@ module tide
 
     end ! function get_filemname
 !
-!
-!= I/O SECTION ========================================================
 !______________________________________________________________________
-!
-    subroutine read_var_nc( var_name, var, record, ncid )
-!----------------------------------------------------------------------
-!  Read a variable (NC format).
-!______________________________________________________________________
-!
-      use glob_const , only: C2K, rk
-      use glob_domain
-      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
-      use pnetcdf
-
-      implicit none
-
-      integer, external :: get_var_real_3d
-
-      integer                   , intent(inout) :: ncid
-      integer                   , intent(in   ) :: record
-      real(rk), dimension(im,jm), intent(  out) :: var
-      character(len=*)          , intent(in   ) :: var_name
-
-      integer                  status, varid
-      integer(MPI_OFFSET_KIND) start(4), edge(4)
-      character(len=64)        units
-
-
-      start = 1
-      edge  = 1
-
-! get variable
-      call check( nf90mpi_inq_varid( ncid, var_name, varid )  &
-                , 'nfmpi_inq_varid: '//trim(var_name) )
-
-! set reading area
-      start(1) = i_global(1)
-      start(2) = j_global(1)
-      start(3) = record
-      edge(1) = im
-      edge(2) = jm
-      edge(3) =  1
-
-! get data
-      call check( get_var_real_3d                    &
-                  ( ncid, varid, start, edge, var )  &
-                , 'get_var_real: '//trim(var_name) )
-
-! convert data if necessary
-      status = nf90mpi_get_att( ncid, varid, "units", units )
-      if ( status == NF_NOERR ) then
-        select case ( trim(units) )
-          case ( "K" )
-            var = var - C2K
-          case ( "Pa" )
-            var = var/100.
-        end select
-      end if
-
-
-      end ! subroutine read_var_nc
-!
-!___________________________________________________________________
-!
-    integer function file_open_nc( path, year )
-!-------------------------------------------------------------------
-!  Opens netcdf file for reading.
-!___________________________________________________________________
-!
-      use glob_domain, only: POM_COMM
-      use mpi        , only: MPI_INFO_NULL
-      use pnetcdf    , only: nf90mpi_open, NF_NOERR, NF_NOWRITE
-
-      implicit none
-
-      integer         , intent(in) :: year
-      character(len=*), intent(in) :: path
-
-      integer            status
-      character(len=256) filename, netcdf_file
-
-
-      filename = get_filename( path, year )
-      netcdf_file = trim(filename)
-      status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE   &
-                           , MPI_INFO_NULL, file_open_nc )
-      if ( status /= NF_NOERR ) then
-        call msg_print("", 2, "Failed to open `"//trim(filename)//"`")
-        file_open_nc = -1
-      end if
-
-    end ! function file_open_nc
-!
-!___________________________________________________________________
-!
-    integer function file_close_nc( ncid )
-!-------------------------------------------------------------------
-!  Opens netcdf file for reading.
-!___________________________________________________________________
-!
-      use pnetcdf, only: nf90mpi_close
-
-      implicit none
-
-      integer, intent(in) :: ncid
-
-
-      file_close_nc = nf90mpi_close( ncid )
-
-
-    end ! function file_close_nc
-!
-!______________________________________________________________________
-!
-    subroutine check(status, routine)
-!----------------------------------------------------------------------
-!  Checks for NetCDF I/O error and exits with an error message if hits.
-!______________________________________________________________________
-!
-      use glob_domain, only: error_status, is_master
-      use pnetcdf    , only: nf90mpi_strerror, NF_NOERR
-
-      implicit none
-
-      integer         , intent(in) :: status
-      character(len=*), intent(in) :: routine
-
-
-      if ( status /= NF_NOERR ) then
-        error_status = 1
-        if ( is_master ) then
-          print '(/a,a)', 'IO error at module `TIDE`: ', routine
-          print '("[",i4,"] ",a)', status, nf90mpi_strerror(status)
-!          call finalize_mpi
-!          stop
-        end if
-        call finalize_mpi
-        stop
-      end if
-
-
-    end ! subroutine check
 !
 ! INTERPOLATION ROUTINES (TODO: move to separate module)
 !______________________________________________________________________

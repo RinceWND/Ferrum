@@ -51,7 +51,7 @@ module config
 
   character(len=PATH_LEN) &
     netcdf_file           & ! output netcdf filename
-  , restart_file            ! restart filename to read from
+  , initial_file            ! restart filename to read from
 
 
   parameter( lono=999.0,lato=999.0, xs=1.5,ys=1.5, fak=0.5)
@@ -281,7 +281,7 @@ module config
 !
       use glob_const , only: rk
       use glob_out   , only: prtd1, prtd2, write_rst
-      use model_run  , only: days, dte, isplit, time_start
+      use model_run  , only: days, dte, isplit, initialize_time, time_start
 
       implicit none
 
@@ -293,7 +293,7 @@ module config
 
       namelist/run_nml/                          &
         days      , dte  , do_restart  , isplit  &
-      , time_start, title, restart_file, spinup
+      , time_start, title, initial_file, spinup
 
       namelist/setup_nml/                     &
         aam_init, alpha , cbcmax, cbcmin      &
@@ -327,10 +327,11 @@ module config
       read ( 73, nml = modules_nml )
       close( 73 )
 
-!  Do some configuration management.
-      if ( .not. do_restart ) restart_file = ''
+! Initialize time
+      call initialize_time( time_start, do_restart )
 
 ! End of input of constants
+      call print_config
 
 
     end ! subroutine read_config
@@ -349,62 +350,65 @@ module config
 
       implicit none
 
+      integer i
+
 
       if ( .not.is_master ) return
 
 ! Print initial (core) summary
-      print '(/'' [ '',a40, '' ] '')', title
-      print '(/'' MODE       = '',i10)', mode
-      print '('' nadv       = '',i10)', nadv
-      print '('' nitera     = '',i10)', nitera
-      print '('' sw         = '',f10.4)', sw
-      print '('' npg        = '',i10)', npg    !fhx:Toni:npg
-      print '('' do_restart = '',l2)', do_restart
-      print '('' write_rst  = '',f10.4)', write_rst
-      print '('' irestart   = '',i10)', irestart
-      print '('' dte        = '',f10.2)', dte
-      print '('' dti        = '',f10.1)', dti
-      print '('' isplit     = '',i10)', isplit
-      print '('' time_start = '',a26)', time_start
-      print '('' days       = '',f10.4)', days
-      print '('' iend       = '',i10)', iend
-      print '('' prtd1      = '',f10.4)', prtd1
-      print '('' iprint     = '',i10)', iprint
-      print '('' prtd2      = '',f10.4)', prtd2
-      print '('' rhoref     = '',f10.3)', rhoref
-      print '('' tbias      = '',f10.3)', tbias
-      print '('' sbias      = '',f10.3)', sbias
-      print '('' grav       = '',f10.4)', grav
-      print '('' Kappa      = '',f10.4)', Kappa
-      print '('' z0b        = '',f10.6)', z0b
-      print '('' cbcmin     = '',f10.6)', cbcmin
-      print '('' cbcmax     = '',f10.6)', cbcmax
-      print '('' horcon     = '',f10.3)', horcon
-      print '('' tprni      = '',f10.4)', tprni
-      print '('' umol       = '',f10.4)', umol
-      print '('' vmaxl      = '',f10.4)', vmaxl
-      print '('' slmax      = '',f10.4)', slmax
-      print '('' lono,lato  = '',2f10.4)', lono,lato
-      print '('' xs,ys,fak  = '',3f10.4)', xs,ys,fak
-      print '('' iperx,ipery= '',2i10)', iperx,ipery
-      print '('' ntp        = '',i10)', ntp
-      print '('' nbct       = '',i10)', nbct
-      print '('' nbcs       = '',i10)', nbcs
-      print '('' ispadv     = '',i10)', ispadv
-      print '('' smoth      = '',f10.4)', smoth
-      print '('' alpha      = '',f10.4)', alpha
+      call msg_print("CONFIGURATION READ", 1, "")
+      print '(/a)', "---- EXPERIMENT ---------------------------------"
+      print '( "  ",a40)', title
+      print '(a/)', "-------------------------------------------------"
+      print '(/a)', "---- CONFIGURATION ------------------------------"
+      print '(/" MODE                : ",i10)' , mode
+      print '(/" Experiment duration : ",f10.4)', days
+      print '(" Start time          : ",a26)'  , time_start
+      print '(/" External timestep   : ",f10.2)', dte
+      print '(" Internal timestep   : ",f10.1)', dti
+      print '(" INT/EXT ratio       : ",i10)'  , isplit
+      print '(" Total model steps   : ",i10)'  , iend
+      print '(/" Advection scheme    : ",i10)' , nadv
+      print '(" Max iterations      : ",i10)'  , nitera
+      print '(" Smolar. smoothing   : ",f10.4)', sw
+      print '(/" PGScheme            : ",i10)'  , npg
+      print '(" Output interval     : ",f10.4)', prtd1
+      print '(" Output steps        : ",i10)'  , iprint
+      print '(" AUX. output steps   : ",f10.4)', prtd2
+      print '(/" IS RESTART?         : ",l2)'   , do_restart
+      print '(" Restart interval    : ",f10.4)', write_rst
+      print '(" Restart steps       : ",i10)'  , irestart
+      print '(/" Temperature bias    : ",f10.3)', tbias
+      print '(" Salinity bias       : ",f10.3)', sbias
+      print '(/" Bottom roughness    : ",f10.6)', z0b
+      print '(" Min bottom friction : ",f10.6)', cbcmin
+      print '(" Max bottom friction : ",f10.6)', cbcmax
+      print '(/" Smag. diffusivity   : ",f10.3)', horcon
+      print '(" Turb.Pr.inversed    : ",f10.4)', tprni
+      print '(" Background visc.    : ",f10.4)', umol
+      print '(/" Velocity limit      : ",f10.4)', vmaxl
+      print '(" Slope factor[UNUSED]: ",f10.4)', slmax
+!      print '('' lono,lato  = '',2f10.4)', lono,lato
+!      print '('' xs,ys,fak  = '',3f10.4)', xs,ys,fak
+!      print '('' iperx,ipery= '',2i10)', iperx,ipery
+      print '(/" Water type          : ",i10)'  , ntp
+      print '(" Surface temp BC     : ",i10)'  , nbct
+      print '(" Surface salt BC     : ",i10)'  , nbcs
+      print '(/" Int.adv. skip steps : ",i10)'  , ispadv
+      print '(" Temporal filter     : ",f10.4)', smoth
+      print '(" Surf. slope weight  : ",f10.4)', alpha
 !      print '('' lramp      = '',l10)', lramp
-      print '('' calc_wind      = '',l2)', calc_wind
-      print '('' calc_tsforce   = '',l2)', calc_tsforce
-      print '('' calc_river     = '',l2)', calc_river
-      print '('' calc_assim     = '',l2)', calc_assim
-      print '('' calc_assimdrf  = '',l2)', calc_assimdrf !eda
-      print '('' calc_uvforce   = '',l2)', calc_uvforce !eda:uvforce
-      print '('' calc_tsurf_mc  = '',l2)', calc_tsurf_mc !fhx:mcsst
-      print '('' calc_tide      = '',l2)', calc_tide     !fhx:tide
-      print '('' calc_interp    = '',l2)', calc_interp   !fhx:interp_flag
-      print '('' output_flag    = '',i2)', output_flag  !fhx:20110131:
-      print '('' SURF_flag      = '',i2)', SURF_flag    !fhx:20110131:
+      print '(/" calc_wind           : ",l2)', calc_wind
+      print '(" calc_tsforce        : ",l2)', calc_tsforce
+      print '(" calc_river          : ",l2)', calc_river
+      print '(" calc_assim          : ",l2)', calc_assim
+      print '(" calc_assimdrf       : ",l2)', calc_assimdrf !eda
+      print '(" calc_uvforce        : ",l2)', calc_uvforce !eda:uvforce
+      print '(" calc_tsurf_mc       : ",l2)', calc_tsurf_mc !fhx:mcsst
+      print '(" calc_tide           : ",l2)', calc_tide     !fhx:tide
+      print '(" calc_interp         : ",l2)', calc_interp   !fhx:interp_flag
+      print '(" output_flag         : ",i2)', output_flag  !fhx:20110131:
+      print '(" SURF_flag           : ",i2)', SURF_flag    !fhx:20110131:
 ! TODO: move below output to their respected modules.
 !        print '(/'' Sensitivity:'')'
 !        print '(''   heat flux     = '',f10.4)', sf_hf

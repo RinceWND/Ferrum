@@ -22,7 +22,7 @@ module bry
 !----------------------------------------------------------------------
   logical           &
        , private :: &
-    DERIVE_2D       & ! average 3D boudaries and use 2D only
+    DERIVE_2D       & ! average 3D boundaries and use 2D only
   , DISABLED        & ! active (read from file) boundaries
   , CLIM_BRY        & ! derive boundary values from climatology
   , hasEAST         & ! eastern boundary present
@@ -30,7 +30,8 @@ module bry
   , hasSOUTH        & ! southern boundary present
   , hasWEST         & ! western boundary present
   , INTERP_BRY      & ! active boundary interpolation [IMPLEMENTED PARTIALLY]
-  , MONTHLY           ! flag to read monthly
+  , MONTHLY         & ! flag to read monthly
+  , USE_CALENDAR
 
   integer           &
        , private :: &
@@ -44,8 +45,8 @@ module bry
   character(len=10)                       &
        , parameter                        &
        , private   :: FORMAT_EXT = ".nc"
-       
-       
+
+
   integer                        &
        , parameter               &
        , private   :: bcNTH = 0  & ! id for northern boundary
@@ -61,7 +62,7 @@ module bry
 !----------------------------------------------------------------------
 ! Constants
 !----------------------------------------------------------------------
-  integer(2), parameter :: & ! Boundary conditions named constants
+  integer(1), parameter :: & ! Boundary conditions named constants
     bc0GRADIENT       = 0  & !  zero-gradient (free-slip) condition
   , bc3POINTSMOOTH    = 1  & !  smoothing with 3 interior points
   , bcCLAMPED         = 2  & !  forced value condition
@@ -73,20 +74,20 @@ module bry
   , bcGENFLATHER      = 8  & !  generalized Flather (Oddo, Pinardi, 2010)
   , bcCHAPMAN         = 9    !  Chapman
 
-  character(32), dimension(-1:10), parameter :: & ! Boundary conditions name strings (first four characters are index keys)
-    bcTITLES = [             &
-      "NULL condition     "  &
-    , "Zero gradient      "  &
-    , "3pts smoothing     "  &
-    , "Clamped (Dirichlet)"  &
-    , "Flather            "  &
-    , "Tracer radiation   "  &
-    , "Radiation          "  &
-    , "Orlanski           "  &
-    , "Enhanced Radiation "  &
-    , "Generalized Flather"  &
-    , "Chapman            "  &
-    , "TEST               "  &
+  character(4), dimension(-1:10), parameter :: & ! Boundary conditions name strings (first four characters are index keys)
+    bcTITLES = [  &
+      "NULL"      & ! Null
+    , "GRAD"      & ! Zero gradient
+    , "3PTS"      & ! 3-points smoothing
+    , "CLMP"      & ! Clamped (Dirichlet)
+    , " FLA"      & ! Flather
+    , "TRAD"      & ! Tracer Radiation (in-outflow)
+    , " RAD"      & ! Radiation
+    , " ORL"      & ! Orlanski
+    , "ERAD"      & ! Enhanced radiation
+    , "GFLA"      & ! Generalized Flather
+    , "CHAP"      & ! Chapman
+    , "TEST"      & !
     ]
 
 !----------------------------------------------------------------------
@@ -96,6 +97,7 @@ module bry
 
   real(kind=rk)      &
     hmax             & ! maximal water depth
+  , tau              & ! nudging timescale
   , rfe              & ! flag for eastern open boundary
   , rfn              & ! flag for northern open boundary
   , rfs              & ! flag for southern open boundary
@@ -119,7 +121,7 @@ module bry
   end type
 
   type BC_TYPE_VAL     ! Value type for all boundaries.
-    integer(2) EAST  & !
+    integer(1) EAST  & !
             , NORTH  & !  ( self-explanatory )
             , SOUTH  & !
             , WEST     !
@@ -412,9 +414,9 @@ module bry
       ,    velvert_east,    velvert_north,    velvert_south,    velvert_west
 
       namelist/bry_nml/                                                &
-        bry_path, DERIVE_2D , el_name   , Hmax    , interp_bry         &
-      , MONTHLY , periodic_x, periodic_y, read_int, s_name             &
-      , t_name  , USE_SPONGE, u_name    , v_name
+        bry_path, DERIVE_2D   , el_name   , Hmax    , interp_bry       &
+      , MONTHLY , periodic_x  , periodic_y, read_int, s_name           &
+      , t_name  , USE_CALENDAR, USE_SPONGE, u_name  , v_name
 
       namelist/bry_cond/                                                     &
                 el_east,         el_north,         el_south,         el_west &
@@ -429,11 +431,12 @@ module bry
 
 ! Do not read boundary fields by default
       DISABLED = .true.
-! Check for active boundary
-      if ( use_bry ) DISABLED = .false.
 
 ! Set max depth
       hmax = 4500. !8000.
+
+! Set nudging timescale
+      tau = 2./86400. ! Half a day
 
 ! Set default relaxation thickness
       NFE = 1
@@ -456,10 +459,14 @@ module bry
       if ( n_west  == -1 ) hasWEST  = .true.
 
 ! Default configuration flags
-      USE_SPONGE = .false.
-      MONTHLY    = .true.
-      DERIVE_2D  = .true.
-      CLIM_BRY   = .true.
+      USE_SPONGE   = .false.
+      MONTHLY      = .true.
+      DERIVE_2D    = .true.
+      CLIM_BRY     = .true.
+      USE_CALENDAR = .true.
+
+! Check for active boundary
+      if ( use_bry ) DISABLED = .false.
 
 ! Default periodic
       periodic_x = .false.
@@ -473,11 +480,11 @@ module bry
       t_name = "temp"
       u_name = "u"
       v_name = "v"
-      
-! [ NOT IMPLEMENTED ] Interpolate active boundary by default (ignored if DISABLED)
+
+! [ NOT IMPLEMENTED ] TODO: Interpolate active boundary by default (ignored if DISABLED)
       interp_bry = .true.
 
-! Default readint interval (daily)
+! Default read interval (daily)
       read_int = 86400
 
 ! Default BC types
@@ -531,43 +538,43 @@ module bry
       periodic_bc % y = periodic_y
 
 !   elevation
-      BC % zeta % EAST  = max(el_east ,-1_2)
-      BC % zeta % NORTH = max(el_north,-1_2)
-      BC % zeta % SOUTH = max(el_south,-1_2)
-      BC % zeta % WEST  = max(el_west ,-1_2)
+      BC % zeta % EAST  = max(el_east ,-1_1)
+      BC % zeta % NORTH = max(el_north,-1_1)
+      BC % zeta % SOUTH = max(el_south,-1_1)
+      BC % zeta % WEST  = max(el_west ,-1_1)
 !   external velocity
-      BC % vel2d % NORM % EAST  = max(vel2d_norm_east ,-1_2)
-      BC % vel2d % NORM % NORTH = max(vel2d_norm_north,-1_2)
-      BC % vel2d % NORM % SOUTH = max(vel2d_norm_south,-1_2)
-      BC % vel2d % NORM % WEST  = max(vel2d_norm_west ,-1_2)
-      BC % vel2d % TANG % EAST  = max(vel2d_tang_east ,-1_2)
-      BC % vel2d % TANG % NORTH = max(vel2d_tang_north,-1_2)
-      BC % vel2d % TANG % SOUTH = max(vel2d_tang_south,-1_2)
-      BC % vel2d % TANG % WEST  = max(vel2d_tang_west ,-1_2)
+      BC % vel2d % NORM % EAST  = max(vel2d_norm_east ,-1_1)
+      BC % vel2d % NORM % NORTH = max(vel2d_norm_north,-1_1)
+      BC % vel2d % NORM % SOUTH = max(vel2d_norm_south,-1_1)
+      BC % vel2d % NORM % WEST  = max(vel2d_norm_west ,-1_1)
+      BC % vel2d % TANG % EAST  = max(vel2d_tang_east ,-1_1)
+      BC % vel2d % TANG % NORTH = max(vel2d_tang_north,-1_1)
+      BC % vel2d % TANG % SOUTH = max(vel2d_tang_south,-1_1)
+      BC % vel2d % TANG % WEST  = max(vel2d_tang_west ,-1_1)
 !   internal velocity
-      BC % vel3d % NORM % EAST  = max(vel3d_norm_east ,-1_2)
-      BC % vel3d % NORM % NORTH = max(vel3d_norm_north,-1_2)
-      BC % vel3d % NORM % SOUTH = max(vel3d_norm_south,-1_2)
-      BC % vel3d % NORM % WEST  = max(vel3d_norm_west ,-1_2)
-      BC % vel3d % TANG % EAST  = max(vel3d_tang_east ,-1_2)
-      BC % vel3d % TANG % NORTH = max(vel3d_tang_north,-1_2)
-      BC % vel3d % TANG % SOUTH = max(vel3d_tang_south,-1_2)
-      BC % vel3d % TANG % WEST  = max(vel3d_tang_east ,-1_2)
+      BC % vel3d % NORM % EAST  = max(vel3d_norm_east ,-1_1)
+      BC % vel3d % NORM % NORTH = max(vel3d_norm_north,-1_1)
+      BC % vel3d % NORM % SOUTH = max(vel3d_norm_south,-1_1)
+      BC % vel3d % NORM % WEST  = max(vel3d_norm_west ,-1_1)
+      BC % vel3d % TANG % EAST  = max(vel3d_tang_east ,-1_1)
+      BC % vel3d % TANG % NORTH = max(vel3d_tang_north,-1_1)
+      BC % vel3d % TANG % SOUTH = max(vel3d_tang_south,-1_1)
+      BC % vel3d % TANG % WEST  = max(vel3d_tang_east ,-1_1)
 !   temp and salt
-      BC % ts % EAST  = max(ts_east ,-1_2)
-      BC % ts % NORTH = max(ts_north,-1_2)
-      BC % ts % SOUTH = max(ts_south,-1_2)
-      BC % ts % WEST  = max(ts_west ,-1_2)
+      BC % ts % EAST  = max(ts_east ,-1_1)
+      BC % ts % NORTH = max(ts_north,-1_1)
+      BC % ts % SOUTH = max(ts_south,-1_1)
+      BC % ts % WEST  = max(ts_west ,-1_1)
 !   vertical velocity (IGNORED anyway)
-      BC % velvert % EAST  = max(velvert_east ,-1_2)
-      BC % velvert % NORTH = max(velvert_north,-1_2)
-      BC % velvert % SOUTH = max(velvert_south,-1_2)
-      BC % velvert % WEST  = max(velvert_west ,-1_2)
+      BC % velvert % EAST  = max(velvert_east ,-1_1)
+      BC % velvert % NORTH = max(velvert_north,-1_1)
+      BC % velvert % SOUTH = max(velvert_south,-1_1)
+      BC % velvert % WEST  = max(velvert_west ,-1_1)
 !   turbulent parameters
-      BC % turb % EAST  = max(turb_east ,-1_2)
-      BC % turb % NORTH = max(turb_north,-1_2)
-      BC % turb % SOUTH = max(turb_south,-1_2)
-      BC % turb % WEST  = max(turb_west ,-1_2)
+      BC % turb % EAST  = max(turb_east ,-1_1)
+      BC % turb % NORTH = max(turb_north,-1_1)
+      BC % turb % SOUTH = max(turb_south,-1_1)
+      BC % turb % WEST  = max(turb_west ,-1_1)
 
       if ( INTERP_BRY ) N = 2
 
@@ -611,31 +618,37 @@ module bry
       fill_clim_v  % WEST  = 1
 
       if ( is_master ) then
-        print '(8x,4a6)', "NORTH", "EAST", "SOUTH", "WEST"
-        print '(a7,": ",4(1x,a,4x))', "ELEV", bcTITLES(BC%zeta%NORTH)  &
-                                            , bcTITLES(BC%zeta%EAST)   &
-                                            , bcTITLES(BC%zeta%SOUTH)  &
-                                            , bcTITLES(BC%zeta%WEST)
-        print '(a7,": ",4(1x,a,4x))', "UA_norm", bcTITLES(BC%vel2d%norm%NORTH)  &
-                                               , bcTITLES(BC%vel2d%norm%EAST)   &
-                                               , bcTITLES(BC%vel2d%norm%SOUTH)  &
-                                               , bcTITLES(BC%vel2d%norm%WEST)
-        print '(a7,": ",4(1x,a,4x))', "UA_tang", bcTITLES(BC%vel2d%tang%NORTH)  &
-                                               , bcTITLES(BC%vel2d%tang%EAST)   &
-                                               , bcTITLES(BC%vel2d%tang%SOUTH)  &
-                                               , bcTITLES(BC%vel2d%tang%WEST)
-        print '(a7,": ",4(1x,a,4x))', "U_norm", bcTITLES(BC%vel3d%norm%NORTH)  &
-                                              , bcTITLES(BC%vel3d%norm%EAST)   &
-                                              , bcTITLES(BC%vel3d%norm%SOUTH)  &
-                                              , bcTITLES(BC%vel3d%norm%WEST)
-        print '(a7,": ",4(1x,a,4x))', "U_tang", bcTITLES(BC%vel3d%tang%NORTH)  &
-                                              , bcTITLES(BC%vel3d%tang%EAST)   &
-                                              , bcTITLES(BC%vel3d%tang%SOUTH)  &
-                                              , bcTITLES(BC%vel3d%tang%WEST)
-        print '(a7,": ",4(1x,a,4x))', "TS", bcTITLES(BC%ts%NORTH)  &
-                                          , bcTITLES(BC%ts%EAST)   &
-                                          , bcTITLES(BC%ts%SOUTH)  &
-                                          , bcTITLES(BC%ts%WEST)
+        print '(/5x,4a9)', "NORTH", "EAST", "SOUTH", "WEST"
+        print '(a7,": ",4(1x,a,4x))', "ELEV"                   &
+                                    , bcTITLES(BC%zeta%NORTH)  &
+                                    , bcTITLES(BC%zeta%EAST)   &
+                                    , bcTITLES(BC%zeta%SOUTH)  &
+                                    , bcTITLES(BC%zeta%WEST)
+        print '(a7,": ",4(1x,a,4x))', "UA_norm"                      &
+                                    , bcTITLES(BC%vel2d%norm%NORTH)  &
+                                    , bcTITLES(BC%vel2d%norm%EAST)   &
+                                    , bcTITLES(BC%vel2d%norm%SOUTH)  &
+                                    , bcTITLES(BC%vel2d%norm%WEST)
+        print '(a7,": ",4(1x,a,4x))', "UA_tang"                      &
+                                    , bcTITLES(BC%vel2d%tang%NORTH)  &
+                                    , bcTITLES(BC%vel2d%tang%EAST)   &
+                                    , bcTITLES(BC%vel2d%tang%SOUTH)  &
+                                    , bcTITLES(BC%vel2d%tang%WEST)
+        print '(a7,": ",4(1x,a,4x))', "U_norm"                       &
+                                    , bcTITLES(BC%vel3d%norm%NORTH)  &
+                                    , bcTITLES(BC%vel3d%norm%EAST)   &
+                                    , bcTITLES(BC%vel3d%norm%SOUTH)  &
+                                    , bcTITLES(BC%vel3d%norm%WEST)
+        print '(a7,": ",4(1x,a,4x))', "U_tang"                       &
+                                    , bcTITLES(BC%vel3d%tang%NORTH)  &
+                                    , bcTITLES(BC%vel3d%tang%EAST)   &
+                                    , bcTITLES(BC%vel3d%tang%SOUTH)  &
+                                    , bcTITLES(BC%vel3d%tang%WEST)
+        print '(a7,": ",4(1x,a,4x))', "TS"                   &
+                                    , bcTITLES(BC%ts%NORTH)  &
+                                    , bcTITLES(BC%ts%EAST)   &
+                                    , bcTITLES(BC%ts%SOUTH)  &
+                                    , bcTITLES(BC%ts%WEST)
       end if
 
       call msg_print("BRY MODULE INITIALIZED", 1, "")
@@ -662,10 +675,10 @@ module bry
 
 
 ! Initial conditions
+      call init_to_bry
+
       if ( CLIM_BRY ) then
         call clim_to_bry
-      else
-        call init_to_bry
       end if
 
       if ( USE_SPONGE ) then
@@ -718,7 +731,7 @@ module bry
 !______________________________________________________________________
 !
       use module_time
-      use glob_grid  , only: dz
+!      use glob_grid  , only: dz
       use model_run  , only: mid_in_month, mid_in_nbr, sec_of_month
 
       type(date), intent(in) :: d_in
@@ -728,6 +741,9 @@ module bry
       , dimension(3)  :: record, year
       real               a, chunk
 
+
+! Initialize with something even if active boundary is disabled
+      call initial_conditions_boundary
 
 ! Quit if the module is not used.
       if ( DISABLED ) return
@@ -753,7 +769,7 @@ module bry
 
         record(3) = mod( record(2), 12 ) + 1
 
-      else
+      elseif ( USE_CALENDAR ) then
 
         year = d_in%year
 
@@ -781,6 +797,11 @@ module bry
 
         record(1) = record(1) + 1
 
+      else
+
+        record = [ 1, 1, 2 ]
+        a = 0._rk
+
       end if
 
 ! Read boundary fields
@@ -791,7 +812,7 @@ module bry
       else
         call read_all( .true., 1, year, record )
       end if
-      
+
       if ( DERIVE_2D ) call derive_barotropic_velocities
 
       call msg_print("BRY INITIALIZED", 2, "")
@@ -805,7 +826,7 @@ module bry
 !  Reads lateral boundary conditions.
 !______________________________________________________________________
 !
-      use glob_grid  , only: dz
+!      use glob_grid  , only: dz
 !      use glob_domain, only: is_master
       use model_run  , only: dti, iint, mid_in_month, mid_in_nbr      &
                            , secs => sec_of_year, sec_of_month
@@ -854,24 +875,42 @@ module bry
           print *, "[!!!] ", sec_of_month, mid_in_month, dti
         end if
 
-      else
+        elseif ( USE_CALENDAR ) then
 
-        year = d_in%year
+          year = d_in%year
 
-        max_in_this = max_chunks_in_year( d_in%year  , read_int )
-        max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
+          max_in_this = max_chunks_in_year( d_in%year  , read_int )
+          max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
 
 ! Decide on the record to read
-        chunk     = chunk_of_year( d_in, read_int )
-        record(1) = int(chunk)
+          chunk     = chunk_of_year( d_in, read_int )
+          record(1) = int(chunk)
 
-        if ( secs - record(1)*read_int < dti ) then ! TODO: test this one as well.
-          ADVANCE_REC = .true.
-        end if
+          if ( secs - record(1)*read_int < dti ) then ! TODO: test this one as well.
+            ADVANCE_REC = .true.
+          end if
 
 !      if ( is_master ) print *, "III", secs-record(1)*read_int, dti, ADVANCE_REC
 
-        record(1) = record(1) + 1
+          record(1) = record(1) + 1
+
+        else
+
+          record(1) = int( iint*dti / read_int ) + 1
+          record(2) = record(1)
+          record(3) = record(2) + 1
+
+! TODO: right now it interpolates between records (edges of rec1-rec2 span). Implement interpolation between the centers of record spans.
+          a = modulo( real(iint*dti), real(read_int) )
+          if ( a < dti ) then
+            if ( a >= 0. ) then
+              ADVANCE_REC = .true.
+            end if
+          end if
+          a = a / read_int
+!        print *, "A: ", a
+
+          ADVANCE_REC_INT = ADVANCE_REC
 
       end if
 
@@ -1012,11 +1051,11 @@ module bry
         S_bry % WST(1:NFW,:,:) = sb(1:NFW,:,:)
         T_bry % WST(1:NFW,:,:) = tb(1:NFW,:,:)
 
-        U_bry % WST(1:NFW,:,:) = ub(1:NFW,:,:)
-        V_bry % WST(1:NFW,:,:) = vb(1:NFW,:,:)
-
         UA_bry % WST(1:NFW,:) = uab(1:NFW,:)
         VA_bry % WST(1:NFW,:) = vab(1:NFW,:)
+
+        U_bry % WST(1:NFW,:,:) = ub(1:NFW,:,:)
+        V_bry % WST(1:NFW,:,:) = vb(1:NFW,:,:)
 
       end if
 
@@ -1039,6 +1078,7 @@ module bry
 
         if ( fill_clim_el % EAST == 1 )  &
           EL_bry % EST(1:NFE,:) = eclim(im:im-NFE+1:-1,:)
+          print *, "BRY: ", EL_bry % EST(1,100) !REM:
 
         if ( fill_clim_s % EAST == 1 )  &
           S_bry % EST(1:NFE,:,:) = sclim(im:im-NFE+1:-1,:,:)
@@ -1121,27 +1161,27 @@ module bry
 
       if ( hasEAST ) then
 
-        EL_bry % EST(1:NFE,:) =                          &
-          ( 1. - a ) * EL_int % EST(1:NFE,:,2)  &
+        EL_bry % EST(1:NFE,:) =                   &
+          ( 1. - a ) * EL_int % EST(1:NFE,:,2)    &
          +       a   * EL_int % EST(1:NFE,:,3)
-         S_bry % EST(1:NFE,:,:) =                          &
+         S_bry % EST(1:NFE,:,:) =                 &
           ( 1. - a ) *  S_int % EST(1:NFE,:,:,2)  &
          +       a   *  S_int % EST(1:NFE,:,:,3)
-         T_bry % EST(1:NFE,:,:) =                          &
+         T_bry % EST(1:NFE,:,:) =                 &
           ( 1. - a ) *  T_int % EST(1:NFE,:,:,2)  &
          +       a   *  T_int % EST(1:NFE,:,:,3)
-         U_bry % EST(1:NFE,:,:) =                          &
+         U_bry % EST(1:NFE,:,:) =                 &
           ( 1. - a ) *  U_int % EST(1:NFE,:,:,2)  &
          +       a   *  U_int % EST(1:NFE,:,:,3)
-         V_bry % EST(1:NFE,:,:) =                          &
+         V_bry % EST(1:NFE,:,:) =                 &
           ( 1. - a ) *  V_int % EST(1:NFE,:,:,2)  &
          +       a   *  V_int % EST(1:NFE,:,:,3)
 
         if ( .not.DERIVE_2D ) then
-          UA_bry % EST(1:NFE,:) =                           &
+          UA_bry % EST(1:NFE,:) =                  &
             ( 1. - a ) *  UA_int % EST(1:NFE,:,2)  &
            +       a   *  UA_int % EST(1:NFE,:,3)
-          VA_bry % EST(1:NFE,:) =                           &
+          VA_bry % EST(1:NFE,:) =                  &
             ( 1. - a ) *  VA_int % EST(1:NFE,:,2)  &
            +       a   *  VA_int % EST(1:NFE,:,3)
         end if
@@ -1150,27 +1190,27 @@ module bry
 
       if ( hasNORTH ) then
 
-        EL_bry % NTH(:,1:NFN) =                          &
-          ( 1. - a ) * EL_int % NTH(:,1:NFN,2)  &
+        EL_bry % NTH(:,1:NFN) =                   &
+          ( 1. - a ) * EL_int % NTH(:,1:NFN,2)    &
          +       a   * EL_int % NTH(:,1:NFN,3)
-         S_bry % NTH(:,1:NFN,:) =                          &
+         S_bry % NTH(:,1:NFN,:) =                 &
           ( 1. - a ) *  S_int % NTH(:,1:NFN,:,2)  &
          +       a   *  S_int % NTH(:,1:NFN,:,3)
-         T_bry % NTH(:,1:NFN,:) =                          &
+         T_bry % NTH(:,1:NFN,:) =                 &
           ( 1. - a ) *  T_int % NTH(:,1:NFN,:,2)  &
          +       a   *  T_int % NTH(:,1:NFN,:,3)
-         U_bry % NTH(:,1:NFN,:) =                          &
+         U_bry % NTH(:,1:NFN,:) =                 &
           ( 1. - a ) *  U_int % NTH(:,1:NFN,:,2)  &
          +       a   *  U_int % NTH(:,1:NFN,:,3)
-         V_bry % NTH(:,1:NFN,:) =                          &
+         V_bry % NTH(:,1:NFN,:) =                 &
           ( 1. - a ) *  V_int % NTH(:,1:NFN,:,2)  &
          +       a   *  V_int % NTH(:,1:NFN,:,3)
 
         if ( .not.DERIVE_2D ) then
-          UA_bry % NTH(:,1:NFN) =                           &
+          UA_bry % NTH(:,1:NFN) =                  &
             ( 1. - a ) *  UA_int % NTH(:,1:NFN,2)  &
            +       a   *  UA_int % NTH(:,1:NFN,3)
-          VA_bry % NTH(:,1:NFN) =                           &
+          VA_bry % NTH(:,1:NFN) =                  &
             ( 1. - a ) *  VA_int % NTH(:,1:NFN,2)  &
            +       a   *  VA_int % NTH(:,1:NFN,3)
         end if
@@ -1179,8 +1219,8 @@ module bry
 
       if ( hasSOUTH ) then
 
-        EL_bry % STH(:,1:NFS) =                 &
-          ( 1. - a ) * EL_int % STH(:,1:NFS,2)  &
+        EL_bry % STH(:,1:NFS) =                   &
+          ( 1. - a ) * EL_int % STH(:,1:NFS,2)    &
          +       a   * EL_int % STH(:,1:NFS,3)
          S_bry % STH(:,1:NFS,:) =                 &
           ( 1. - a ) *  S_int % STH(:,1:NFS,:,2)  &
@@ -1208,8 +1248,8 @@ module bry
 
       if ( hasWEST ) then
 
-        EL_bry % WST(1:NFW,:) =                 &
-          ( 1. - a ) * EL_int % WST(1:NFW,:,2)  &
+        EL_bry % WST(1:NFW,:) =                   &
+          ( 1. - a ) * EL_int % WST(1:NFW,:,2)    &
          +       a   * EL_int % WST(1:NFW,:,3)
          S_bry % WST(1:NFW,:,:) =                 &
           ( 1. - a ) *  S_int % WST(1:NFW,:,:,2)  &
@@ -1245,7 +1285,7 @@ module bry
 !  Vertically integrates baroclinic boundary values
 !______________________________________________________________________
 !
-      use glob_grid, only: dz
+      use grid, only: dz
 
       implicit none
 
@@ -1310,7 +1350,9 @@ module bry
     subroutine read_all( execute, n, year, record )
 
       use glob_domain, only: i_global, j_global
+      use io
       use mpi        , only: MPI_OFFSET_KIND
+      use pnetcdf    , only: NF90_NOERR, NF90_NOWRITE
 
       implicit none
 
@@ -1318,7 +1360,7 @@ module bry
       integer              , intent(in) :: n
       integer, dimension(3), intent(in) :: record, year
 
-      integer                  ncid, status
+      integer                  file_id, status
       integer(MPI_OFFSET_KIND) start(4), edge(4)
       real(rk)                 dummy(1,1,1)
       character(len=128)       desc
@@ -1337,8 +1379,9 @@ module bry
 
       call msg_print("", 1, desc)
 
-      ncid = file_open_nc( trim(get_filename( bry_path, year(n) )) )
-      if ( ncid == -1 ) return
+      file_id = file_open( trim( get_filename( bry_path, year(n) ) )  &
+                         , NF90_NOWRITE )
+      if ( file_id /= NF90_NOERR ) return
 
 ! EAST
       if ( hasEAST ) then
@@ -1363,11 +1406,11 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          status = read_var_3d_nc( "east_"//t_name, T_bry%EST  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "east_"//t_name, T_bry%EST  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "east_"//t_name, T_int%EST(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "east_"//t_name, T_int%EST(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_t % east = 0
         if ( status < 0 ) then
@@ -1376,11 +1419,11 @@ module bry
         end if
 ! Salinity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "east_"//s_name, S_bry%EST  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "east_"//s_name, S_bry%EST  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "east_"//s_name, S_int%EST(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "east_"//s_name, S_int%EST(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_s % east = 0
         if ( status < 0 ) then
@@ -1389,11 +1432,11 @@ module bry
         end if
 ! Normal velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "east_"//u_name, U_bry%EST  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "east_"//u_name, U_bry%EST  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "east_"//u_name, U_int%EST(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "east_"//u_name, U_int%EST(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_u % east = 0
         if ( status < 0 ) then
@@ -1402,11 +1445,11 @@ module bry
         end if
 ! Tangential velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "east_"//v_name, V_bry%EST  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "east_"//v_name, V_bry%EST  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "east_"//v_name, V_int%EST(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "east_"//v_name, V_int%EST(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_v % east = 0
         if ( status < 0 ) then
@@ -1431,11 +1474,11 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          status = read_var_2d_nc( "east_"//el_name, EL_bry%EST  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "east_"//el_name, EL_bry%EST  &
+                           , start, edge )
         else
-          status = read_var_2d_nc( "east_"//el_name, EL_int%EST(:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "east_"//el_name, EL_int%EST(:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_el % east = 0
         if ( status < 0 ) then
@@ -1449,20 +1492,20 @@ module bry
         start = 1
         edge = 0
 ! Temperature
-        status = read_var_3d_nc( "east_"//t_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "east_"//t_name, dummy  &
+                         , start, edge )
 ! Salinity
-        status = read_var_3d_nc( "east_"//s_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "east_"//s_name, dummy  &
+                         , start, edge )
 ! Normal velocity
-        status = read_var_3d_nc( "east_"//u_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "east_"//u_name, dummy  &
+                         , start, edge )
 ! Tangential velocity
-        status = read_var_3d_nc( "east_"//v_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "east_"//v_name, dummy  &
+                         , start, edge )
 ! Elevation
-        status = read_var_2d_nc( "east_"//el_name, dummy(1,:,:)  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "east_"//el_name, dummy(1,:,:)  &
+                         , start, edge )
 
       end if
 
@@ -1489,11 +1532,11 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          status = read_var_3d_nc( "north_"//t_name, T_bry%NTH  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "north_"//t_name, T_bry%NTH  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "north_"//t_name, T_int%NTH(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "north_"//t_name, T_int%NTH(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_t % north = 0
         if ( status < 0 ) then
@@ -1502,11 +1545,11 @@ module bry
         end if
 ! Salinity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "north_"//s_name, S_bry%NTH  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "north_"//s_name, S_bry%NTH  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "north_"//s_name, S_int%NTH(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "north_"//s_name, S_int%NTH(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_s % north = 0
         if ( status < 0 ) then
@@ -1515,11 +1558,11 @@ module bry
         end if
 ! Tangential velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "north_"//u_name, U_bry%NTH  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "north_"//u_name, U_bry%NTH  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "north_"//u_name, U_int%NTH(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "north_"//u_name, U_int%NTH(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_u % north = 0
         if ( status < 0 ) then
@@ -1528,11 +1571,11 @@ module bry
         end if
 ! Normal velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "north_"//v_name, V_bry%NTH  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "north_"//v_name, V_bry%NTH  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "north_"//v_name, V_int%NTH(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "north_"//v_name, V_int%NTH(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_v % north = 0
         if ( status < 0 ) then
@@ -1557,11 +1600,11 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          status = read_var_2d_nc( "north_"//el_name, EL_bry%NTH  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "north_"//el_name, EL_bry%NTH  &
+                           , start, edge )
         else
-          status = read_var_2d_nc( "north_"//el_name, EL_int%NTH(:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "north_"//el_name, EL_int%NTH(:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_el % north = 0
         if ( status < 0 ) then
@@ -1574,20 +1617,20 @@ module bry
         start = 1
         edge = 0
 ! Temperature
-        status = read_var_3d_nc( "north_"//t_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "north_"//t_name, dummy  &
+                         , start, edge )
 ! Salinity
-        status = read_var_3d_nc( "north_"//s_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "north_"//s_name, dummy  &
+                         , start, edge )
 ! Normal velocity
-        status = read_var_3d_nc( "north_"//u_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "north_"//u_name, dummy  &
+                         , start, edge )
 ! Tangential velocity
-        status = read_var_3d_nc( "north_"//v_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "north_"//v_name, dummy  &
+                         , start, edge )
 ! Elevation
-        status = read_var_2d_nc( "north_"//el_name, dummy(1,:,:)  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "north_"//el_name, dummy(1,:,:)  &
+                         , start, edge )
 
       end if
 
@@ -1614,11 +1657,11 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          status = read_var_3d_nc( "south_"//t_name, T_bry%STH  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "south_"//t_name, T_bry%STH  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "south_"//t_name, T_int%STH(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "south_"//t_name, T_int%STH(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_t % south = 0
         if ( status < 0 ) then
@@ -1627,11 +1670,11 @@ module bry
         end if
 ! Salinity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "south_"//s_name, S_bry%STH  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "south_"//s_name, S_bry%STH  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "south_"//s_name, S_int%STH(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "south_"//s_name, S_int%STH(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_s % south = 0
         if ( status < 0 ) then
@@ -1640,11 +1683,11 @@ module bry
         end if
 ! Tangential velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "south_"//u_name, U_bry%STH  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "south_"//u_name, U_bry%STH  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "south_"//u_name, U_int%STH(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "south_"//u_name, U_int%STH(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_u % south = 0
         if ( status < 0 ) then
@@ -1653,11 +1696,11 @@ module bry
         end if
 ! Normal velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "south_"//v_name, V_bry%STH  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "south_"//v_name, V_bry%STH  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "south_"//v_name, V_int%STH(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "south_"//v_name, V_int%STH(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_v % south = 0
         if ( status < 0 ) then
@@ -1682,11 +1725,11 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          status = read_var_2d_nc( "south_"//el_name, EL_bry%STH  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "south_"//el_name, EL_bry%STH  &
+                           , start, edge )
         else
-          status = read_var_2d_nc( "south_"//el_name, EL_int%STH(:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "south_"//el_name, EL_int%STH(:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_el % south = 0
         if ( status < 0 ) then
@@ -1699,20 +1742,20 @@ module bry
         start = 1
         edge = 0
 ! Temperature
-        status = read_var_3d_nc( "south_"//t_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "south_"//t_name, dummy  &
+                         , start, edge )
 ! Salinity
-        status = read_var_3d_nc( "south_"//s_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "south_"//s_name, dummy  &
+                         , start, edge )
 ! Normal velocity
-        status = read_var_3d_nc( "south_"//u_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "south_"//u_name, dummy  &
+                         , start, edge )
 ! Tangential velocity
-        status = read_var_3d_nc( "south_"//v_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "south_"//v_name, dummy  &
+                         , start, edge )
 ! Elevation
-        status = read_var_2d_nc( "south_"//el_name, dummy(1,:,:)  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "south_"//el_name, dummy(1,:,:)  &
+                         , start, edge )
 
       end if
 
@@ -1739,11 +1782,11 @@ module bry
         end if
 ! Temperature
         if ( n == 1 ) then
-          status = read_var_3d_nc( "west_"//t_name, T_bry%WST  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "west_"//t_name, T_bry%WST  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "west_"//t_name, T_int%WST(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "west_"//t_name, T_int%WST(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_t % west = 0
         if ( status < 0 ) then
@@ -1752,11 +1795,11 @@ module bry
         end if
 ! Salinity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "west_"//s_name, S_bry%WST  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "west_"//s_name, S_bry%WST  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "west_"//s_name, S_int%WST(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "west_"//s_name, S_int%WST(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_s % west = 0
         if ( status < 0 ) then
@@ -1765,11 +1808,11 @@ module bry
         end if
 ! Normal velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "west_"//u_name, U_bry%WST  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "west_"//u_name, U_bry%WST  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "west_"//u_name, U_int%WST(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "west_"//u_name, U_int%WST(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_u % west = 0
         if ( status < 0 ) then
@@ -1778,11 +1821,11 @@ module bry
         end if
 ! Tangential velocity
         if ( n == 1 ) then
-          status = read_var_3d_nc( "west_"//v_name, V_bry%WST  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "west_"//v_name, V_bry%WST  &
+                           , start, edge )
         else
-          status = read_var_3d_nc( "west_"//v_name, V_int%WST(:,:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "west_"//v_name, V_int%WST(:,:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_v % west = 0
         if ( status < 0 ) then
@@ -1807,11 +1850,11 @@ module bry
         end if
 ! Elevation
         if ( n == 1 ) then
-          status = read_var_2d_nc( "west_"//el_name, EL_bry%WST  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "west_"//el_name, EL_bry%WST  &
+                           , start, edge )
         else
-          status = read_var_2d_nc( "west_"//el_name, EL_int%WST(:,:,n)  &
-                                 , start, edge, ncid )
+          status = var_read( file_id, "west_"//el_name, EL_int%WST(:,:,n)  &
+                           , start, edge )
         end if
         fill_clim_el % west = 0
         if ( status < 0 ) then
@@ -1824,25 +1867,25 @@ module bry
         start = 1
         edge = 0
 ! Temperature
-        status = read_var_3d_nc( "west_"//t_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "west_"//t_name, dummy  &
+                         , start, edge )
 ! Salinity
-        status = read_var_3d_nc( "west_"//s_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "west_"//s_name, dummy  &
+                         , start, edge )
 ! Normal velocity
-        status = read_var_3d_nc( "west_"//u_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "west_"//u_name, dummy  &
+                         , start, edge )
 ! Tangential velocity
-        status = read_var_3d_nc( "west_"//v_name, dummy  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "west_"//v_name, dummy  &
+                         , start, edge )
 ! Elevation
-        status = read_var_2d_nc( "west_"//el_name, dummy(1,:,:)  &
-                               , start, edge, ncid )
+        status = var_read( file_id, "west_"//el_name, dummy(1,:,:)  &
+                         , start, edge )
 
       end if
 
 ! Close file
-      call check( file_close_nc( ncid ), "nf_close: bry" )
+      file_id = file_close( file_id )
 
 
     end ! subroutine read_all
@@ -1853,12 +1896,16 @@ module bry
 !  Apply external (2D) elevation boundary conditions.
 !______________________________________________________________________
 !
-      use glob_const, only: g => GRAV
-      use glob_grid , only: dx, dy, fsm, h
-      use glob_ocean, only: elb, elf, uab, uaf, vab, vaf
-      use model_run , only: dti2
+      use glob_const, only: g => GRAV, SMALL
+      use grid      , only: dx, dy, fsm
+      use glob_ocean, only: d, el, elf!, uab, uaf, vab, vaf
+      use model_run , only: dte
 
       implicit none
+
+      real(rk), dimension(im,2) :: grdx
+      real(rk), dimension(2,jm) :: grdy
+      real(rk)                  :: cff, cx, cy, dvdt, dvdx, dvdy
 
 
 ! Apply periodic BC in x-dimension
@@ -1872,20 +1919,42 @@ module bry
 
           select case ( BC % zeta % east )
 
-            case ( bcFLATHER ) ! Complementary BCs for 2d vel should be bcFLATHER for tangential velocities.
-                               ! TODO: Normal, however, should be deduced from continuity equation...
-                               ! TODO: CHECK if these boundaries have any effect on interior at all...
-                               ! [ DO NOT USE ]
-              elf(imm1,2:jmm1) = ( elb(imm1,2:jmm1)                 &
-                                  *(uab(imm1,2:jmm1)-sqrt(g*h(imm1,2:jmm1)))     &
-                                  +uab(imm1,2:jmm1)*h(imm1,2:jmm1)  &
-                                  -uab(imm1,2:jmm1)*h(im,2:jmm1) ) &
-                                 /(uab(imm1,2:jmm1)-sqrt(g*h(imm1,2:jmm1)))
+            case ( bcRADIATION )
+              do j = 2,jm
+                grdy(1,j) = el(imm1,j) - el(imm1,j-1)
+                grdy(2,j) = el(im  ,j) - el(im  ,j-1)
+              end do
+              do j = 2,jmm1
+                dvdt =  el(imm1,j) - elf(imm1,j)
+                dvdx = elf(imm1,j) - elf(imm2,j)
 
+                if ( (dvdt*(grdy(1,j)+grdy(1,j+1))) > 0. ) then
+                  dvdy = grdy(1,j  )
+                else
+                  dvdy = grdy(1,j+1)
+                end if
+                cff = max( dvdx*dvdx+dvdy*dvdy, SMALL )
+                if ( dvdt*dvdx < 0. ) dvdt = 0.
+                cx = dvdt*dvdx
+                cy = min( cff, max( dvdt*dvdy, -cff ) )
+                elf(im,j) = ( cff*el(im,j) + cx*elf(imm1,j)  &
+                             - max( cy, 0._rk )*grdy(2,j  )  &
+                             - min( cy, 0._rk )*grdy(2,j+1)  &
+                             ) / ( cff + cx )
+              end do
+
+            case ( bcCHAPMAN )
+              do j = 2,jmm1
+                cff = dte/dx(imm1,j)
+                cx  = cff*sqrt( g*d(imm1,j) )
+                elf(im,j) = ( el(im,j) + cx*elf(imm1,j) )/(1.+cx)
+              end do
+
+            case default
+              elf(im,:) = elf(imm1,:)
 
           end select
 
-          elf(im,:) = elf(imm1,:)
 
         end if
 ! WEST
@@ -1893,18 +1962,41 @@ module bry
 
           select case ( BC % zeta % west )
 
-            case ( bcFLATHER )
-              elf( 2,2:jmm1) = EL_bry % WST(1,2:jmm1)       &
-                              - ( uaf(3,2:jmm1)             &
-                                 -UA_bry % WST(1,2:jmm1) )  &
-                                /sqrt(g*h(2,2:jmm1))        &
-                              + elb(2,2:jmm1)               &
-                              + dti2*(uab(2,2:jmm1)-uab(3,2:jmm1)) &
-                               /dx(2,2:jmm1)
+            case ( bcRADIATION )
+              do j = 2,jm
+                grdy(1,j) = el(1,j) - el(1,j-1)
+                grdy(2,j) = el(2,j) - el(2,j-1)
+              end do
+              do j = 2,jmm1
+                dvdt =  el(2,j) - elf(2,j)
+                dvdx = elf(2,j) - elf(3,j)
+
+                if ( (dvdt*(grdy(2,j)+grdy(2,j+1))) > 0. ) then
+                  dvdy = grdy(2,j  )
+                else
+                  dvdy = grdy(2,j+1)
+                end if
+                cff = max( dvdx*dvdx+dvdy*dvdy, SMALL )
+                if ( dvdt*dvdx < 0. ) dvdt = 0.
+                cx = dvdt*dvdx
+                cy = min( cff, max( dvdt*dvdy, -cff ) )
+                elf(1,j) = ( cff*el(1,j) + cx*elf(2,j)      &
+                            - max( cy, 0._rk )*grdy(1,j  )  &
+                            - min( cy, 0._rk )*grdy(1,j+1)  &
+                            ) / ( cff + cx )
+              end do
+
+            case ( bcCHAPMAN )
+              do j = 2,jmm1
+                cff = dte/dx(2,j)
+                cx  = cff*sqrt( g*d(2,j) )
+                elf(1,j) = ( el(1,j) + cx*elf(2,j) )/(1.+cx)
+              end do
+
+            case default
+              elf(1,:) = elf(2,:)
 
           end select
-
-          elf(1,:) = elf(2,:)
 
         end if
 
@@ -1922,18 +2014,41 @@ module bry
 
           select case ( BC % zeta % north )
 
-            case ( bcFLATHER )
-              elf(2:imm1,jmm1) = EL_bry % NTH(2:imm1,1)     &
-                              + ( vaf(2:imm1,jmm1)          &
-                                 -VA_bry % NTH(2:imm1,1) )  &
-                                /sqrt(g*h(2:imm1,jmm1))     &
-                              + elb(2:imm1,jmm1)            &
-                              + dti2*(vab(2:imm1,jmm1)-vab(2:imm1,jmm2)) &
-                               /dy(2:imm1,jmm1)
+            case ( bcRADIATION )
+              do i = 2,im
+                grdx(i,1) = el(i,jmm1) - el(i-1,jmm1)
+                grdx(i,2) = el(i,jm  ) - el(i-1,jm  )
+              end do
+              do i = 2,imm1
+                dvdt =  el(i,jmm1) - elf(i,jmm1)
+                dvdy = elf(i,jmm1) - elf(i,jmm2)
+
+                if ( (dvdt*(grdx(i,1)+grdx(i+1,1))) > 0. ) then
+                  dvdx = grdx(i  ,1)
+                else
+                  dvdx = grdx(i+1,1)
+                end if
+                cff = max( dvdx*dvdx+dvdy*dvdy, small )
+                if ( dvdt*dvdy < 0. ) dvdt = 0.
+                cx = min( cff, max( dvdt*dvdx, -cff ) )
+                cy = dvdt*dvdy
+                elf(i,jm) = ( cff*el(i,jm) + cy*elf(i,jmm1)  &
+                            - max( cx, 0._rk )*grdx(i  ,2)   &
+                            - min( cx, 0._rk )*grdx(i+1,2)   &
+                            ) / ( cff + cy )
+              end do
+
+            case ( bcCHAPMAN )
+              do i = 2,imm1
+                cff = dte/dy(i,jmm1)
+                cy  = cff*sqrt( g*d(i,jmm1) )
+                elf(i,jm) = ( el(i,jm) + cy*elf(i,jmm1) )/(1.+cy)
+              end do
+
+            case default
+              elf(:,jm) = elf(:,jmm1)
 
           end select
-
-          elf(:,jm) = elf(:,jmm1)
 
         end if
 ! SOUTH
@@ -1941,18 +2056,41 @@ module bry
 
           select case ( BC % zeta % south )
 
-            case ( bcFLATHER )
-              elf(2:imm1, 2) = EL_bry % STH(2:imm1,1)       &
-                              - ( vaf(2:imm1,3)             &
-                                 -VA_bry % STH(2:imm1,1) )  &
-                                /sqrt(g*h(2:imm1,2))        &
-                              + elb(2:imm1,2)               &
-                              + dti2*(vab(2:imm1,2)-vab(2:imm1,3)) &
-                               /dy(2:imm1,2)
+            case ( bcRADIATION )
+              do i = 2,im
+                grdx(i,1) = el(i,1) - el(i-1,1)
+                grdx(i,2) = el(i,2) - el(i-1,2)
+              end do
+              do i = 2,imm1
+                dvdt =  el(i,2) - elf(i,2)
+                dvdy = elf(i,2) - elf(i,3)
+
+                if ( (dvdt*(grdx(i,2)+grdx(i+1,2))) > 0. ) then
+                  dvdx = grdx(i  ,2)
+                else
+                  dvdx = grdx(i+1,2)
+                end if
+                cff = max( dvdx*dvdx+dvdy*dvdy, SMALL )
+                if ( dvdt*dvdy < 0. ) dvdt = 0.
+                cx = min( cff, max( dvdt*dvdx, -cff ) )
+                cy = dvdt*dvdy
+                elf(i,1) = ( cff*el(i,1) + cy*elf(i,2)  &
+                            - max( cx, 0._rk )*grdx(i  ,1)   &
+                            - min( cx, 0._rk )*grdx(i+1,1)   &
+                            ) / ( cff + cy )
+              end do
+ 
+            case ( bcCHAPMAN )
+              do i = 2,imm1
+                cff = dte/dy(i,2)
+                cy  = cff*sqrt( g*d(i,2) )
+                elf(i,1) = ( el(i,1) + cy*elf(i,2) )/(1.+cy)
+              end do
+
+            case default
+              elf(:,1) = elf(:,2)
 
           end select
-
-          elf(:,1) = elf(:,2)
 
         end if
 
@@ -1971,8 +2109,8 @@ module bry
 !______________________________________________________________________
 !
       use glob_const , only: GRAV
-      use glob_grid  , only: dum, dvm, h, dx, dy
-      use glob_ocean , only: d, el, uaf, ua, vaf, va
+      use grid       , only: dum, dvm, h, dx, dy
+      use glob_ocean , only: d, dt, el, elf, uaf, ua, vaf, va
       use model_run  , only: dte, ramp
 
       implicit none
@@ -2016,9 +2154,11 @@ module bry
               uaf(im,2:jmm1) = UA_bry%EST(1,2:jmm1)
 
             case ( bcFLATHER )
-              uaf(im,2:jmm1) = UA_bry%EST(1,2:jmm1)              &
-                         + sqrt(GRAV/d(imm1,2:jmm1))             &
-                          *(el(imm1,2:jmm1)-EL_bry%EST(1,2:jmm1))
+              cx(2:jmm1) = sqrt( 2.*GRAV / (d(imm1,2:jmm1)+d(im,2:jmm1)) )
+              uaf(im,2:jmm1) = UA_bry%EST(1,2:jmm1)                    &
+                             + cx(2:jmm1)                              &
+                               * ( .5*(el(imm1,2:jmm1)+el(im,2:jmm1))  &
+                                 - EL_bry%EST(1,2:jmm1) )
 
             case ( bcGENFLATHER )
               uaf(im,2:jmm1) = ( UA_bry%EST(1,2:jmm1)                   &
@@ -2026,13 +2166,6 @@ module bry
                                 +sqrt(GRAV/d(imm1,2:jmm1))              &
                                 *(el(imm1,2:jmm1)-EL_bry%EST(1,2:jmm1)))&
                                /(h(imm1,2:jmm1)+el(imm1,2:jmm1))
-
-            case ( 10 ) ! bcFLATHER
-              cx(2:jmm1) = sqrt( 2.*GRAV / (d(imm1,2:jmm1)+d(im,2:jmm1)) )
-              uaf(im,2:jmm1) = UA_bry%EST(1,2:jmm1)                    &
-                             + cx(2:jmm1)                              &
-                               * ( .5*(el(imm1,2:jmm1)+el(im,2:jmm1))  &
-                                 - EL_bry%EST(1,2:jmm1) )
 
             case default
               uaf(im,2:jmm1) = 0.
@@ -2062,8 +2195,9 @@ module bry
 !                              *dx(imm1,2:jmm1)/dx(imm2,2:jmm1)
 
             case ( bcCHAPMAN )
-              cx(2:jmm1) = dte*.5*(1./dx(imm1,1:jmm2)+1./dx(imm1,2:jmm1))     &
-                         * sqrt( .5*GRAV * (d(imm1,1:jmm2)+d(imm1,2:jmm1)) )
+              cx(2:jmm1) = dte*.5*(1./dx(imm1,1:jmm2)+1./dx(imm1,2:jmm1))  &
+                         * sqrt( dvm(imm1,2:jmm1)*.5*GRAV                  &
+                               * (d(imm1,1:jmm2)+d(imm1,2:jmm1)) )
               vaf(im,2:jmm1) = (va(im,2:jmm1)+cx(2:jmm1)*vaf(imm1,2:jmm1))  &
                              / (1.+cx(2:jmm1))
 
@@ -2091,9 +2225,11 @@ module bry
               uaf(2,2:jmm1) = UA_bry%WST(1,2:jmm1)
 
             case ( bcFLATHER )
-              uaf(2,2:jmm1) = UA_bry%WST(1,2:jmm1)              &
-                           - sqrt(GRAV/d(2,2:jmm1))             &
-                            *(el(2,2:jmm1)-EL_bry%WST(1,2:jmm1))
+              cx(2:jmm1) = sqrt( 2.*GRAV / (d(1,2:jmm1)+d(2,2:jmm1)) )
+              uaf(2,2:jmm1) = UA_bry%WST(1,2:jmm1)                &
+                            - cx(2:jmm1)                          &
+                              * ( .5*(el(1,2:jmm1)+el(2,2:jmm1))  &
+                                 - EL_bry%WST(1,2:jmm1) )
 
             case ( bcGENFLATHER )
               uaf(2,2:jmm1) = ( UA_bry%WST(1,2:jmm1)                 &
@@ -2101,13 +2237,6 @@ module bry
                                -sqrt(GRAV/d(2,2:jmm1))               &
                                *(el(2,2:jmm1)-EL_bry%WST(1,2:jmm1))) &
                               /(h(2,2:jmm1)+el(2,2:jmm1))
-
-            case ( 10 ) ! bcFLATHER
-              cx(2:jmm1) = sqrt( 2.*GRAV / (d(1,2:jmm1)+d(2,2:jmm1)) )
-              uaf(2,2:jmm1) = UA_bry%WST(1,2:jmm1)                &
-                            - cx(2:jmm1)                          &
-                              * ( .5*(el(1,2:jmm1)+el(2,2:jmm1))  &
-                                 - EL_bry%WST(1,2:jmm1) )
 
             case default
               uaf(2,2:jmm1) = 0.
@@ -2137,10 +2266,11 @@ module bry
 !                              *dx(2,2:jmm1)/dx(3,2:jmm1)
 
             case ( bcCHAPMAN )
-              cx(2:jmm1) = dte*.5*(1./dx(3,1:jmm2)+1./dx(3,2:jmm1))     &
-                         * sqrt( .5*GRAV * (d(3,1:jmm2)+d(3,2:jmm1)) )
+              cx(2:jmm1) = dte*.5*(1./dx(3,1:jmm2)+1./dx(3,2:jmm1))  &
+                         * sqrt( dvm(3,2:jmm1)*.5*GRAV               &
+                               * (d(3,1:jmm2)+d(3,2:jmm1)) )
               vaf(2,2:jmm1) = (va(2,2:jmm1)+cx(2:jmm1)*vaf(3,2:jmm1))  &
-                             / (1.+cx(2:jmm1))
+                            / (1.+cx(2:jmm1))
 
             case default
               vaf(1,2:jmm1) = 0.
@@ -2188,9 +2318,11 @@ module bry
               vaf(2:imm1,jm) = VA_bry%NTH(2:imm1,1)
 
             case ( bcFLATHER )
-              vaf(2:imm1,jm) = VA_bry%NTH(2:imm1,1)              &
-                         + sqrt(GRAV/d(2:imm1,jmm1))             &
-                          *(el(2:imm1,jmm1)-EL_bry%NTH(2:imm1,1))
+              ce(2:imm1) = sqrt( 2.*GRAV / (d(2:imm1,jmm1)+d(2:imm1,jm)) )
+              vaf(2:imm1,jm) = VA_bry%NTH(2:imm1,1)                    &
+                             + ce(2:imm1)                              &
+                               * ( .5*(el(2:imm1,jmm1)+el(2:imm1,jm))  &
+                                  - EL_bry%NTH(2:imm1,1) )
 
             case ( bcGENFLATHER )
               vaf(2:imm1,jm) = ( VA_bry%NTH(2:imm1,1)                   &
@@ -2198,13 +2330,6 @@ module bry
                                 +sqrt(GRAV/d(2:imm1,jmm1))              &
                                 *(el(2:imm1,jmm1)-EL_bry%NTH(2:imm1,1)))&
                                /(h(2:imm1,jmm1)+el(2:imm1,jmm1))
-
-            case ( 10 ) ! bcFLATHER
-              ce(2:imm1) = sqrt( 2.*GRAV / (d(2:imm1,jmm1)+d(2:imm1,jm)) )
-              vaf(2:imm1,jm) = VA_bry%NTH(2:imm1,1)                    &
-                             + ce(2:imm1)                              &
-                               * ( .5*(el(2:imm1,jmm1)+el(2:imm1,jm))  &
-                                  - EL_bry%NTH(2:imm1,1) )
 
             case default
               vaf(2:imm1,jm) = 0.
@@ -2233,8 +2358,9 @@ module bry
 !                              *dy(2:imm1,jmm1)/dy(2:imm1,jmm2)
 
             case ( bcCHAPMAN )
-              ce(2:imm1) = dte*.5*(1./dy(1:imm2,jmm1)+1./dy(2:imm1,jmm1))     &
-                         * sqrt( .5*GRAV * (d(1:imm2,jmm1)+d(2:imm1,jmm1)) )
+              ce(2:imm1) = dte*.5*(1./dy(1:imm2,jmm1)+1./dy(2:imm1,jmm1))  &
+                         * sqrt( dum(2:imm1,jmm1)*.5*GRAV                  &
+                               * (d(1:imm2,jmm1)+d(2:imm1,jmm1)) )
               uaf(2:imm1,jm) = (ua(2:imm1,jm)+ce(2:imm1)*uaf(2:imm1,jmm1))  &
                              / (1.+ce(2:imm1))
 
@@ -2262,9 +2388,11 @@ module bry
               vaf(2:imm1,2) = VA_bry%STH(2:imm1,1)
 
             case ( bcFLATHER )
-              vaf(2:imm1,2) = VA_bry%STH(2:imm1,1)              &
-                           - sqrt(GRAV/d(2:imm1,2))             &
-                            *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))
+              ce(2:imm1) = sqrt( 2.*GRAV / (d(2:imm1,1)+d(2:imm1,2)) )
+              vaf(2:imm1,2) = VA_bry%STH(2:imm1,1)                &
+                            - ce(2:imm1)                          &
+                              * ( .5*(el(2:imm1,1)+el(2:imm1,2))  &
+                                 - EL_bry%STH(2:imm1,1) )
 
             case ( bcGENFLATHER )
               vaf(2:imm1,2) = ( VA_bry%STH(2:imm1,1)                 &
@@ -2272,13 +2400,6 @@ module bry
                                -sqrt(GRAV/d(2:imm1,2))               &
                                *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))) &
                               /(h(2:imm1,2)+el(2:imm1,2))
-
-            case ( 10 ) ! bcFLATHER
-              ce(2:imm1) = sqrt( 2.*GRAV / (d(2:imm1,1)+d(2:imm1,2)) )
-              vaf(2:imm1,2) = VA_bry%STH(2:imm1,1)                &
-                            - ce(2:imm1)                          &
-                              * ( .5*(el(2:imm1,1)+el(2:imm1,2))  &
-                                 - EL_bry%STH(2:imm1,1) )
 
             case default
               vaf(2:imm1,2) = 0.
@@ -2308,8 +2429,9 @@ module bry
 !                              *dy(2:imm1,2)/dy(2:imm1,3)
 
             case ( bcCHAPMAN )
-              ce(2:imm1) = dte*.5*(1./dy(1:imm2,2)+1./dy(2:imm1,2))     &
-                         * sqrt( .5*GRAV * (d(1:imm2,2)+d(2:imm1,2)) )
+              ce(2:imm1) = dte*.5*(1./dy(1:imm2,2)+1./dy(2:imm1,2))  &
+                         * sqrt( dum(2:imm1,2)*.5*GRAV               &
+                               * (d(1:imm2,2)+d(2:imm1,2)) )
               uaf(2:imm1,1) = (ua(2:imm1,1)+ce(2:imm1)*uaf(2:imm1,2))  &
                              / (1.+ce(2:imm1))
 
@@ -2322,6 +2444,34 @@ module bry
 
       end if ! periodic_y end
 
+
+      if ( .not. ( periodic_bc % x .and. periodic_bc % y ) ) then
+
+        if ( hasSOUTH .and. hasWEST ) then
+          uaf(2,1) = .5*(uaf(3,1)+uaf(2,2))
+          uaf(1,1) = uaf(2,1)
+          vaf(1,2) = .5*(vaf(2,2)+vaf(1,3))
+          vaf(1,1) = vaf(1,2)
+        end if
+
+        if ( hasSOUTH .and. hasEAST ) then
+          uaf(im,1) = .5*(uaf(imm1,1)+uaf(im,2))
+          vaf(im,2) = .5*(vaf(imm1,2)+vaf(im,3))
+          vaf(im,1) = vaf(im,2)
+        end if
+
+        if ( hasNORTH .and. hasEAST ) then
+          uaf(im,jm) = .5*(uaf(imm1,jm)+uaf(im,jmm1))
+          vaf(im,jm) = .5*(vaf(imm1,jm)+vaf(im,jmm1))
+        end if
+
+        if ( hasNORTH .and. hasWEST ) then
+          uaf(2,jm) = .5*(uaf(3,jm)+uaf(2,jmm1))
+          uaf(1,jm) = uaf(2,jm)
+          vaf(1,jm) = .5*(vaf(2,jm)+vaf(1,jmm1))
+        end if
+
+      end if
 
 ! Apply u- and v-masks
       uaf = uaf*dum
@@ -2337,7 +2487,7 @@ module bry
 !______________________________________________________________________
 !
       use glob_const , only: SMALL
-      use glob_grid  , only: dum, dvm, h
+      use grid       , only: dum, dvm, h
       use glob_ocean , only: d, u, ub, uf, v, vb, vf, wubot, wvbot
 
       implicit none
@@ -2416,25 +2566,25 @@ module bry
 
               case ( bcRADIATION_ENH )
               do k = 1,kbm1
-                do j = 1,jmm1
-                  grdy(1,j) = u(imm1,j+1,k)-u(imm1,j,k)
-                  grdy(2,j) = u(im  ,j+1,k)-u(im  ,j,k)
+                do j = 2,jm
+                  grdy(1,j) = u(imm1,j,k)-u(imm1,j-1,k)
+                  grdy(2,j) = u(im  ,j,k)-u(im  ,j-1,k)
                 end do
                 do j = 2,jmm1
                   dvdt =  u(imm1,j,k)-uf(imm1,j,k)
                   dvdx = uf(imm1,j,k)-uf(imm2,j,k)
-                  if ( dvdt*dvdx < 0. ) dvdt = 0.
-                  if ( dvdt*(grdy(1,j-1)+grdy(1,j)) > 0. ) then
-                    dvdy = grdy(1,j-1)
-                  else
+                  if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
                     dvdy = grdy(1,j  )
+                  else
+                    dvdy = grdy(1,j+1)
                   end if
-                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  cff = max(dvdx*dvdx + dvdy*dvdy, SMALL)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
                   cx  = dvdt*dvdx
                   cy  = min(cff,max(dvdt*dvdy,-cff))
                   uf(im,j,k) = ( cff*u(im,j,k) + cx*uf(imm1,j,k)      &
-                                - max(cy,0.)*grdy(2,j-1)              &
-                                - min(cy,0.)*grdy(2,j  ) )            &
+                                - max(cy,0._rk)*grdy(2,j  )           &
+                                - min(cy,0._rk)*grdy(2,j+1) )         &
                                / (cff+cx)
                 end do
               end do
@@ -2465,6 +2615,31 @@ module bry
                                  - 2.*v(imm1,j,k) + v(imm1,j+1,k) )   &
                                      + (1.-cff) * ( v(im  ,j-1,k)     &
                                  - 2.*v(im  ,j,k) + v(im  ,j+1,k) ) )
+                end do
+              end do
+
+            case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do j = 1,jmm1
+                  grdy(1,j) = v(imm1,j+1,k)-v(imm1,j,k)
+                  grdy(2,j) = v(im  ,j+1,k)-v(im  ,j,k)
+                end do
+                do j = 2,jmm1
+                  dvdt =  v(imm1,j,k)-vf(imm1,j,k)
+                  dvdx = vf(imm1,j,k)-vf(imm2,j,k)
+                  if ( dvdt*(grdy(1,j-1)+grdy(1,j)) > 0. ) then
+                    dvdy = grdy(1,j-1)
+                  else
+                    dvdy = grdy(1,j  )
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  vf(im,j,k) = ( cff*v(im,j,k) + cx*vf(imm1,j,k)      &
+                                - max(cy,0._rk)*grdy(2,j-1)           &
+                                - min(cy,0._rk)*grdy(2,j  ) )         &
+                               / (cff+cx)
                 end do
               end do
 
@@ -2499,7 +2674,6 @@ module bry
                                    + 2.*u(3,j,k) + u(3,j+1,k) )   &
                                     + (1.-cff) * ( u(2,j-1,k)     &
                                    + 2.*u(2,j,k) + u(2,j+1,k) ) )
-                  uf(1,j,k) = uf(2,j,k)
                 end do
               end do
 
@@ -2514,40 +2688,40 @@ module bry
                   uf(2,j,k) = ( (1.-cff)*ub(2,j,k)    &
                                + 2.*cff * u(3,j,k) )  &
                               / (1.+cff)
-                  uf(1,j,k) = uf(2,j,k)
                 end do
               end do
 
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
-                do j = 1,jmm1
-                  grdy(1,j) = u(2,j+1,k)-u(2,j,k)
-                  grdy(2,j) = u(3,j+1,k)-u(3,j,k)
+                do j = 2,jm
+                  grdy(1,j) = u(2,j,k)-u(2,j-1,k)
+                  grdy(2,j) = u(3,j,k)-u(3,j-1,k)
                 end do
                 do j = 2,jmm1
-                  dvdt =  u(2,j,k)-uf(2,j,k)
-                  dvdx = uf(2,j,k)-uf(3,j,k)
-                  if ( dvdt*dvdx < 0. ) dvdt = 0.
-                  if ( dvdt*(grdy(2,j-1)+grdy(2,j)) > 0. ) then
-                    dvdy = grdy(2,j-1)
-                  else
+                  dvdt =  u(3,j,k)-uf(3,j,k)
+                  dvdx = uf(3,j,k)-uf(4,j,k)
+                  if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
                     dvdy = grdy(2,j  )
+                  else
+                    dvdy = grdy(2,j+1)
                   end if
                   cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
                   cx  = dvdt*dvdx
                   cy  = min(cff,max(dvdt*dvdy,-cff))
                   uf(2,j,k) = ( cff*u(2,j,k) + cx*uf(3,j,k)           &
-                               - max(cy,0.)*grdy(1,j-1)               &
-                               - min(cy,0.)*grdy(1,j  ) )             &
+                               - max(cy,0._rk)*grdy(1,j  )            &
+                               - min(cy,0._rk)*grdy(1,j+1) )          &
                               / (cff+cx)
-                  uf(1,j,k) = uf(2,j,k)
                 end do
               end do
 
             case default
-              uf(1:2,:,:) = 0.
+              uf(2,:,:) = 0.
 
           end select
+
+          uf(1,:,:) = uf(2,:,:) ! Fill up unused cells
 
           select case ( BC % VEL3D % TANG % WEST )
 
@@ -2570,6 +2744,31 @@ module bry
                                    + 2.*u(2,j,k) + v(2,j+1,k) )   &
                                     + (1.-cff) * ( v(1,j-1,k)     &
                                    + 2.*u(1,j,k) + v(1,j+1,k) ) )
+                end do
+              end do
+
+            case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do j = 1,jmm1
+                  grdy(1,j) = v(1,j+1,k)-v(1,j,k)
+                  grdy(2,j) = v(2,j+1,k)-v(2,j,k)
+                end do
+                do j = 2,jmm1
+                  dvdt =  v(2,j,k)-vf(2,j,k)
+                  dvdx = vf(2,j,k)-vf(3,j,k)
+                  if ( dvdt*(grdy(2,j-1)+grdy(2,j)) > 0. ) then
+                    dvdy = grdy(2,j-1)
+                  else
+                    dvdy = grdy(2,j  )
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdx < 0. ) dvdt = 0.
+                  cx  = dvdt*dvdx
+                  cy  = min(cff,max(dvdt*dvdy,-cff))
+                  vf(1,j,k) = ( cff*v(1,j,k) + cx*vf(2,j,k)           &
+                               - max(cy,0._rk)*grdy(1,j-1)            &
+                               - min(cy,0._rk)*grdy(1,j  ) )          &
+                              / (cff+cx)
                 end do
               end do
 
@@ -2668,8 +2867,8 @@ module bry
                   cx  = min(cff,max(dvdt*dvdx,-cff))
                   cy  = dvdt*dvdy
                   vf(i,jm,k) = ( cff*v(i,jm,k) + cy*vf(i,jmm1,k)      &
-                                - max(cx,0.)*grdx(i  ,2)              &
-                                - min(cx,0.)*grdx(i+1,2) )            &
+                                - max(cx,0._rk)*grdx(i  ,2)           &
+                                - min(cx,0._rk)*grdx(i+1,2) )         &
                                / (cff+cy)
                 end do
               end do
@@ -2700,6 +2899,31 @@ module bry
                                  + 2.*u(i,jmm1,k) + u(i+1,jmm1,k) )   &
                                      + (1.-cff) * ( u(i-1,jm  ,k)     &
                                  + 2.*u(i,jm  ,k) + u(i+1,jm  ,k) ) )
+                end do
+              end do
+
+            case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do i = 1,imm1
+                  grdx(i,1) = u(i+1,jmm1,k)-u(i,jmm1,k)
+                  grdx(i,2) = u(i+1,jm  ,k)-u(i,jm  ,k)
+                end do
+                do i = 2,imm1
+                  dvdt =  u(i,jmm1,k)-uf(i,jmm1,k)
+                  dvdy = uf(i,jmm1,k)-uf(i,jmm2,k)
+                  if ( dvdt*(grdx(i-1,1)+grdx(i,1)) > 0. ) then
+                    dvdx = grdx(i-1,1)
+                  else
+                    dvdx = grdx(i  ,1)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, small)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
+                  cx  = min(cff,max(dvdt*dvdx,-cff))
+                  cy  = dvdt*dvdy
+                  uf(i,jm,k) = ( cff*u(i,jm,k) + cy*uf(i,jmm1,k)      &
+                                - max(cx,0._rk)*grdx(i-1,2)           &
+                                - min(cx,0._rk)*grdx(i  ,2) )         &
+                               / (cff+cy)
                 end do
               end do
 
@@ -2748,7 +2972,6 @@ module bry
                   vf(i,2,k) = ( (1.-cff)*vb(i,2,k)    &
                                + 2.*cff * v(i,3,k) )  &
                               / (1.+cff)
-                  vf(i,1,k) = vf(i,2,k)
                 end do
               end do
 
@@ -2771,10 +2994,9 @@ module bry
                   cx  = min(cff,max(dvdt*dvdx,-cff))
                   cy  = dvdt*dvdy
                   vf(i,2,k) = ( cff*v(i,2,k) + cy*vf(i,3,k)           &
-                               - max(cx,0.)*grdx(i  ,1)               &
-                               - min(cx,0.)*grdx(i+1,1) )             &
+                               - max(cx,0._rk)*grdx(i  ,1)            &
+                               - min(cx,0._rk)*grdx(i+1,1) )          &
                               / (cff+cy)
-                  vf(i,1,k) = vf(i,2,k)
                 end do
               end do
 
@@ -2782,6 +3004,8 @@ module bry
               vf(:,1:2,:) = 0.
 
           end select
+
+          vf(:,1,:) = vf(:,2,:) ! Fill up unused cells
 
           select case ( BC % VEL3D % TANG % SOUTH )
 
@@ -2807,6 +3031,31 @@ module bry
                 end do
               end do
 
+            case ( bcRADIATION_ENH )
+              do k = 1,kbm1
+                do i = 1,imm1
+                  grdx(i,1) = u(i+1,1,k)-u(i,1,k)
+                  grdx(i,2) = u(i+1,2,k)-u(i,2,k)
+                end do
+                do i = 2,imm1
+                  dvdt =  u(i,2,k)-uf(i,2,k)
+                  dvdy = uf(i,2,k)-uf(i,3,k)
+                  if ( dvdt*(grdx(i-1,2)+grdx(i,2)) > 0. ) then
+                    dvdx = grdx(i-1,2)
+                  else
+                    dvdx = grdx(i  ,2)
+                  end if
+                  cff = max(dvdx*dvdx + dvdy*dvdy, SMALL)
+                  if ( dvdt*dvdy < 0. ) dvdt = 0.
+                  cx  = min(cff,max(dvdt*dvdx,-cff))
+                  cy  = dvdt*dvdy
+                  uf(i,1,k) = ( cff*u(i,1,k) + cy*uf(i,2,k)           &
+                               - max(cx,0._rk)*grdx(i-1,1)            &
+                               - min(cx,0._rk)*grdx(i  ,1) )          &
+                              / (cff+cy)
+                end do
+              end do
+
             case default
               uf(:,1,:) = 0.
 
@@ -2816,6 +3065,34 @@ module bry
 
       end if ! periodic_y end
 
+
+      if ( .not. ( periodic_bc % x .and. periodic_bc % y ) ) then
+
+        if ( hasSOUTH .and. hasWEST ) then
+          uf(2,1,:) = .5*(uf(3,1,:)+uf(2,2,:))
+          uf(1,1,:) = uf(2,1,:)
+          vf(1,2,:) = .5*(vf(2,2,:)+vf(1,3,:))
+          vf(1,1,:) = vf(1,2,:)
+        end if
+
+        if ( hasSOUTH .and. hasEAST ) then
+          uf(im,1,:) = .5*(uf(imm1,1,:)+uf(im,2,:))
+          vf(im,2,:) = .5*(vf(imm1,2,:)+vf(im,3,:))
+          vf(im,1,:) = vf(1,2,:)
+        end if
+
+        if ( hasNORTH .and. hasEAST ) then
+          uf(im,jm,:) = .5*(uf(imm1,jm,:)+uf(im,jmm1,:))
+          vf(im,jm,:) = .5*(vf(imm1,jm,:)+vf(im,jmm1,:))
+        end if
+
+        if ( hasNORTH .and. hasWEST ) then
+          uf(2,jm,:) = .5*(uf(3,jm,:)+uf(2,jmm1,:))
+          uf(1,jm,:) = uf(2,jm,:)
+          vf(1,jm,:) = .5*(vf(2,jm,:)+vf(1,jmm1,:))
+        end if
+
+      end if
 
 ! Apply u- nd v-masks
       do k = 1,kbm1
@@ -2836,9 +3113,10 @@ module bry
 !______________________________________________________________________
 !
       use glob_const , only: SMALL
-      use glob_grid  , only: dx, dy, fsm, zz
+      use grid       , only: dum, dvm, dx, dy, fsm, zz
       use glob_ocean , only: dt, s, t, u, uf, v, vf, w
       use model_run  , only: dti
+      use glob_domain,only:is_master!REM:
 
       implicit none
 
@@ -2862,24 +3140,24 @@ module bry
           select case ( BC % TS % EAST )
 
             case ( bc0GRADIENT )
-              uf(im,:,1:kbm1) = t(imm1,:,1:kbm1)
-              vf(im,:,1:kbm1) = s(imm1,:,1:kbm1)
+              uf(im,:,1:kbm1) = uf(imm1,:,1:kbm1)
+              vf(im,:,1:kbm1) = vf(imm1,:,1:kbm1)
 
             case ( bc3POINTSMOOTH )
-              uf(im,2:jmm1,1:kbm1) = ( t(imm1,1:jmm2,1:kbm1)       &
-                                     + t(imm1,2:jmm1,1:kbm1)       &
-                                     + t(imm1,3:jm  ,1:kbm1) )/3.
-              uf(im,1     ,1:kbm1) = ( t(imm1,1     ,1:kbm1)       &
-                                     + t(imm1,2     ,1:kbm1) )*.5
-              uf(im,  jm  ,1:kbm1) = ( t(imm1,  jmm1,1:kbm1)       &
-                                     + t(imm1,  jm  ,1:kbm1) )*.5
-              vf(im,2:jmm1,1:kbm1) = ( s(imm1,1:jmm2,1:kbm1)       &
-                                     + s(imm1,2:jmm1,1:kbm1)       &
-                                     + s(imm1,3:jm  ,1:kbm1) )/3.
-              vf(im,1     ,1:kbm1) = ( s(imm1,1     ,1:kbm1)       &
-                                     + s(imm1,2     ,1:kbm1) )*.5
-              vf(im,  jm  ,1:kbm1) = ( s(imm1,  jmm1,1:kbm1)       &
-                                     + s(imm1,  jm  ,1:kbm1) )*.5
+              uf(im,2:jmm1,1:kbm1) = ( uf(imm1,1:jmm2,1:kbm1)       &
+                                     + uf(imm1,2:jmm1,1:kbm1)       &
+                                     + uf(imm1,3:jm  ,1:kbm1) )/3.
+              uf(im,1     ,1:kbm1) = ( uf(imm1,1     ,1:kbm1)       &
+                                     + uf(imm1,2     ,1:kbm1) )*.5
+              uf(im,  jm  ,1:kbm1) = ( uf(imm1,  jmm1,1:kbm1)       &
+                                     + uf(imm1,  jm  ,1:kbm1) )*.5
+              vf(im,2:jmm1,1:kbm1) = ( vf(imm1,1:jmm2,1:kbm1)       &
+                                     + vf(imm1,2:jmm1,1:kbm1)       &
+                                     + vf(imm1,3:jm  ,1:kbm1) )/3.
+              vf(im,1     ,1:kbm1) = ( vf(imm1,1     ,1:kbm1)       &
+                                     + vf(imm1,2     ,1:kbm1) )*.5
+              vf(im,  jm  ,1:kbm1) = ( vf(imm1,  jmm1,1:kbm1)       &
+                                     + vf(imm1,  jm  ,1:kbm1) )*.5
 
             case ( bcCLAMPED )
               uf(im,:,1:kbm1) = T_bry%EST(1,:,1:kbm1)
@@ -2928,12 +3206,12 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = t(imm1,j,k)-t(imm1,j-1,k)
-                  grdy(2,j) = t(im  ,j,k)-t(im  ,j-1,k)
+                  grdy(1,j) = ( t(imm1,j,k)-t(imm1,j-1,k) )*dvm(imm1,j)
+                  grdy(2,j) = ( t(im  ,j,k)-t(im  ,j-1,k) )*dvm(im  ,j)
                 end do
                 do j = 2,jmm1
-                  dvdt =  t(imm1,j,k)-uf(imm1,j,k)
-                  dvdx = uf(imm1,j,k)-uf(imm2,j,k)
+                  dvdt =    t(imm1,j,k)-uf(imm1,j,k)
+                  dvdx = ( uf(imm1,j,k)-uf(imm2,j,k) )*dum(imm1,j)
                   if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
                     dvdy = grdy(1,j  )
                   else
@@ -2952,12 +3230,12 @@ module bry
 
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = s(imm1,j,k)-s(imm1,j-1,k)
-                  grdy(2,j) = s(im  ,j,k)-s(im  ,j-1,k)
+                  grdy(1,j) = ( s(imm1,j,k)-s(imm1,j-1,k) )*dvm(imm1,j)
+                  grdy(2,j) = ( s(im  ,j,k)-s(im  ,j-1,k) )*dvm(im  ,j)
                 end do
                 do j = 2,jmm1
-                  dvdt =  s(imm1,j,k)-vf(imm1,j,k)
-                  dvdx = vf(imm1,j,k)-vf(imm2,j,k)
+                  dvdt =    s(imm1,j,k)-vf(imm1,j,k)
+                  dvdx = ( vf(imm1,j,k)-vf(imm2,j,k) )*dum(imm1,j)
                   if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
                     dvdy = grdy(1,j  )
                   else
@@ -2984,24 +3262,24 @@ module bry
           select case ( BC % TS % WEST )
 
             case ( bc0GRADIENT )
-              uf(1,:,1:kbm1) = t(2,:,1:kbm1)
-              vf(1,:,1:kbm1) = s(2,:,1:kbm1)
+              uf(1,:,1:kbm1) = uf(2,:,1:kbm1)
+              vf(1,:,1:kbm1) = vf(2,:,1:kbm1)
 
             case ( bc3POINTSMOOTH )
-              uf(1,2:jmm1,1:kbm1) = ( t(2,1:jmm2,1:kbm1)       &
-                                    + t(2,2:jmm1,1:kbm1)       &
-                                    + t(2,3:jm  ,1:kbm1) )/3.
-              uf(1,1     ,1:kbm1) = ( t(2,1     ,1:kbm1)       &
-                                    + t(2,2     ,1:kbm1) )*.5
-              uf(1,  jm  ,1:kbm1) = ( t(2,  jmm1,1:kbm1)       &
-                                    + t(2,  jm  ,1:kbm1) )*.5
-              vf(1,2:jmm1,1:kbm1) = ( s(2,1:jmm2,1:kbm1)       &
-                                    + s(2,2:jmm1,1:kbm1)       &
-                                    + s(2,3:jm  ,1:kbm1) )/3.
-              vf(1,1     ,1:kbm1) = ( s(2,1     ,1:kbm1)       &
-                                    + s(2,2     ,1:kbm1) )*.5
-              vf(1,  jm  ,1:kbm1) = ( s(2,  jmm1,1:kbm1)       &
-                                    + s(2,  jm  ,1:kbm1) )*.5
+              uf(1,2:jmm1,1:kbm1) = ( uf(2,1:jmm2,1:kbm1)       &
+                                    + uf(2,2:jmm1,1:kbm1)       &
+                                    + uf(2,3:jm  ,1:kbm1) )/3.
+              uf(1,1     ,1:kbm1) = ( uf(2,1     ,1:kbm1)       &
+                                    + uf(2,2     ,1:kbm1) )*.5
+              uf(1,  jm  ,1:kbm1) = ( uf(2,  jmm1,1:kbm1)       &
+                                    + uf(2,  jm  ,1:kbm1) )*.5
+              vf(1,2:jmm1,1:kbm1) = ( vf(2,1:jmm2,1:kbm1)       &
+                                    + vf(2,2:jmm1,1:kbm1)       &
+                                    + vf(2,3:jm  ,1:kbm1) )/3.
+              vf(1,1     ,1:kbm1) = ( vf(2,1     ,1:kbm1)       &
+                                    + vf(2,2     ,1:kbm1) )*.5
+              vf(1,  jm  ,1:kbm1) = ( vf(2,  jmm1,1:kbm1)       &
+                                    + vf(2,  jm  ,1:kbm1) )*.5
 
             case ( bcCLAMPED )
               uf(1,:,1:kbm1) = T_bry%WST(1,:,1:kbm1)
@@ -3049,12 +3327,12 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = t(1,j,k)-t(1,j-1,k)
-                  grdy(2,j) = t(2,j,k)-t(2,j-1,k)
+                  grdy(1,j) = ( t(1,j,k)-t(1,j-1,k) )*dvm(1,j)
+                  grdy(2,j) = ( t(2,j,k)-t(2,j-1,k) )*dvm(2,j)
                 end do
                 do j = 2,jmm1
-                  dvdt =  t(2,j,k)-uf(2,j,k)
-                  dvdx = uf(2,j,k)-uf(3,j,k)
+                  dvdt =    t(2,j,k)-uf(2,j,k)
+                  dvdx = ( uf(2,j,k)-uf(3,j,k) )*dum(3,j)
                   if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
                     dvdy = grdy(2,j  )
                   else
@@ -3073,12 +3351,12 @@ module bry
 
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = s(1,j,k)-s(1,j-1,k)
-                  grdy(2,j) = s(2,j,k)-s(2,j-1,k)
+                  grdy(1,j) = ( s(1,j,k)-s(1,j-1,k) )*dvm(1,j)
+                  grdy(2,j) = ( s(2,j,k)-s(2,j-1,k) )*dvm(2,j)
                 end do
                 do j = 2,jmm1
-                  dvdt =  s(2,j,k)-vf(2,j,k)
-                  dvdx = vf(2,j,k)-vf(3,j,k)
+                  dvdt =    s(2,j,k)-vf(2,j,k)
+                  dvdx = ( vf(2,j,k)-vf(3,j,k) )*dum(3,j)
                   if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
                     dvdy = grdy(2,j  )
                   else
@@ -3114,24 +3392,24 @@ module bry
           select case ( BC % TS % NORTH )
 
             case ( bc0GRADIENT )
-              uf(:,jm,1:kbm1) = t(:,jmm1,1:kbm1)
-              vf(:,jm,1:kbm1) = s(:,jmm1,1:kbm1)
+              uf(:,jm,1:kbm1) = uf(:,jmm1,1:kbm1)
+              vf(:,jm,1:kbm1) = vf(:,jmm1,1:kbm1)
 
             case ( bc3POINTSMOOTH )
-              uf(2:imm1,jm,1:kbm1) = ( t(1:imm2,jmm1,1:kbm1)       &
-                                     + t(2:imm1,jmm1,1:kbm1)       &
-                                     + t(3:im  ,jmm1,1:kbm1) )/3.
-              uf(1     ,jm,1:kbm1) = ( t(1     ,jmm1,1:kbm1)       &
-                                     + t(2     ,jmm1,1:kbm1) )*.5
-              uf(  im  ,jm,1:kbm1) = ( t(imm1  ,jmm1,1:kbm1)       &
-                                     + t(im    ,jmm1,1:kbm1) )*.5
-              vf(2:imm1,jm,1:kbm1) = ( s(1:imm2,jmm1,1:kbm1)       &
-                                     + s(2:imm1,jmm1,1:kbm1)       &
-                                     + s(3:im  ,jmm1,1:kbm1) )/3.
-              vf(1     ,jm,1:kbm1) = ( s(1     ,jmm1,1:kbm1)       &
-                                     + s(2     ,jmm1,1:kbm1) )*.5
-              vf(  im  ,jm,1:kbm1) = ( s(imm1  ,jmm1,1:kbm1)       &
-                                     + s(im    ,jmm1,1:kbm1) )*.5
+              uf(2:imm1,jm,1:kbm1) = ( uf(1:imm2,jmm1,1:kbm1)       &
+                                     + uf(2:imm1,jmm1,1:kbm1)       &
+                                     + uf(3:im  ,jmm1,1:kbm1) )/3.
+              uf(1     ,jm,1:kbm1) = ( uf(1     ,jmm1,1:kbm1)       &
+                                     + uf(2     ,jmm1,1:kbm1) )*.5
+              uf(  im  ,jm,1:kbm1) = ( uf(imm1  ,jmm1,1:kbm1)       &
+                                     + uf(im    ,jmm1,1:kbm1) )*.5
+              vf(2:imm1,jm,1:kbm1) = ( vf(1:imm2,jmm1,1:kbm1)       &
+                                     + vf(2:imm1,jmm1,1:kbm1)       &
+                                     + vf(3:im  ,jmm1,1:kbm1) )/3.
+              vf(1     ,jm,1:kbm1) = ( vf(1     ,jmm1,1:kbm1)       &
+                                     + vf(2     ,jmm1,1:kbm1) )*.5
+              vf(  im  ,jm,1:kbm1) = ( vf(imm1  ,jmm1,1:kbm1)       &
+                                     + vf(im    ,jmm1,1:kbm1) )*.5
 
             case ( bcCLAMPED )
               uf(:,jm,1:kbm1) = T_bry%NTH(:,1,1:kbm1)
@@ -3180,12 +3458,12 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = t(i,jmm1,k)-t(i-1,jmm1,k)
-                  grdx(i,2) = t(i,jm  ,k)-t(i-1,jm  ,k)
+                  grdx(i,1) = ( t(i,jmm1,k)-t(i-1,jmm1,k) )*dum(i,jmm1)
+                  grdx(i,2) = ( t(i,jm  ,k)-t(i-1,jm  ,k) )*dum(i,jm  )
                 end do
                 do i = 2,imm1
-                  dvdt =  t(i,jmm1,k)-uf(i,jmm1,k)
-                  dvdy = uf(i,jmm1,k)-uf(i,jmm2,k)
+                  dvdt =    t(i,jmm1,k)-uf(i,jmm1,k)
+                  dvdy = ( uf(i,jmm1,k)-uf(i,jmm2,k) )*dvm(i,jmm1)
                   if ( dvdt*(grdx(i,1)+grdx(i+1,1)) > 0. ) then
                     dvdx = grdx(i  ,1)
                   else
@@ -3204,12 +3482,12 @@ module bry
 
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = s(i,jmm1,k)-s(i-1,jmm1,k)
-                  grdx(i,2) = s(i,jm  ,k)-s(i-1,jm  ,k)
+                  grdx(i,1) = ( s(i,jmm1,k)-s(i-1,jmm1,k) )*dum(i,jmm1)
+                  grdx(i,2) = ( s(i,jm  ,k)-s(i-1,jm  ,k) )*dum(i,jm  )
                 end do
                 do i = 2,imm1
-                  dvdt =  s(i,jmm1,k)-vf(i,jmm1,k)
-                  dvdy = vf(i,jmm1,k)-vf(i,jmm2,k)
+                  dvdt =    s(i,jmm1,k)-vf(i,jmm1,k)
+                  dvdy = ( vf(i,jmm1,k)-vf(i,jmm2,k) )*dvm(i,jmm1)
                   if ( dvdt*(grdx(i,1)+grdx(i+1,1)) > 0. ) then
                     dvdx = grdx(i  ,1)
                   else
@@ -3236,24 +3514,24 @@ module bry
           select case ( BC % TS % SOUTH )
 
             case ( bc0GRADIENT )
-              uf(:,1,1:kbm1) = t(:,2,1:kbm1)
-              vf(:,1,1:kbm1) = s(:,2,1:kbm1)
+              uf(:,1,1:kbm1) = uf(:,2,1:kbm1)
+              vf(:,1,1:kbm1) = vf(:,2,1:kbm1)
 
             case ( bc3POINTSMOOTH )
-              uf(2:imm1,1,1:kbm1) = ( t(1:imm2,2,1:kbm1)       &
-                                    + t(2:imm1,2,1:kbm1)       &
-                                    + t(3:im  ,2,1:kbm1) )/3.
-              uf(1     ,1,1:kbm1) = ( t(1     ,2,1:kbm1)       &
-                                    + t(2     ,2,1:kbm1) )*.5
-              uf(  im  ,1,1:kbm1) = ( t(imm1  ,2,1:kbm1)       &
-                                    + t(im    ,2,1:kbm1) )*.5
-              vf(2:imm1,1,1:kbm1) = ( s(1:imm2,2,1:kbm1)       &
-                                    + s(2:imm1,2,1:kbm1)       &
-                                    + s(3:im  ,2,1:kbm1) )/3.
-              vf(1     ,1,1:kbm1) = ( s(1     ,2,1:kbm1)       &
-                                    + s(2     ,2,1:kbm1) )*.5
-              vf(  im  ,1,1:kbm1) = ( s(imm1  ,2,1:kbm1)       &
-                                    + s(im    ,2,1:kbm1) )*.5
+              uf(2:imm1,1,1:kbm1) = ( uf(1:imm2,2,1:kbm1)       &
+                                    + uf(2:imm1,2,1:kbm1)       &
+                                    + uf(3:im  ,2,1:kbm1) )/3.
+              uf(1     ,1,1:kbm1) = ( uf(1     ,2,1:kbm1)       &
+                                    + uf(2     ,2,1:kbm1) )*.5
+              uf(  im  ,1,1:kbm1) = ( uf(imm1  ,2,1:kbm1)       &
+                                    + uf(im    ,2,1:kbm1) )*.5
+              vf(2:imm1,1,1:kbm1) = ( vf(1:imm2,2,1:kbm1)       &
+                                    + vf(2:imm1,2,1:kbm1)       &
+                                    + vf(3:im  ,2,1:kbm1) )/3.
+              vf(1     ,1,1:kbm1) = ( vf(1     ,2,1:kbm1)       &
+                                    + vf(2     ,2,1:kbm1) )*.5
+              vf(  im  ,1,1:kbm1) = ( vf(imm1  ,2,1:kbm1)       &
+                                    + vf(im    ,2,1:kbm1) )*.5
 
             case ( bcCLAMPED )
               uf(:,1,1:kbm1) = T_bry%STH(:,1,1:kbm1)
@@ -3301,12 +3579,12 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = t(i,1,k)-t(i-1,1,k)
-                  grdx(i,2) = t(i,2,k)-t(i-1,2,k)
+                  grdx(i,1) = ( t(i,1,k)-t(i-1,1,k) )*dum(i,1)
+                  grdx(i,2) = ( t(i,2,k)-t(i-1,2,k) )*dum(i,2)
                 end do
                 do i = 2,imm1
-                  dvdt =  t(i,2,k)-uf(i,2,k)
-                  dvdy = uf(i,2,k)-uf(i,3,k)
+                  dvdt =    t(i,2,k)-uf(i,2,k)
+                  dvdy = ( uf(i,2,k)-uf(i,3,k) )*dvm(i,3)
                   if ( dvdt*(grdx(i,2)+grdx(i+1,2)) > 0. ) then
                     dvdx = grdx(i  ,2)
                   else
@@ -3325,12 +3603,12 @@ module bry
 
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = s(i,1,k)-s(i-1,1,k)
-                  grdx(i,2) = s(i,2,k)-s(i-1,2,k)
+                  grdx(i,1) = ( s(i,1,k)-s(i-1,1,k) )*dum(i,1)
+                  grdx(i,2) = ( s(i,2,k)-s(i-1,2,k) )*dum(i,2)
                 end do
                 do i = 2,imm1
-                  dvdt =  s(i,2,k)-vf(i,2,k)
-                  dvdy = vf(i,2,k)-vf(i,3,k)
+                  dvdt =    s(i,2,k)-vf(i,2,k)
+                  dvdy = ( vf(i,2,k)-vf(i,3,k) )*dvm(i,3)
                   if ( dvdt*(grdx(i,2)+grdx(i+1,2)) > 0. ) then
                     dvdx = grdx(i  ,2)
                   else
@@ -3377,7 +3655,7 @@ module bry
         end if
 
       end if
-! Allpy rho-mask
+! Apply rho-mask
       do k = 1,kbm1
         uf(:,:,k) = uf(:,:,k)*fsm
         vf(:,:,k) = vf(:,:,k)*fsm
@@ -3392,7 +3670,7 @@ module bry
 !  Apply vertical velocity boundary conditions.
 !______________________________________________________________________
 
-      use glob_grid  , only: fsm
+      use grid       , only: fsm
       use glob_ocean , only: w
 
       implicit none
@@ -3416,7 +3694,7 @@ module bry
 !______________________________________________________________________
 !
       use glob_const , only: SMALL
-      use glob_grid  , only: dx, dy, fsm
+      use grid       , only: dx, dy, fsm
       use glob_ocean , only: kh, km, kq, l, q2, q2l, u, uf, v, vf
       use model_run  , only: dti
 
@@ -3539,7 +3817,7 @@ module bry
     end ! subroutine bc_turb
 !______________________________________________________________________
 !
-    pure character(len=256) function get_filename( path, year )
+    pure character(256) function get_filename( path, year )
 !----------------------------------------------------------------------
 !  Costructs filename string in `<path>YYYY<FORMAT_EXT>` format.
 !______________________________________________________________________
@@ -3550,13 +3828,17 @@ module bry
       integer         , intent(in) :: year
 
 
-      if ( year == -1 ) then
-        write( get_filename, '( a, a )' ) trim(path)      &
-                                        , trim(FORMAT_EXT)
+      if ( path(len(trim(path)):len(trim(path))) == "." ) then
+        if ( year == -1 ) then
+          write( get_filename, '( a, a )' ) trim(path)      &
+                                          , trim(FORMAT_EXT)
+        else
+          write( get_filename, '( a, i4.4, a )' ) trim(path)      &
+                                                , year            &
+                                                , trim(FORMAT_EXT)
+        end if
       else
-        write( get_filename, '( a, i4.4, a )' ) trim(path)      &
-                                              , year            &
-                                              , trim(FORMAT_EXT)
+        get_filename = path
       end if
 
 
@@ -3565,188 +3847,115 @@ module bry
 != I/O SECTION ========================================================
 !______________________________________________________________________
 !
-    integer(1) function read_var_3d_nc( var_name, var        &
-                                      , start, edge, ncid )
-!----------------------------------------------------------------------
-!  Read a variable (NC format).
-!______________________________________________________________________
+!    integer(1) function read_var_3d_nc( var_name, var        &
+!                                      , start, edge, ncid )
+!!----------------------------------------------------------------------
+!!  Read a variable (NC format).
+!!______________________________________________________________________
+!!
+!      use glob_const , only: rk
+!      use glob_domain
+!      use mpi        , only: MPI_OFFSET_KIND
+!      use pnetcdf
 !
-      use glob_const , only: rk
-      use glob_domain
-      use mpi        , only: MPI_OFFSET_KIND
-      use pnetcdf
-
-      implicit none
-
-      integer, external :: get_var_real_3d
-
-      integer                   , intent(in   ) :: ncid
-      integer(MPI_OFFSET_KIND)                                 &
-              , dimension(4)    , intent(in   ) :: start, edge
-      real(rk), dimension(:,:,:), intent(  out) :: var
-      character(len=*)          , intent(in   ) :: var_name
-
-      integer                  varid, status
-      character(len=256)       units
-
-
-      read_var_3d_nc = 0
-
-! get variable
-      status = nf90mpi_inq_varid( ncid, var_name, varid )
-      if ( status /= NF_NOERR ) then
-        call msg_print( "", 2, "Failed reading `"//trim(var_name) )
-        read_var_3d_nc = -1
-        return
-      end if
-
-! get data
-      call check( get_var_real_3d                    &
-                  ( ncid, varid, start, edge, var )  &
-                , 'get_var_real: '//trim(var_name) )
-
-! convert data if necessary
-      status = nf90mpi_get_att( ncid, varid, "units", units )
-      if ( status == NF_NOERR ) then
-        select case ( trim(units) )
-          case ( "cm", "cm/s", "cm s^-1" )
-            var = var/100.
-          case ( "mm", "mm/s", "mm s^-1" )
-            var = var/1000.
-        end select
-      end if
-
-
-    end ! subroutine read_var_3d_nc
-!______________________________________________________________________
+!      implicit none
 !
-    integer(1) function read_var_2d_nc( var_name, var        &
-                                      , start, edge, ncid )
-!----------------------------------------------------------------------
-!  Read a variable (NC format).
-!______________________________________________________________________
+!      integer, external :: get_var_real_3d
 !
-      use glob_const , only: rk
-      use glob_domain
-      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
-      use pnetcdf
-
-      implicit none
-
-      integer, external :: get_var_real_2d
-
-      integer                   , intent(in   ) :: ncid
-      integer(MPI_OFFSET_KIND)                                 &
-              , dimension(4)    , intent(in   ) :: start, edge
-      real(rk), dimension(:,:)  , intent(  out) :: var
-      character(len=*)          , intent(in   ) :: var_name
-
-      integer                  varid, status
-      character(len=256)       units
-
-
-      read_var_2d_nc = 0
-
-! get variable
-      status = nf90mpi_inq_varid( ncid, var_name, varid )
-      if ( status /= NF_NOERR ) then
-        call msg_print( "", 2, "Failed reading `"//trim(var_name) )
-        read_var_2d_nc = -1
-        return
-      end if
-
-! get data
-      call check( get_var_real_2d                    &
-                  ( ncid, varid, start, edge, var )  &
-                , 'get_var_real: '//trim(var_name) )
-
-! convert data if necessary
-      status = nf90mpi_get_att( ncid, varid, "units", units )
-      if ( status == NF_NOERR ) then
-        select case ( trim(units) )
-          case ( "cm", "cm/s", "cm s^-1" )
-            var = var/100.
-          case ( "mm", "mm/s", "mm s^-1" )
-            var = var/1000.
-        end select
-      end if
-
-
-    end ! subroutine read_var_2d_nc
+!      integer                   , intent(in   ) :: ncid
+!      integer(MPI_OFFSET_KIND)                                 &
+!              , dimension(4)    , intent(in   ) :: start, edge
+!      real(rk), dimension(:,:,:), intent(  out) :: var
+!      character(len=*)          , intent(in   ) :: var_name
 !
-!___________________________________________________________________
+!      integer                  varid, status
+!      character(len=256)       units
 !
-    integer function file_open_nc( path )
-!-------------------------------------------------------------------
-!  Opens netcdf file for reading.
-!___________________________________________________________________
 !
-      use glob_domain, only: POM_COMM
-      use mpi        , only: MPI_INFO_NULL
-      use pnetcdf    , only: nf90mpi_open, NF_NOERR, NF_NOWRITE
-
-      implicit none
-
-      character(len=*), intent(in) :: path
-
-      integer            status
-
-
-      status = nf90mpi_open( POM_COMM, trim( path ), NF_NOWRITE   &
-                           , MPI_INFO_NULL, file_open_nc )
-      if ( status /= NF_NOERR ) then
-        call msg_print("", 2, "Failed to open `"//trim( path )//"`")
-        file_open_nc = -1
-      end if
-
-    end ! function file_open_nc
+!      read_var_3d_nc = 0
 !
-!___________________________________________________________________
+!! get variable
+!      status = nf90mpi_inq_varid( ncid, var_name, varid )
+!      if ( status /= NF_NOERR ) then
+!        call msg_print( "", 2, "Failed reading `"//trim(var_name) )
+!        read_var_3d_nc = -1
+!        return
+!      end if
 !
-    integer function file_close_nc( ncid )
-!-------------------------------------------------------------------
-!  Opens netcdf file for reading.
-!___________________________________________________________________
+!! get data
+!      call check( get_var_real_3d                    &
+!                  ( ncid, varid, start, edge, var )  &
+!                , 'get_var_real: '//trim(var_name) )
 !
-      use pnetcdf, only: nf90mpi_close
-
-      implicit none
-
-      integer, intent(in) :: ncid
-
-
-      file_close_nc = nf90mpi_close( ncid )
-
-
-    end ! function file_close_nc
+!! convert data if necessary
+!      status = nf90mpi_get_att( ncid, varid, "units", units )
+!      if ( status == NF_NOERR ) then
+!        select case ( trim(units) )
+!          case ( "cm", "cm/s", "cm s^-1" )
+!            var = var/100.
+!          case ( "mm", "mm/s", "mm s^-1" )
+!            var = var/1000.
+!        end select
+!      end if
 !
-!______________________________________________________________________
 !
-    subroutine check(status, routine)
-!----------------------------------------------------------------------
-!  Checks for NetCDF I/O error and exits with an error message if hits.
-!______________________________________________________________________
+!    end ! subroutine read_var_3d_nc
+!!______________________________________________________________________
+!!
+!    integer(1) function read_var_2d_nc( var_name, var        &
+!                                      , start, edge, ncid )
+!!----------------------------------------------------------------------
+!!  Read a variable (NC format).
+!!______________________________________________________________________
+!!
+!      use glob_const , only: rk
+!      use glob_domain
+!      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
+!      use pnetcdf
 !
-      use glob_domain, only: error_status, is_master
-      use pnetcdf    , only: nf90mpi_strerror, NF_NOERR
-
-      implicit none
-
-      integer         , intent(in) :: status
-      character(len=*), intent(in) :: routine
-
-
-      if ( status /= NF_NOERR ) then
-        error_status = 1
-        if ( is_master ) then
-          print '(/a,a)', 'IO error at module `BRY`: ', routine
-          print '("[",i4,"] ",a)', status, nf90mpi_strerror(status)
-          stop
-        end if
-      end if
-
-
-    end ! subroutine check
+!      implicit none
+!
+!      integer, external :: get_var_real_2d
+!
+!      integer                   , intent(in   ) :: ncid
+!      integer(MPI_OFFSET_KIND)                                 &
+!              , dimension(4)    , intent(in   ) :: start, edge
+!      real(rk), dimension(:,:)  , intent(  out) :: var
+!      character(len=*)          , intent(in   ) :: var_name
+!
+!      integer                  varid, status
+!      character(len=256)       units
+!
+!
+!      read_var_2d_nc = 0
+!
+!! get variable
+!      status = nf90mpi_inq_varid( ncid, var_name, varid )
+!      if ( status /= NF_NOERR ) then
+!        call msg_print( "", 2, "Failed reading `"//trim(var_name) )
+!        read_var_2d_nc = -1
+!        return
+!      end if
+!
+!! get data
+!      call check( get_var_real_2d                    &
+!                  ( ncid, varid, start, edge, var )  &
+!                , 'get_var_real: '//trim(var_name) )
+!
+!! convert data if necessary
+!      status = nf90mpi_get_att( ncid, varid, "units", units )
+!      if ( status == NF_NOERR ) then
+!        select case ( trim(units) )
+!          case ( "cm", "cm/s", "cm s^-1" )
+!            var = var/100.
+!          case ( "mm", "mm/s", "mm s^-1" )
+!            var = var/1000.
+!        end select
+!      end if
+!
+!
+!    end ! subroutine read_var_2d_nc
+!
 
 
 end module

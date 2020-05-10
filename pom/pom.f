@@ -10,10 +10,6 @@
       use model_run  , only: dti, dtime, iend, iint
 
       use module_time
-      use river
-      use assim
-      use interp
-      use mcsst        !fhx:mcsst
       use seaice
 
       implicit none
@@ -29,19 +25,6 @@
 
       mb = dtime%month
 
-!      if ( calc_uvforce ) call uvforce_init(dtime)
-!      call tsforce_init( dtime )
-!      if ( calc_tsurf_mc ) call mcsst_init(dtime) !fhx:mcsst
-!      if ( calc_interp ) call interp_init !fhx:interp_flag
-!      call wind_init( dtime )
-!      call river_init( dtime )
-!      call assim_init( dtime )
-!      if ( use_ice ) call ice_init( dtime )
-! TODO: Move all of these to initialize?
-      call msg_print("INITIALIZATION COMPLETE", 1, "")
-
-      if ( .not.do_restart ) call out_init( trim(netcdf_file) )
-
       tick0 = realtime()
       if ( is_master ) then
         call msg_print("BEGIN NUMERICAL EXPERIMENT", 1, "")
@@ -52,42 +35,26 @@
       do iint = 1,iend
 
 
-!     external forcings
-!        if ( iint==1 .or. .not.spinup ) then  ! when spinup, do only once
-!
-!          if ( calc_uvforce ) call uvforce_main(dtime)  !eda:uvforce
-!          call tsforce_main( dtime )
-!          if ( calc_tsurf_mc )call mcsst_main(dtime)  !fhx:mcsst
-!          if ( calc_tsforce ) call tsforce_tsflx( dtime )
-!          if ( calc_wind )    call wind_main( dtime )
-!          if ( calc_river )   call river_main( dtime, .false. )
-!          if ( calc_ice )     call ice_main( dtime )
-!
-!        end if
-
-
 !     advance model
-!       call advance( dtime )    !lyo:???
         call advance
 !        call ice_advance
 
 !     drifter data assimilation  !eda:
-
-        if ( calc_assimdrf ) call assimdrf_main( dtime )
+!        if ( calc_assimdrf ) call assimdrf_main( dtime )
 
 !     satellite SSHA data assimilation
-        if ( calc_assim ) call assim_main( dtime )
+!        if ( calc_assim ) call assim_main( dtime )
 
-
+!     increment time
         dtime = dtime + int( dti )
 
         if ( is_master ) print '(" = ",a)', date2str( dtime )
 
 ! write output
-        call write_output( dtime, monthly_flag, mb )
+        call output_results( dtime, monthly_flag, mb )
 
 ! write SURF output
-        call write_output_surf !fhx:20110131:
+!        call write_output_surf !fhx:20110131:
 
 ! write restart
         call write_restart( dtime )
@@ -107,7 +74,8 @@
       call finalize_mpi
 
       if (is_master) print '(a,f7.2,a)',"Done in ",(tick1-tick0)," sec."
-      
+
+
       end program
 
 !______________________________________________________________________
@@ -118,7 +86,7 @@
       end
 
 !______________________________________________________________________
-      subroutine write_output( d_in, output_mode, mb )
+      subroutine output_results( d_in, output_mode, mb )
 
       use config     , only: calc_assim, netcdf_file
      &                     , output_flag
@@ -127,7 +95,7 @@
       use glob_out
       use model_run  , only: iint
       use module_time
-      use assim, only : assim_store_ssha
+!      use assim, only : assim_store_ssha
 
       implicit none
 
@@ -149,6 +117,7 @@
           wvsurf_mean = wvsurf_mean / real ( num )
           wtsurf_mean = wtsurf_mean / real ( num )
           wssurf_mean = wssurf_mean / real ( num )
+          swrad_mean  = swrad_mean  / real ( num )
           u_mean      = u_mean      / real ( num )
           v_mean      = v_mean      / real ( num )
           w_mean      = w_mean      / real ( num )
@@ -161,9 +130,8 @@
 
 
 !     store ssha for data assimilation to t(k=kb)
-
-          if ( calc_assim )
-     &        call assim_store_ssha( t_mean(:,:,kb), 't(k=kb)', d_in )
+!          if ( calc_assim )
+!     &        call assim_store_ssha( t_mean(:,:,kb), 't(k=kb)', d_in )
 
 !     store tsurf & ssurf in rho(k=kb) & s(k=kb) respectively
 !     note that these will be satellite &/or monthly climatology
@@ -189,70 +157,19 @@
           call exchange3d_mpi( km_mean, im, jm, kb )
 
 
+          if ( output_flag == 1 ) then
 
-
-
-!         if ( my_task == 41 )
-!     $        print*, im/2,jm/2,rot(im/2,jm/2),
-!     $        uab_mean(im/2,jm/2),vab_mean(im/2,jm/2)
-!
-!     u,v winds ---> zonal and meridional winds
-!         do j = 1, jm
-!            do i = 1, im
-!               u_tmp = uab_mean(i,j)
-!               v_tmp = vab_mean(i,j)
-!               uab_mean(i,j)
-!     $              = u_tmp * cos( rot(i,j) * deg2rad )
-!     $              - v_tmp * sin( rot(i,j) * deg2rad )
-!               vab_mean(i,j)
-!     $              = u_tmp * sin( rot(i,j) * deg2rad )
-!     $              + v_tmp * cos( rot(i,j) * deg2rad )
-!            enddo
-!         enddo
-!
-!         if ( my_task == 41 )
-!     $        print*, im/2,jm/2,
-!     $        cos(rot(im/2,jm/2)*deg2rad),
-!     $        uab_mean(im/2,jm/2),vab_mean(im/2,jm/2)
-!
-!         do j = 1, jm
-!            do i = 1, im
-!               u_tmp = wusurf_mean(i,j)
-!               v_tmp = wvsurf_mean(i,j)
-!               wusurf_mean(i,j)
-!     $              = u_tmp * cos( rot(i,j) * deg2rad )
-!     $              - v_tmp * sin( rot(i,j) * deg2rad )
-!               wvsurf_mean(i,j)
-!     $              = u_tmp * sin( rot(i,j) * deg2rad )
-!     $              + v_tmp * cos( rot(i,j) * deg2rad )
-!            enddo
-!         enddo
-!
-!         do k=1,kbm1
-!            do j = 1, jm
-!               do i = 1, im
-!                  u_tmp = u_mean(i,j,k)
-!                  v_tmp = v_mean(i,j,k)
-!                  u_mean(i,j,k)
-!     $                 = u_tmp * cos( rot(i,j) * deg2rad )
-!     $                 - v_tmp * sin( rot(i,j) * deg2rad )
-!                  v_mean(i,j,k)
-!     $                 = u_tmp * sin( rot(i,j) * deg2rad )
-!     $                 + v_tmp * cos( rot(i,j) * deg2rad )
-!               enddo
-!            enddo
-!         enddo
-
-          if (output_flag == 1) then
-
-            call write_output_pnetcdf(
-     $        "out/"//trim(netcdf_file)//".nc")
+            call write_output(
+     &        "out/"//trim(netcdf_file)//".nc", out_record )
 
           else if (output_flag == 0) then
 
-            call write_output_pnetcdf0(
-     $        "out/"//trim(netcdf_file)//"."//
-     $        date2str(d_in)//".nc" )
+            call create_output(
+     &        "out/"//trim(netcdf_file)//"."//
+     &        date2str(d_in)//".nc" )
+            call write_output(
+     &        "out/"//trim(netcdf_file)//"."//
+     &        date2str(d_in)//".nc", 1 )
 
           end if
 
@@ -271,14 +188,17 @@
           rho_mean    = 0.
           kh_mean     = 0.
           km_mean     = 0.
+          aam_mean    = 0.
 
           num = 0
+
+          out_record = out_record + 1
 
         end if
       end if
 
       return
-      end !subroutine write_output
+      end !subroutine output_results
 !______________________________________________________________________
 !
       subroutine write_output_surf !fhx:20110131: new subr.
@@ -310,9 +230,9 @@
         call exchange2d_mpi( uwsrf_mean, im, jm )
         call exchange2d_mpi( vwsrf_mean, im, jm )
 
-        if ( SURF_flag == 1 )
-     $    call write_SURF_pnetcdf(
-     $        "out/SRF."//trim(netcdf_file)//".nc")
+!        if ( SURF_flag == 1 )
+!     $    call write_SURF_pnetcdf(
+!     $        "out/SRF."//trim(netcdf_file)//".nc")
 
         usrf_mean  = 0.0
         vsrf_mean  = 0.0
@@ -425,7 +345,7 @@
         call exchange3d_mpi(q2lb,im,jm,kb)
 
 
-        call write_restart_pnetcdf(
+        call create_restart(
      $        "out/"//date2str(d_in)//"."//
      $        trim(netcdf_file)//".rst" )
 
@@ -449,8 +369,8 @@
         character(len=*), intent(in) :: msg, desc
         integer         , intent(in) :: status
 
-        integer, parameter :: line_len = 56
-        integer*2, dimension(6), parameter :: chr =
+        integer                 , parameter :: line_len = 56
+        integer(2), dimension(6), parameter :: chr =
 !     &                          (/ 9675  ! 1: white circle
      &                          (/ 79_2    ! 1: latin capital letter o
      &                           , 33_2    ! 2: exclamation mark
@@ -461,11 +381,18 @@
      &                           , 42_2    ! 5: asterisk
      &                           , 32_2    ! 6: space
      &                          /)
-        integer                   i
-        character(len=64)         fmt01!, fmt02
-        character(len=line_len-4) line
+        integer               i
+        character(64)         fmt01!, fmt02
+        character(line_len-4) line
 
-        if ( .not.is_master ) return
+
+! If fatal error prepare to terminate execution
+        if ( status == 3 ) then
+          call finalize_mpi
+! If not fatal leave just master to print the message
+        elseif ( .not.is_master ) then
+          return
+        end if
 
         line = ""
 
@@ -490,9 +417,7 @@
         print fmt01, (desc(i:i),i=1,len(desc))
         print fmt01, ("-",i=1,line_len)
 
-        if ( status == 3 ) then
-          call finalize_mpi
-          stop
-        end if
+        if ( status == 3 ) stop
+
 
       end subroutine

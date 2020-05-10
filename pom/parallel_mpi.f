@@ -41,16 +41,19 @@
 !  Terminate the MPI execution environment
 !______________________________________________________________________
 
-      use mpi, only: mpi_finalize
+      use glob_domain, only: is_master
+      use mpi        , only: mpi_finalize
 
       implicit none
 
       integer ierr
 
-! terminate MPI environment
+! terminate MPI environment : TODO: Check returned error code?
       call mpi_finalize(ierr)
+      print *, "Finalized with ", ierr
+! stop every process except master
+      if ( .not.is_master ) stop
 
-      return
 
       end
 
@@ -74,7 +77,7 @@
 ! check number of processors
       if ( nproc /= n_proc ) then
         error_status = 1
-        if ( is_master ) print '(a,i3''/=''i3//a)'
+        if ( is_master ) print '(a,i3,''/='',i3//a)'
      &  , 'Incompatible number of processors',nproc,n_proc
      &  , 'POM terminated with error'
         call finalize_mpi

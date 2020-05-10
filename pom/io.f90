@@ -26,12 +26,14 @@ module io
   end interface
 
   interface var_read
+    module procedure var_read_0d
     module procedure var_read_1d
     module procedure var_read_2d
     module procedure var_read_3d
   end interface
 
   interface var_write
+    module procedure var_write_0d
     module procedure var_write_1d
     module procedure var_write_2d
     module procedure var_write_3d
@@ -51,9 +53,9 @@ module io
 !
 !______________________________________________________________________
 !
-    integer function var_define( ncid   , name     , nvdims , vdims   &
-                               , vartype, long_name, units  , nofill  &
-                               , fillval, coords   , lcoords )
+    integer function var_define( ncid     , name , vartype, vdims    &
+                               , long_name, units, nofill , fillval  &
+                               , coords                              )
 !----------------------------------------------------------------------
 !  Defines variable in NetCDF file.
 !______________________________________________________________________
@@ -62,57 +64,48 @@ module io
                        , nf90mpi_put_att                        &
                        , NF_NOERR
 
-      integer                  &
-      , intent(in) :: ncid     & ! ID of NetCDF file (in define mode)
-                    , nvdims   & ! Number of dimensions
-                    , vartype  & ! Variable's type
-                    , nofill     ! Do not write missing values
-                                 !  (useful for static masks)
+      integer     , intent(in)   :: ncid       & ! ID of NetCDF file (in define mode)
+                                  , vartype    & ! Variable's type
+                                  , nofill       ! Do not write missing values
+                                                 !  (useful for static masks)
 
-      integer                       &
-      , dimension(nvdims)           &
-      , intent(in)        :: vdims    ! Variable's dimensions array
+      integer     , intent(in)                 &
+                  , dimension(:) :: vdims        ! Variable's dimensions array
 
-      character(len=*)               &
-      , intent(in)     :: name       & ! Variable's name (ID)
-                        , long_name  & ! Variable's human-readable name
-                        , units      & ! Variable's units
-                        , coords       ! Variable's coordinates (opt.)
+      character(*), intent(in)   :: name       & ! Variable's name (ID)
+                                  , long_name  & ! Variable's human-readable name
+                                  , units      & ! Variable's units
+                                  , coords       ! Variable's coordinates (opt.)
 
-      logical, intent(in) :: lcoords  ! Write coordinates or not
-      real   , intent(in) :: fillval  ! Missing value
+      real        , intent(in)   :: fillval      ! Missing value
 
-      integer varid ! Temporary variable
 
 ! define variable
-      call check( nf90mpi_def_var                          &
-                    ( ncid, name, vartype, vdims, varid )  &
-                , 'nf_def_var @ '//name )
+      call check( nf90mpi_def_var( ncid, name, vartype  &
+                                 , vdims, var_define )  &
+                , "var_define:def_var `"//name//"`" )
 ! define fill value
       if ( nofill > -1 ) then
-        call check( nf90mpi_def_var_fill                &
-                      ( ncid, varid, nofill, fillval )  &
-                  , 'nf_def_var_fill @ '//name )
+        call check( nf90mpi_def_var_fill( ncid, var_define   &
+                                        , nofill, fillval )  &
+                  , "var_define:def_var_fill `"//name//"`" )
       end if
 ! define attributes
-      call check( nf90mpi_put_att                                  &
-                    ( ncid, varid, 'long_name', trim(long_name) )  &
-                , 'nf_put_att : long_name @ '//name )
-
-      call check( nf90mpi_put_att                          &
-                    ( ncid, varid, 'units', trim(units) )  &
-                , 'nf_put_att : units @ '//name )
+      call check( nf90mpi_put_att( ncid, var_define, 'long_name'  &
+     &                           , trim(long_name) )              &
+                , "var_define:put_att("//long_name//") @ `"//name//"`" )
+      call check( nf90mpi_put_att( ncid, var_define, 'units'  &
+     &                           ,trim(units) )               &
+                , "var_define:put_att("//units//") @ `"//name//"`" )
 ! add coordinates attribute, if necessary
-      if ( lcoords ) then
-        call check( nf90mpi_put_att                                 &
-                      ( ncid, varid, 'coordinates', trim(coords) )  &
-                  , 'nf_put_att : coordinates @ '//name )
+      if ( coords /= "" ) then
+        call check( nf90mpi_put_att( ncid, var_define, 'coordinates'  &
+     &                             , trim(coords) )                   &
+                  , "var_define:put_att("//coords//") @ `"//name//"`" )
       end if
 
-      var_define = varid
 
-
-    end ! function def_var_pnetcdf
+    end ! function var_define
 !
 !___________________________________________________________________
 !
@@ -121,26 +114,22 @@ module io
 !  Creates netcdf file.
 !___________________________________________________________________
 !
-      use pnetcdf, only: NF_UNLIMITED, nf90mpi_def_dim
+      use mpi    , only: MPI_OFFSET_KIND
+      use pnetcdf, only: NF90_UNLIMITED, nf90mpi_def_dim
 
       implicit none
 
       integer     , intent(in) :: ncid
-      integer(8)  , intent(in) :: length
+      integer(4)  , intent(in) :: length
       character(*), intent(in) :: name
 
-      integer status
+      integer(MPI_OFFSET_KIND) dim_len
 
 
-      if ( length == -1 ) then
-        status = nf90mpi_def_dim( ncid, name, int(NF_UNLIMITED,8)  &
-                                , dim_define )
-      else
-        status = nf90mpi_def_dim( ncid, name, length  &
-                                , dim_define )
-      end if
-
-      call check( status, 'nf_def_dim: '//trim(name) )
+      dim_len = max( int(length        ,MPI_OFFSET_KIND)    &
+                   , int(NF90_UNLIMITED,MPI_OFFSET_KIND) )
+      call check( nf90mpi_def_dim( ncid, name, dim_len, dim_define )  &
+                , 'dim_define:def_dim '//name )
 
 
     end ! function dim_define
@@ -256,27 +245,30 @@ module io
 !
 !___________________________________________________________________
 !
-    integer function file_open( path )
+    integer function file_open( path, mode )
 !-------------------------------------------------------------------
 !  Opens netcdf file for reading.
 !___________________________________________________________________
 !
       use glob_domain, only: POM_COMM
       use mpi        , only: MPI_INFO_NULL
-      use pnetcdf    , only: nf90mpi_open, NF_NOERR, NF_NOWRITE
+      use pnetcdf    , only: nf90mpi_open, NF90_NOERR
 
       implicit none
 
       character(*), intent(in) :: path
+      integer     , intent(in) :: mode
 
       integer status
 
 
-      status = nf90mpi_open( POM_COMM, trim(path), NF_NOWRITE   &
+      file_open = 0
+
+      status = nf90mpi_open( POM_COMM, trim(path), mode  &
                            , MPI_INFO_NULL, file_open )
-      if ( status /= NF_NOERR ) then
+      if ( is_error( status ) ) then
         call msg_print("", 2, "Failed to open `"//trim(path)//"`")
-        file_open = -1
+        file_open = status
       end if
 
 
@@ -320,6 +312,78 @@ module io
 
 
     end ! function file_end_defintion
+!
+!______________________________________________________________________
+!
+    integer function var_read_0d( ncid, name, var, start )
+!----------------------------------------------------------------------
+!  Macro for reading scalar variable.
+!______________________________________________________________________
+!
+      use mpi    , only: MPI_OFFSET_KIND
+      use pnetcdf, only: NF90_NOERR                 &
+                       , nf90mpi_get_att            &
+                       , nf90mpi_get_var_all        &
+                       , nf90mpi_inquire_attribute  &
+                       , nf90mpi_inq_varid
+
+      implicit none
+
+      integer     , intent(in   ) :: ncid
+      character(*), intent(in   ) :: name
+      real(rk)    , intent(inout) :: var
+      integer(MPI_OFFSET_KIND)                      &
+                  , dimension(:)                    &
+                  , intent(in   ) :: start
+
+      integer  status, varid, vartype
+      real(rk) add_offset, missing_value, scale_factor
+
+
+      var_read_0d = nf90mpi_inq_varid( ncid, name, varid )
+
+      call check( var_read_0d, "inq_varid `"//trim(name)//"`" )
+      if ( var_read_0d /= NF90_NOERR ) return
+
+      add_offset    = 0.
+      scale_factor  = 1.
+      missing_value = 9.96920996838687e+36
+
+      status = nf90mpi_inquire_attribute( ncid, varid, "add_offset", vartype )
+      if ( status == NF90_NOERR ) then
+        status = nf90mpi_get_att( ncid, varid, "add_offset", add_offset )
+      end if
+
+      status = nf90mpi_inquire_attribute( ncid, varid, "scale_factor", vartype )
+      if ( status == NF90_NOERR ) then
+        status = nf90mpi_get_att( ncid, varid, "scale_factor", scale_factor )
+      end if
+
+      var_read_0d = nf90mpi_get_var_all( ncid, varid, var, start )
+
+      if ( var_read_0d /= NF90_NOERR ) return
+
+      status = nf90mpi_inquire_attribute( ncid, varid            &
+                                        , "_FillValue", vartype )
+      if ( status == NF90_NOERR ) then
+
+        status = nf90mpi_get_att( ncid, varid, "_FillValue", missing_value )
+        call check( status, 'Failed reading `_FillValue` of '//name )
+
+        if ( var == missing_value ) then
+          var = 0.
+        else
+          var = var*scale_factor + add_offset
+        end if
+
+        return
+
+      end if
+
+      var = var*scale_factor + add_offset
+
+
+    end ! function var_read_0d
 !______________________________________________________________________
 !
     integer function var_read_1d( ncid, name, var, start, stride )
@@ -350,6 +414,7 @@ module io
 
       var_read_1d = nf90mpi_inq_varid( ncid, name, varid )
 
+      call check( var_read_1d, "inq_varid `"//trim(name)//"`" )
       if ( var_read_1d /= NF90_NOERR ) return
 
       add_offset    = 0.
@@ -375,7 +440,7 @@ module io
       if ( status == NF90_NOERR ) then
 
         status = nf90mpi_get_att( ncid, varid, "_FillValue", missing_value )
-        call handle_error_pnetcdf( 'Failed reading `_FillValue`', status )
+        call check( status, 'Failed reading `_FillValue` of '//name )
 
         where ( var == missing_value )
           var = 0.
@@ -421,6 +486,7 @@ module io
 
       var_read_2d = nf90mpi_inq_varid( ncid, name, varid )
 
+      call check( var_read_2d, "inq_varid `"//trim(name)//"`" )
       if ( var_read_2d /= NF90_NOERR ) return
 
       add_offset    = 0.
@@ -437,7 +503,6 @@ module io
         status = nf90mpi_get_att( ncid, varid, "scale_factor", scale_factor )
       end if
 
-      print *, "!!", name, "::", shape(var),"--",start,":",stride
       var_read_2d = nf90mpi_get_var_all( ncid, varid, var, start, stride )
 
       if ( var_read_2d /= NF90_NOERR ) return
@@ -447,7 +512,7 @@ module io
       if ( status == NF90_NOERR ) then
 
         status = nf90mpi_get_att( ncid, varid, "_FillValue", missing_value )
-        call handle_error_pnetcdf( 'Failed reading `_FillValue`', status )
+        call check( status, 'Failed reading `_FillValue` of '//name )
 
         where ( var == missing_value )
           var = 0.
@@ -493,6 +558,7 @@ module io
 
       var_read_3d = nf90mpi_inq_varid( ncid, name, varid )
 
+      call check( var_read_3d, "inq_varid `"//trim(name)//"`" )
       if ( var_read_3d /= NF90_NOERR ) return
 
       add_offset    = 0.
@@ -518,7 +584,7 @@ module io
       if ( status == NF90_NOERR ) then
 
         status = nf90mpi_get_att( ncid, varid, "_FillValue", missing_value )
-        call handle_error_pnetcdf( 'Failed reading `_FillValue`', status )
+        call check( status, 'Failed reading `_FillValue` of '//name )
 
         where ( var == missing_value )
           var = 0.
@@ -534,6 +600,37 @@ module io
 
 
     end ! function var_read_3d
+!______________________________________________________________________
+!
+    subroutine var_write_0d( ncid, name, var, start )
+!----------------------------------------------------------------------
+!  Macro for writing scalar variable.
+!______________________________________________________________________
+!
+      use mpi    , only: MPI_OFFSET_KIND
+      use pnetcdf, only: nf90mpi_inq_varid          &
+                       , nf90mpi_put_var_all
+
+      implicit none
+
+      integer     , intent(in   ) :: ncid
+      character(*), intent(in   ) :: name
+      real(rk)    , intent(inout) :: var
+      integer(MPI_OFFSET_KIND)                      &
+                  , dimension(:)                    &
+                  , intent(in   ) :: start
+
+      integer varid
+
+
+      call check( nf90mpi_inq_varid( ncid, name, varid )  &
+                , 'nf_inq_varid: '//trim(name) )
+
+      call check( nf90mpi_put_var_all( ncid, varid, var, start )  &
+                    , "nf_put_var: "//trim(name) )
+
+
+    end ! function var_write_0d
 !______________________________________________________________________
 !
     subroutine var_write_1d( ncid, name, var, start, stride )
@@ -657,7 +754,7 @@ module io
 !  Checks for NetCDF I/O error and exits with an error message if hits.
 !______________________________________________________________________
 !
-      use glob_domain, only: error_status, is_master
+      use glob_domain, only: error_status, my_task
       use pnetcdf    , only: nf90mpi_strerror, NF_NOERR
 
       implicit none
@@ -667,12 +764,9 @@ module io
 
 
       if ( status /= NF_NOERR ) then
-        error_status = 1
-        if ( is_master ) then
-          print '(/a,a)', 'IO error: ', routine
-          print *, nf90mpi_strerror(status)
-          stop
-        end if
+        !error_status = 1 ! Suppress for now... TODO: Do we even need this redundant error check?..
+        print '(/a,i4,a,a)', 'IO error @ ', my_task, ': ', routine
+        print *, nf90mpi_strerror(status)
       end if
 
 

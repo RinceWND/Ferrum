@@ -47,7 +47,7 @@
         call mode_interaction
 
 ! external (2-D) mode calculation
-        do iext=1,isplit
+        do iext = 1, isplit
           call mode_external
           call check_nan_2d  !fhx:tide:debug
 !          if (use_ice) call ice_advance
@@ -153,9 +153,8 @@
       use config     , only: aam_init, horcon, mode, n1d, npg
       use bry        , only: aamfrz, USE_SPONGE
       use glob_domain, only: im, imm1, jm, jmm1, kbm1
-      use glob_grid  , only: dx, dy
-      use glob_misc  , only: aamfac
-      use glob_ocean , only: a, aam, c, ee, u, v
+      use grid       , only: dx, dy
+      use glob_ocean , only: a, aam, aamfac, c, ee, u, v
 
       implicit none
 
@@ -232,7 +231,7 @@
 !
       use config     , only: mode
       use glob_domain, only: im, jm, kbm1
-      use glob_grid  , only: dz
+      use grid       , only: dz
       use glob_ocean
       use model_run  , only: isp2i, ispi
 
@@ -250,15 +249,11 @@
         aam2d = 0.
 
         do k=1,kbm1
-          do j=1,jm
-            do i=1,im
-              adx2d(i,j) = adx2d(i,j) +  advx(i,j,k)*dz(k)
-              ady2d(i,j) = ady2d(i,j) +  advy(i,j,k)*dz(k)
-              drx2d(i,j) = drx2d(i,j) + drhox(i,j,k)*dz(k)
-              dry2d(i,j) = dry2d(i,j) + drhoy(i,j,k)*dz(k)
-              aam2d(i,j) = aam2d(i,j) +   aam(i,j,k)*dz(k)
-            end do
-          end do
+          adx2d = adx2d +  advx(:,:,k)*dz(k)
+          ady2d = ady2d +  advy(:,:,k)*dz(k)
+          drx2d = drx2d + drhox(:,:,k)*dz(k)
+          dry2d = dry2d + drhoy(:,:,k)*dz(k)
+          aam2d = aam2d +   aam(:,:,k)*dz(k)
         end do
 
         call advave(tps)
@@ -304,11 +299,12 @@
       use config     , only: alpha, cbcmax, cbcmin, ispadv, smoth
      &                     , use_tide, z0b
       use glob_const , only: grav, Kappa
-      use glob_domain, only: im, imm1, jm, jmm1, kbm1!, my_task
-      use glob_grid  , only: art, aru, arv, cor, dx, dy, fsm, h, zz
+      use glob_domain, only: im, imm1, jm, jmm1, kbm1   , my_task
+      use grid       , only: art, aru, arv, cor, dx, dy, fsm, h, zz
       use glob_ocean
       use tide       , only: tide_ua, tide_va, tide_advance => step
       use model_run  , only: dte, dte2, iext, isp2i, ispi, isplit,dtime
+     &                     , iint,iext
 
       implicit none
 
@@ -423,6 +419,13 @@
       ua = ua + .5*smoth*( uab + uaf - 2.*ua )
       va = va + .5*smoth*( vab + vaf - 2.*va )
       el = el + .5*smoth*( elb + elf - 2.*el )
+      ! if (iint>2) then
+      ! print *, iint,"=",my_task, ": UA : ", maxval(abs(va))
+      ! print *, iint,"=",my_task, ": UAB: ", maxval(abs(vab))
+      ! print *, iint,"=",my_task, ": UAF: ", maxval(abs(vaf))
+      ! call finalize_mpi
+      ! stop
+      ! end if
 
       elb = el
       el  = elf
@@ -491,7 +494,7 @@
       use config     , only: mode, nadv, nbcs, nbct, do_restart
      &                     , smoth, t_lo, t_hi
       use glob_domain
-      use glob_grid  , only: dz, h
+      use grid       , only: dz, h  ,fsm
       use glob_ocean
       use model_run
 
@@ -501,8 +504,8 @@
 
 
       if ( mode /= 2 ) then
-      if ( ( iint>1 .and. .not.do_restart )
-     & .or.( iint>2 .and.      do_restart ) ) then
+      if ( ( iint>2 .and. .not.do_restart )
+     &               .or.      do_restart ) then
 
 ! adjust u(z) and v(z) such that depth average of (u,v) = (ua,va)
         tps = 0.
@@ -517,6 +520,8 @@
 
         do k=1,kbm1
           do j=1,jm
+            u(1,j,k) = .5*( u(1,j,k) - tps(1,j) )
+     &               +    ( utb(1,j) + utf(1,j) )/dt(1,j)
             do i=2,im
               u(i,j,k)=(u(i,j,k)-tps(i,j))+
      $                 (utb(i,j)+utf(i,j))/(dt(i,j)+dt(i-1,j))
@@ -539,6 +544,10 @@
         end do
 
         do k=1,kbm1
+          do i=1,im
+            v(i,1,k) = .5*( v(i,1,k) - tps(i,1) )
+     &               +    ( vtb(i,1) + vtf(i,1) )/dt(i,1)
+          end do
           do j=2,jm
             do i=1,im
               v(i,j,k)=(v(i,j,k)-tps(i,j))+
@@ -731,7 +740,7 @@
         use glob_const , only: rk
         use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
      &                       , n_east, n_north, n_south, n_west
-        use glob_grid  , only: dx, dy, fsm, zz
+        use grid       , only: dx, dy, fsm, zz
         use glob_ocean , only: dt, et, etb, etf, tps, u, v, w, wr
         use model_run  , only: dti2
 
@@ -799,7 +808,7 @@
 ! called by: advance      [advance.f]
 !
 ! calls    : bcast0i_mpi  [parallel_mpi.f]
-!            finalize_mpi [mpi]
+!            finalize_mpi [parallel_mpi.f]
 !            sum0d_mpi    [parallel_mpi.f]
 !            sum0i_mpi    [parallel_mpi.f]
 !______________________________________________________________________
@@ -807,7 +816,7 @@
       use config     , only: sbias, tbias
       use glob_const , only: rk
       use glob_domain
-      use glob_grid  , only: art, dz, fsm
+      use grid       , only: art, dz, fsm
       use glob_ocean , only: et, dt, sb, tb
       use glob_out   , only: iprint
       use model_run
@@ -944,8 +953,10 @@
 !
       use air        , only: wssurf, wtsurf, wusurf, wvsurf
       use glob_domain, only: kb
-      use glob_ocean , only: aam, cbc, elb, kh, rho, s, t, u, uab
-     &                     , v, vab, w, wubot, wvbot
+      use glob_ocean , only: aam, cbc  , elb  , kh
+     &                     , km , rho  , s    , t
+     &                     , u  , uab  , v    , vab
+     &                     , w  , wubot, wvbot
       use glob_out
 
       implicit none
@@ -968,7 +979,7 @@
       rho_mean    = rho_mean    + rho
       kh_mean     = kh_mean     + kh
       aam(:,:,kb) = cbc(:,:)          !lyo:20110315:botwavedrag:store cbc
-      km_mean     = km_mean     + aam !lyo:20110202:save aam inst. of km
+      aam_mean    = aam_mean    + aam
 
       num = num + 1
 
@@ -1147,7 +1158,7 @@
 !
       use glob_const , only: rk
       use glob_domain, only: i_global, im, j_global, jm, kb
-      use glob_grid  , only: h
+      use grid       , only: h
 
       implicit none
 
@@ -1162,7 +1173,7 @@
       do k=1,kb
         do j=1,jm
           do i=1,im
-            if ( isnan(var(i,j,k)) ) then
+            if ( var(i,j,k) == var(i,j,k)+1 ) then
               print '(2a,3i4,2f12.4)'
      &            , "detect nan : ",varname
      &            , i_global(i), j_global(j), k
@@ -1220,7 +1231,7 @@
       use air
       use glob_const , only: rk
       use glob_domain, only: i_global, im, j_global, jm
-      use glob_grid  , only: fsm, h
+      use grid       , only: fsm, h
       use model_run  , only: time
       use glob_ocean
 
@@ -1236,7 +1247,7 @@
 
       do j=1,jm
         do i=1,im
-          if ( isnan(var(i,j)) ) then
+          if ( var(i,j) == var(i,j)+1 ) then
             print '(2a,2i4,3f12.4)',
      $            "detect nan : ",varname,
      $            i_global(i),j_global(j),

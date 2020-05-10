@@ -11,7 +11,7 @@
 module clim
 
   use glob_const , only: PATH_LEN, rk, VAR_LEN
-  use glob_domain, only: im, jm, kb
+  use glob_domain, only: im, is_master, jm, kb, kbm1
 
   implicit none
 
@@ -20,15 +20,25 @@ module clim
 !----------------------------------------------------------------------
 ! Configuration variables
 !----------------------------------------------------------------------
-  real(rk), private :: a   & ! time-interpolation factor
-                     , ct    ! relaxation inverse period
+  logical              NO_CLIM, NO_MEAN ! Flags for climatology and background files existence
+
+  real(rk), private :: a          & ! time-interpolation factor
+                     , deep_rel   & ! relaxation period for deep cells
+                     , h_thres    & ! apply TS relaxation to cells deeper than set threshold
+                     , surf_rel     ! relaxation period for surface
+
+  integer(1)                            & ! Surface relaxation
+       , private    :: RELAX_SURF_TEMP  & !  for temperature
+                     , RELAX_SURF_SALT    !  for salinity
+                                          ! 0 - no relaxation
+                                          ! 1 - relax to climatology
+                                          ! 2 - relax to sst/sss
 
   character(len=10)                       &
        , parameter                        &
        , private   :: FORMAT_EXT = ".nc"
 
   logical, private :: INTERP_CLIM  & ! Interpolation flag
-                    , RELAX_SURF   & ! Surface relaxation flag
                     , RELAX_TS       ! Deep cells relaxation flag
 !----------------------------------------------------------------------
 ! Climatology time mode
@@ -62,12 +72,6 @@ module clim
   ,  v_clim_name          & ! Y-velocity
   , va_clim_name            ! Vertically integrated y-velocity
 
-  real(rk)              &
-       , private        &
-       , parameter ::   &
-    h_thres = 1000.     &  ! apply TS relaxation to cells deeper than set threshold
-  , t_rel   = 30.          ! relaxation period (days)
-
 !----------------------------------------------------------------------
 ! Climatological arrays
 !----------------------------------------------------------------------
@@ -75,8 +79,8 @@ module clim
        , allocatable         &
        , dimension(:,:)   :: &
      eclim                   &
-  , s_relx                   &
-  , t_relx                   &
+  , s_relx                   & ! mask for salinity surface relaxation
+  , t_relx                   & ! mask for temperature surface relaxation
   , uaclim                   &
   , vaclim
   real(kind=rk)              &
@@ -122,7 +126,8 @@ module clim
 !______________________________________________________________________
 !
       use glob_domain, only: is_master
-      use glob_grid  , only: h
+      use grid       , only: h
+      use model_run  , only: dti
 
       implicit none
 
@@ -130,9 +135,10 @@ module clim
 
       integer pos
 
-      namelist/clim/                                            &
-        CLIM_MODE, ct, INTERP_CLIM, ts_clim_path, ts_mean_path  &
-      , uv_clim_path
+      namelist/clim/                                                  &
+        CLIM_MODE      , deep_rel       , h_thres     , INTERP_CLIM   &
+      , RELAX_SURF_SALT, RELAX_SURF_TEMP, RELAX_TS    , surf_rel      &
+      , ts_clim_path   , ts_mean_path   , uv_clim_path
 
       namelist/clim_vars/                        &
         el_clim_name, s_clim_name,  s_mean_name  &
@@ -143,11 +149,17 @@ module clim
 ! Initialize with default values
       INTERP_CLIM = .true.
       RELAX_TS    = .true.
-      RELAX_SURF = .false.
+      RELAX_SURF_SALT = 0
+      RELAX_SURF_TEMP = 0
+
+      NO_CLIM = .false.
+      NO_MEAN = .false.
+
+      h_thres  = 1000._rk
+      deep_rel = 15._rk
+      surf_rel =  2._rk
 
       CLIM_MODE = 2
-
-      ct = 1. / (15.*86400.)  ! 15-days surface relaxation period
 
       ts_clim_path = "in/clim/"
       ts_mean_path = "in/clim/"
@@ -179,27 +191,41 @@ module clim
       if ( ts_mean_path(pos:pos) == "/" ) then
         ts_mean_path = trim(ts_mean_path)//"mean."
       end if
-      
+
       pos = len(trim(uv_clim_path))
       if ( uv_clim_path(pos:pos) == "/" ) then
         uv_clim_path = trim(uv_clim_path)//"clim."
       end if
 
+      deep_rel = max( deep_rel, dti/86400._rk )
+      surf_rel = max( surf_rel, dti/86400._rk )
+
       if ( is_master ) then
         print *, "Climatology TS: ", trim(ts_clim_path)
         print *, "Background TS : ", trim(ts_mean_path)
         print *, "Climatology UV: ", trim(uv_clim_path)
+        print *, "-----"
+        print '(a,f8.2)', "Deep (slow) relaxation period:    ", deep_rel
+        print '(a,f8.2)', "Surface (fast) relaxation period: ", surf_rel
       end if
 
 ! Allocate necessary arrays
       call allocate_arrays
 
-      if ( RELAX_SURF ) then
-        s_relx = ( 1. + tanh( .002*(h-1000.) ) )*.5
-        t_relx = ( 1. + tanh( .002*(h-1000.) ) )*.5
+! Always allow surface relaxation only over deep ocean > 1000m (TODO: Is it really necessary?)
+      if ( RELAX_SURF_SALT > 0 ) then
+        s_relx = ( 1._rk + tanh( .002_rk*(h-1000._rk) ) )*.5_rk
       end if
 
-      call msg_print("CLIM MODULE INITIALIZED", 1, "")
+      if ( RELAX_SURF_TEMP > 0 ) then
+        t_relx = ( 1._rk + tanh( .002_rk*(h-1000._rk) ) )*.5_rk
+      end if
+
+! Convert relaxation periods to frequencies
+      deep_rel = 1._rk / (deep_rel*86400._rk)
+      surf_rel = 1._rk / (surf_rel*86400._rk)
+
+      call msg_print("CLIM MODULE READY", 1, "")
 
 
     end ! subroutine initialize_mod
@@ -237,6 +263,7 @@ module clim
 
 ! Initialize mandatory arrays
       eclim = 0.
+      rmean = 0.
       sclim = 0.
       smean = 0.
       tclim = 0.
@@ -258,12 +285,17 @@ module clim
       , va_int(im,jm,   2:N+1)  &
       , vc_int(im,jm,kb,2:N+1)  &
        )
-       
+
 ! Allocate depth-relaxation arrays
-      if ( RELAX_SURF ) then
+      if ( RELAX_SURF_SALT > 0 ) then
         allocate(        &
           s_relx(im,jm)  &
-        , t_relx(im,jm)  &
+         )
+      end if
+
+      if ( RELAX_SURF_TEMP > 0 ) then
+        allocate(        &
+          t_relx(im,jm)  &
          )
       end if
 
@@ -277,16 +309,19 @@ module clim
 !  Reads forcing fields before experiment's start.
 !______________________________________________________________________
 !
-      use glob_domain, only: is_master
+      use glob_domain, only: is_master    ,my_task
+      use io
       use module_time
       use model_run  , only: sec_of_month, mid_in_month, mid_in_nbr
+      use glob_ocean , only: elb, sb, tb, ub, vb
+      use pnetcdf    , only: NF90_NOWRITE
 
       implicit none
 
       type(date), intent(in) :: d_in
 
-      logical                  fexist
       integer, dimension(3) :: record
+      integer                  status
 
 
 ! Determine the record to read
@@ -311,49 +346,81 @@ module clim
         record(2) = record(1)
       end if
 
+      el_int(:,:  ,2) = elb
+      uc_int(:,:,:,2) = ub
+      vc_int(:,:,:,2) = vb
+
+      if ( INTERP_CLIM ) then
+        el_int(:,:  ,3) = elb
+        uc_int(:,:,:,3) = ub
+        vc_int(:,:,:,3) = vb
+      end if
+
 ! Read climatology
-      inquire ( file = trim(ts_clim_path), exist = fexist )
       call msg_print("", 6, "Read TS climatology:")
-      if ( fexist ) then
-        call read_clim_ts_pnetcdf( tc_int(:,:,:,2), sc_int(:,:,:,2)  &
-                                 , ts_clim_path, record(2) )
+      status = read_clim( trim(ts_clim_path), record(2)          &
+                        , t_clim_name       , s_clim_name        &
+                        , tc_int(:,:,:,2)   , sc_int(:,:,:,2) )
+      if ( status /= 0 ) then
+        NO_CLIM = .true.
+        call msg_print("", 2, "CLIMATOLOGY TO BE DERIVED FROM INITIAL CONDITIONS")
+        tc_int(:,:,:,2) = tb
+        sc_int(:,:,:,2) = sb
         if ( INTERP_CLIM ) then
-          call read_clim_ts_pnetcdf( tc_int(:,:,:,3), sc_int(:,:,:,3)  &
-                                   , ts_clim_path, record(3) )
+          tc_int(:,:,:,3) = tb
+          sc_int(:,:,:,3) = sb
         end if
-      else
-        call msg_print("", 2, "FAILED...")
-        tc_int = 15.
-        sc_int = 33.
+      elseif ( INTERP_CLIM ) then
+        status = read_clim( trim(ts_clim_path), record(3)          &
+                          , t_clim_name       , s_clim_name        &
+                          , tc_int(:,:,:,3)   , sc_int(:,:,:,3) )
       end if
 
 ! Read background TS
-      inquire ( file = trim(ts_mean_path), exist = fexist )
       call msg_print("", 6, "Read background TS:")
-      if ( fexist ) then
-        call read_mean_ts_pnetcdf( tm_int(:,:,:,2), sm_int(:,:,:,2)  &
-                                 , ts_mean_path, record(2) )
-        if ( INTERP_CLIM ) then
-          call read_mean_ts_pnetcdf( tm_int(:,:,:,3), sm_int(:,:,:,3)  &
-                                   , ts_mean_path, record(3) )
-        end if
-      else
-        call msg_print("", 2, "FAILED...")
+      status = read_clim( trim(ts_mean_path), record(2)          &
+                        , t_mean_name       , s_mean_name        &
+                        , tm_int(:,:,:,2)   , sm_int(:,:,:,2) )
+      if ( status /= 0 ) then
+        NO_MEAN = .true.
+        call msg_print("", 2, "BACKGROUND MEANS TO BE SET TO CLIMATOLOGY! HIGHLY UNDESIRABLE!")
         tm_int = tc_int
         sm_int = sc_int
+      elseif ( INTERP_CLIM ) then
+        status = read_clim( trim(ts_mean_path), record(3)          &
+                          , t_mean_name       , s_mean_name        &
+                          , tm_int(:,:,:,3)   , sm_int(:,:,:,3) )
       end if
 
+! TODO: IS the below part actually necessary? We should be able to derive density at the beginning of a step.
       if ( INTERP_CLIM ) then
 ! Interpolate TS and get background density
-        sclim = ( 1. - a )*sc_int(:,:,:,2) + a*sc_int(:,:,:,3)
-        tclim = ( 1. - a )*tc_int(:,:,:,2) + a*tc_int(:,:,:,3)
-        smean = ( 1. - a )*sm_int(:,:,:,2) + a*sm_int(:,:,:,3)
-        tmean = ( 1. - a )*tm_int(:,:,:,2) + a*tm_int(:,:,:,3)
+        if ( .not.NO_CLIM ) then
+          sclim = ( 1. - a )*sc_int(:,:,:,2) + a*sc_int(:,:,:,3)
+          tclim = ( 1. - a )*tc_int(:,:,:,2) + a*tc_int(:,:,:,3)
+        end if
+        if ( .not.NO_MEAN ) then
+          smean = ( 1. - a )*sm_int(:,:,:,2) + a*sm_int(:,:,:,3)
+          tmean = ( 1. - a )*tm_int(:,:,:,2) + a*tm_int(:,:,:,3)
+        end if
+        eclim = ( 1. - a )*el_int(:,:,2) + a*el_int(:,:,3)
+        uclim = ( 1. - a )*uc_int(:,:,:,2) + a*uc_int(:,:,:,3)
+        vclim = ( 1. - a )*vc_int(:,:,:,2) + a*vc_int(:,:,:,3)
       else
-        sclim = sc_int(:,:,:,2)
-        tclim = tc_int(:,:,:,2)
-        smean = sm_int(:,:,:,2)
-        tmean = tm_int(:,:,:,2)
+
+        if ( .not.NO_CLIM ) then
+          sclim = sc_int(:,:,:,2)
+          tclim = tc_int(:,:,:,2)
+        end if
+        if ( .not.NO_MEAN ) then
+          smean = sm_int(:,:,:,2)
+          tmean = tm_int(:,:,:,2)
+        end if
+
+        eclim = el_int(:,:,2)
+        uclim = uc_int(:,:,:,2)
+        vclim = vc_int(:,:,:,2)
+
       end if
 
       call dens( smean, tmean, rmean )
@@ -408,8 +475,9 @@ module clim
 
       type(date), intent(in) :: d_in
 
-      logical                   ADVANCE_REC_INT, fexist
+      logical                   ADVANCE_REC_INT
       integer, dimension(3)  :: record
+      integer                   status
 
 
 ! Determine the record to read
@@ -441,59 +509,65 @@ module clim
       if ( ADVANCE_REC_INT ) then
 
         if ( INTERP_CLIM ) then
-          sc_int(:,:,:,2) = sc_int(:,:,:,3)
-          tc_int(:,:,:,2) = tc_int(:,:,:,3)
-          sm_int(:,:,:,2) = sm_int(:,:,:,3)
-          tm_int(:,:,:,2) = tm_int(:,:,:,3)
+          if ( .not.NO_CLIM ) then
+            sc_int(:,:,:,2) = sc_int(:,:,:,3)
+            tc_int(:,:,:,2) = tc_int(:,:,:,3)
+          end if
+          if ( .not.NO_MEAN ) then
+            sm_int(:,:,:,2) = sm_int(:,:,:,3)
+            tm_int(:,:,:,2) = tm_int(:,:,:,3)
+          end if
         end if
 
-        ! Read climatology
-        inquire ( file = trim(ts_clim_path), exist = fexist )
-        call msg_print("", 6, "Read TS climatology:")
-        if ( fexist ) then
+        if ( .not.NO_CLIM ) then
+! Read climatology
+          call msg_print("", 6, "Read TS climatology:")
           if ( INTERP_CLIM ) then
-            call read_clim_ts_pnetcdf( tc_int(:,:,:,3), sc_int(:,:,:,3)  &
-                                     , ts_clim_path, record(3) )
+            status = read_clim( trim(ts_clim_path), record(3)          &
+                              , t_clim_name       , s_clim_name        &
+                              , tc_int(:,:,:,3)   , sc_int(:,:,:,3) )
           else
-            call read_clim_ts_pnetcdf( tc_int(:,:,:,2), sc_int(:,:,:,2)  &
-                                     , ts_clim_path, record(1) )
+            status = read_clim( trim(ts_clim_path), record(1)          &
+                              , t_clim_name       , s_clim_name        &
+                              , tc_int(:,:,:,2)   , sc_int(:,:,:,2) )
           end if
-        else
-          call msg_print("", 2, "FAILED...")
-          tc_int(:,:,:,3) = 15.
-          sc_int(:,:,:,3) = 33.
         end if
 
-  ! Read background TS
-        inquire ( file = trim(ts_mean_path), exist = fexist )
-        call msg_print("", 6, "Read background TS:")
-        if ( fexist ) then
+        if ( .not.NO_MEAN ) then
+! Read background TS
+          call msg_print("", 6, "Read background TS:")
           if ( INTERP_CLIM ) then
-            call read_mean_ts_pnetcdf( tm_int(:,:,:,3), sm_int(:,:,:,3)  &
-                                     , ts_mean_path, record(3) )
+            status = read_clim( trim(ts_mean_path), record(3)          &
+                              , t_mean_name       , s_mean_name        &
+                              , tm_int(:,:,:,3)   , sm_int(:,:,:,3) )
           else
-            call read_mean_ts_pnetcdf( tm_int(:,:,:,2), sm_int(:,:,:,2)  &
-                                     , ts_mean_path, record(1) )
+            status = read_clim( trim(ts_mean_path), record(1)          &
+                              , t_mean_name       , s_mean_name        &
+                              , tm_int(:,:,:,2)   , sm_int(:,:,:,2) )
           end if
-        else
-          call msg_print("", 2, "FAILED...")
-          tm_int(:,:,:,3) = tc_int(:,:,:,3)
-          sm_int(:,:,:,3) = sc_int(:,:,:,3)
         end if
 
       end if
 
 ! Interpolate TS and get background density
       if ( INTERP_CLIM ) then
-        sclim = ( 1. - a )*sc_int(:,:,:,2) + a*sc_int(:,:,:,3)
-        tclim = ( 1. - a )*tc_int(:,:,:,2) + a*tc_int(:,:,:,3)
-        smean = ( 1. - a )*sm_int(:,:,:,2) + a*sm_int(:,:,:,3)
-        tmean = ( 1. - a )*tm_int(:,:,:,2) + a*tm_int(:,:,:,3)
+        if ( .not.NO_CLIM ) then
+          sclim = ( 1. - a )*sc_int(:,:,:,2) + a*sc_int(:,:,:,3)
+          tclim = ( 1. - a )*tc_int(:,:,:,2) + a*tc_int(:,:,:,3)
+        end if
+        if ( .not.NO_MEAN ) then
+          smean = ( 1. - a )*sm_int(:,:,:,2) + a*sm_int(:,:,:,3)
+          tmean = ( 1. - a )*tm_int(:,:,:,2) + a*tm_int(:,:,:,3)
+        end if
       else
-        sclim = sc_int(:,:,:,2)
-        tclim = tc_int(:,:,:,2)
-        sclim = sm_int(:,:,:,2)
-        tclim = tm_int(:,:,:,2)
+        if ( .not.NO_CLIM ) then
+          sclim = sc_int(:,:,:,2)
+          tclim = tc_int(:,:,:,2)
+        end if
+        if ( .not.NO_MEAN ) then
+          smean = sm_int(:,:,:,2)
+          tmean = tm_int(:,:,:,2)
+        end if
       end if
 
       call dens( smean, tmean, rmean )
@@ -518,8 +592,8 @@ module clim
       if ( .not.RELAX_TS ) return
 
       where ( hz .gt. h_thres )
-        temp = ( tclim - temp ) / ( t_rel * 86400. )
-        salt = ( sclim - salt ) / ( t_rel * 86400. )
+        temp = deep_rel * ( tclim - temp )
+        salt = deep_rel * ( sclim - salt )
       end where
 
 
@@ -527,7 +601,7 @@ module clim
 !
 !______________________________________________________________________
 !
-    subroutine relax_surface( wssurf, wtsurf )
+    subroutine relax_surface( wssurf, wtsurf, sss, sst )
 !----------------------------------------------------------------------
 !  Relax surface fluxes to climatologies
 !______________________________________________________________________
@@ -536,13 +610,25 @@ module clim
 
       implicit none
 
+      real(rk), dimension(im,jm), intent(in   ) :: sss, sst
       real(rk), dimension(im,jm), intent(inout) :: wssurf, wtsurf
 
 
-      if ( .not.RELAX_SURF ) return
+      select case ( RELAX_SURF_SALT )
+        case ( 0 )
+        case ( 1 )
+          wssurf = wssurf + deep_rel*s_relx*( sb(:,:,1) - sclim(:,:,1) )
+        case ( 2 )
+          wssurf = wssurf + surf_rel * ( sb(:,:,1) - sss )
+      end select
 
-      wtsurf = wtsurf + ct * t_relx * ( tb(:,:,1) - tclim(:,:,1) )
-      wssurf = wssurf + ct * s_relx * ( sb(:,:,1) - sclim(:,:,1) )
+      select case ( RELAX_SURF_TEMP )
+        case ( 0 )
+        case ( 1 )
+          wtsurf = wtsurf + deep_rel*t_relx*( tb(:,:,1) - tclim(:,:,1) )
+        case ( 2 )
+          wtsurf = wtsurf + surf_rel * ( tb(:,:,1) - sst )
+      end select
 
 
     end ! subroutine relax_surface
@@ -551,7 +637,7 @@ module clim
 !
     pure character(len=256) function get_filename( path, year )
 !----------------------------------------------------------------------
-!  Costructs filename string in `<path>YYYY<FORMAT_EXT>` format.
+!  Constructs filename string in `<path>YYYY<FORMAT_EXT>` format.
 !______________________________________________________________________
 !
       implicit none
@@ -570,141 +656,66 @@ module clim
 != I/O SECTION ========================================================
 !______________________________________________________________________
 !
-    subroutine read_var_nc( var_name, var, record, ncid )
-!----------------------------------------------------------------------
-!  Read a variable (NC format).
-!______________________________________________________________________
-!
-      use glob_const , only: C2K, rk
-      use glob_domain
-      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
-      use pnetcdf
+    integer function read_clim( filepath , record       &
+                              , temp_name, salt_name    &
+                              , temp     , salt      )
+
+      use glob_domain, only: i_global, j_global
+      use grid       , only: fsm
+      use io
+      use mpi        , only: MPI_OFFSET_KIND
+      use pnetcdf    , only: NF90_NOWRITE
 
       implicit none
 
-      integer, external :: get_var_real_3d
+      character(*), intent(in)          :: filepath, salt_name, temp_name
+      integer     , intent(in)          :: record
+      real(rk)    , dimension(im,jm,kb)  &
+                  , intent(out)         :: temp, salt
 
-      integer                   , intent(inout) :: ncid
-      integer                   , intent(in   ) :: record
-      real(rk), dimension(im,jm), intent(  out) :: var
-      character(len=*)          , intent(in   ) :: var_name
-
-      integer                  status, varid
-      integer(MPI_OFFSET_KIND) start(4), edge(4)
-      character(len=64)        units
+      character(PATH_LEN)                    :: tmp_str
+      integer(MPI_OFFSET_KIND), dimension(4) :: edge, start
+      integer k, file_id
 
 
-      start = 1
-      edge  = 1
+      tmp_str = ""
 
-! get variable
-      call check( nf90mpi_inq_varid( ncid, var_name, varid )  &
-                , 'nfmpi_inq_varid: '//trim(var_name) )
+! open file
+      if ( is_master ) then
+        write(tmp_str, '("Reading file ",a," @ ",i2)') filepath, record
+        call msg_print("", 6, trim(tmp_str))
+      end if
 
-! set reading area
-      start(1) = i_global(1)
-      start(2) = j_global(1)
-      start(3) = record
-      edge(1) = im
-      edge(2) = jm
-      edge(3) =  1
+      file_id = file_open( filepath, NF90_NOWRITE )
+      if ( file_id <= 0 ) then
+        read_clim = -1
+        return
+      end if
+
+! define domain to read
+      start = [ i_global(1), j_global(1),  1, record ]
+      edge  = [ im         , jm         , kb,      1 ]
 
 ! get data
-      call check( get_var_real_3d                    &
-                  ( ncid, varid, start, edge, var )  &
-                , 'get_var_real: '//trim(var_name) )
+      read_clim = var_read( file_id, temp_name, temp, start, edge )
+      read_clim = var_read( file_id, salt_name, salt, start, edge )
 
-! convert data if necessary
-      status = nf90mpi_get_att( ncid, varid, "units", units )
-      if ( status == NF_NOERR ) then
-        select case ( trim(units) )
-          case ( "K" )
-            var = var - C2K
-          case ( "Pa" )
-            var = var/100.
-        end select
-      end if
+      do k = 1,kbm1
+        where ( fsm == 0. )
+          temp(:,:,k) = 0.
+          salt(:,:,k) = 0.
+        end where
+      end do
+      temp(:,:,kb) = temp(:,:,kbm1)
+      salt(:,:,kb) = salt(:,:,kbm1)
+
+! close file
+      read_clim = file_close( file_id )
 
 
-      end ! subroutine read_var_nc
+    end ! function read_clim
 !
 !___________________________________________________________________
 !
-    integer function file_open_nc( path, year )
-!-------------------------------------------------------------------
-!  Opens netcdf file for reading.
-!___________________________________________________________________
-!
-      use glob_domain, only: POM_COMM
-      use mpi        , only: MPI_INFO_NULL
-      use pnetcdf    , only: nf90mpi_open, NF_NOERR, NF_NOWRITE
-
-      implicit none
-
-      integer         , intent(in) :: year
-      character(len=*), intent(in) :: path
-
-      integer            status
-      character(len=256) filename, netcdf_file
-
-
-      filename = get_filename( path, year )
-      netcdf_file = trim(filename)
-      status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE   &
-                           , MPI_INFO_NULL, file_open_nc )
-      if ( status /= NF_NOERR ) then
-        call msg_print("", 2, "Failed to open `"//trim(filename)//"`")
-        file_open_nc = -1
-      end if
-
-    end ! function file_open_nc
-!
-!___________________________________________________________________
-!
-    integer function file_close_nc( ncid )
-!-------------------------------------------------------------------
-!  Opens netcdf file for reading.
-!___________________________________________________________________
-!
-      use pnetcdf, only: nf90mpi_close
-
-      implicit none
-
-      integer, intent(in) :: ncid
-
-
-      file_close_nc = nf90mpi_close( ncid )
-
-
-    end ! function file_close_nc
-!
-!______________________________________________________________________
-!
-    subroutine check(status, routine)
-!----------------------------------------------------------------------
-!  Checks for NetCDF I/O error and exits with an error message if hits.
-!______________________________________________________________________
-!
-      use glob_domain, only: error_status, is_master
-      use pnetcdf    , only: nf90mpi_strerror, NF_NOERR
-
-      implicit none
-
-      integer         , intent(in) :: status
-      character(len=*), intent(in) :: routine
-
-
-      if ( status /= NF_NOERR ) then
-        error_status = 1
-        if ( is_master ) then
-          print '(/a,a)', 'IO error at module `CLIM`: ', routine
-          print '("[",i4,"] ",a)', status, nf90mpi_strerror(status)
-          stop
-        end if
-      end if
-
-
-    end ! subroutine check
-
 
 end module clim

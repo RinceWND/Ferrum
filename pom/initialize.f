@@ -11,19 +11,27 @@
 !______________________________________________________________________
 !
       use config
-      use glob_const , only: initialize_constants
+      use glob_const , only: initialize_constants,rhoref
       use glob_domain
-      use glob_grid  , only: east_e, north_e, h
-      use io         , only: initialize_io
-      use glob_misc  , only: aamfac
-      use glob_ocean , only: d, dt, el, et
-      use glob_out   , only: iout, iprint
-      use model_run  , only: dtime, initialize_time, time, time0
+      use grid       , only: east_e, north_e, h
+      use grid       , only: initialize_grid_module => initialize_mod
+      use glob_ocean , only: aamfac, d, dt, el, et
+     &                     , initialize_ocean => allocate_arrays
+      use glob_out   , only: out_record, iprint
+     &                     , initialize_mean_arrays => allocate_arrays
+      use model_run  , only: dtime, time, time0
 
       implicit none
 
       integer, parameter :: TEST_CASE = 0 !1
 
+
+! initialize the MPI execution environment and create communicator for
+!internal POM communications
+      call initialize_mpi
+
+! Initialize various constants
+      call initialize_constants
 
 ! Read domain distribution (TODO: get rid of hardcoded parameters)
       call read_domain_dist( 'domain.nml' )
@@ -34,10 +42,6 @@
 !  `read_config` initializes all parameters to their default values
 ! prior to reading them.
 
-! initialize the MPI execution environment and create communicator for
-!internal POM communications
-      call initialize_mpi
-
 ! distribute the model domain across processors
       call distribute_mpi
 
@@ -47,43 +51,31 @@
 ! decide on interpolation feasibility (sets calc_interp flag)
       call check_interpolation
 
-! Initialize various constants
-      call initialize_constants
-
-! Allocate and initialize arrays
-!  (TODO: allocate them before or after initializing MPI?)
-      call initialize_arrays
-
 ! Initialize general IO and config
-      call initialize_io( 'config.nml' )
-
-! Initialize time
-      call initialize_time( restart_file )
-!______________________________________________________________________
-!  Uses `restart_file` string to offset time.
-!  If `do_restart` is .false. this string is forced to be empty, thus
-! the offseting is ignored.
-
-! Print configuration
-      call print_config
+      call initialize_grid_module( 'config.nml' )
 
 ! Initialize grid
       call initialize_grid( TEST_CASE )
 
+! Allocate and initialize arrays
+      call initialize_ocean
+
 ! The model is initialized. Below is some updates. TODO: Separate?
       call msg_print("MODEL CORE INITIALIZED", 1, "")
+      ! TODO: Revised up to here. Code below is "as it was before".
 
 ! Initialize modules
       call initialize_modules
 
+! read initial and lateral boundary conditions
+      call initial_conditions
+      call create_initial("out/init."//trim(netcdf_file)//".nc") ! TODO: Move after IC updated?
+
 ! read previous (initial) record [TODO: NOTE! This step should be done before update_initial for clim to get rmean. But what happens to boundary?]
       call modules_initial_step( dtime )
 
-! read initial and lateral boundary conditions
-      call initial_conditions
-
 ! read laterel boundary conditions
-      call lateral_boundary_conditions !ayumi:20100407
+      !call lateral_boundary_conditions !ayumi:20100407
 
 ! read M2 tidal amplitude & phase
       if ( calc_tide ) call read_tide      !fhx:tide
@@ -102,30 +94,21 @@
         call incmix(aamfac,im,jm,1,lono,lato,east_e,north_e,xs,ys,fak)
       end if
 
-! read restart data from a previous run
+! read restart data from a previous run TODO: Shoul be in init module as a variation of read_initial
       if ( do_restart ) then
-        call read_restart_pnetcdf
-! update elevation
-        d  = h+el
-        dt = h+et
+        call read_restart
 ! update time
         time = time0
-        if ( append_output ) iout = int(time/iprint)
+        if ( append_output ) out_record = int(time/iprint)
       end if
 
-! write grid and initial conditions
-      if (output_flag == 1) then
-        if ( netcdf_file /= 'nonetcdf' )
-     $      call write_output_pnetcdf(
-     $      "out/"//trim(netcdf_file)//".nc")
-      end if
+! Output routines
+      call initialize_mean_arrays
 
-      if ( SURF_flag == 2 ) then  !fhx:20110131: flag=2 for initial SURF output
-        if ( netcdf_file /= 'nonetcdf' )
-     $      call write_SURF_pnetcdf(
-     $      "out/SRF."//trim(netcdf_file)//".nc")
+! write grid (NO initial conditions)
+      if ( output_flag == 1 ) then
+        call create_output("out/"//trim(netcdf_file)//".nc")
       end if
-
 
 ! check for errors
       call   sum0i_mpi(error_status,master_task)
@@ -138,213 +121,10 @@
         stop
       end if
 
-      call msg_print("MODEL STATE UPDATED", 1, "")
+      call msg_print("INITIALIZATION COMPLETE", 1, "")
 
 
       end ! subroutine initialize
-!
-!______________________________________________________________________
-!
-      subroutine initialize_arrays
-!----------------------------------------------------------------------
-!  Allocate arrays and initialize them for safety.
-!______________________________________________________________________
-!
-      use config     , only: ntide
-      use glob_const , only: rk
-      use glob_domain, only: im, im_coarse, jm, jm_coarse, kb, kbm1
-      use glob_grid
-      use glob_misc
-      use glob_ocean
-      use glob_out
-
-      implicit none
-
-      integer k
-
-      iout = 0
-
-      iouts = 0 !fhx:20110131:
-
-
-      allocate(
-     &  dz(kb), dzz(kb), z(kb), zz(kb)
-     & )
-
-      allocate(
-     &  aam2d(im,jm)   ,
-     $  aamfac(im,jm)  ,    !fhx:incmix
-     $  advua(im,jm)   ,
-     $  advva(im,jm)   ,
-     $  adx2d(im,jm)   ,
-     $  ady2d(im,jm)   ,
-     $  art(im,jm)     ,
-     $  aru(im,jm)     ,
-     $  arv(im,jm)     ,
-     $  cbc(im,jm)     ,
-     $  icb(im,jm)     ,    !:rwnd
-     $  ice(im,jm)     ,    !:rwnd
-     $  icf(im,jm)     ,    !:rwnd
-     $  cor(im,jm)     ,
-     $  d(im,jm)       ,
-     $  drx2d(im,jm)   ,
-     $  dry2d(im,jm)   ,
-     $  dt(im,jm)      ,
-     $  dum(im,jm)     ,
-     $  dvm(im,jm)     ,
-     $  dx(im,jm)      ,
-     $  dy(im,jm)      ,
-     $  east_c(im,jm)  ,
-     $  east_e(im,jm)  ,
-     $  east_u(im,jm)  ,
-     $  east_v(im,jm)  ,
-     $  egb(im,jm)     ,
-     $  egf(im,jm)     ,
-     $  el(im,jm)      ,
-     $  elb(im,jm)     ,
-     $  elf(im,jm)     ,
-     $  et(im,jm)      ,
-     $  etb(im,jm)     ,
-     $  etf(im,jm)     ,
-     $  fluxua(im,jm)  ,
-     $  fluxva(im,jm)  ,
-     $  fsm(im,jm)     ,
-     $  h(im,jm)       ,
-     $  hi(im,jm)      ,    !:rwnd
-     $  hz(im,jm,kb)   ,
-     $  north_c(im,jm) ,
-     $  north_e(im,jm) ,
-     $  north_u(im,jm) ,
-     $  north_v(im,jm) ,
-     $  psi(im,jm)     ,
-     $  rot(im,jm)     ,
-     $  ssurf(im,jm)   ,
-     $  tauiwu(im,jm)  ,    !:rwnd
-     $  tauiwv(im,jm)  ,    !:rwnd
-     $  tps(im,jm)     ,
-     $  tsurf(im,jm)   ,
-     $  ua(im,jm)      ,
-     $  uab(im,jm)     ,
-     $  uaf(im,jm)     ,
-     $  uib(im,jm)     ,    !:rwnd
-     $  ui(im,jm)      ,    !:rwnd
-     $  uif(im,jm)     ,    !:rwnd
-     $  utb(im,jm)     ,
-     $  utf(im,jm)     ,
-     $  va(im,jm)      ,
-     $  vab(im,jm)     ,
-     $  vaf(im,jm)     ,
-     $  vib(im,jm)     ,    !:rwnd
-     $  vi(im,jm)      ,    !:rwnd
-     $  vif(im,jm)     ,    !:rwnd
-     $  vtb(im,jm)     ,
-     $  vtf(im,jm)     ,
-     $  wubot(im,jm)   ,
-     $  wvbot(im,jm)   ,
-     $  alon_coarse(im_coarse,jm_coarse) ,
-     $  alat_coarse(im_coarse,jm_coarse) ,
-     $  mask_coarse(im_coarse,jm_coarse)
-     & )
-
-      allocate(
-     &  aam(im,jm,kb)  ,
-     $  advx(im,jm,kb) ,
-     $  advy(im,jm,kb) ,
-     $  a(im,jm,kb)    ,
-     $  c(im,jm,kb)    ,
-     $  drhox(im,jm,kb),
-     $  drhoy(im,jm,kb),
-     $  dtef(im,jm,kb) ,
-     $  ee(im,jm,kb)   ,
-     $  gg(im,jm,kb)   ,
-     $  kh(im,jm,kb)   ,
-     $  km(im,jm,kb)   ,
-     $  kq(im,jm,kb)   ,
-     $  l(im,jm,kb)    ,
-     $  q2b(im,jm,kb)  ,
-     $  q2(im,jm,kb)   ,
-     $  q2lb(im,jm,kb) ,
-     $  q2l(im,jm,kb)  ,
-     $  rho(im,jm,kb)  ,
-     $  sb(im,jm,kb)   ,
-     $  s(im,jm,kb)    ,
-     $  tb(im,jm,kb)   ,
-     $  t(im,jm,kb)    ,
-     $  ub(im,jm,kb)   ,
-     $  uf(im,jm,kb)   ,
-     $  u(im,jm,kb)    ,
-     $  vb(im,jm,kb)   ,
-     $  vf(im,jm,kb)   ,
-     $  v(im,jm,kb)    ,
-     $  w(im,jm,kb)    ,
-     $  wr(im,jm,kb)   ,
-     $  zflux(im,jm,kb)
-     & )
-
-      allocate(
-     &  uab_mean(im,jm)    ,
-     $  vab_mean(im,jm)    ,
-     $  elb_mean(im,jm)    ,
-     $  wusurf_mean(im,jm) ,
-     $  wvsurf_mean(im,jm) ,
-     $  wtsurf_mean(im,jm) ,
-     $  wssurf_mean(im,jm)
-     & )
-
-      allocate(
-     $  u_mean(im,jm,kb)   ,
-     $  v_mean(im,jm,kb)   ,
-     $  w_mean(im,jm,kb)   ,
-     $  t_mean(im,jm,kb)   ,
-     $  s_mean(im,jm,kb)   ,
-     $  rho_mean(im,jm,kb) ,
-     $  kh_mean(im,jm,kb)  ,
-     $  km_mean(im,jm,kb)
-     & )
-
-! TODO: move to seaice and tide modules
-!      allocate(
-!     $  cibe(jm)       ,
-!     $  cibn(im)       ,
-!     $  cibs(im)       ,
-!     $  cibw(jm)       ,
-!     $  ampe(jm,ntide) ,
-!     $  phae(jm,ntide) ,
-!     $  amue(jm,ntide) ,
-!     $  phue(jm,ntide)
-!     & )
-
-
-      allocate(
-     $  usrf_mean(im,jm)    ,
-     $  vsrf_mean(im,jm)    ,
-     $  elsrf_mean(im,jm)   ,
-     $  uwsrf_mean(im,jm)   ,
-     $  vwsrf_mean(im,jm)   ,
-     & )
-
-! 2-D and 3-D arrays
-      elb    = 0.
-      elf    = 0.
-      cor    = 0.
-      tauiwu = 0.
-      tauiwv = 0.
-      drx2d  = 0.
-      dry2d  = 0.
-      wubot  = 0.     !lyo:20110315:botwavedrag:
-      wvbot  = 0.     !lyo:20110315:botwavedrag:
-      aamfac = 1.     !fhx:incmix
-      hi     =  .35
-
-      ub(:,:,1:kbm1) = 0.
-      vb(:,:,1:kbm1) = 0.
-
-      do k = 1, kb
-        hz(:,:,kb) = -h*zz(k)
-      end do
-
-
-      end ! subroutine initialize_arrays
 !
 !______________________________________________________________________
 !
@@ -353,12 +133,17 @@
 !  Reads of generates grid.
 !______________________________________________________________________
 !
-      use glob_domain, only: im, imm1, jm, jmm1
-      use glob_grid
+      use config     , only: n1d
+      use glob_const , only: DEG2RAD, Ohm, rk, SMALL
+      use glob_domain, only: im, imm1, jm, jmm1, kb, n_west, n_south
+      use grid
+      use glob_ocean , only: d, dt, el, et
 
       implicit none
 
       integer, intent(in) :: TEST_CASE
+
+      integer i,j    ,ierr
 
 
       if ( TEST_CASE == 0 ) then
@@ -368,148 +153,10 @@
         call make_grid(TEST_CASE)
       end if
 
-!lyo:ecs:
-!     Close northern boundary:
-!!        if(n_north.eq.-1) then
-!          do j=jm-5,jm
-!!           do j=jm-0,jm
-!!           fsm(:,j)=0.0
-!!           h(:,j)=1.0
-!!          enddo
-!!        endif
-!
-
-! derive u- and v-mask from rho-mask
-      dum(2:im,:) = fsm(2:im,:)*fsm(1:imm1,:)
-      dum(1   ,:) = dum(2   ,:)
-      dvm(:,2:jm) = fsm(:,2:jm)*fsm(:,1:jmm1)
-      dvm(:,1   ) = dvm(:,2   )
-
-      call exchange2d_mpi(  h,im,jm)
-      call exchange2d_mpi(fsm,im,jm)
-      call exchange2d_mpi(dum,im,jm)
-      call exchange2d_mpi(dvm,im,jm)
-
       call check_cfl_min
 
 
       end ! subroutine initialize_grid
-!
-!______________________________________________________________________
-!
-      subroutine read_grid
-!----------------------------------------------------------------------
-!  Set up vertical and horizontal grid, topography, areas and masks.
-!______________________________________________________________________
-!
-      use config     , only: n1d
-      use glob_const , only: DEG2RAD, Ohm, rk, SMALL
-      use glob_domain, only: im, jm, kb, n_south, n_west
-      use glob_grid
-      use io         , only: grid_path, read_grid_pnetcdf
-      use glob_ocean , only: d, dt, el, et
-
-      implicit none
-
-      integer i,j,k
-
-! read grid
-      call read_grid_pnetcdf( grid_path )
-!______________________________________________________________________
-!      The followings are read in read_grid_pnetcdf:
-!     z,zz,dx,dy
-!     east_u,east_v,east_e,east_c
-!     north_u,north_v,north_e,north_c
-!     rot,h,fsm
-
-! define "u" and "v" masks from "rho" mask
-      dvm = fsm
-      dum = fsm
-      do j=1,jm-1
-        do i=1,im
-          if (fsm(i,j)==0..and.fsm(i,j+1)/=0.) dvm(i,j+1) = 0.
-        end do
-      end do
-      do j=1,jm
-        do i=1,im-1
-          if (fsm(i,j)==0..and.fsm(i+1,j)/=0.) dum(i+1,j) = 0.
-        end do
-      end do
-      call exchange2d_mpi(dum,im,jm)
-      call exchange2d_mpi(dvm,im,jm)
-
-! modify SMALL to zero distances to 1 meter
-      where( dx < SMALL ) dx = 1.
-      where( dy < SMALL ) dy = 1.
-
-!fhx:debug:close north boundary for NWATL
-!       if(n_north.eq.-1) then
-!          fsm(:,jm)=0.0
-!          h(:,jm)=1.0
-!       endif
-!
-!lyo:scs1d:beg:Artificially increase dx & dy for 1d-simulations
-      if (n1d.ne.0) then
-        do j=1,jm; do i=1,im
-          dx(i,j)=1.e9; dy(i,j)=1.e9
-        enddo; enddo
-      endif
-!lyo:scs1d:end:
-!
-! derive vertical grid variables
-!      z(kb) = -1. ! :DIRTY HACK!!! (for stupid grid)
-!      zz(kb-1) = .5*(z(kb-1)+z(kb)) ! :
-!      zz(kb) = 2.*zz(kb-1)-zz(kb-2) ! :
-!!      if (my_task==1) fsm(:,jm-8:jm) = 0.
-!      h = 1500.
-      do k=1,kb-1
-        dz(k) = z(k)- z(k+1)
-        dzz(k)=zz(k)-zz(k+1)
-      end do
-      dz(kb) = dz(kb-1) !=0. !lyo:20110202 =0 is dangerous but checked
-      dzz(kb)=dzz(kb-1) !=0. !thro' code - and found to be ok.
-
-      call print_grid_vert
-
-! set up Coriolis parameter
-      cor = 2.*Ohm*sin(north_e*DEG2RAD)
-
-! inertial period for temporal filter
-!      period=(2.e0*pi)/abs(cor(im/2,jm/2))/86400.e0
-
-! calculate areas of "rho" cells
-      art = dx*dy
-
-! calculate areas of "u" and "v" cells
-      do j=2,jm
-        do i=2,im
-          aru(i,j)=.25*(dx(i,j)+dx(i-1,j))*(dy(i,j)+dy(i-1,j))
-          arv(i,j)=.25*(dx(i,j)+dx(i,j-1))*(dy(i,j)+dy(i,j-1))
-        end do
-      end do
-      call exchange2d_mpi(aru,im,jm)
-      call exchange2d_mpi(arv,im,jm)
-
-      if (n_west == -1) then
-        do j=1,jm
-          aru(1,j)=aru(2,j)
-          arv(1,j)=arv(2,j)
-        end do
-      end if
-
-      if (n_south == -1) then
-        do i=1,im
-          aru(i,1)=aru(i,2)
-          arv(i,1)=arv(i,2)
-        end do
-      end if
-
-! initialize water column depths
-      d  = h+el
-      dt = h+et
-
-
-      end
 !
 !______________________________________________________________________
 !
@@ -518,62 +165,1031 @@
 !  Set up initial and lateral boundary conditions.
 !______________________________________________________________________
 !
-      use bry
-      use glob_bry
-      use config     , only: restart_file
+      use bry        , only: initial_conditions_boundary
+      use config     , only: initial_file
       use glob_const , only: rk
       use glob_domain
-      use io         , only: read_initial
-      use glob_ocean , only: s, sb, t, tb
+      use grid       , only: dz, fsm
+      use io
+      use mpi        , only: MPI_OFFSET_KIND
+      use glob_ocean , only: elb, rho, s, sb, t, tb, uab, ub, vab, vb
+      use pnetcdf    , only: NF90_NOWRITE
 
       implicit none
 
-      integer i,j,k
+      logical                      fexist
+      integer                      file_id, i, j, k, record, status
+      integer(MPI_OFFSET_KIND)
+     &       , dimension(4)     :: edge, start
+      character(32) :: el_name, s_name, t_name, u_name, v_name
 
 
-! read initial temperature and salinity from ic file
-!      call read_initial_ts_pnetcdf(kb,tb,sb)
-      call read_initial
+      el_name = "elev"
+       s_name = "salt"
+       t_name = "temp"
+       u_name = "u"
+       v_name = "v"
+      record = 1
 
-      do k=1,kbm1
-        do j=1,jm
-          do i=1,im
-            t(i,j,k)=tb(i,j,k)
-            s(i,j,k)=sb(i,j,k)
-          end do
-        end do
+! Initialize main parameters with "common" values
+      tb  = 15.
+      sb  = 33.
+      elb =  0.
+      ub  =  0.
+      vb  =  0.
+
+!      record = dtime % month
+! Set computational-thread-specific domain to read in parallel
+      start = [ i_global(1), j_global(1),  1, record ]
+      edge  = [ im         , jm         , kb,      1 ]
+
+! Read initial file
+      call msg_print("", 6, "Read initial conditions:")
+      file_id = file_open( trim(initial_file), NF90_NOWRITE )
+      if ( .not.is_error(file_id) ) then
+        status = var_read( file_id,  t_name,  tb, start, edge )
+        status = var_read( file_id,  s_name,  sb, start, edge )
+        status = var_read( file_id,  u_name,  ub, start, edge )
+        status = var_read( file_id,  v_name,  vb, start, edge )
+        status = var_read( file_id, el_name, elb, start, edge )
+!        call read_initial_ts_pnetcdf( tb, sb, ub, vb, elb, 1 ) !dtime%month )
+!        call read_ts_z_pnetcdf( tb, sb, 40, dtime%month, ic_path )
+      end if
+
+! Derive barotropic velocities
+      uab = 0.
+      vab = 0.
+      do k = 1, kbm1
+        sb(:,:,k) = sb(:,:,k) * fsm
+        tb(:,:,k) = tb(:,:,k) * fsm
+        uab(:,:)  = uab(:,:) + ub(:,:,k)*dz(k)
+        vab(:,:)  = vab(:,:) + vb(:,:,k)*dz(k)
       end do
 
-! set thermodynamic boundary conditions (for the seamount problem, and
-! other possible applications, lateral thermodynamic boundary conditions
-! are set equal to the initial conditions and are held constant
-! thereafter - users may create variable boundary conditions)
-!lyo:pac10:Comment out - replace by tobe etc below:
-!     do k=1,kbm1
-!       do j=1,jm
-!         tbe(j,k) = tb(im,j,k) * fsm(im,j) !lyo:20110202:use initial
-!         sbe(j,k) = sb(im,j,k) * fsm(im,j) ! t,sb instead of t,sclim
-!         tbw(j,k) = tb( 1,j,k) * fsm( 1,j) !lyo:20110202:add west
-!         sbw(j,k) = sb( 1,j,k) * fsm( 1,j)
-!       end do
-!       do i=1,im
-!         tbn(i,k) = tb(i,jm,k) * fsm(i,jm) !lyo:20110202:add north
-!         sbn(i,k) = sb(i,jm,k) * fsm(i,jm)
-!         tbs(i,k) = tb(i, 1,k) * fsm(i, 1) !lyo:20110202:add south
-!         sbs(i,k) = sb(i, 1,k) * fsm(i, 1)
-!       end do
-!     enddo
-
-!lyo:pac10:beg:From /lustre/ltfs/scratch/Yu-Lin.Chang/sbPOM/stcc_exp/dx10_wind_5pe-5_kb350/pom/initialize.f; NOT from Alu's stcc code which does not have below
-!lyo:pac10:end:
-
-!      call read_ice_pnetcdf( "ice.19790102.nc", icb )
-
-! Set initial conditions for modules.
-      call initial_conditions_boundary
+! Calculate initial density.
+      call dens(sb,tb,rho)
 
 
       end
+!
+!______________________________________________________________________
+!
+      subroutine read_restart
+!----------------------------------------------------------------------
+!  Set up initial and lateral boundary conditions.
+!______________________________________________________________________
+!
+      use air        , only: wusurf, wvsurf
+      use config     , only: initial_file
+      use glob_const , only: rk
+      use glob_domain
+      use io
+      use mpi        , only: MPI_OFFSET_KIND
+      use model_run  , only: time0
+      use glob_ocean
+      use pnetcdf    , only: NF90_NOWRITE
+
+      implicit none
+
+      logical                      fexist
+      integer                      file_id, i, j, k, record, status
+      integer(MPI_OFFSET_KIND)
+     &       , dimension(3)     :: edge, start
+
+
+      start = [ i_global(1), j_global(1),  1 ]
+      edge  = [ im         , jm         , kb ]
+
+! Read initial file
+      call msg_print("", 6, "Read restart file:")
+      file_id = file_open( trim(initial_file), NF90_NOWRITE )
+      if ( .not.is_error(file_id) ) then
+        status = var_read(file_id,'time'  ,time0 , start(3:3) )
+        status = var_read(file_id,'wusurf',wusurf, start(1:2),edge(1:2))
+        status = var_read(file_id,'wvsurf',wvsurf, start(1:2),edge(1:2))
+        status = var_read(file_id,'wubot' ,wubot , start(1:2),edge(1:2))
+        status = var_read(file_id,'wvbot' ,wvbot , start(1:2),edge(1:2))
+        status = var_read(file_id,'aam2d' ,aam2d , start(1:2),edge(1:2))
+        status = var_read(file_id,'ua'    ,ua    , start(1:2),edge(1:2))
+        status = var_read(file_id,'uab'   ,uab   , start(1:2),edge(1:2))
+        status = var_read(file_id,'va'    ,va    , start(1:2),edge(1:2))
+        status = var_read(file_id,'vab'   ,vab   , start(1:2),edge(1:2))
+        status = var_read(file_id,'el'    ,el    , start(1:2),edge(1:2))
+        status = var_read(file_id,'elb'   ,elb   , start(1:2),edge(1:2))
+        status = var_read(file_id,'et'    ,et    , start(1:2),edge(1:2))
+        status = var_read(file_id,'etb'   ,etb   , start(1:2),edge(1:2))
+        status = var_read(file_id,'egb'   ,egb   , start(1:2),edge(1:2))
+        status = var_read(file_id,'utb'   ,utb   , start(1:2),edge(1:2))
+        status = var_read(file_id,'vtb'   ,vtb   , start(1:2),edge(1:2))
+        status = var_read(file_id,'adx2d' ,adx2d , start(1:2),edge(1:2))
+        status = var_read(file_id,'ady2d' ,ady2d , start(1:2),edge(1:2))
+        status = var_read(file_id,'advua' ,advua , start(1:2),edge(1:2))
+        status = var_read(file_id,'advva' ,advva , start(1:2),edge(1:2))
+        status = var_read(file_id,'u'     ,u     , start     ,edge     )
+        status = var_read(file_id,'ub'    ,ub    , start     ,edge     )
+        status = var_read(file_id,'v'     ,v     , start     ,edge     )
+        status = var_read(file_id,'vb'    ,vb    , start     ,edge     )
+        status = var_read(file_id,'w'     ,w     , start     ,edge     )
+        status = var_read(file_id,'t'     ,t     , start     ,edge     )
+        status = var_read(file_id,'tb'    ,tb    , start     ,edge     )
+        status = var_read(file_id,'s'     ,s     , start     ,edge     )
+        status = var_read(file_id,'sb'    ,sb    , start     ,edge     )
+        status = var_read(file_id,'rho'   ,rho   , start     ,edge     )
+        status = var_read(file_id,'km'    ,km    , start     ,edge     )
+        status = var_read(file_id,'kh'    ,kh    , start     ,edge     )
+        status = var_read(file_id,'kq'    ,kq    , start     ,edge     )
+        status = var_read(file_id,'l'     ,l     , start     ,edge     )
+        status = var_read(file_id,'q2'    ,q2    , start     ,edge     )
+        status = var_read(file_id,'q2b'   ,q2b   , start     ,edge     )
+        status = var_read(file_id,'aam'   ,aam   , start     ,edge     )
+        status = var_read(file_id,'q2l'   ,q2l   , start     ,edge     )
+        status = var_read(file_id,'q2lb'  ,q2lb  , start     ,edge     )
+      else
+        call msg_print("", 2, "FAILED...")
+        call finalize_mpi
+        stop
+      end if
+
+! Close file
+      file_id = file_close( file_id )
+
+      end
+!______________________________________________________________________
+!
+      subroutine create_output( out_file )
+!----------------------------------------------------------------------
+!  Create output file.
+!______________________________________________________________________
+!
+        use air
+        use config     , only: use_ice, mode, title
+        use glob_const , only: MODE_BAROTROPIC, rk
+        use glob_domain
+        use grid
+        use io
+        use glob_ocean
+        use glob_out
+        use pnetcdf    , only: NF90_FLOAT
+        use seaice     , only: icec, iceu, icev
+        use model_run  , only: time, time_start
+        use mpi        , only: MPI_OFFSET_KIND
+
+        implicit none
+
+        character(*), intent(in) :: out_file
+
+!  Output floating point precision.
+! Set to 4 to reduce output file's size. TODO: Unused yet
+        integer, parameter :: wk = 4
+
+        character(len=120) str_tmp!, netcdf_out_file
+        integer time_dimid, x_dimid, y_dimid, z_dimid
+        integer file_id, varid, status
+
+        integer(MPI_OFFSET_KIND), dimension(4) :: start, edge
+
+
+!     create file
+        if ( is_master )
+     &    call msg_print("", 6, "Creating `"//trim(out_file)//"`")
+
+        file_id = file_create( out_file )
+
+! define global attributes
+        call att_write( file_id, -1, 'title'      , trim(title)   )
+        call att_write( file_id, -1, 'description', 'Output file' )
+
+! define dimensions
+        time_dimid = dim_define( file_id, 'time',         0 )
+        z_dimid    = dim_define( file_id, 'z'   ,        kb )
+        y_dimid    = dim_define( file_id, 'y'   , jm_global )
+        x_dimid    = dim_define( file_id, 'x'   , im_global )
+
+! define variables and their attributes
+        str_tmp  = 'days since '//time_start
+        varid = var_define( file_id, 'time'
+     &                    , NF90_FLOAT, [ time_dimid ]
+     &                    , 'time'
+     &                    , "days since "//time_start
+     &                    , -1, 0., '' )
+
+        varid = var_define( file_id, 'z'
+     &                    , NF90_FLOAT, [ z_dimid ]
+     &                    , 'sigma of cell face'
+     &                    , 'sigma_level'
+     &                    , -1, 0., '' )
+        call att_write( file_id, varid
+     &                    , 'standard_name'
+     &                    , 'ocean_sigma_coordinate' )
+        call att_write( file_id, varid
+     &                    , 'formula_terms'
+     &                    , 'sigma: z eta: elb depth: h' )
+
+        varid = var_define( file_id, 'zz'
+     &                    , NF90_FLOAT, [ z_dimid ]
+     &                    , 'sigma of cell centre'
+     &                    , 'sigma_level'
+     &                    , -1, 0., '' )
+        call att_write( file_id, varid
+     &                    , 'standard_name'
+     &                    , 'ocean_sigma_coordinate' )
+        call att_write( file_id, varid
+     &                    , 'formula_terms'
+     &                    , 'sigma: zz eta: elb depth: h' )
+
+        varid = var_define( file_id, 'east_u'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'easting of u-points'
+     &                    , 'degrees east'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'east_v'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'easting of v-points'
+     &                    , 'degrees east'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'east_e'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'easting of elevation points'
+     &                    , 'degrees east'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'north_u'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'northing of u-points'
+     &                    , 'degrees north'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'north_v'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'northing of v-points'
+     &                    , 'degrees north'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'north_e'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'northing of elevation points'
+     &                    , 'degrees north'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'rot'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'Rotation angle of x-axis wrt. east'
+     &                    , 'degree'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'h'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'undisturbed water depth'
+     &                    , 'metre'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'fsm'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'free surface mask'
+     &                    , 'dimensionless'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'dum'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'u - free surface mask'
+     &                    , 'dimensionless'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'dvm'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'v - free surface mask'
+     &                    , 'dimensionless'
+     &                    , -1, 0., 'east_v north_v' )
+
+        varid = var_define( file_id, 'uab', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'depth-averaged u'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'vab', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'depth-averaged v'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'elb', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'surface elevation'
+     &                    , 'metre'
+     &                    , 0, -999., 'east_e north_e' )
+        varid = var_define( file_id, 'wusurf', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'x-momentum flux'
+     &                    , 'metre^2/sec^2'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'wvsurf', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'y-momentum flux'
+     &                    , 'metre^2/sec^2'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'wtsurf', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'temperature flux'
+     &                    , 'deg m/s'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'swrad', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'upward net heat flux'
+     &                    , 'K m/s'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'wssurf', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'salinity flux'
+     &                    , 'psu m/s'
+     &                    , -1, 0., 'east_e north_e' )
+        if ( use_ice ) then
+          varid = var_define( file_id, 'icec', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid, time_dimid ]
+     &                      , 'sea ice concentration'
+     &                      , 'fraction'
+     &                      , 0, 0., 'east_e north_e' )
+        end if
+
+        if ( mode /= MODE_BAROTROPIC ) then
+          varid = var_define( file_id, 'u', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid
+     &                        , z_dimid, time_dimid ]
+     &                      , 'x-velocity'
+     &                      , 'metre/sec'
+     &                      , -1, 0., 'east_u north_u zz' )
+          varid = var_define( file_id, 'v', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid
+     &                        , z_dimid, time_dimid ]
+     &                      , 'y-velocity'
+     &                      , 'metre/sec'
+     &                      , -1, 0., 'east_v north_v zz' )
+          varid = var_define( file_id, 'w', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid
+     &                        , z_dimid, time_dimid ]
+     &                      , 'z-velocity'
+     &                      , 'metre/sec'
+     &                      , -1, 0., 'east_e north_e z' )
+          varid = var_define( file_id, 't', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid
+     &                        , z_dimid, time_dimid ]
+     &                      , 'potential temperature'
+     &                      , 'degC'
+     &                      , 0, -999., 'east_e north_e zz' )
+          varid = var_define( file_id, 's', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid
+     &                        , z_dimid, time_dimid ]
+     &                      , 'salinity x rho / rhoref'
+     &                      , 'PSS'
+     &                      , 0, 0., 'east_e north_e zz' )
+          varid = var_define( file_id, 'rho', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid
+     &                        , z_dimid, time_dimid ]
+     &                      , '(density-1000)/rhoref'
+     &                      , 'dimensionless'
+     &                      , -1, 0., 'east_e north_e zz' )
+        end if
+
+! end definitions
+        call file_end_definition( file_id )
+
+! write static data
+        start = [  1, 1,1,1 ]
+        edge  = [ kb, 1,1,1 ]
+        call var_write( file_id, "z" , z , start, edge )
+        call var_write( file_id, "zz", zz, start, edge )
+
+        start(1:2) = [ i_global(1), j_global(1) ]
+        edge (1:2) = [  im        , jm          ]
+        call var_write( file_id, "east_u" , east_u , start, edge )
+        call var_write( file_id, "east_v" , east_v , start, edge )
+        call var_write( file_id, "east_e" , east_e , start, edge )
+        call var_write( file_id, "north_u", north_u, start, edge )
+        call var_write( file_id, "north_v", north_v, start, edge )
+        call var_write( file_id, "north_e", north_e, start, edge )
+        call var_write( file_id, "rot"    , rot    , start, edge )
+        call var_write( file_id, "h"      , h      , start, edge )
+        call var_write( file_id, "fsm"    , fsm    , start, edge )
+        call var_write( file_id, "dum"    , dum    , start, edge )
+        call var_write( file_id, "dvm"    , dvm    , start, edge )
+
+        file_id = file_close( file_id )
+
+
+      end ! subroutine create_output
+
+
+!______________________________________________________________________
+!
+      subroutine write_output( out_file, record )
+!----------------------------------------------------------------------
+!  Write output file.
+!______________________________________________________________________
+!
+        use air
+        use config     , only: use_ice, mode, title ! TODO: `use_ice` move output sections to be perfomed by their own modules
+        use glob_const , only: MODE_BAROTROPIC, rk
+        use glob_domain
+        use grid
+        use io
+        use glob_ocean
+        use pnetcdf    , only: NF90_WRITE
+        use seaice     , only: icec, iceu, icev
+        use model_run  , only: time, time_start
+        use mpi        , only: MPI_OFFSET_KIND
+
+        implicit none
+
+        character(*), intent(in) :: out_file
+        integer     , intent(in) :: record
+
+        integer                                   file_id , status
+        integer(MPI_OFFSET_KIND), dimension(4) :: start   , edge
+        character(PATH_LEN)                       tmp_str
+
+
+        tmp_str = ""
+!     create file
+        if ( is_master ) then
+          write( tmp_str, '("Writing `",a,"` @ ",i5)' )
+     &           trim(out_file), record
+          call msg_print("", 6, tmp_str)
+        end if
+
+        file_id = file_open( out_file, NF90_WRITE ) ! TODO: Eliminate pnetcdf dependency. Pass own type ids and the responsible module will handle possible conversion.
+
+        start = [ record, 1,1,1 ]
+        edge  = [      1, 1,1,1 ]
+        call var_write( file_id, "time", time, start )
+
+        start = [ i_global(1), j_global(1), record, 1 ]
+        edge  = [  im        , jm         ,      1, 1 ]
+        call var_write( file_id, "uab"   , uab   , start, edge )
+        call var_write( file_id, "vab"   , vab   , start, edge )
+        call var_write( file_id, "elb"   , elb   , start, edge )
+        call var_write( file_id, "wusurf", wusurf, start, edge )
+        call var_write( file_id, "wvsurf", wvsurf, start, edge )
+        call var_write( file_id, "wtsurf", wtsurf, start, edge )
+        call var_write( file_id, "wssurf", wssurf, start, edge )
+        call var_write( file_id, "swrad" , swrad , start, edge )
+        if ( use_ice ) then
+          call var_write( file_id, "icec", icec  , start, edge )
+        end if
+
+        if ( mode /= MODE_BAROTROPIC ) then
+          start(3:4) = [  1, record ]
+          edge (3:4) = [ kb,      1 ]
+          call var_write( file_id, "u"   , u  , start, edge )
+          call var_write( file_id, "v"   , v  , start, edge )
+          call var_write( file_id, "w"   , w  , start, edge )
+          call var_write( file_id, "s"   , s  , start, edge )
+          call var_write( file_id, "t"   , t  , start, edge )
+          call var_write( file_id, "rho" , rho, start, edge )
+        end if
+
+!     close file
+        file_id = file_close( file_id )
+
+
+      end ! subroutine write_output
+!______________________________________________________________________
+!
+      subroutine create_initial( out_file )
+!----------------------------------------------------------------------
+!  Create initial conditions file.
+!______________________________________________________________________
+!
+        use air
+        use clim       , only: rmean
+        use config     , only: use_ice, mode, title
+        use glob_const , only: MODE_BAROTROPIC, rk
+        use glob_domain
+        use grid
+        use io
+        use glob_ocean
+        use glob_out
+        use pnetcdf    , only: NF90_FLOAT
+        use seaice     , only: icec, iceu, icev
+        use model_run  , only: time, time_start
+        use mpi        , only: MPI_OFFSET_KIND
+
+        implicit none
+
+        character(*), intent(in) :: out_file
+
+!  Output floating point precision.
+! Set to 4 to reduce output file's size. TODO: Unused yet
+        integer, parameter :: wk = 4
+
+        character(len=120) str_tmp!, netcdf_out_file
+        integer time_dimid, x_dimid, y_dimid, z_dimid
+        integer file_id, varid, status
+
+        integer(MPI_OFFSET_KIND), dimension(4) :: start, edge
+
+
+!     create file
+        if ( is_master )
+     &    call msg_print("", 6, "Creating `"//trim(out_file)//"`")
+
+        file_id = file_create( out_file )
+
+! define global attributes
+        call att_write( file_id, -1, 'title'      , trim(title)   )
+        call att_write( file_id, -1, 'description', 'Initial file' )
+
+! define dimensions
+        time_dimid = dim_define( file_id, 'time',         1 )
+        z_dimid    = dim_define( file_id, 'z'   ,        kb )
+        y_dimid    = dim_define( file_id, 'y'   , jm_global )
+        x_dimid    = dim_define( file_id, 'x'   , im_global )
+
+! define variables and their attributes
+        str_tmp  = 'days since '//time_start
+        varid = var_define( file_id, 'time'
+     &                    , NF90_FLOAT, [ time_dimid ]
+     &                    , 'time'
+     &                    , "days since "//time_start
+     &                    , -1, 0., '' )
+
+        varid = var_define( file_id, 'z'
+     &                    , NF90_FLOAT, [ z_dimid ]
+     &                    , 'sigma of cell face'
+     &                    , 'sigma_level'
+     &                    , -1, 0., '' )
+        call att_write( file_id, varid
+     &                    , 'standard_name'
+     &                    , 'ocean_sigma_coordinate' )
+        call att_write( file_id, varid
+     &                    , 'formula_terms'
+     &                    , 'sigma: z eta: elb depth: h' )
+
+        varid = var_define( file_id, 'zz'
+     &                    , NF90_FLOAT, [ z_dimid ]
+     &                    , 'sigma of cell centre'
+     &                    , 'sigma_level'
+     &                    , -1, 0., '' )
+        call att_write( file_id, varid
+     &                    , 'standard_name'
+     &                    , 'ocean_sigma_coordinate' )
+        call att_write( file_id, varid
+     &                    , 'formula_terms'
+     &                    , 'sigma: zz eta: elb depth: h' )
+
+        varid = var_define( file_id, 'east_u'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'easting of u-points'
+     &                    , 'degrees east'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'east_v'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'easting of v-points'
+     &                    , 'degrees east'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'east_e'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'easting of elevation points'
+     &                    , 'degrees east'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'north_u'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'northing of u-points'
+     &                    , 'degrees north'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'north_v'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'northing of v-points'
+     &                    , 'degrees north'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'north_e'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'northing of elevation points'
+     &                    , 'degrees north'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'rot'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'Rotation angle of x-axis wrt. east'
+     &                    , 'degree'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'h'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'undisturbed water depth'
+     &                    , 'metre'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'fsm'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'free surface mask'
+     &                    , 'dimensionless'
+     &                    , -1, 0., 'east_e north_e' )
+
+        varid = var_define( file_id, 'zeta', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'surface elevation'
+     &                    , 'metre'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'uwnd', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'meridional wind'
+     &                    , 'metre/sec'
+     &                    , 0, -999., 'east_e north_e' )
+        varid = var_define( file_id, 'vwnd', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'zonal wind'
+     &                    , 'metre/sec'
+     &                    , 0, -999., 'east_e north_e' )
+        varid = var_define( file_id, 'swrad', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'net shortwave radiation upwards'
+     &                    , 'K m/s'
+     &                    , -1, 0., 'east_e north_e' )
+
+        if ( mode /= MODE_BAROTROPIC ) then
+          varid = var_define( file_id, 'u', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid
+     &                        , z_dimid, time_dimid ]
+     &                      , 'x-velocity'
+     &                      , 'metre/sec'
+     &                      , -1, 0., 'east_u north_u zz' )
+          varid = var_define( file_id, 'v', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid
+     &                        , z_dimid, time_dimid ]
+     &                      , 'y-velocity'
+     &                      , 'metre/sec'
+     &                      , -1, 0., 'east_v north_v zz' )
+          varid = var_define( file_id, 'w', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid
+     &                        , z_dimid, time_dimid ]
+     &                      , 'z-velocity'
+     &                      , 'metre/sec'
+     &                      , -1, 0., 'east_e north_e z' )
+          varid = var_define( file_id, 't', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid
+     &                        , z_dimid, time_dimid ]
+     &                      , 'potential temperature'
+     &                      , 'degC'
+     &                      , 0, -999., 'east_e north_e zz' )
+          varid = var_define( file_id, 's', NF90_FLOAT
+     &                      , [ x_dimid, y_dimid
+     &                        , z_dimid, time_dimid ]
+     &                      , 'salinity x rho / rhoref'
+     &                      , 'PSS'
+     &                      , 0, 0., 'east_e north_e zz' )
+        end if
+
+        varid = var_define( file_id, 'rho', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid
+     &                      , z_dimid, time_dimid ]
+     &                    , '(density-1000)/rhoref'
+     &                    , 'dimensionless'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'rmean', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid
+     &                      , z_dimid, time_dimid ]
+     &                    , 'Background (density-1000)/rhoref'
+     &                    , 'dimensionless'
+     &                    , -1, 0., 'east_e north_e zz' )
+
+! end definitions
+        call file_end_definition( file_id )
+
+! write static data
+        start = [  1, 1,1,1 ]
+        edge  = [ kb, 1,1,1 ]
+        call var_write( file_id, "z" , z , start, edge )
+        call var_write( file_id, "zz", zz, start, edge )
+
+        start(1:2) = [ i_global(1), j_global(1) ]
+        edge (1:2) = [  im        , jm          ]
+        call var_write( file_id, "east_u" , east_u , start, edge )
+        call var_write( file_id, "east_v" , east_v , start, edge )
+        call var_write( file_id, "east_e" , east_e , start, edge )
+        call var_write( file_id, "north_u", north_u, start, edge )
+        call var_write( file_id, "north_v", north_v, start, edge )
+        call var_write( file_id, "north_e", north_e, start, edge )
+        call var_write( file_id, "rot"    , rot    , start, edge )
+        call var_write( file_id, "h"      , h      , start, edge )
+        call var_write( file_id, "fsm"    , fsm    , start, edge )
+        call var_write( file_id, "zeta"   , elb    , start, edge )
+        call var_write( file_id, "uwnd"   , uwsrf  , start, edge )
+        call var_write( file_id, "vwnd"   , vwsrf  , start, edge )
+        call var_write( file_id, "swrad"  , swrad  , start, edge )
+
+        edge(3) = kb
+
+        if ( mode /= MODE_BAROTROPIC ) then
+          call var_write( file_id, "u"      , ub     , start, edge )
+          call var_write( file_id, "v"      , vb     , start, edge )
+          call var_write( file_id, "t"      , tb     , start, edge )
+          call var_write( file_id, "s"      , sb     , start, edge )
+          call var_write( file_id, "w"      , w      , start, edge )
+        end if
+
+        call var_write( file_id, "rho"    , rho    , start, edge )
+        call var_write( file_id, "rmean"  , rmean  , start, edge )
+
+        file_id = file_close( file_id )
+
+
+      end ! subroutine create_initial
+!______________________________________________________________________
+!
+      subroutine create_restart( out_file )
+!----------------------------------------------------------------------
+!  Create restart file.
+!______________________________________________________________________
+!
+        use air
+        use config     , only: use_ice, mode, spinup, title
+        use glob_const , only: MODE_BAROTROPIC, rk
+        use glob_domain
+        use grid
+        use io
+        use glob_ocean
+        use glob_out
+        use pnetcdf    , only: NF90_DOUBLE
+        use seaice     , only: icec, iceu, icev
+        use model_run  , only: time, time_start, time0
+        use mpi        , only: MPI_OFFSET_KIND
+
+        implicit none
+
+        character(*), intent(in) :: out_file
+
+        integer time_dimid, x_dimid, y_dimid, z_dimid
+        integer file_id, varid, status
+
+        integer(MPI_OFFSET_KIND), dimension(4) :: start, edge
+
+
+!     create file
+        if ( is_master )
+     &    call msg_print("", 6, "Creating `"//trim(out_file)//"`")
+
+        file_id = file_create( out_file )
+
+! define global attributes
+        call att_write( file_id, -1, 'title'      , trim(title)   )
+        call att_write( file_id, -1, 'description', 'Restart file' )
+
+! define dimensions
+        time_dimid = dim_define( file_id, 'time',         1 )
+        z_dimid    = dim_define( file_id, 'z'   ,        kb )
+        y_dimid    = dim_define( file_id, 'y'   , jm_global )
+        x_dimid    = dim_define( file_id, 'x'   , im_global )
+
+! define variables and their attributes
+        varid = var_define( file_id, 'time'
+     &                    , NF90_DOUBLE, [ time_dimid ]
+     &                    , 'time'
+     &                    , "days since "//time_start
+     &                    , -1, 0., '' )
+
+        varid = var_define( file_id, 'wusurf'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'x-momentum flux at the surface'
+     &                    , 'metre^2/sec^2'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'wvsurf'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'y-momentum flux at the surface'
+     &                    , 'metre^2/sec^2'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'wubot'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'x-momentum flux at the bottom'
+     &                    , 'metre^2/sec^2'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'wvbot'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'y-momentum flux at the bottom'
+     &                    , 'metre^2/sec^2'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'aam2d'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'vertical average of aam'
+     &                    , 'metre^2/sec'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'ua'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'vertical mean of u'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'uab'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'vertical mean of u at time -dt'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'va'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'vertical mean of v'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'vab'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'vertical mean of v at time -dt'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'el'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'surface elevation in external mode'
+     &                    , 'metre'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'elb'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'surface elevation in external mode at -dt'
+     &                    , 'metre'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'et'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'surface elevation in internal mode'
+     &                    , 'metre'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'etb'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'surface elevation in internal mode at -dt'
+     &                    , 'metre'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'egb'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'surface elevation for pres. grad. at -dt'
+     &                    , 'metre'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'utb'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'ua time averaged over dti'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'vtb'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'va time averaged over dti'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'adx2d'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'vertical integral of advx'
+     &                    , '-'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'ady2d'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'vertical integral of advy'
+     &                    , '-'
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'advua'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'sum of 2nd, 3rd and 4th terms in eq (18)'
+     &                    , '-'
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'advva'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid ]
+     &                    , 'sum of 2nd, 3rd and 4th terms in eq (19)'
+     &                    , '-'
+     &                    , -1, 0., 'east_v north_v' )
+
+        varid = var_define( file_id, 'u'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'x-velocity'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_u north_u zz' )
+        varid = var_define( file_id, 'ub'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'x-velocity at time -dt'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_u north_u zz' )
+        varid = var_define( file_id, 'v'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'y-velocity'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_v north_v zz' )
+        varid = var_define( file_id, 'vb'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'y-velocity at time -dt'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_v north_v zz' )
+        varid = var_define( file_id, 'w'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'sigma-velocity'
+     &                    , 'metre/sec'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 't'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'potential temperature'
+     &                    , 'K'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'tb'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'potential temperature at time -dt'
+     &                    , 'K'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 's'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'salinity x rho / rhoref'
+     &                    , 'PSS'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'sb'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'salinity x rho / rhoref at time -dt'
+     &                    , 'PSS'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'rho'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , '(density - 1000) / rhoref'
+     &                    , 'dimensionless'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'km'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'vertical kinematic viscosity'
+     &                    , 'metre^2/sec'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'kh'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'vertical diffusivity'
+     &                    , 'metre^2/sec'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'kq'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'kq'
+     &                    , 'metre^2/sec'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'l'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'turbulent length scale'
+     &                    , '-'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'q2'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'twice the turbulent kinetic energy'
+     &                    , 'metre^2/sec^2'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'q2b'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'twice the turbulent kinetic energy at -dt'
+     &                    , 'metre^2/sec^2'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'aam'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'horizontal kinematic viscosity'
+     &                    , 'metre^2/sec'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'q2l'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'q2 x l'
+     &                    , 'metre^3/sec^2'
+     &                    , -1, 0., 'east_e north_e zz' )
+        varid = var_define( file_id, 'q2lb'
+     &                    , NF90_DOUBLE, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'q2 x l at time -dt'
+     &                    , 'metre^3/sec^2'
+     &                    , -1, 0., 'east_e north_e zz' )
+
+! end definitions
+        call file_end_definition( file_id )
+
+! write data
+        start = [ i_global(1), j_global(1),  1, 1 ]
+        edge  = [ im         , jm         , kb, 1 ]
+
+        if ( spinup ) then
+          call var_write( file_id, "time", time0, start(4:4) )
+        else
+          call var_write( file_id, "time", time , start(4:4) )
+        end if
+
+        call var_write( file_id, "wusurf" , wusurf , start, edge )
+        call var_write( file_id, "wvsurf" , wvsurf , start, edge )
+        call var_write( file_id, "wubot"  , wubot  , start, edge )
+        call var_write( file_id, "wvbot"  , wvbot  , start, edge )
+        call var_write( file_id, "aam2d"  , aam2d  , start, edge )
+        call var_write( file_id, "ua"     , ua     , start, edge )
+        call var_write( file_id, "uab"    , uab    , start, edge )
+        call var_write( file_id, "va"     , va     , start, edge )
+        call var_write( file_id, "vab"    , vab    , start, edge )
+        call var_write( file_id, "el"     , el     , start, edge )
+        call var_write( file_id, "elb"    , elb    , start, edge )
+        call var_write( file_id, "et"     , et     , start, edge )
+        call var_write( file_id, "etb"    , etb    , start, edge )
+        call var_write( file_id, "egb"    , egb    , start, edge )
+        call var_write( file_id, "utb"    , utb    , start, edge )
+        call var_write( file_id, "vtb"    , vtb    , start, edge )
+        call var_write( file_id, "adx2d"  , adx2d  , start, edge )
+        call var_write( file_id, "ady2d"  , ady2d  , start, edge )
+        call var_write( file_id, "advua"  , advua  , start, edge )
+        call var_write( file_id, "advva"  , advva  , start, edge )
+
+        call var_write( file_id, "u"      , u      , start, edge )
+        call var_write( file_id, "ub"     , ub     , start, edge )
+        call var_write( file_id, "v"      , v      , start, edge )
+        call var_write( file_id, "vb"     , vb     , start, edge )
+        call var_write( file_id, "w"      , w      , start, edge )
+        call var_write( file_id, "t"      , t      , start, edge )
+        call var_write( file_id, "tb"     , tb     , start, edge )
+        call var_write( file_id, "s"      , s      , start, edge )
+        call var_write( file_id, "sb"     , sb     , start, edge )
+        call var_write( file_id, "rho"    , rho    , start, edge )
+        call var_write( file_id, "km"     , km     , start, edge )
+        call var_write( file_id, "kh"     , kh     , start, edge )
+        call var_write( file_id, "kq"     , kq     , start, edge )
+        call var_write( file_id, "l"      , l      , start, edge )
+        call var_write( file_id, "q2"     , q2     , start, edge )
+        call var_write( file_id, "q2b"    , q2b    , start, edge )
+        call var_write( file_id, "aam"    , aam    , start, edge )
+        call var_write( file_id, "q2l"    , q2l    , start, edge )
+        call var_write( file_id, "q2lb"   , q2lb   , start, edge )
+
+        file_id = file_close( file_id )
+
+
+      end ! subroutine create_restart
+
 !
 !______________________________________________________________________
 !lyo:pac10:beg:Here thro *end: replaced subr.lateral_boundary_conditions
@@ -588,7 +1204,7 @@
       use glob_const , only: rk
       use glob_domain, only: i_global, im, im_global
      &                     , j_global, jm, jm_global, master_task
-      use glob_grid  , only: cor
+      use grid       , only: cor
 
       implicit none
 
@@ -620,7 +1236,7 @@
          if ( here ) then
             corcon=cor(ic-i_global(1)+1,jc-j_global(1)+1)
          endif
-         call bcast(corcon,1,master_task)
+         call bcast0d_mpi(corcon,1,master_task)
          do j=1,jm; do i=1,im !f-plane:
             cor(i,j)=corcon
             enddo; enddo
@@ -764,7 +1380,7 @@
 
 
 !      call read_tide_east_pnetcdf(ampe,phae)
-        call read_tide_east_pnetcdf(ampe,phae,amue,phue)
+!        call read_tide_east_pnetcdf(ampe,phae,amue,phue)
 
 !      if(my_task.eq.0)print*,ampe(10,1),phae(10,1),amue(10,1),phue(10,1)
 !      if(my_task.eq.0)print*,ampe(10,2),phae(10,2),amue(10,2),phue(10,2)
@@ -784,8 +1400,9 @@
       use air        , only: vfluxf
       use config     , only: aam_init, npg
       use glob_const , only: rk, SMALL
-      use glob_domain, only: im, is_master, jm, kb, kbm1
-      use glob_grid  , only: dz, h
+      use glob_domain, only: im, is_master, jm, kb, kbm1  ,my_task
+      use grid       , only: dz, h
+      use model_run,only:iint
       use glob_ocean , only: aam, d, drhox, drhoy, drx2d, dry2d, dt
      &                     , el, elb, et, etb, etf
      &                     , kh, km, kq, l, q2, q2b, q2l, q2lb
@@ -887,7 +1504,7 @@
       use config     , only: cbcmax, cbcmin, z0b
       use glob_const , only: Kappa, rk
       use glob_domain, only: im, jm, kbm1
-      use glob_grid  , only: h, zz
+      use grid       , only: h, zz
       use glob_ocean , only: cbc
 
       implicit none
@@ -1160,8 +1777,10 @@
 !______________________________________________________________________
 !
       use glob_const , only: DEG2RAD, rk
-      use glob_domain
-      use glob_grid
+      use glob_domain, only: i_global, im_global, is_master
+     &                     , j_global, jm_global, kb
+     &                     , n_east, n_north, n_south, n_west
+      use grid
       use glob_ocean , only: d, dt, el, et
 
       implicit none
@@ -1300,7 +1919,7 @@
 !     rot,h,fsm,dum,dvm
 
 
-      call print_grid_vert
+      call print_config
 
 ! set up Coriolis parameter
         do j=1,jm
@@ -1340,30 +1959,6 @@
 
 
       end
-!______________________________________________________________________
-!
-      subroutine print_grid_vert
-!----------------------------------------------------------------------
-!  Prints vertical sigma distribution.
-!______________________________________________________________________
-
-      use glob_domain, only: is_master, kb
-      use glob_grid  , only: z, zz, dz, dzz
-
-      implicit none
-
-      integer k
-
-! print vertical grid information
-      if ( is_master ) then
-        print '(/a)', "=========== VERTICAL DISCRETIZATION ==========="
-        print '(/3x,a,9x,a,8x,a,8x,a,8x,a)', 'k','z','zz','dz','dzz'
-        do k=1,kb
-          print '(1x,i5,4f10.3)', k,z(k),zz(k),dz(k),dzz(k)
-        end do
-      end if
-
-      end ! subroutine
 
 !______________________________________________________________________
 ! fhx:interp_flag
@@ -1411,7 +2006,7 @@
 !
         use glob_const , only: grav, rk, SMALL
         use glob_domain, only: im, jm, master_task, my_task, POM_COMM
-        use glob_grid  , only: dx, dy, fsm, h
+        use grid       , only: dx, dy, fsm, h
         use model_run  , only: dte
         use mpi        , only: MPI_DOUBLE, MPI_MIN, MPI_REAL
      &                       , mpi_reduce

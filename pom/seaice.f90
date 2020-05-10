@@ -11,7 +11,8 @@
 !
 module seaice
 
-  use glob_const, only: PATH_LEN, rk, VAR_LEN
+  use glob_const , only: PATH_LEN, rk, VAR_LEN
+  use glob_domain, only: im, imm1, jm, jmm1
 
   implicit none
 
@@ -40,7 +41,8 @@ module seaice
        , private   :: FORMAT_EXT = ".nc"
 
   logical          &
-    interp_ice       ! Interpolate in time
+    interp_ice     & ! Interpolate in time
+  , use_calendar     ! Use calendar to offset read record number from the start of a year
 
 !----------------------------------------------------------------------
 ! Paths configuration
@@ -95,8 +97,8 @@ module seaice
 
       integer pos
 
-      namelist/ice/           &
-        ice_path, read_int
+      namelist/ice/                       &
+        ice_path, read_int, use_calendar
 
       namelist/ice_vars/      &
         icec_name, iceh_name
@@ -114,14 +116,16 @@ module seaice
 
       icec_name = "icec"
       iceh_name = "iceh"
-      
-      interp_ice = .true.
+
+      interp_ice   = .true.
+      USE_CALENDAR = .true.
 
 ! Override configuration
-      open ( 73, file = config_file, status = 'old' )
-      read ( 73, nml = ice )
-      read ( 73, nml = ice_vars )
-      close( 73 )
+      open  ( 73, file = config_file, status = 'old' )
+      read  ( 73, nml = ice )
+      rewind( 73 )
+      read  ( 73, nml = ice_vars )
+      close ( 73 )
 
 ! Variables management
       pos = len(trim(ice_path))
@@ -217,30 +221,39 @@ module seaice
       ncid = -1
 
       year = d_in%year
-
-      max_in_this = max_chunks_in_year( d_in%year  , read_int )
-      max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
-
+      
 ! Decide on the record to read
-      chunk     = chunk_of_year( d_in, read_int )
-      record(1) = int(chunk)
+      if ( USE_CALENDAR ) then
 
-      if ( chunk - record(1) < .5 ) then
-        record(2) = record(1)
+        max_in_this = max_chunks_in_year( d_in%year  , read_int )
+        max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
+
+        chunk     = chunk_of_year( d_in, read_int )
+        record(1) = int(chunk)
+
+        if ( chunk - record(1) < .5 ) then
+          record(2) = record(1)
+        else
+          record(2) = record(1) + 1
+        end if
+        record(3) = record(2) + 1
+
+        if ( record(2) == 0 ) then
+          record(2) = max_in_prev ! TODO: [ NEEDS TESTING ]
+          year(2) = d_in%year - 1
+        elseif ( record(3) == max_in_this ) then
+          record(3) = 1
+          year(3) = d_in%year + 1
+        end if
+
+        record(1) = record(1) + 1
+
       else
-        record(2) = record(1) + 1
-      end if
-      record(3) = record(2) + 1
 
-      if ( record(2) == 0 ) then
-        record(2) = max_in_prev ! TODO: [ NEEDS TESTING ]
-        year(2) = d_in%year - 1
-      elseif ( record(3) == max_in_this ) then
-        record(3) = 1
-        year(3) = d_in%year + 1
-      end if
+        record = [ 1, 1, 2 ]
+        a = 0._rk
 
-      record(1) = record(1) + 1
+      end if
 
 ! Read ice fields
       if ( interp_ice ) then
@@ -266,7 +279,7 @@ module seaice
       use config     , only: tbias
 !      use glob_domain, only: is_master
       use module_time
-      use model_run  , only: dti, sec_of_year
+      use model_run  , only: dti, iint, sec_of_year
       use glob_ocean , only: t
 
       implicit none
@@ -287,49 +300,71 @@ module seaice
 
       year = d_in%year
 
-      max_in_this = max_chunks_in_year( d_in%year  , read_int )
-      max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
+      ADVANCE_REC     = .false.
+      ADVANCE_REC_INT = .false.
 
 ! Decide on the record to read
-      chunk     = chunk_of_year( d_in, read_int )
-      record(1) = int(chunk)
+      if ( USE_CALENDAR ) then
 
-      if ( secs - int(real(record(1))*read_int) < dti ) then ! TODO: test this one as well.
-        ADVANCE_REC = .true.
-      else
-        ADVANCE_REC = .false.
-      end if
+        max_in_this = max_chunks_in_year( d_in%year  , read_int )
+        max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
 
-      secs = secs - int((real(record(1))+.5)*read_int)
+! Decide on the record to read
+        chunk     = chunk_of_year( d_in, read_int )
+        record(1) = int(chunk)
 
-      if ( chunk - record(1) < .5 ) then ! TODO: test (real - int) = ?
-        record(2) = record(1)
-        a = chunk - record(1) + .5
-      else
-        record(2) = record(1) + 1
-        a = chunk - record(1) - .5
-      end if
-      record(3) = record(2) + 1
-
-      if ( record(2) == 0 ) then
-        record(2) = max_in_prev + 1 ! TODO: [ NEEDS TESTING ]
-        year(2) = d_in%year - 1
-      elseif ( record(3) == max_in_this + 1 ) then
-        record(3) = 1
-        year(3) = d_in%year + 1
-      end if
-
-      if ( secs >= 0 .and. secs < dti ) then
-        ADVANCE_REC_INT = .true.
-        if ( interp_ice ) then
-          icec_int(:,:,2) = icec_int(:,:,3)
-          iceh_int(:,:,2) = iceh_int(:,:,3)
+        if ( secs - int(real(record(1))*read_int) < dti ) then ! TODO: test this one as well.
+          ADVANCE_REC = .true.
         end if
-      else
-        ADVANCE_REC_INT = .false.
-      end if
 
-      record(1) = record(1) + 1
+        secs = secs - int((real(record(1))+.5)*read_int)
+
+        if ( chunk - record(1) < .5 ) then ! TODO: test (real - int) = ?
+          record(2) = record(1)
+          a = chunk - record(1) + .5
+        else
+          record(2) = record(1) + 1
+          a = chunk - record(1) - .5
+        end if
+        record(3) = record(2) + 1
+
+        if ( record(2) == 0 ) then
+          record(2) = max_in_prev + 1 ! TODO: [ NEEDS TESTING ]
+          year(2) = d_in%year - 1
+        elseif ( record(3) == max_in_this + 1 ) then
+          record(3) = 1
+          year(3) = d_in%year + 1
+        end if
+
+        if ( secs >= 0 .and. secs < dti ) then
+          ADVANCE_REC_INT = .true.
+          if ( interp_ice ) then
+            icec_int(:,:,2) = icec_int(:,:,3)
+            iceh_int(:,:,2) = iceh_int(:,:,3)
+          end if
+        end if
+
+        record(1) = record(1) + 1
+
+      else
+
+        record(1) = int( iint*dti / read_int ) + 1
+        record(2) = record(1)
+        record(3) = record(2) + 1
+
+! TODO: right now it interpolates between records (edges of rec1-rec2 span). Implement interpolation between the centers of record spans.
+        a = modulo( real(iint*dti), real(read_int) )
+        if ( a < dti ) then
+          if ( a >= 0. ) then
+            ADVANCE_REC = .true.
+          end if
+        end if
+        a = a / read_int
+!        print *, "A: ", a
+
+        ADVANCE_REC_INT = ADVANCE_REC
+
+      end if
 
       if ( interp_ice ) then
         call read_all( ADVANCE_REC_INT, 3, year, record )
@@ -659,14 +694,21 @@ module seaice
 !
     subroutine read_all( execute, n, year, record )
 
+      use glob_domain, only: i_global, j_global
+      use io
+      use mpi        , only: MPI_OFFSET_KIND
+      use pnetcdf    , only: NF90_NOWRITE
+
       implicit none
 
       logical              , intent(in) :: execute
       integer              , intent(in) :: n
       integer, dimension(3), intent(in) :: record, year
 
-      integer            ncid
-      character(len=128) desc
+      integer                      file_id, status
+      integer(MPI_OFFSET_KIND)  &
+             , dimension(4)     :: start, edge
+      character(128)               desc
 
 
       if ( .not. execute ) return
@@ -681,32 +723,31 @@ module seaice
 
       call msg_print("", 1, desc)
 
-! Read wind file
-      ncid = file_open_nc( ice_path, year(n) )
+! Read file
+      file_id = file_open( trim( get_filename( ice_path, year(n) ) )  &
+                         , NF90_NOWRITE )
 
-      if ( ncid /= -1 ) then
+      icec_int(:,:,n) = 0.
 
-        if ((     interp_ice .and. n>=2) .or.       &
-            (.not.interp_ice .and. n==1)      ) then
-          call read_var_nc( icec_name, icec_int(:,:,n), record(n), ncid )
-          if ( ncid == -1 ) then
-            icec_int(:,:,n) = 0.
-            call msg_print("", 2, "Sec ice concentration is set to zero.")
-          end if
-        end if
+      start = [ i_global(1), j_global(1), record(n), 1 ]
+      edge  = [ im         , jm         ,         1, 1 ]
 
-        call check( file_close_nc( ncid ), "nf_close" )
-
+      if ((     interp_ice .and. n>=2) .or.       &
+          (.not.interp_ice .and. n==1)      ) then
+        status = var_read( file_id, icec_name, icec_int(:,:,n)  &
+                         , start, edge )
       end if
+
+      file_id = file_close( file_id )
 
 
     end ! subroutine read_all
 !
 !______________________________________________________________________
 !
-    pure character(len=256) function get_filename( path, year )
+    pure character(256) function get_filename( path, year )
 !----------------------------------------------------------------------
-!  Costructs filename string in `<path>YYYY<FORMAT_EXT>` format.
+!  Constructs filename string in `<path>YYYY<FORMAT_EXT>` format.
 !______________________________________________________________________
 !
       implicit none
@@ -715,148 +756,16 @@ module seaice
       integer         , intent(in) :: year
 
 
-      write( get_filename, '( a, i4.4, a )' ) trim(path)      &
-                                            , year            &
-                                            , trim(FORMAT_EXT)
-
-    end ! function get_filemname
-!
-!
-!= I/O SECTION ========================================================
-!______________________________________________________________________
-!
-    subroutine read_var_nc( var_name, var, record, ncid )
-!----------------------------------------------------------------------
-!  Read a variable (NC format).
-!______________________________________________________________________
-!
-      use glob_const , only: rk
-      use glob_domain
-      use mpi        , only: MPI_INFO_NULL, MPI_OFFSET_KIND
-      use pnetcdf
-
-      implicit none
-
-      integer, external :: get_var_real_3d
-
-      integer                   , intent(inout) :: ncid
-      integer                   , intent(in   ) :: record
-      real(rk), dimension(im,jm), intent(  out) :: var
-      character(len=*)          , intent(in   ) :: var_name
-
-      integer                  status, varid
-      integer(MPI_OFFSET_KIND) start(4), edge(4)
-      character(len=64)        units
-
-
-      start = 1
-      edge  = 1
-
-! get variable
-      call check( nf90mpi_inq_varid( ncid, var_name, varid )  &
-                , 'nfmpi_inq_varid: '//trim(var_name) )
-
-! set reading area
-      start(1) = i_global(1)
-      start(2) = j_global(1)
-      start(3) = record
-      edge(1) = im
-      edge(2) = jm
-      edge(3) =  1
-
-! get data
-      call check( get_var_real_3d                    &
-                  ( ncid, varid, start, edge, var )  &
-                , 'get_var_real: '//trim(var_name) )
-
-! convert data if necessary
-      status = nf90mpi_get_att( ncid, varid, "units", units )
-      if ( status == NF_NOERR ) then
-        select case ( trim(units) )
-          case ( "%" )
-            var = var/100.
-        end select
+      if ( path(len(trim(path)):len(trim(path))) == "." ) then
+        write( get_filename, '( a, i4.4, a )' ) trim(path)      &
+                                               , year            &
+                                               , trim(FORMAT_EXT)
+      else
+        get_filename = path
       end if
 
-
-      end ! subroutine read_var_nc
+    end ! function get_filename
 !
-!___________________________________________________________________
-!
-    integer function file_open_nc( path, year )
-!-------------------------------------------------------------------
-!  Opens netcdf file for reading.
-!___________________________________________________________________
-!
-      use glob_domain, only: POM_COMM
-      use mpi        , only: MPI_INFO_NULL
-      use pnetcdf    , only: nf90mpi_open, NF_NOERR, NF_NOWRITE
 
-      implicit none
-
-      integer         , intent(in) :: year
-      character(len=*), intent(in) :: path
-
-      integer            status
-      character(len=256) filename, netcdf_file
-
-
-      filename = get_filename( path, year )
-      netcdf_file = trim(filename)
-      status = nf90mpi_open( POM_COMM, netcdf_file, NF_NOWRITE   &
-                           , MPI_INFO_NULL, file_open_nc )
-      if ( status /= NF_NOERR ) then
-        call msg_print("", 2, "Failed to open `"//trim(filename)//"`")
-        file_open_nc = -1
-      end if
-
-    end ! function file_open_nc
-!
-!___________________________________________________________________
-!
-    integer function file_close_nc( ncid )
-!-------------------------------------------------------------------
-!  Opens netcdf file for reading.
-!___________________________________________________________________
-!
-      use pnetcdf, only: nf90mpi_close
-
-      implicit none
-
-      integer, intent(in) :: ncid
-
-
-      file_close_nc = nf90mpi_close( ncid )
-
-
-    end ! function file_close_nc
-!
-!______________________________________________________________________
-!
-    subroutine check(status, routine)
-!----------------------------------------------------------------------
-!  Checks for NetCDF I/O error and exits with an error message if hits.
-!______________________________________________________________________
-!
-      use glob_domain, only: error_status, is_master
-      use pnetcdf    , only: nf90mpi_strerror, NF_NOERR
-
-      implicit none
-
-      integer         , intent(in) :: status
-      character(len=*), intent(in) :: routine
-
-
-      if ( status /= NF_NOERR ) then
-        error_status = 1
-        if ( is_master ) then
-          print '(/a,a)', 'IO error at module `AIR`: ', routine
-          print '("[",i4,"] ",a)', status, nf90mpi_strerror(status)
-          stop
-        end if
-      end if
-
-
-    end ! subroutine check
 
 end ! module seaice
