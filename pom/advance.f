@@ -295,7 +295,7 @@
 !
       use module_time
       use air        , only: e_atmos, vfluxf, wusurf, wvsurf
-      use bry        , only: bc_vel_ext, bc_zeta
+      use bry        , only: apply_tide, bc_vel_ext, bc_zeta ! TODO: Move apply_tide to tide
       use config     , only: alpha, cbcmax, cbcmin, ispadv, smoth
      &                     , use_tide, z0b
       use glob_const , only: grav, Kappa
@@ -396,9 +396,13 @@
       call exchange2d_mpi(vaf,im,jm)
 
       if ( use_tide ) then
+        ! uaf = uaf - tide_ua
+        ! vaf = vaf - tide_va
+        call apply_tide(-1._rk)
         call tide_advance( dtime + int(iext*dte) )
-        uaf = uaf + tide_ua! - tide_ua_b
-        vaf = vaf + tide_va! - tide_va_b
+        call apply_tide(1._rk)
+        ! uaf = uaf + tide_ua! - tide_ua_b
+        ! vaf = vaf + tide_va! - tide_va_b
       end if
 
       if     ( iext == (isplit-2) ) then
@@ -951,7 +955,7 @@
 ! called by: advance [advance.f]
 !______________________________________________________________________
 !
-      use air        , only: wssurf, wtsurf, wusurf, wvsurf
+      use air        , only: wssurf, wtsurf, wusurf, wvsurf, swrad
       use glob_domain, only: kb
       use glob_ocean , only: aam, cbc  , elb  , kh
      &                     , km , rho  , s    , t
@@ -969,6 +973,7 @@
       wvsurf_mean = wvsurf_mean + wvsurf
       wtsurf_mean = wtsurf_mean + wtsurf
       wssurf_mean = wssurf_mean + wssurf
+      swrad_mean  = swrad_mean  + swrad
       u(:,:,kb)   = wubot(:,:)        !fhx:20110318:store wvbot
       v(:,:,kb)   = wvbot(:,:)        !fhx:20110318:store wvbot
       u_mean      = u_mean      + u
@@ -1247,7 +1252,7 @@
 
       do j=1,jm
         do i=1,im
-          if ( var(i,j) == var(i,j)+1 ) then
+          if ( var(i,j) == var(i,j)+1 .or. var(i,j) /= var(i,j) ) then
             print '(2a,2i4,3f12.4)',
      $            "detect nan : ",varname,
      $            i_global(i),j_global(j),

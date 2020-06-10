@@ -35,6 +35,7 @@ module glob_const
       c2k     = 273.16        _rk  ! Celcius to Kelvin offset
       cpw     = 3986.         _rk  ! Specific heat of water (J/kg)
       pi      = atan(1._rk)*4._rk  ! PI
+      rad2deg = 180._rk/pi         ! radians to degrees conversion factor
       deg2rad = pi/180._rk         ! degrees to radians conversion factor
       grav    = 9.806         _rk  ! gravity constant (m/s^2)
       small   = 1.e-10        _rk  ! small value
@@ -389,15 +390,12 @@ module model_run
 
   contains
 
-    subroutine initialize_time( time_string, do_restart )
+    subroutine initialize_model_run
 
       use glob_out, only: iprint, iprints, irestart   &
                         , prtd1 , prtd2  , write_rst
 
       implicit none
-
-      logical     , intent(in) :: do_restart
-      character(*), intent(in) :: time_string
 
       type(date) dtime_offset
 
@@ -418,27 +416,6 @@ module model_run
 
       ispi = 1._rk/       real(isplit)
       isp2i= 1._rk/(2._rk*real(isplit))
-
-! Initialize time
-! Do not offset time if not restarting
-!      if ( do_restart ) then
-!
-!        dtime_offset = str2date(  time_start(1:19) )
-!        dtime        = str2date( time_string(1:19) )
-!
-!        time0 = real( (dtime-dtime_offset)/86400 ) ! Why should this be integer division?
-!
-!      else
-
-        dtime = str2date( time_string )
-
-        time0 = 0._rk
-
-!      end if
-
-      time = time0
-
-!      call update_time
 
 
     end subroutine

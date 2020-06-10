@@ -12,24 +12,15 @@ LD = mpifort
 CLEAN = rm
 
 # Set miscellaneous compiler flags
-#MISCFLAGS = -g -fcheck=all -fbacktrace -fbounds-check -Wall#-ffpe-trap=underflow,denormal,zero,overflow -Wall #-Warray-temporaries -Wcharacter-truncation -Wconversion-extra  -Wrealloc-lhs
-MISCFLAGS =
+#MISCFLAGS = -Og -g -fcheck=all -fbacktrace -fbounds-check -Wall -march=native -std=f2018# -ffpe-trap=underflow,denormal,zero,overflow -ffpe-summary=all -Wall #-Warray-temporaries -Wcharacter-truncation -Wconversion-extra  -Wrealloc-lhs
+MISCFLAGS = -std=f2018 -O3 -ffast-math -funroll-loops -march=native
 
-# Set libraries and include files
-NETCDFINC = -I/usr/include/x86_64-linux-gnu -I./
+# Set libraries and include files (the below should work for Ubuntu 20.04 if you install gfortran and pnetcdf from repositories (which in turn will require openmpi, not mpich)
+NETCDFINC = -I/usr/lib/x86_64-linux-gnu/fortran/gfortran-mod-15/ -I./
 NETCDFLIB = -L/usr/lib/x86_64-linux-gnu
 
-#FFLAGS = -ip -O3 -lmpi  $(NETCDFINC)
-#FFLAGS = -check bounds -check format -lmpi  $(NETCDFINC)
-#FFLAGS = -check bounds  -lmpi  $(NETCDFINC)
-#FFLAGS = -O3 -fp-model precise  -assume byterecl $(NETCDFINC)
-#FFLAGS = -O3 -debug minimal -fp-model precise -override-limits $(NETCDFINC)
-FFLAGS = -O3 $(NETCDFINC) $(MISCFLAGS)
+FFLAGS = $(NETCDFINC) $(MISCFLAGS)
 
-#LIBS = -ip  -O3  -lmpi $(NETCDFLIB) -lpnetcdf
-#LIBS =  -check bounds  -lmpi $(NETCDFLIB) -lpnetcdf
-#LIBS = -O3 -fp-model precise -assume byterecl  $(NETCDFLIB) -lpnetcdf
-# LIBS = -O3 -debug minimal -fp-model precise -override-limits $(NETCDFLIB) -lpnetcdf
 LIBS = $(NETCDFLIB) -lpnetcdf
 #-----------------------------------------------------------------------
 # Set the executable
@@ -48,27 +39,18 @@ OUTDIR = out
 #-----------------------------------------------------------------------
  OBJS = module_time.o    \
         globals.o        \
+        io.o             \
         config.o         \
+        grid.o           \
         clim.o           \
-        bry.o            \
         seaice.o         \
         air.o            \
-        io.o             \
         tide.o           \
+        bry.o            \
         parallel_mpi.o   \
-        io_pnetcdf.o     \
-        river.o          \
         advance.o        \
         solver.o         \
         initialize.o     \
-        heat.o           \
-        interp.o         \
-        wind.o           \
-        tsforce.o        \
-        assim.o          \
-        assim_drf.o      \
-        mcsst.o          \
-        uvforce.o        \
         pom.o
 VPATH = $(SRCDIR)
 
@@ -102,4 +84,4 @@ $(BIN): $(OBJS)
 # Cleaning target
 #-----------------------------------------------------------------------
 clean:
-	@rm -f *.o *.mod *.il $(BIN)
+	@rm -f *.o *.mod $(BIN)

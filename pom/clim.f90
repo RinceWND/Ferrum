@@ -383,6 +383,7 @@ module clim
                         , tm_int(:,:,:,2)   , sm_int(:,:,:,2) )
       if ( status /= 0 ) then
         NO_MEAN = .true.
+        print *, "NO_MEAN: ", status
         call msg_print("", 2, "BACKGROUND MEANS TO BE SET TO CLIMATOLOGY! HIGHLY UNDESIRABLE!")
         tm_int = tc_int
         sm_int = sc_int
@@ -687,7 +688,7 @@ module clim
       end if
 
       file_id = file_open( filepath, NF90_NOWRITE )
-      if ( file_id <= 0 ) then
+      if ( file_id < 0 ) then
         read_clim = -1
         return
       end if

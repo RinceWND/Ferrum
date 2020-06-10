@@ -40,9 +40,10 @@ module io
   end interface
 
 
-  public :: att_write, check     , dim_define , is_error    &
-          , file_open, file_close, file_create, var_define  &
-          , file_end_definition  , var_read   , var_write
+  public :: att_write , check     , dim_define , is_error             &
+          , file_open , file_close, file_create, file_end_definition  &
+          , var_define, var_rank  , var_read   , var_shape            &
+          , var_write
 
   private
 
@@ -133,6 +134,66 @@ module io
 
 
     end ! function dim_define
+!
+!___________________________________________________________________
+!
+    integer function var_rank( ncid, name )
+
+      use pnetcdf, only: nf90mpi_inq_varid, nf90mpi_inquire_variable
+
+      implicit none
+
+      integer     , intent(in) :: ncid
+      character(*), intent(in) :: name
+
+      integer varid
+
+
+      call check( nf90mpi_inq_varid( ncid, name, varid )  &
+                , "inq_varid:var_rank "//name )
+      call check( nf90mpi_inquire_variable( ncid, varid, ndims = var_rank ) &
+                , "inquire_variable(ndims):var_rank "//name )
+
+
+    end function
+!
+!___________________________________________________________________
+!
+    function var_shape( ncid, name )
+!-------------------------------------------------------------------
+!  Returns a variable's shape.
+!___________________________________________________________________
+!
+      use mpi    , only: MPI_OFFSET_KIND
+      use pnetcdf, only: nf90mpi_inq_varid          &
+                       , nf90mpi_inquire_dimension  &
+                       , nf90mpi_inquire_variable
+
+      implicit none
+
+      integer(MPI_OFFSET_KIND), dimension(:), allocatable :: var_shape
+
+      integer     , intent(in) :: ncid
+      character(*), intent(in) :: name
+
+      integer, dimension(:), allocatable :: dimids
+      integer                               i, ndims, varid
+
+
+      call check( nf90mpi_inq_varid( ncid, name, varid )  &
+                , "inq_varid:var_shape "//name )
+      call check( nf90mpi_inquire_variable( ncid, varid, ndims = ndims ) &
+                , "inquire_variable(ndims):var_shape "//name )
+      allocate( dimids(ndims), var_shape(ndims) )
+      call check( nf90mpi_inquire_variable( ncid, varid, dimids = dimids ) &
+                , "inquire_variable(dimids):var_shape "//name )
+      do i = 1, ndims
+        call check( nf90mpi_inquire_dimension( ncid, dimids(i), len = var_shape(i) ) &
+                  , "inquire_dimension(len):var_shape "//name )
+      end do
+
+
+    end function var_shape
 !
 !___________________________________________________________________
 !

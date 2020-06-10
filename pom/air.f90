@@ -579,25 +579,18 @@ module air
         vwsrf = vwnd(:,:,1)
 
 ! Calculate wind stress
+        call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+
         if ( USE_BULK ) then
           if ( READ_HEAT ) then
             dlrad(:,:,1) = ( 1. - a ) * dlrad(:,:,2) + a * dlrad(:,:,3)
           end if
-          call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
           call calculate_fluxes
         end if
 
       end if
 
       if ( USE_FLUXES ) then
-!        if ( INTERP_STRESS ) then
-!          ustr(:,:,1) = ( 1. - a ) * ustr(:,:,2) + a * ustr(:,:,3)
-!          vstr(:,:,1) = ( 1. - a ) * vstr(:,:,2) + a * vstr(:,:,3)
-          call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
-!        else
-!          wusurf = ustr(:,:,1)
-!          wvsurf = vstr(:,:,1)
-!        end if
         if ( INTERP_HEAT ) then
           wtsurf = ( 1. - a ) * ( lrad(:,:,2)+sheat(:,:,2)+lheat(:,:,2) )  &
                  +        a   * ( lrad(:,:,3)+sheat(:,:,3)+lheat(:,:,3) )
@@ -794,27 +787,21 @@ module air
         uwsrf = uwnd(:,:,1)
         vwsrf = vwnd(:,:,1)
 
+! Calculate wind stress
+        call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+
         if ( .not.CALC_SWR ) then
           swrad = ( 1. - a ) * srad(:,:,2) + a * srad(:,:,3)
         end if
 
-! Calculate wind stress
+! Calculate surface fluxes
         if ( USE_BULK ) then
-          call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
           call calculate_fluxes
         end if
 
       end if
 
-      if ( USE_FLUXES ) then
-!        if ( INTERP_STRESS ) then
-!          wusurf = ( 1. - a ) * ustr(:,:,2) + a * ustr(:,:,3)
-!          wvsurf = ( 1. - a ) * vstr(:,:,2) + a * vstr(:,:,3)
-        call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
-!        else
-!          wusurf = ustr(:,:,1)
-!          wvsurf = vstr(:,:,1)
-!        end if
+      if ( USE_FLUXES ) then ! TODO: Rename or get rid of this confusing USE_FLUXES
         if ( INTERP_HEAT ) then
           wtsurf = ( 1. - a ) * ( lrad(:,:,2)+sheat(:,:,2)+lheat(:,:,2) )  &
                  +        a   * ( lrad(:,:,3)+sheat(:,:,3)+lheat(:,:,3) )
@@ -2462,7 +2449,7 @@ module air
 
       u_int = ( 1. - a ) * u1 + a * u2
       v_int = ( 1. - a ) * v1 + a * v2
-! Do not interpolate wind linearly with rough temporal resolution or quite variable wind direction.
+! Do not interpolate wind linearly with rough temporal resolution or moderately variable wind direction.
 ! First, get the "correct" direction from linear interpolation, and then recalculate the absolute value.
 ! The obvious caveat is when w(n+1) and w(n) are perfectly in opposite to one another the resulted direction defaults to zero.
       dir = atan2(v_int,u_int)

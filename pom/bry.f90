@@ -65,14 +65,16 @@ module bry
   integer(1), parameter :: & ! Boundary conditions named constants
     bc0GRADIENT       = 0  & !  zero-gradient (free-slip) condition
   , bc3POINTSMOOTH    = 1  & !  smoothing with 3 interior points
-  , bcCLAMPED         = 2  & !  forced value condition
+  , bcCLAMPED         = 2  & !  forced value condition (Dirichlet)
   , bcFLATHER         = 3  & !  Flather (tidal) condition
   , bcINOUTFLOW       = 4  & !  in-, outflow condition
   , bcRADIATION       = 5  & !  radiation condition
   , bcORLANSKI        = 6  & !  Orlanski internal normal velocity condition
   , bcRADIATION_ENH   = 7  & !  enhanced radiation condition
   , bcGENFLATHER      = 8  & !  generalized Flather (Oddo, Pinardi, 2010)
-  , bcCHAPMAN         = 9    !  Chapman
+  , bcCHAPMAN         = 9  & !  Chapman
+  , bcIMPEDANCE       = 10 & !  impedance condition
+  , bcFLATHER_SSH     = 11
 
   character(4), dimension(-1:10), parameter :: & ! Boundary conditions name strings (first four characters are index keys)
     bcTITLES = [  &
@@ -826,11 +828,13 @@ module bry
 !  Reads lateral boundary conditions.
 !______________________________________________________________________
 !
+      use config     , only: use_tide
 !      use glob_grid  , only: dz
 !      use glob_domain, only: is_master
       use model_run  , only: dti, iint, mid_in_month, mid_in_nbr      &
                            , secs => sec_of_year, sec_of_month
       use module_time
+      use tide       , only: tide_el, tide_ua, tide_va
 
       implicit none
 
@@ -932,6 +936,57 @@ module bry
 
 
     end ! subroutine step
+!
+!______________________________________________________________________
+!
+    subroutine apply_tide( sgn )
+!----------------------------------------------------------------------
+!  Advances interpolation fields when reading the next record.
+!______________________________________________________________________
+!
+      use tide, only: tide_el, tide_ua, tide_va
+
+      implicit none
+
+      real(rk), intent(in) :: sgn
+
+
+        if ( hasEAST ) then
+          EL_bry % EST(1:NFE,:) = EL_bry % EST(1:NFE,:)      &
+                                + sgn*tide_el(im:im-NFE+1:-1,:)
+          UA_bry % EST(1:NFE,:) = UA_bry % EST(1:NFE,:)      &
+                                + sgn*tide_ua(im:im-NFE+1:-1,:)
+          VA_bry % EST(1:NFE,:) = VA_bry % EST(1:NFE,:)      &
+                                + sgn*tide_va(im:im-NFE+1:-1,:)
+        end if
+        if ( hasNORTH ) then
+          EL_bry % NTH(:,1:NFN) = EL_bry % NTH(:,1:NFN)      &
+                                + sgn*tide_el(:,jm:jm-NFN+1:-1)
+          UA_bry % NTH(:,1:NFN) = UA_bry % NTH(:,1:NFN)      &
+                                + sgn*tide_ua(:,jm:jm-NFN+1:-1)
+          VA_bry % NTH(:,1:NFN) = VA_bry % NTH(:,1:NFN)      &
+                                + sgn*tide_va(:,jm:jm-NFN+1:-1)
+        end if
+        if ( hasSOUTH ) then
+          EL_bry % STH(:,1:NFS) = EL_bry % STH(:,1:NFS)      &
+                                + sgn*tide_el(:,1:NFS)
+          UA_bry % STH(:,1:NFS) = UA_bry % STH(:,1:NFS)      &
+                                + sgn*tide_ua(:,1:NFS)
+          VA_bry % STH(:,1:NFS) = VA_bry % STH(:,1:NFS)      &
+                                + sgn*tide_va(:,1:NFS)
+        end if
+        if ( hasWEST ) then
+          EL_bry % WST(1:NFW,:) = EL_bry % WST(1:NFW,:)      &
+                                + sgn*tide_el(1:NFW,:)
+          UA_bry % WST(1:NFW,:) = UA_bry % WST(1:NFW,:)      &
+                                + sgn*tide_ua(1:NFW,:)
+          VA_bry % WST(1:NFW,:) = VA_bry % WST(1:NFW,:)      &
+                                + sgn*tide_va(1:NFW,:)
+        end if
+
+
+    end subroutine
+!
 !______________________________________________________________________
 !
     subroutine advance_record
@@ -1078,7 +1133,6 @@ module bry
 
         if ( fill_clim_el % EAST == 1 )  &
           EL_bry % EST(1:NFE,:) = eclim(im:im-NFE+1:-1,:)
-          print *, "BRY: ", EL_bry % EST(1,100) !REM:
 
         if ( fill_clim_s % EAST == 1 )  &
           S_bry % EST(1:NFE,:,:) = sclim(im:im-NFE+1:-1,:,:)
@@ -1897,8 +1951,8 @@ module bry
 !______________________________________________________________________
 !
       use glob_const, only: g => GRAV, SMALL
-      use grid      , only: dx, dy, fsm
-      use glob_ocean, only: d, el, elf!, uab, uaf, vab, vaf
+      use grid      , only: dum, dvm, dx, dy, fsm
+      use glob_ocean, only: d, el, elf, uaf, vaf
       use model_run , only: dte
 
       implicit none
@@ -1918,6 +1972,10 @@ module bry
         if ( hasEAST ) then
 
           select case ( BC % zeta % east )
+
+            case ( bcCLAMPED )
+              elf(imm1,2:jmm1) = EL_bry%EST(1,2:jmm1)
+              elf(im  ,2:jmm1) = elf(imm1,2:jmm1)
 
             case ( bcRADIATION )
               do j = 2,jm
@@ -1950,17 +2008,28 @@ module bry
                 elf(im,j) = ( el(im,j) + cx*elf(imm1,j) )/(1.+cx)
               end do
 
-            case default
-              elf(im,:) = elf(imm1,:)
+            case ( bcIMPEDANCE )
+              do j = 2,jmm1
+                if ( dum(imm1,j) /= 0. ) then
+                  cx = sqrt( d(imm1,j)/g )
+                  elf(imm1,j) = EL_bry%EST(1,j) + cx*( uaf(imm1,j)-UA_bry%EST(1,j) )
+                  elf(im,j) = elf(imm1,j)
+                end if
+              end do
 
           end select
 
+          ! elf(im,:) = EL_bry%EST(1,:)
 
         end if
 ! WEST
         if ( hasWEST ) then
 
           select case ( BC % zeta % west )
+
+            case ( bcCLAMPED )
+              elf(2,2:jmm1) = EL_bry%WST(1,2:jmm1)
+              elf(1,2:jmm1) = elf(2,2:jmm1)
 
             case ( bcRADIATION )
               do j = 2,jm
@@ -1993,10 +2062,18 @@ module bry
                 elf(1,j) = ( el(1,j) + cx*elf(2,j) )/(1.+cx)
               end do
 
-            case default
-              elf(1,:) = elf(2,:)
+            case ( bcIMPEDANCE )
+              do j = 2,jmm1
+                if ( dum(2,j) /= 0. ) then
+                  cx = sqrt( d(2,j)/g )
+                  elf(2,j) = EL_bry%WST(1,j) - cx*( uaf(3,j)-UA_bry%WST(1,j) )
+                  elf(1,j) = elf(2,j)
+                end if
+              end do
 
           end select
+
+          ! elf(1,:) = EL_bry%WST(1,:)
 
         end if
 
@@ -2013,6 +2090,10 @@ module bry
         if ( hasNORTH ) then
 
           select case ( BC % zeta % north )
+
+            case ( bcCLAMPED )
+              elf(2:imm1,jmm1) = EL_bry%NTH(2:imm1,1)
+              elf(2:imm1,jm  ) = elf(2:imm1,jmm1)
 
             case ( bcRADIATION )
               do i = 2,im
@@ -2045,16 +2126,51 @@ module bry
                 elf(i,jm) = ( el(i,jm) + cy*elf(i,jmm1) )/(1.+cy)
               end do
 
-            case default
-              elf(:,jm) = elf(:,jmm1)
+            case ( bcIMPEDANCE )
+              do i = 2,imm1
+                if ( dvm(i,jm) /= 0. ) then
+                  ! cy = sqrt( d(i,jm)/g )*dvm(i,jm)
+                  ! elf(i,jmm1) = EL_bry%NTH(i,1) + cy*( vaf(i,jmm1)-VA_bry%NTH(i,1) )
+                  ! elf(i,jmm1) = elf(i,jmm1) + 2._rk*EL_bry%NTH(i,1) - elf(i,jmm2)!WIP:
+                  ! elf(i,jm) = 2._rk*EL_bry%NTH(i,1) - elf(i,jmm1)
+                  cy = .5_rk*sqrt( 2._rk*d(i,jm)/(d(i,jm)+d(i,jmm1)) )*dvm(i,jm)
+                  elf(i,jm) = EL_bry%NTH(i,1) + cy*( elf(i,jmm1) - EL_bry%NTH(i,1) )
+                end if
+              end do
+              ! if ( hasWEST ) then
+                ! if ( dvm(2,jm) /= 0. .and. dum(1,jmm1) /= 0. ) then
+                  ! cy = sqrt( d(2,jmm1)/g )*dvm(2,jm)*dum(1,jmm1)
+                  ! elf(2,jmm1) = EL_bry%NTH(2,   1) + cy*( vaf(2,jmm1)-VA_bry%NTH(2,   1) )  &
+                              ! + EL_bry%WST(1,jmm1) - cy*( uaf(3,jmm1)-UA_bry%WST(1,jmm1) )
+                  ! elf(2,jmm1) = .5*elf(2,jmm1)
+                  ! elf(1,jmm1) = elf(2,jmm1)
+                  ! elf(2,jm  ) = elf(2,jmm1)
+                ! end if
+              ! end if
+              ! if ( hasEAST ) then
+                ! if ( dvm(imm1,jm) /= 0. .and. dum(im,jmm1) /= 0. ) then
+                  ! cy = sqrt( d(imm1,jmm1)/g )*dvm(imm1,jm)*dum(im,jmm1)
+                  ! elf(imm1,jmm1) = EL_bry%NTH(imm1,   1) + cy*( vaf(imm1,jmm1)-VA_bry%NTH(imm1,   1) )  &
+                                 ! + EL_bry%EST(   1,jmm1) + cy*( uaf(imm1,jmm1)-UA_bry%EST(   1,jmm1) )
+                  ! elf(imm1,jmm1) = .5*elf(imm1,jmm1)
+                  ! elf(im  ,jmm1) = elf(imm1,jmm1)
+                  ! elf(imm1,jm  ) = elf(imm1,jmm1)
+                ! end if
+              ! end if
 
           end select
+
+          ! elf(:,jm) = EL_bry%NTH(:,1)
 
         end if
 ! SOUTH
         if ( hasSOUTH ) then
 
           select case ( BC % zeta % south )
+
+            case ( bcCLAMPED )
+              elf(2:imm1,2) = EL_bry%STH(2:imm1,1)
+              elf(2:imm1,1) = elf(2:imm1,2)
 
             case ( bcRADIATION )
               do i = 2,im
@@ -2087,11 +2203,41 @@ module bry
                 elf(i,1) = ( el(i,1) + cy*elf(i,2) )/(1.+cy)
               end do
 
-            case default
-              elf(:,1) = elf(:,2)
+            case ( bcIMPEDANCE )
+              do i = 2,imm1
+                if ( dvm(i,2) /= 0. ) then
+                  cy = sqrt( d(i,2)/g )
+                  elf(i,2) = - cy*( vaf(i,3)-VA_bry%STH(i,1) )
+                  elf(i,2) = elf(i,2) + 2._rk*EL_bry%STH(i,1) - elf(i,3)
+                  elf(i,1) = elf(i,2)
+                end if
+              end do
 
           end select
 
+          ! elf(:,1) = EL_bry%STH(:,1)
+
+        end if
+
+      end if
+
+! Manage corner cells
+      if ( .not. ( periodic_bc % x .and. periodic_bc % y ) ) then
+
+        if ( hasSOUTH .and. hasWEST ) then
+          elf(1,1) = .5*(elf(2,1)+elf(1,2))
+        end if
+
+        if ( hasSOUTH .and. hasEAST ) then
+          elf(im,1) = .5*(elf(imm1,1)+elf(im,2))
+        end if
+
+        if ( hasNORTH .and. hasEAST ) then
+          elf(im,jm) = .5*(elf(imm1,jm)+elf(im,jmm1))
+        end if
+
+        if ( hasNORTH .and. hasWEST ) then
+          elf(1,jm) = .5*(elf(2,jm)+elf(1,jmm1))
         end if
 
       end if
@@ -2108,15 +2254,17 @@ module bry
 !  Apply external (2D) velocity boundary conditions.
 !______________________________________________________________________
 !
+      use air        , only: wusurf, wvsurf
       use glob_const , only: GRAV
       use grid       , only: dum, dvm, h, dx, dy
-      use glob_ocean , only: d, dt, el, elf, uaf, ua, vaf, va
+      use glob_ocean , only: d, dt, el, elf, uaf, ua, vaf, va, wubot, wvbot
       use model_run  , only: dte, ramp
 
       implicit none
 
       real(rk), dimension(im) :: ce
       real(rk), dimension(jm) :: cx
+
 
 ! Apply periodic BC in x-dimension
       if ( periodic_bc % x ) then
@@ -2160,12 +2308,27 @@ module bry
                                * ( .5*(el(imm1,2:jmm1)+el(im,2:jmm1))  &
                                  - EL_bry%EST(1,2:jmm1) )
 
+            case ( bcFLATHER_SSH )
+              cx(2:jmm1) = -GRAV*2._rk*( EL_bry%EST(1,2:jmm1)-el(imm1,2:jmm1) )  &
+                                       /( dx(im,2:jmm1)+dx(imm1,2:jmm1) )
+              cx(2:jmm1) = cx(2:jmm1)                                  &
+                         - 2._rk/(d(imm1,2:jmm1)+d(im,2:jmm1))         &
+                                *(wusurf(im,2:jmm1)-wubot(im,2:jmm1))
+              cx(2:jmm1) = ua(imm1,2:jmm1)                                     &
+                         + dx(im,2:jmm1)*cx(2:jmm1)                          &
+                          /(sqrt(.5_rk*GRAV*(d(im,2:jmm1)+d(imm1,2:jmm1))))
+              uaf(im,2:jmm1) = cx(2:jmm1)                                        &
+                             + sqrt( 2._rk*GRAV/(d(im,2:jmm1)+d(imm1,2:jmm1)) )  &
+                              *( .5_rk*(el(im,2:jmm1)+el(imm1,2:jmm1))           &
+                               - EL_bry%EST(1,2:jmm1) )
+
             case ( bcGENFLATHER )
               uaf(im,2:jmm1) = ( UA_bry%EST(1,2:jmm1)                   &
                                 *(h(im,2:jmm1)+EL_bry%EST(1,2:jmm1))    &
                                 +sqrt(GRAV/d(imm1,2:jmm1))              &
                                 *(el(imm1,2:jmm1)-EL_bry%EST(1,2:jmm1)))&
                                /(h(imm1,2:jmm1)+el(imm1,2:jmm1))
+
 
             case default
               uaf(im,2:jmm1) = 0.
@@ -2230,6 +2393,20 @@ module bry
                             - cx(2:jmm1)                          &
                               * ( .5*(el(1,2:jmm1)+el(2,2:jmm1))  &
                                  - EL_bry%WST(1,2:jmm1) )
+
+            case ( bcFLATHER_SSH )
+              cx(2:jmm1) = -GRAV*2._rk*( el(2,2:jmm1)-EL_bry%WST(1,2:jmm1) )  &
+                                       /( dx(1,2:jmm1)+dx(2,2:jmm1) )
+              cx(2:jmm1) = cx(2:jmm1)                                  &
+                         - 2._rk/(d(2,2:jmm1)+d(1,2:jmm1))         &
+                                *(wusurf(1,2:jmm1)-wubot(1,2:jmm1))
+              cx(2:jmm1) = ua(3,2:jmm1)                                     &
+                         + dx(2,2:jmm1)*cx(2:jmm1)                          &
+                          /(sqrt(.5_rk*GRAV*(d(1,2:jmm1)+d(2,2:jmm1))))
+              uaf(2,2:jmm1) = cx(2:jmm1)                                   &
+                           - sqrt( 2._rk*GRAV/(d(1,2:jmm1)+d(2,2:jmm1)) )  &
+                            *( .5_rk*(el(1,2:jmm1)+el(2,2:jmm1))           &
+                             - EL_bry%WST(1,2:jmm1) )
 
             case ( bcGENFLATHER )
               uaf(2,2:jmm1) = ( UA_bry%WST(1,2:jmm1)                 &
@@ -2324,6 +2501,20 @@ module bry
                                * ( .5*(el(2:imm1,jmm1)+el(2:imm1,jm))  &
                                   - EL_bry%NTH(2:imm1,1) )
 
+            case ( bcFLATHER_SSH )
+              ce(2:imm1) = -GRAV*2._rk*( EL_bry%NTH(2:imm1,1)-el(2:imm1,jmm1) )  &
+                                       /( dy(2:imm1,jm)+dy(2:imm1,jmm1) )
+              ce(2:imm1) = ce(2:imm1)                                  &
+                         - 2._rk/(d(2:imm1,jmm1)+d(2:imm1,jm))         &
+                                *(wvsurf(2:imm1,jm)-wvbot(2:imm1,jm))
+              ce(2:imm1) = va(2:imm1,jmm1)                                   &
+                         + dy(2:imm1,jmm1)*ce(2:imm1)                        &
+                          /(sqrt(.5_rk*GRAV*(d(2:imm1,jm)+d(2:imm1,jmm1))))
+              vaf(2:imm1,jm) = ce(2:imm1)                                        &
+                             + sqrt( 2._rk*GRAV/(d(2:imm1,jm)+d(2:imm1,jmm1)) )  &
+                              *( .5_rk*(el(2:imm1,jm)+el(2:imm1,jmm1))           &
+                               - EL_bry%NTH(2:imm1,1) )
+
             case ( bcGENFLATHER )
               vaf(2:imm1,jm) = ( VA_bry%NTH(2:imm1,1)                   &
                                 *(h(2:imm1,jm)+EL_bry%NTH(2:imm1,1))    &
@@ -2393,6 +2584,20 @@ module bry
                             - ce(2:imm1)                          &
                               * ( .5*(el(2:imm1,1)+el(2:imm1,2))  &
                                  - EL_bry%STH(2:imm1,1) )
+
+            case ( bcFLATHER_SSH )
+              ce(2:imm1) = -GRAV*2._rk*( el(2:imm1,2)-EL_bry%STH(2:imm1,1) )  &
+                                       /( dy(2:imm1,1)+dy(2:imm1,2) )
+              ce(2:imm1) = ce(2:imm1)                               &
+                         - 2._rk/(d(2:imm1,2)+d(2:imm1,1))          &
+                                *(wvsurf(2:imm1,1)-wvbot(2:imm1,1))
+              ce(2:imm1) = va(2:imm1,3)                                     &
+                         + dy(2:imm1,2)*ce(2:imm1)                          &
+                          /(sqrt(.5_rk*GRAV*(d(2:imm1,1)+d(2:imm1,2))))
+              vaf(2:imm1,2) = ce(2:imm1)                                    &
+                            - sqrt( 2._rk*GRAV/(d(2:imm1,1)+d(2:imm1,2)) )  &
+                             *( .5_rk*(el(2:imm1,1)+el(2:imm1,2))           &
+                              - EL_bry%STH(2:imm1,1) )
 
             case ( bcGENFLATHER )
               vaf(2:imm1,2) = ( VA_bry%STH(2:imm1,1)                 &
@@ -2567,12 +2772,12 @@ module bry
               case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = u(imm1,j,k)-u(imm1,j-1,k)
-                  grdy(2,j) = u(im  ,j,k)-u(im  ,j-1,k)
+                  grdy(1,j) = ( u(imm1,j,k)-u(imm1,j-1,k) )*dvm(imm1,j)
+                  grdy(2,j) = ( u(im  ,j,k)-u(im  ,j-1,k) )*dvm(im  ,j)
                 end do
                 do j = 2,jmm1
-                  dvdt =  u(imm1,j,k)-uf(imm1,j,k)
-                  dvdx = uf(imm1,j,k)-uf(imm2,j,k)
+                  dvdt =    u(imm1,j,k)-uf(imm1,j,k)
+                  dvdx = ( uf(imm1,j,k)-uf(imm2,j,k) )*dum(imm1,j)
                   if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
                     dvdy = grdy(1,j  )
                   else
@@ -2621,12 +2826,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 1,jmm1
-                  grdy(1,j) = v(imm1,j+1,k)-v(imm1,j,k)
-                  grdy(2,j) = v(im  ,j+1,k)-v(im  ,j,k)
+                  grdy(1,j) = ( v(imm1,j+1,k)-v(imm1,j,k) )*dvm(imm1,j+1)
+                  grdy(2,j) = ( v(im  ,j+1,k)-v(im  ,j,k) )*dvm(im  ,j+1)
                 end do
                 do j = 2,jmm1
-                  dvdt =  v(imm1,j,k)-vf(imm1,j,k)
-                  dvdx = vf(imm1,j,k)-vf(imm2,j,k)
+                  dvdt =    v(imm1,j,k)-vf(imm1,j,k)
+                  dvdx = ( vf(imm1,j,k)-vf(imm2,j,k) )*dum(imm1,j)
                   if ( dvdt*(grdy(1,j-1)+grdy(1,j)) > 0. ) then
                     dvdy = grdy(1,j-1)
                   else
@@ -2694,12 +2899,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = u(2,j,k)-u(2,j-1,k)
-                  grdy(2,j) = u(3,j,k)-u(3,j-1,k)
+                  grdy(1,j) = ( u(2,j,k)-u(2,j-1,k) )*dvm(2,j)
+                  grdy(2,j) = ( u(3,j,k)-u(3,j-1,k) )*dvm(3,j)
                 end do
                 do j = 2,jmm1
-                  dvdt =  u(3,j,k)-uf(3,j,k)
-                  dvdx = uf(3,j,k)-uf(4,j,k)
+                  dvdt =    u(3,j,k)-uf(3,j,k)
+                  dvdx = ( uf(3,j,k)-uf(4,j,k) )*dum(4,j)
                   if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
                     dvdy = grdy(2,j  )
                   else
@@ -2750,12 +2955,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 1,jmm1
-                  grdy(1,j) = v(1,j+1,k)-v(1,j,k)
-                  grdy(2,j) = v(2,j+1,k)-v(2,j,k)
+                  grdy(1,j) = ( v(1,j+1,k)-v(1,j,k) )*dvm(1,j+1)
+                  grdy(2,j) = ( v(2,j+1,k)-v(2,j,k) )*dvm(2,j+1)
                 end do
                 do j = 2,jmm1
-                  dvdt =  v(2,j,k)-vf(2,j,k)
-                  dvdx = vf(2,j,k)-vf(3,j,k)
+                  dvdt =    v(2,j,k)-vf(2,j,k)
+                  dvdx = ( vf(2,j,k)-vf(3,j,k) )*dum(3,j)
                   if ( dvdt*(grdy(2,j-1)+grdy(2,j)) > 0. ) then
                     dvdy = grdy(2,j-1)
                   else
@@ -2851,12 +3056,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = v(i,jmm1,k)-v(i-1,jmm1,k)
-                  grdx(i,2) = v(i,jm  ,k)-v(i-1,jm  ,k)
+                  grdx(i,1) = ( v(i,jmm1,k)-v(i-1,jmm1,k) )*dum(i,jmm1)*dum(i,jm)
+                  grdx(i,2) = ( v(i,jm  ,k)-v(i-1,jm  ,k) )*dum(i,jmm1)*dum(i,jm)
                 end do
                 do i = 2,imm1
-                  dvdt =  v(i,jmm1,k)-vf(i,jmm1,k)
-                  dvdy = vf(i,jmm1,k)-vf(i,jmm2,k)
+                  dvdt =    v(i,jmm1,k)-vf(i,jmm1,k)
+                  dvdy = ( vf(i,jmm1,k)-vf(i,jmm2,k) )*dvm(i,jmm1)*dvm(i,jmm2)
                   if ( dvdt*dvdy < 0. ) dvdt = 0.
                   if ( dvdt*(grdx(i,1)+grdx(i+1,1)) > 0. ) then
                     dvdx = grdx(i  ,1)
@@ -2905,12 +3110,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 1,imm1
-                  grdx(i,1) = u(i+1,jmm1,k)-u(i,jmm1,k)
-                  grdx(i,2) = u(i+1,jm  ,k)-u(i,jm  ,k)
+                  grdx(i,1) = ( u(i+1,jmm1,k)-u(i,jmm1,k) )*dum(i,jmm1)*dum(i+1,jmm1)
+                  grdx(i,2) = ( u(i+1,jm  ,k)-u(i,jm  ,k) )*dum(i,jm  )*dum(i+1,jm  )
                 end do
                 do i = 2,imm1
-                  dvdt =  u(i,jmm1,k)-uf(i,jmm1,k)
-                  dvdy = uf(i,jmm1,k)-uf(i,jmm2,k)
+                  dvdt =    u(i,jmm1,k)-uf(i,jmm1,k)
+                  dvdy = ( uf(i,jmm1,k)-uf(i,jmm2,k) )*dvm(i,jmm1)*dvm(i,jmm2)
                   if ( dvdt*(grdx(i-1,1)+grdx(i,1)) > 0. ) then
                     dvdx = grdx(i-1,1)
                   else
@@ -2978,12 +3183,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = v(i,2,k)-v(i-1,2,k)
-                  grdx(i,2) = v(i,3,k)-v(i-1,3,k)
+                  grdx(i,1) = ( v(i,2,k)-v(i-1,2,k) )*dum(i,2)
+                  grdx(i,2) = ( v(i,3,k)-v(i-1,3,k) )*dum(i,3)
                 end do
                 do i = 2,imm1
-                  dvdt =  v(i,3,k)-vf(i,3,k)
-                  dvdy = vf(i,3,k)-vf(i,4,k)
+                  dvdt =    v(i,3,k)-vf(i,3,k)
+                  dvdy = ( vf(i,3,k)-vf(i,4,k) )*dvm(i,4)
                   if ( dvdt*dvdy < 0. ) dvdt = 0.
                   if ( dvdt*(grdx(i,2)+grdx(i+1,2)) > 0. ) then
                     dvdx = grdx(i  ,2)
@@ -3034,12 +3239,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 1,imm1
-                  grdx(i,1) = u(i+1,1,k)-u(i,1,k)
-                  grdx(i,2) = u(i+1,2,k)-u(i,2,k)
+                  grdx(i,1) = ( u(i+1,1,k)-u(i,1,k) )*dum(i+1,1)
+                  grdx(i,2) = ( u(i+1,2,k)-u(i,2,k) )*dum(i+1,2)
                 end do
                 do i = 2,imm1
-                  dvdt =  u(i,2,k)-uf(i,2,k)
-                  dvdy = uf(i,2,k)-uf(i,3,k)
+                  dvdt =    u(i,2,k)-uf(i,2,k)
+                  dvdy = ( uf(i,2,k)-uf(i,3,k) )*dvm(i,3)
                   if ( dvdt*(grdx(i-1,2)+grdx(i,2)) > 0. ) then
                     dvdx = grdx(i-1,2)
                   else

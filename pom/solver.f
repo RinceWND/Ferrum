@@ -1240,7 +1240,7 @@
 !
       use clim       , only: rmean
       use glob_const , only: grav, rk
-      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1    ,my_task!REM:
      &                     , n_south, n_west
       use grid       , only: dum, dvm, dx, dy, dzz, zz
       use glob_ocean , only: d, drhox, drhoy, dt, density => rho
@@ -1259,7 +1259,7 @@
 
 ! convert a 2nd order matrices to special 4th order
 ! special 4th order case
-      call order2d_mpi(dt ,d4th  ,im,jm)
+      call order2d_mpi(d  ,d4th  ,im,jm)
       call order3d_mpi(rho,rho4th,im,jm,kb)
 
 ! compute terms correct to 4th order
@@ -1275,8 +1275,8 @@
             drho(i,j,k)=   (rho(i,j,k)-rho(i-1,j,k))*dum(i,j)
             rhou(i,j,k)=.5*(rho(i,j,k)+rho(i-1,j,k))*dum(i,j)
           end do
-          ddx(i,j)=   (dt(i,j)-dt(i-1,j))*dum(i,j)
-          d4(i,j) =.5*(dt(i,j)+dt(i-1,j))*dum(i,j)
+          ddx(i,j)=   (d(i,j)-d(i-1,j))*dum(i,j)
+          d4(i,j) =.5*(d(i,j)+d(i-1,j))*dum(i,j)
         end do
       end do
 
@@ -1285,20 +1285,20 @@
           do i=3,imm1
             do k=1,kbm1
               drho(i,j,k)=drho(i,j,k) - (1./24.)*
-     $                    (dum(i+1,j)*(rho(i+1,j,k)-rho(i,j,k))-
-     $                    2.*(rho(i,j,k)-rho(i-1,j,k))+
-     $                    dum(i-1,j)*(rho(i-1,j,k)-rho(i-2,j,k)))
+     $                    (dum(i+1,j)*(rho(i+1,j,k)-rho(i  ,j,k))-
+     $                             2.*(rho(i  ,j,k)-rho(i-1,j,k))+
+     $                     dum(i-1,j)*(rho(i-1,j,k)-rho(i-2,j,k)))
               rhou(i,j,k)=rhou(i,j,k) + (1./16.)*
-     $                    (dum(i+1,j)*(rho(i,j,k)-rho(i+1,j,k))+
-     $                    dum(i-1,j)*(rho(i-1,j,k)-rho(i-2,j,k)))
+     $                    (dum(i+1,j)*(rho(i  ,j,k)-rho(i+1,j,k))+
+     $                     dum(i-1,j)*(rho(i-1,j,k)-rho(i-2,j,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dum(i+1,j)*(dt(i+1,j)-dt(i,j))-
-     $               2.*(dt(i,j)-dt(i-1,j))+
-     $               dum(i-1,j)*(dt(i-1,j)-dt(i-2,j)))
+     $               (dum(i+1,j)*(d(i+1,j)-d(i  ,j))-
+     $                        2.*(d(i  ,j)-d(i-1,j))+
+     $                dum(i-1,j)*(d(i-1,j)-d(i-2,j)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dum(i+1,j)*(dt(i,j)-dt(i+1,j))+
-     $              dum(i-1,j)*(dt(i-1,j)-dt(i-2,j)))
+     $              (dum(i+1,j)*(d(i  ,j)-d(i+1,j))+
+     $               dum(i-1,j)*(d(i-1,j)-d(i-2,j)))
           end do
         end do
       else
@@ -1306,20 +1306,20 @@
           do i=2,imm1
             do k=1,kbm1
               drho(i,j,k)=drho(i,j,k) - (1./24.)*
-     $                   (dum(i+1,j)*(rho(i+1,j,k)-rho(i,j,k))-
-     $                    2.*(rho(i,j,k)-rho(i-1,j,k))+
+     $                   (dum(i+1,j)*(rho(i+1,j,k)-rho   (i  ,j,k))-
+     $                            2.*(rho(i  ,j,k)-rho   (i-1,j,k))+
      $                    dum(i-1,j)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
               rhou(i,j,k)=rhou(i,j,k) + (1./16.)*
-     $                    (dum(i+1,j)*(rho(i,j,k)-rho(i+1,j,k))+
-     $                    dum(i-1,j)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
+     $                    (dum(i+1,j)*(rho(i  ,j,k)-rho   (i+1,j,k))+
+     $                     dum(i-1,j)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dum(i+1,j)*(dt(i+1,j)-dt(i,j))-
-     $               2.*(dt(i,j)-dt(i-1,j))+
-     $               dum(i-1,j)*(dt(i-1,j)-d4th(i-2,j)))
+     $               (dum(i+1,j)*(d(i+1,j)-d   (i  ,j))-
+     $                        2.*(d(i  ,j)-d   (i-1,j))+
+     $                dum(i-1,j)*(d(i-1,j)-d4th(i-2,j)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dum(i+1,j)*(dt(i,j)-dt(i+1,j))+
-     $              dum(i-1,j)*(dt(i-1,j)-d4th(i-2,j)))
+     $              (dum(i+1,j)*(d(i  ,j)-d   (i+1,j))+
+     $               dum(i-1,j)*(d(i-1,j)-d4th(i-2,j)))
           end do
         end do
       end if
@@ -1353,6 +1353,14 @@
         end do
       end do
 
+!!      print *, "BAROPG_MCC" !REM:
+!!      if ( my_task==1 ) then
+!!        print '(*(2(f15.7,";"),f15.7/))', (drhox(60,70,k),drho(60,70,k)
+!!     &                            ,rhou(60,70,k), k=1,kbm1)
+!!      end if
+!!      call finalize_mpi
+!!      stop
+
 ! compute terms correct to 4th order
       do i=1,im
         do j=1,jm
@@ -1376,8 +1384,8 @@
             drho(i,j,k)=   (rho(i,j,k)-rho(i,j-1,k))*dvm(i,j)
             rhou(i,j,k)=.5*(rho(i,j,k)+rho(i,j-1,k))*dvm(i,j)
           end do
-          ddx(i,j)=   (dt(i,j)-dt(i,j-1))*dvm(i,j)
-          d4(i,j) =.5*(dt(i,j)+dt(i,j-1))*dvm(i,j)
+          ddx(i,j)=   (d(i,j)-d(i,j-1))*dvm(i,j)
+          d4(i,j) =.5*(d(i,j)+d(i,j-1))*dvm(i,j)
         end do
       end do
 
@@ -1386,20 +1394,20 @@
           do i=1,im
             do k=1,kbm1
               drho(i,j,k)=drho(i,j,k)-(1./24.)*
-     $                    (dvm(i,j+1)*(rho(i,j+1,k)-rho(i,j,k))-
-     $                    2.*(rho(i,j,k)-rho(i,j-1,k))+
-     $                    dvm(i,j-1)*(rho(i,j-1,k)-rho(i,j-2,k)))
+     $                    (dvm(i,j+1)*(rho(i,j+1,k)-rho(i,j  ,k))-
+     $                             2.*(rho(i,j  ,k)-rho(i,j-1,k))+
+     $                     dvm(i,j-1)*(rho(i,j-1,k)-rho(i,j-2,k)))
               rhou(i,j,k)=rhou(i,j,k)+(1./16.)*
-     $                    (dvm(i,j+1)*(rho(i,j,k)-rho(i,j+1,k))+
-     $                    dvm(i,j-1)*(rho(i,j-1,k)-rho(i,j-2,k)))
+     $                    (dvm(i,j+1)*(rho(i,j  ,k)-rho(i,j+1,k))+
+     $                     dvm(i,j-1)*(rho(i,j-1,k)-rho(i,j-2,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dvm(i,j+1)*(dt(i,j+1)-dt(i,j))-
-     $               2.*(dt(i,j)-dt(i,j-1))+
-     $               dvm(i,j-1)*(dt(i,j-1)-dt(i,j-2)))
+     $               (dvm(i,j+1)*(d(i,j+1)-d(i,j  ))-
+     $                        2.*(d(i,j  )-d(i,j-1))+
+     $                dvm(i,j-1)*(d(i,j-1)-d(i,j-2)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dvm(i,j+1)*(dt(i,j)-dt(i,j+1))+
-     $              dvm(i,j-1)*(dt(i,j-1)-dt(i,j-2)))
+     $              (dvm(i,j+1)*(d(i,j  )-d(i,j+1))+
+     $               dvm(i,j-1)*(d(i,j-1)-d(i,j-2)))
           end do
         end do
       else
@@ -1407,20 +1415,20 @@
           do i=1,im
             do k=1,kbm1
               drho(i,j,k)=drho(i,j,k)-(1./24.)*
-     $                    (dvm(i,j+1)*(rho(i,j+1,k)-rho(i,j,k))-
-     $                    2.*(rho(i,j,k)-rho(i,j-1,k))+
-     $                    dvm(i,j-1)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
+     $                    (dvm(i,j+1)*(rho(i,j+1,k)-rho   (i,j  ,k))-
+     $                             2.*(rho(i,j  ,k)-rho   (i,j-1,k))+
+     $                     dvm(i,j-1)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
               rhou(i,j,k)=rhou(i,j,k)+(1./16.)*
-     $                    (dvm(i,j+1)*(rho(i,j,k)-rho(i,j+1,k))+
-     $                    dvm(i,j-1)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
+     $                    (dvm(i,j+1)*(rho(i,j  ,k)-rho   (i,j+1,k))+
+     $                     dvm(i,j-1)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dvm(i,j+1)*(dt(i,j+1)-dt(i,j))-
-     $               2.*(dt(i,j)-dt(i,j-1))+
-     $               dvm(i,j-1)*(dt(i,j-1)-d4th(i,j-2)))
+     $               (dvm(i,j+1)*(d(i,j+1)-d   (i,j  ))-
+     $                        2.*(d(i,j  )-d   (i,j-1))+
+     $                dvm(i,j-1)*(d(i,j-1)-d4th(i,j-2)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dvm(i,j+1)*(dt(i,j)-dt(i,j+1))+
-     $              dvm(i,j-1)*(dt(i,j-1)-d4th(i,j-2)))
+     $              (dvm(i,j+1)*(d(i,j  )-d   (i,j+1))+
+     $               dvm(i,j-1)*(d(i,j-1)-d4th(i,j-2)))
           end do
         end do
       end if
@@ -1476,29 +1484,32 @@
 ! called by: pgscheme [advance.f]
 !______________________________________________________________________
 !
-      use glob_const , only: grav, rk
-      use glob_domain, only: im, jm, kb, kbm1
-      use grid       , only: dum, dvm, dx, dy, dz, z
-      use glob_ocean , only: drhox, drhoy, dt, rho
+      use glob_const , only: grav, rk ,rhoref!REM:
+      use glob_domain, only: im, jm, kb, kbm1   ,my_task!REM:
+      use grid       , only: aru,arv,dum, dvm, dx, dy, dz, dzz, h, z,zz
+      use glob_ocean , only: drhox, drhoy, d, dt, el, et, density => rho
       use model_run  , only: ramp
+      use clim, only: rmean
 
       implicit none
 
       integer       i,j,k
-      real(kind=rk) p(im,jm,kb),fx(im,jm,kb),fc(im,jm,kb)
-      real(kind=rk) dh,cff,cff1
+      !real(16) p(im,jm,kb),fx(im,jm,kb),fc(im,jm,kb)
+      real(rk), dimension(im,jm,kb) :: p, fx, fc, rho
+      real(rk) dh,cff,cff1
 
 
-!      rho = rho-rmean
+      rho = density - rmean
 
       p(:,:,1) = 0.
       do k = 1,kbm1
-        p(:,:,k+1) = p(:,:,k) + dt*dz(k)*rho(:,:,k)
-        fx(:,:,k) = .5*dt*dz(k)*(p(:,:,k)+p(:,:,k+1))
+!        p(:,:,k+1) = p(:,:,k) + dt*dz(k)*(density(:,:,k))
+        p(:,:,k+1) = d*dz(k)*(rho(:,:,k))
+        fx(:,:,k) = .5*d*dz(k)*(p(:,:,k)+p(:,:,k+1))
       end do
 
       cff = .5*grav
-      cff1= grav !/rhoref
+      cff1= grav!/rhoref
 !
 !  Calculate pressure gradient in the XI-direction (m4/s2).
 !
@@ -1507,24 +1518,34 @@
         do j = 1,jm
           do i = 2,im
             if (dum(i,j)/=0.) then
-              dh = z(k+1)*(dt(i,j)-dt(i-1,j))
+              dh = z(k+1)*(d(i,j)-d(i-1,j))+el(i,j)-el(i-1,j)
               fc(i,j,k+1) = .5*dh*(p(i,j,k+1)+p(i-1,j,k+1))
-              if (k==1) then
-                drhox(i,j,k) = .5*(cff1*(fx(i-1,j,k)-
-     &                                fx(i  ,j,k)+
-     &                                fc(i,j,k  )-
-     &                                fc(i,j,k+1)))*(dy(i,j)+dy(i-1,j))
-              else
-                drhox(i,j,k) = drhox(i,j,k-1) +
-     &                      .5*(cff1*(fx(i-1,j,k)-
-     &                                fx(i  ,j,k)+
-     &                                fc(i,j,k  )-
-     &                                fc(i,j,k+1)))*(dy(i,j)+dy(i-1,j))
-              end if
+              drhox(i,j,k) = cff*dz(k)*(dt(i-1,j)+dt(i,j))
+     &                                 *( et(i-1,j)-et(i,j) )
+     &                            + cff1*(fx(i-1,j,k)-
+     &                                    fx(i  ,j,k)+
+     &                                    fc(i,j,k  )-
+     &                                    fc(i,j,k+1))
             end if
           end do
         end do
       end do
+      do k = 1, kbm1
+        drhox(2:im,:,k) = .5*(dy(2:im,:)+dy(1:im-1,:))*drhox(2:im,:,k)
+      end do
+!!      print *, "BAROPG_LIN" !REM:
+!!      if ( my_task==1 ) then
+!!        print *, "Di  :", d(25,25), h(25,25), el(25,25)
+!!        print *, "Di-1:", d(24,25), h(24,25), el(24,25)
+!!        print *, "dy:", dy(25,25), dy(24,25)
+!!        do k = 1, kbm1
+!!          fx(25,25,k) = z(k+1)*(h(25,25)-h(24,25))
+!!        end do
+!!        print '(*(3(f15.7,";"),f15.7/))', (fx(60,70,k),fc(60,70,k)
+!!     &                            ,drhox(60,70,k),fx(60,70,k), k=1,kbm1)
+!!      end if
+!!      call finalize_mpi
+!!      stop
 !
 !  Calculate pressure gradient in the ETA-direction (m4/s2).
 !
@@ -1533,27 +1554,24 @@
         do j = 2,jm
           do i = 1,im
             if (dvm(i,j)/=0.) then
-              dh = z(k+1)*(dt(i,j)-dt(i,j-1))
+              dh = z(k+1)*(d(i,j)-d(i,j-1))+el(i,j)-el(i,j-1)
               fc(i,j,k+1) = .5*dh*(p(i,j,k+1)+p(i,j-1,k+1))
-              if (k==1) then
-                drhoy(i,j,k) = .5*(cff1*(fx(i,j-1,k)-
-     &                                fx(i,j  ,k)+
-     &                                fc(i,j,k  )-
-     &                                fc(i,j,k+1)))*(dx(i,j)+dx(i,j-1))
-              else
-                drhoy(i,j,k) = drhoy(i,j,k-1) +
-     &                      .5*(cff1*(fx(i,j-1,k)-
-     &                                fx(i,j  ,k)+
-     &                                fc(i,j,k  )-
-     &                                fc(i,j,k+1)))*(dx(i,j)+dx(i,j-1))
-              end if
+              drhoy(i,j,k) = cff*dz(k)*(dt(i,j-1)+dt(i,j))
+     &                                 *( et(i,j-1)-et(i,j) )
+     &                            + cff1*(fx(i,j-1,k)-
+     &                                    fx(i,j  ,k)+
+     &                                    fc(i,j,k  )-
+     &                                    fc(i,j,k+1))
             end if
           end do
         end do
       end do
+      do k = 1, kbm1
+        drhoy(:,2:jm,k) = .5*(dx(:,2:jm)+dx(:,1:jm-1))*drhoy(:,2:jm,k)
+      end do
 
-      drhox = -ramp*drhox
-      drhoy = -ramp*drhoy
+      drhox = ramp*drhox
+      drhoy = ramp*drhoy
 
 !      if (ramp > 0) then
 !        write(40+my_task,*) iint, drhox(50,50,:),drhoy(50,50,:)
@@ -1587,7 +1605,7 @@
 !      end if
 !      if (iint > 10) call finalize_mpi
 
-!      rho = rho+rmean
+      ! rho = rho+rmean
 
 
       end ! subroutine baropg_lin
@@ -1603,19 +1621,21 @@
 !______________________________________________________________________
 !
       use glob_const , only: grav, rhoref, rk
-      use glob_domain, only: im, jm, kbm1
-      use grid       , only: dum, dvm, dx, dy, dz, z, zz
-      use glob_ocean , only: d, drhox, drhoy, dt, rho
+      use glob_domain, only: im, jm, kb, kbm1   ,my_task!:REM
+      use grid       , only: dum, dvm, dx, dy, dz, z, zz  ,h!:REM
+      use glob_ocean , only: d, drhox, drhoy, dt, density => rho  ,el!:REM
       use model_run  , only: ramp
+      use clim,only:rmean
 
       implicit none
 
       integer       i,j,k
-      real(kind=rk) phix(2:im),phie(im)
-      real(kind=rk) fac,fac1,fac2,fac3,cff1,cff2,cff3,cff4,gamma
+      real(rk) phix(2:im),phie(im)
+      real(rk) fac,fac1,fac2,fac3,cff1,cff2,cff3,cff4,gamma
+      real(rk) rho(im,jm,kb)
 
 
-!      rho = rho-rmean
+      rho = density - rmean
 
       fac  = 10000.      /rhoref
       fac1 =     .5 *grav!/rhoref
@@ -1624,12 +1644,12 @@
 
       do j = 1,jm
         do i = 2,im
-          cff1 = (z(1)-zz(1))*(d(i,j)+d(i-1,j))
+          cff1 = -zz(1)*(d(i,j)+d(i-1,j))
           phix(i) = fac1*(rho(i,j,1)-rho(i-1,j,1))*cff1
 !          phix(i) = phix(i) + fac*(e_atmos(i,j)-e_atmos(i-1,j))
           phix(i) = phix(i)+                                              &
      &            (fac2+fac1*(rho(i,j,1)+rho(i-1,j,1)))*
-     &            (z(1)*(d(i,j)-d(i-1,j)))! + el(i,j)-el(i-1,j))
+     &            (el(i,j)-el(i-1,j))
           drhox(i,j,1) = -.25*dz(1)*(dt(i,j)+dt(i-1,j))*
      &                      phix(i)*(dy(i,j)+dy(i-1,j))*dum(i,j)
          end do
@@ -1642,7 +1662,7 @@
             cff1 = 1./(d(i  ,j)*(zz(k-1)-zz(k))*
      &                 d(i-1,j)*(zz(k-1)-zz(k)))
             cff2 = (d(i,j)-d(i-1,j))*(zz(k)+zz(k-1))
-!     &         +2.*(el(i,j)-el(i-1,j))
+     &            + 2.*(el(i,j)-el(i-1,j))
             cff3 = (zz(k-1)-zz(k))*(d(i,j)-d(i-1,j))
             gamma = .125*cff1*cff2*cff3
 
@@ -1652,9 +1672,9 @@
      &             rho(i,j,k  )-rho(i-1,j,k  )
             cff3 = (d(i,j)+d(i-1,j))*(zz(k-1)-zz(k))
             cff4 = (1.+gamma)*
-     &               (zz(k-1)*(d(i,j)-d(i-1,j)))+!el(i,j)-el(i-1,j))+
+     &               (zz(k-1)*(d(i,j)-d(i-1,j))+el(i,j)-el(i-1,j))+
      &             (1.-gamma)*
-     &               (zz(k  )*(d(i,j)-d(i-1,j)))!+el(i,j)-el(i-1,j))
+     &               (zz(k  )*(d(i,j)-d(i-1,j))+el(i,j)-el(i-1,j))
             phix(i) = phix(i)+                                            &
      &                fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1668,8 +1688,7 @@
 !     &           z_r(i,j,k  )-z_r(i-1,j,k  )
 !            phix(i)=phix(i)+                                            &
 !     &              fac3*(cff1*cff3-cff2*cff4)
-            drhox(i,j,k) = drhox(i,j,k-1)
-     &                     -.25*dz(k)*(dt(i,j)+dt(i-1,j))*
+            drhox(i,j,k) = -.25*dz(k)*(dt(i,j)+dt(i-1,j))*
      &                        phix(i)*(dy(i,j)+dy(i-1,j))*dum(i,j)
           end do
         end do
@@ -1700,7 +1719,7 @@
               cff1 = 1./(d(i,j  )*(z(k-1)-z(k))*
      &                   d(i,j-1)*(z(k-1)-z(k)))
               cff2 = (d(i,j)-d(i,j-1))*(zz(k)+zz(k-1))
-!     &           +2.*(el(i,j)-el(i,j-1))
+     &              + 2.*(el(i,j)-el(i,j-1))
               cff3 = (zz(k-1)-zz(k))*(d(i,j)-d(i,j-1))
               gamma = .125*cff1*cff2*cff3
 
@@ -1710,9 +1729,9 @@
      &               rho(i,j,k  )-rho(i,j-1,k  )
               cff3 = (d(i,j)+d(i,j-1))*(zz(k-1)-zz(k))
               cff4 = (1.+gamma)*
-     &                (zz(k-1)*(d(i,j)-d(i,j-1)))+!el(i,j)-el(i,j-1))+
+     &                (zz(k-1)*(d(i,j)-d(i,j-1))+el(i,j)-el(i,j-1))+
      &               (1.-gamma)*
-     &                (zz(k  )*(d(i,j)-d(i,j-1)))!+el(i,j)-el(i,j-1))
+     &                (zz(k  )*(d(i,j)-d(i,j-1))+el(i,j)-el(i,j-1))
               phie(i) = phie(i)+                                          &
      &                  fac3*(cff1*cff3-cff2*cff4)
 !
@@ -1726,8 +1745,7 @@
 !     &             z_r(i,j,k  )-z_r(i,j-1,k  )
 !              phie(i)=phie(i)+                                          &
 !     &                fac3*(cff1*cff3-cff2*cff4)
-              drhoy(i,j,k) = drhoy(i,j,k-1)-
-     &                        .25*dz(k)*(dt(i,j)+dt(i,j-1))*
+              drhoy(i,j,k) = -.25*dz(k)*(dt(i,j)+dt(i,j-1))*
      &                          phie(i)*(dx(i,j)+dx(i,j-1))*dvm(i,j)
 !              if (isnan(drhoy(i,j,k))) write(*,*) my_task,"::",i,j,k
             end do
@@ -1735,8 +1753,19 @@
         end if
       end do
 
-      drhox = - ramp*drhox
-      drhoy = - ramp*drhoy
+!!      print *, "BAROPG_SONG" !REM:
+!!      if ( my_task==1 ) then
+!!        print *, "Di  :", d(25,25), h(25,25), el(25,25)
+!!        print *, "Di-1:", d(24,25), h(24,25), el(24,25)
+!!        print *, "dy:", dy(25,25), dy(24,25)
+!!        print '(*(1(f15.7,";"),f15.7/))', (drhox(60,70,k)
+!!     &                            ,drhox(60,70,k), k=1,kbm1)
+!!      end if
+!!      call finalize_mpi
+!!      stop
+
+      drhox = ramp*drhox
+      drhoy = ramp*drhoy
 
 !      if (ramp > 0) then
 !        write(40+my_task,*) iint, drhox(50,50,:)
@@ -1760,26 +1789,26 @@
 !______________________________________________________________________
 !
       use glob_const , only: grav, rhoref, rk
-      use glob_domain, only: im, imm1, jm, jmm1, kb
-      use grid       , only: dx, dy, dz, z, zz
-      use glob_ocean , only: d, drhox, drhoy, dt, rho
+      use glob_domain, only: im, imm1, jm, jmm1, kb  ,my_task!REM:
+      use grid       , only: dum, dvm, dx, dy, dz, z, zz
+      use glob_ocean , only: d, drhox, drhoy, dt, density => rho, el
       use model_run  , only: ramp
       use clim       , only: rmean
 
       implicit none
 
       integer                     i,j,k
-      real(kind=rk), parameter :: OneFifth   = .2
-     &                           ,OneTwelfth = 1./12.
-     &                           ,eps        = 1.e-10
-      real(kind=rk)               GRho, GRho0, HalfGRho
-      real(kind=rk)               fac,cff,cff1,cff2
-      real(kind=rk), dimension(im,jm,kb):: p
-      real(kind=rk), dimension(im,kb+1) :: idR, idZ
-      real(kind=rk), dimension(im,jm)   :: fc, aux, idRx, idZx
+      real(rk), parameter :: OneFifth   = .2
+     &                      ,OneTwelfth = 1./12.
+     &                      ,eps        = 1.e-10
+      real(rk)               GRho, GRho0, HalfGRho
+      real(rk)               fac,cff,cff1,cff2
+      real(rk), dimension(im,jm,kb):: p, rho
+      real(rk), dimension(im,kb+1) :: idR, idZ
+      real(rk), dimension(im,jm)   :: fc, aux, idRx, idZx
 
 
-      rho = rho-rmean
+      rho = density - rmean
 
 !
 !-----------------------------------------------------------------------
@@ -1787,7 +1816,7 @@
 !-----------------------------------------------------------------------
 !
       GRho  = grav!/rhoref
-      GRho0 = 1000./GRho
+      GRho0 = 1000.*GRho/rhoref
       HalfGRho = .5*GRho
       fac = 100./rhoref
 
@@ -1817,8 +1846,9 @@
         end do
         do i=1,im
           cff1 = 1./(d(i,j)*(zz(1)-zz(2)))
-          cff2 = .5*(rho(i,j,1)-rho(i,j,2))*d(i,j)*(z(1)-zz(1))*cff1
-          p(i,j,1) = Grho*(rho(i,j,1)+cff2)*d(i,j)*(z(1)-zz(1))
+          cff2 = .5*(rho(i,j,1)-rho(i,j,2))*d(i,j)*(-zz(1))*cff1
+          p(i,j,1) = Grho0*  el(i,j)
+     &             + Grho *(rho(i,j,1)+cff2)*d(i,j)*(-zz(1))
         end do
         do k = 2,kb
           do i = 1,im
@@ -1845,7 +1875,7 @@
       do k = 1,kb
         do j = 1,jm
           do i = 2,im
-            aux(i,j) = zz(k)*(d(i,j)-d(i-1,j))
+            aux(i,j) = zz(k)*(d(i,j)-d(i-1,j))+el(i,j)-el(i-1,j)
             fc(i,j) = rho(i,j,k)-rho(i-1,j,k)
           end do
         end do
@@ -1875,26 +1905,47 @@
             else
               drhox(i,j,k) = drhox(i,j,k-1)
             end if
-            drhox(i,j,k) =drhox(i,j,k)+.25*(dy(i,j)+dy(i-1,j))*
-     &                    (dz(k)*(d(i,j)+d(i-1,j)))*
+            drhox(i,j,k) = drhox(i,j,k)+
+     &                    .25*(dy(i,j)+dy(i-1,j))*
+     &                    (dz(k)*(dt(i,j)+dt(i-1,j)))*
      &                    (p(i-1,j,k)-p(i,j,k)-
      &                     HalfGRho*
      &                     ((rho(i,j,k)+rho(i-1,j,k))*
-     &                      (zz(k)*(dt(i,j)-d(i-1,j)))
-!     &                             +et(i,j)-et(i-1,j))-
+     &                      (zz(k)*(d(i,j)-d(i-1,j))
+     &                             +el(i,j)-el(i-1,j))
      &                      -OneFifth*
      &                       ((idRx(i,j)-idRx(i-1,j))*
-     &                        (zz(k)*(dt(i,j)-d(i-1,j))
-!     &                               +et(i,j)-et(i-1,j)-
+     &                        (zz(k)*(d(i,j)-d(i-1,j))
+     &                               +el(i,j)-el(i-1,j)
      &                        -OneTwelfth*
      &                         (idZx(i,j)+idZx(i-1,j)))-
      &                        (idZx(i,j)-idZx(i-1,j))*
-     &                        (rho(i,j,k)-rho(i-1,j,k)-
-     &                         OneTwelfth*
+     &                        (rho(i,j,k)-rho(i-1,j,k)
+     &                        -OneTwelfth*
      &                         (idRx(i,j)+idRx(i-1,j))))))
+!     &                     /(.5*(dt(i,j)+dt(i-1,j)))
           end do
         end do
       end do
+!!      do k=1,kb-1
+!!        do j=2,jmm1
+!!          do i=2,imm1
+!!            drhox(i,j,k)=.25*(dt(i,j)+dt(i-1,j))
+!!     $                      *drhox(i,j,k)*dum(i,j)
+!!     $                      *(dy(i,j)+dy(i-1,j))
+!!          end do
+!!        end do
+!!      end do
+      print *, "BAROPG_SHCH" !REM:
+      if ( my_task==1 ) then
+!!        print *, "Di  :", d(25,25), h(25,25), el(25,25)
+!!        print *, "Di-1:", d(24,25), h(24,25), el(24,25)
+!!        print *, "dy:", dy(25,25), dy(24,25)
+        print '(*(2(f18.7,";"),f18.7/))', (drhox(60,70,k)
+     &                    ,drhox(60,70,k)/dt(60,70),dt(60,70), k=1,kb-1)
+      end if
+!!      call finalize_mpi
+!!      stop
 !
 !-----------------------------------------------------------------------
 !  ETA-component pressure gradient term.
@@ -1933,33 +1984,33 @@
             else
               drhoy(i,j,k) = drhoy(i,j,k-1)
             end if
-            drhoy(i,j,k) =drhoy(i,j,k)+.25*(dx(i,j)+dy(i,j-1))*
-     &                    (dz(k)*(d(i,j)+d(i,j-1)))*
+            drhoy(i,j,k) = drhoy(i,j,k)+
+     &                    .25*(dx(i,j)+dx(i,j-1))*
+     &                    (dz(k)*(dt(i,j)+dt(i,j-1)))*
      &                    (p(i,j-1,k)-p(i,j,k)-
      &                     HalfGRho*
      &                     ((rho(i,j,k)+rho(i,j-1,k))*
-     &                      (zz(k)*(d(i,j)-d(i,j-1)))
-!     &                             +et(i,j)-et(i,j-1))-
+     &                      (zz(k)*(d(i,j)-d(i,j-1))
+     &                             +el(i,j)-el(i,j-1))
      &                      -OneFifth*
      &                       ((idRx(i,j)-idRx(i,j-1))*
      &                        (zz(k)*(d(i,j)-d(i,j-1))
-!     &                               +et(i,j)-et(i,j-1)-
+     &                               +el(i,j)-el(i,j-1)
      &                        -OneTwelfth*
      &                         (idZx(i,j)+idZx(i,j-1)))-
      &                        (idZx(i,j)-idZx(i,j-1))*
-     &                        (rho(i,j,k)-rho(i,j-1,k)-
-     &                         OneTwelfth*
+     &                        (rho(i,j,k)-rho(i,j-1,k)
+     &                        -OneTwelfth*
      &                         (idRx(i,j)+idRx(i,j-1))))))
+!     &                     /(.5*(dt(i,j)+dt(i,j-1)))
           end do
         end do
       end do
 !
 
 
-      drhox = - ramp*drhox
-      drhoy = - ramp*drhoy
-
-      rho = rho+rmean
+      drhox = ramp*drhox
+      drhoy = ramp*drhoy
 
 
       end ! subroutine baropg_shch

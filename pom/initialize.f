@@ -62,26 +62,51 @@
 
 ! The model is initialized. Below is some updates. TODO: Separate?
       call msg_print("MODEL CORE INITIALIZED", 1, "")
-      ! TODO: Revised up to here. Code below is "as it was before".
+      ! TODO: Revised up to here. Code below is "untested".
 
 ! Initialize modules
       call initialize_modules
 
+
+      if ( .not.do_restart ) then
 ! read initial and lateral boundary conditions
-      call initial_conditions
-      call create_initial("out/init."//trim(netcdf_file)//".nc") ! TODO: Move after IC updated?
+        call initial_conditions
+
+! Initialize time
+        call initialize_time
 
 ! read previous (initial) record [TODO: NOTE! This step should be done before update_initial for clim to get rmean. But what happens to boundary?]
-      call modules_initial_step( dtime )
-
-! read laterel boundary conditions
-      !call lateral_boundary_conditions !ayumi:20100407
-
-! read M2 tidal amplitude & phase
-      if ( calc_tide ) call read_tide      !fhx:tide
+        call modules_initial_step( dtime )
 
 ! update initial conditions and set the remaining conditions
-      call update_initial
+        call update_initial
+        call create_initial("out/init."//trim(netcdf_file)//".nc")
+
+! read laterel boundary conditions
+       !call lateral_boundary_conditions !ayumi:20100407
+
+! read M2 tidal amplitude & phase
+        if ( use_tide ) call read_tide  ! TODO: move to initialize_modules?
+
+      else
+
+! read restart data from a previous run TODO: Shoul be in init module as a variation of read_initial
+        call read_restart
+! update time and water column
+        !time = time0
+
+        d  = h+el
+        dt = h+et
+
+        if ( append_output ) out_record = int(time/iprint)
+
+! Initialize time
+        call initialize_time
+! initialise modules
+        call modules_initial_step( dtime )
+
+      end if
+
 
 ! calculate the bottom friction coefficient
       call bottom_friction
@@ -92,14 +117,6 @@
       if ( lono/=999. .and. lato/=999. ) then
 !set lono.OR.lato=999. to skip
         call incmix(aamfac,im,jm,1,lono,lato,east_e,north_e,xs,ys,fak)
-      end if
-
-! read restart data from a previous run TODO: Shoul be in init module as a variation of read_initial
-      if ( do_restart ) then
-        call read_restart
-! update time
-        time = time0
-        if ( append_output ) out_record = int(time/iprint)
       end if
 
 ! Output routines
@@ -185,8 +202,8 @@
 
 
       el_name = "elev"
-       s_name = "salt"
-       t_name = "temp"
+       s_name = "mean_s" !"salt"
+       t_name = "mean_t" !"temp"
        u_name = "u"
        v_name = "v"
       record = 1
@@ -245,7 +262,7 @@
       use glob_domain
       use io
       use mpi        , only: MPI_OFFSET_KIND
-      use model_run  , only: time0
+      use model_run  , only: time
       use glob_ocean
       use pnetcdf    , only: NF90_NOWRITE
 
@@ -261,10 +278,11 @@
       edge  = [ im         , jm         , kb ]
 
 ! Read initial file
-      call msg_print("", 6, "Read restart file:")
+      call msg_print("", 6, "Read restart file: `"
+     &                      //trim(initial_file)//"`")
       file_id = file_open( trim(initial_file), NF90_NOWRITE )
       if ( .not.is_error(file_id) ) then
-        status = var_read(file_id,'time'  ,time0 , start(3:3) )
+        status = var_read(file_id,'time'  ,time  , start(3:3) )
         status = var_read(file_id,'wusurf',wusurf, start(1:2),edge(1:2))
         status = var_read(file_id,'wvsurf',wvsurf, start(1:2),edge(1:2))
         status = var_read(file_id,'wubot' ,wubot , start(1:2),edge(1:2))
@@ -313,7 +331,28 @@
 ! Close file
       file_id = file_close( file_id )
 
+
       end
+!______________________________________________________________________
+!
+      subroutine initialize_time
+!----------------------------------------------------------------------
+!  Initialize `dtime` variable
+!______________________________________________________________________
+!
+        use config     , only: do_restart
+        use model_run  , only: dtime, time, time0, time_start
+        use module_time
+
+        implicit none
+
+
+! Initialize time
+        dtime = str2date( time_start ) + int(time*86400.)
+        time0 = time
+
+
+      end subroutine
 !______________________________________________________________________
 !
       subroutine create_output( out_file )
@@ -331,6 +370,8 @@
         use glob_out
         use pnetcdf    , only: NF90_FLOAT
         use seaice     , only: icec, iceu, icev
+        use tide       , only: define_tide, define_tide_init
+     &                       , write_tide_init
         use model_run  , only: time, time_start
         use mpi        , only: MPI_OFFSET_KIND
 
@@ -452,6 +493,8 @@
      &                    , 'v - free surface mask'
      &                    , 'dimensionless'
      &                    , -1, 0., 'east_v north_v' )
+        call define_tide_init( file_id, [ x_dimid, y_dimid ]
+     &                       , NF90_FLOAT )
 
         varid = var_define( file_id, 'uab', NF90_FLOAT
      &                    , [ x_dimid, y_dimid, time_dimid ]
@@ -500,6 +543,9 @@
      &                      , 'fraction'
      &                      , 0, 0., 'east_e north_e' )
         end if
+
+        call define_tide( file_id, [ x_dimid, y_dimid, time_dimid ]
+     &                  , NF90_FLOAT )
 
         if ( mode /= MODE_BAROTROPIC ) then
           varid = var_define( file_id, 'u', NF90_FLOAT
@@ -562,6 +608,7 @@
         call var_write( file_id, "fsm"    , fsm    , start, edge )
         call var_write( file_id, "dum"    , dum    , start, edge )
         call var_write( file_id, "dvm"    , dvm    , start, edge )
+        call write_tide_init( file_id, start, edge )
 
         file_id = file_close( file_id )
 
@@ -571,7 +618,7 @@
 
 !______________________________________________________________________
 !
-      subroutine write_output( out_file, record )
+      subroutine write_output( out_file, record, write_means )
 !----------------------------------------------------------------------
 !  Write output file.
 !______________________________________________________________________
@@ -585,11 +632,14 @@
         use glob_ocean
         use pnetcdf    , only: NF90_WRITE
         use seaice     , only: icec, iceu, icev
+        use tide       , only: write_tide
         use model_run  , only: time, time_start
         use mpi        , only: MPI_OFFSET_KIND
+        use glob_out
 
         implicit none
 
+        logical     , intent(in) :: write_means
         character(*), intent(in) :: out_file
         integer     , intent(in) :: record
 
@@ -614,27 +664,48 @@
 
         start = [ i_global(1), j_global(1), record, 1 ]
         edge  = [  im        , jm         ,      1, 1 ]
-        call var_write( file_id, "uab"   , uab   , start, edge )
-        call var_write( file_id, "vab"   , vab   , start, edge )
-        call var_write( file_id, "elb"   , elb   , start, edge )
-        call var_write( file_id, "wusurf", wusurf, start, edge )
-        call var_write( file_id, "wvsurf", wvsurf, start, edge )
-        call var_write( file_id, "wtsurf", wtsurf, start, edge )
-        call var_write( file_id, "wssurf", wssurf, start, edge )
-        call var_write( file_id, "swrad" , swrad , start, edge )
+        if ( write_means ) then
+          call var_write( file_id, "uab"   , uab_mean   , start, edge )
+          call var_write( file_id, "vab"   , vab_mean   , start, edge )
+          call var_write( file_id, "elb"   , elb_mean   , start, edge )
+          call var_write( file_id, "wusurf", wusurf_mean, start, edge )
+          call var_write( file_id, "wvsurf", wvsurf_mean, start, edge )
+          call var_write( file_id, "wtsurf", wtsurf_mean, start, edge )
+          call var_write( file_id, "wssurf", wssurf_mean, start, edge )
+          call var_write( file_id, "swrad" , swrad_mean , start, edge )
+        else
+          call var_write( file_id, "uab"   , uab   , start, edge )
+          call var_write( file_id, "vab"   , vab   , start, edge )
+          call var_write( file_id, "elb"   , elb   , start, edge )
+          call var_write( file_id, "wusurf", wusurf, start, edge )
+          call var_write( file_id, "wvsurf", wvsurf, start, edge )
+          call var_write( file_id, "wtsurf", wtsurf, start, edge )
+          call var_write( file_id, "wssurf", wssurf, start, edge )
+          call var_write( file_id, "swrad" , swrad , start, edge )
+        end if
         if ( use_ice ) then
           call var_write( file_id, "icec", icec  , start, edge )
         end if
+        call write_tide( file_id, start, edge )
 
         if ( mode /= MODE_BAROTROPIC ) then
           start(3:4) = [  1, record ]
           edge (3:4) = [ kb,      1 ]
-          call var_write( file_id, "u"   , u  , start, edge )
-          call var_write( file_id, "v"   , v  , start, edge )
-          call var_write( file_id, "w"   , w  , start, edge )
-          call var_write( file_id, "s"   , s  , start, edge )
-          call var_write( file_id, "t"   , t  , start, edge )
-          call var_write( file_id, "rho" , rho, start, edge )
+          if ( write_means ) then
+            call var_write( file_id, "u"   , u_mean  , start, edge )
+            call var_write( file_id, "v"   , v_mean  , start, edge )
+            call var_write( file_id, "w"   , w_mean  , start, edge )
+            call var_write( file_id, "s"   , s_mean  , start, edge )
+            call var_write( file_id, "t"   , t_mean  , start, edge )
+            call var_write( file_id, "rho" , rho_mean, start, edge )
+          else
+            call var_write( file_id, "u"   , u  , start, edge )
+            call var_write( file_id, "v"   , v  , start, edge )
+            call var_write( file_id, "w"   , w  , start, edge )
+            call var_write( file_id, "s"   , s  , start, edge )
+            call var_write( file_id, "t"   , t  , start, edge )
+            call var_write( file_id, "rho" , rho, start, edge )
+          end if
         end if
 
 !     close file
@@ -1398,30 +1469,39 @@
 !______________________________________________________________________
 !
       use air        , only: vfluxf
-      use config     , only: aam_init, npg
+      use config     , only: aam_init, npg  ,do_restart,use_tide
       use glob_const , only: rk, SMALL
       use glob_domain, only: im, is_master, jm, kb, kbm1  ,my_task
       use grid       , only: dz, h
-      use model_run,only:iint
+      use model_run,only:iint, dtime
       use glob_ocean , only: aam, d, drhox, drhoy, drx2d, dry2d, dt
      &                     , el, elb, et, etb, etf
      &                     , kh, km, kq, l, q2, q2b, q2l, q2lb
      &                     , rho, s, sb, t, tb, u, ua, ub, uab
      &                     , v, va, vb, vab, w
+      use tide, only: tide_advance=>step, tide_el, tide_ua, tide_va
 
       implicit none
 
       integer i,j,k
 
 
+      if ( .not.do_restart .and. use_tide ) then
+        call tide_advance( dtime )
+        uab = tide_ua
+        vab = tide_va
+        elb = tide_el
+        etb = elb
+      end if
       ua = uab
       va = vab
       el = elb
       et = etb
       etf= et
-      d  = h+el
-      dt = h+et
       w(:,:,1) = vfluxf
+
+      d  = h + el
+      dt = h + et
 
       do k=1,kb
         l(:,:,k) = .1*dt

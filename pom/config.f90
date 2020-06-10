@@ -86,9 +86,12 @@ module config
   character(len=4) &
     windf      ! TODO: remove this path
 
+  logical          &
+    output_means     ! write variables averaged over time strting from previous output
+
   integer          &
     output_flag    &
-  , SURF_flag      &
+  , SURF_flag      & ! TODO: move to potential output module?.. (glob_out rework)
   , monthly_flag
 
   real(kind=rk)    &
@@ -269,6 +272,9 @@ module config
       do_restart    = .false.
       append_output = .false.
 
+      output_flag  = 1
+      output_means = .false.
+
 
     end ! subroutine
 !
@@ -281,7 +287,7 @@ module config
 !
       use glob_const , only: rk
       use glob_out   , only: prtd1, prtd2, write_rst
-      use model_run  , only: days, dte, isplit, initialize_time, time_start
+      use model_run  , only: days, dte, isplit, initialize_model_run, time_start
 
       implicit none
 
@@ -303,9 +309,10 @@ module config
       , t_hi    , t_lo  , tbias , tprni       &
       , umol    , vmaxl , z0b
 
-      namelist/output_nml/                                       &
-        append_output, monthly_flag, netcdf_file  , output_flag  &
-      , prtd1        , prtd2       , write_rst    , SURF_flag
+      namelist/output_nml/                                     &
+        append_output, monthly_flag, netcdf_file, output_flag  &
+      , output_means , prtd1       , prtd2      , write_rst    &
+      , SURF_flag
 
       namelist/modules_nml/                             &
         USE_AIR, USE_BRY, USE_ICE, USE_RIVER, USE_TIDE
@@ -327,8 +334,8 @@ module config
       read ( 73, nml = modules_nml )
       close( 73 )
 
-! Initialize time
-      call initialize_time( time_start, do_restart )
+!  Initialise timestep-related variables
+      call initialize_model_run
 
 ! End of input of constants
       call print_config

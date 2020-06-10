@@ -88,8 +88,8 @@
 !______________________________________________________________________
       subroutine output_results( d_in, output_mode, mb )
 
-      use config     , only: calc_assim, netcdf_file
-     &                     , output_flag
+      use config     , only: calc_assim , netcdf_file
+     &                     , output_flag, output_means
       use glob_domain, only: im, jm, kb
       use glob_ocean , only: ssurf, tsurf
       use glob_out
@@ -126,6 +126,7 @@
           rho_mean    = rho_mean    / real ( num )
           kh_mean     = kh_mean     / real ( num )
           km_mean     = km_mean     / real ( num )
+          aam_mean    = aam_mean    / real ( num )
 
 
 
@@ -147,6 +148,7 @@
           call exchange2d_mpi( wvsurf_mean, im, jm )
           call exchange2d_mpi( wtsurf_mean, im, jm )
           call exchange2d_mpi( wssurf_mean, im, jm )
+          call exchange2d_mpi( swrad_mean, im, jm )
           call exchange3d_mpi( u_mean, im, jm, kb )
           call exchange3d_mpi( v_mean, im, jm, kb )
           call exchange3d_mpi( w_mean, im, jm, kb )
@@ -155,12 +157,14 @@
           call exchange3d_mpi( rho_mean, im, jm, kb )
           call exchange3d_mpi( kh_mean, im, jm, kb )
           call exchange3d_mpi( km_mean, im, jm, kb )
+          call exchange3d_mpi( aam_mean, im, jm, kb )
 
 
           if ( output_flag == 1 ) then
 
             call write_output(
-     &        "out/"//trim(netcdf_file)//".nc", out_record )
+     &        "out/"//trim(netcdf_file)//".nc"
+     &       , out_record, output_means )
 
           else if (output_flag == 0) then
 
@@ -169,7 +173,7 @@
      &        date2str(d_in)//".nc" )
             call write_output(
      &        "out/"//trim(netcdf_file)//"."//
-     &        date2str(d_in)//".nc", 1 )
+     &        date2str(d_in)//".nc", 1, output_means )
 
           end if
 
@@ -180,6 +184,7 @@
           wvsurf_mean = 0.
           wtsurf_mean = 0.
           wssurf_mean = 0.
+          swrad_mean  = 0.
           u_mean      = 0.
           v_mean      = 0.
           w_mean      = 0.
@@ -399,6 +404,7 @@
 ! Print simple message if only `DESC` is present.
         if ( msg == '' .and. desc /= '' ) then
           print '("[",a,"] ",a)', char(chr(status)), desc
+          if ( status == 3 ) stop
           return
         end if
 
