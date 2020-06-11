@@ -19,6 +19,12 @@ module io
 
   implicit none
 
+  interface att_read
+    module procedure att_read_chr
+    ! module procedure att_read_int
+    ! module procedure att_read_flt
+  end interface
+
   interface att_write
     module procedure att_write_chr
     module procedure att_write_int
@@ -40,10 +46,10 @@ module io
   end interface
 
 
-  public :: att_write , check     , dim_define , is_error             &
-          , file_open , file_close, file_create, file_end_definition  &
-          , var_define, var_rank  , var_read   , var_shape            &
-          , var_write
+  public :: att_read, att_write, check     , dim_define   &
+          , is_error, file_open, file_close, file_create  &
+          , file_end_definition, var_define, var_rank     &
+          , var_read, var_shape, var_write
 
   private
 
@@ -138,7 +144,10 @@ module io
 !___________________________________________________________________
 !
     integer function var_rank( ncid, name )
-
+!-------------------------------------------------------------------
+!  Returns a variable's rank.
+!___________________________________________________________________
+!
       use pnetcdf, only: nf90mpi_inq_varid, nf90mpi_inquire_variable
 
       implicit none
@@ -194,6 +203,34 @@ module io
 
 
     end function var_shape
+!
+!___________________________________________________________________
+!
+    character(256) function att_read_chr( ncid, var_name, name )
+!-------------------------------------------------------------------
+!  Returns a variable's string attribute.
+!___________________________________________________________________
+!
+      use pnetcdf, only: NF_GLOBAL, nf90mpi_get_att, nf90mpi_inq_varid
+
+      implicit none
+
+      integer     , intent(in) :: ncid
+      character(*), intent(in) :: name, var_name
+
+      integer status, varid
+
+
+      if ( var_name == "" ) then
+        status = nf90mpi_get_att( ncid, NF_GLOBAL, name, att_read_chr )
+      else
+        status = nf90mpi_inq_varid( ncid, var_name, varid )
+        status = nf90mpi_get_att( ncid, varid, name, att_read_chr )
+      end if
+      call check( status, 'nf_get_att_int: '//name)
+
+
+    end ! function att_read_chr
 !
 !___________________________________________________________________
 !

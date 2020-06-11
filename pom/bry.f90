@@ -2443,10 +2443,10 @@ module bry
 !                              *dx(2,2:jmm1)/dx(3,2:jmm1)
 
             case ( bcCHAPMAN )
-              cx(2:jmm1) = dte*.5*(1./dx(3,1:jmm2)+1./dx(3,2:jmm1))  &
-                         * sqrt( dvm(3,2:jmm1)*.5*GRAV               &
-                               * (d(3,1:jmm2)+d(3,2:jmm1)) )
-              vaf(2,2:jmm1) = (va(2,2:jmm1)+cx(2:jmm1)*vaf(3,2:jmm1))  &
+              cx(2:jmm1) = dte*.5*(1./dx(2,1:jmm2)+1./dx(2,2:jmm1))  &
+                         * sqrt( dvm(2,2:jmm1)*.5*GRAV               &
+                               * (d(2,1:jmm2)+d(2,2:jmm1)) )
+              vaf(1,2:jmm1) = (va(1,2:jmm1)+cx(2:jmm1)*vaf(2,2:jmm1))  &
                             / (1.+cx(2:jmm1))
 
             case default

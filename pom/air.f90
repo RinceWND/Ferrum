@@ -590,7 +590,7 @@ module air
 
       end if
 
-      if ( USE_FLUXES ) then
+      if ( USE_FLUXES ) then ! TODO: It negates fluxes calculation in calculate_fluxes
         if ( INTERP_HEAT ) then
           wtsurf = ( 1. - a ) * ( lrad(:,:,2)+sheat(:,:,2)+lheat(:,:,2) )  &
                  +        a   * ( lrad(:,:,3)+sheat(:,:,3)+lheat(:,:,3) )
@@ -1749,6 +1749,7 @@ module air
                 + .6667_rk*(zet-14.28_rk)*exp(-dzet) + 8.525_rk )
       end if
 
+
     end ! function psit_26
 !
 !______________________________________________________________________
@@ -1915,10 +1916,11 @@ module air
 !
 ! --- Constant Latent Heat of Vaporization
 !     L = 2.501e+6  (MKS)
+!______________________________________________________________________
 !
       implicit none
 
-      real(rk), intent(in)  :: t
+      real(rk), intent(in) :: t
 
 
       heat_latent = 2.5008e+6_rk - 2.3e+3_rk * t
@@ -1937,8 +1939,8 @@ module air
 
       implicit none
 
-      real(rk), intent(in)  :: alat, alon, acl
-      integer , intent(in)  :: iyr, imt, idy, ihr, ime
+      real(rk), intent(in) :: alat, alon, acl
+      integer , intent(in) :: iyr, imt, idy, ihr, ime
 
       integer imt1, iyr1, intT1, intT2, jab
       real(rk)                               &
@@ -2466,6 +2468,7 @@ module air
 !
     subroutine read_all( execute, n, year, record )
 
+      use glob_const , only: C2K, rho_cpw, rhoref
       use glob_domain, only: i_global, j_global
       use io
       use mpi        , only: MPI_OFFSET_KIND
@@ -2552,6 +2555,10 @@ module air
                        , start, edge ) /= NF90_NOERR       ) then
             pres(:,:,n) = 1013.
             call msg_print("", 2, "Atm.pressure is defaulted to 1013 hPa.")
+          else
+            if ( trim(att_read( file_id, pres_name, "units" )) == "Pa" ) then
+              pres(:,:,n) = pres(:,:,n)/100.
+            end if
           end if
         end if
 
@@ -2561,6 +2568,10 @@ module air
                        , start, edge ) /= NF90_NOERR      ) then
             sst(:,:,n) = tb(:,:,1)
             call msg_print("", 2, "SST is defaulted to surf. level temp.")
+          else
+            if ( trim(att_read( file_id, sst_name, "units" )) == "K" ) then
+              sst(:,:,n) = sst(:,:,n) - C2K
+            end if
           end if
         end if
 
@@ -2570,6 +2581,10 @@ module air
                        , start, edge ) /= NF90_NOERR       ) then
             temp(:,:,n) = tb(:,:,1)
             call msg_print("", 2, "Tair is defaulted to surf. level temp.")
+          else
+            if ( trim(att_read( file_id, tair_name, "units" )) == "K" ) then
+              temp(:,:,n) = temp(:,:,n) - C2K
+            end if
           end if
         end if
 
@@ -2607,6 +2622,12 @@ module air
               ustr(:,:,n) = 0.
               vstr(:,:,n) = 0.
               call msg_print("", 2, "Wind stress is defaulted to zero.")
+            else
+              select case ( trim(att_read( file_id, ustr_name, "units" )) )
+                case ( "N/m2", "N/m^2", "N m**-2", "N m^-2" )
+                  ustr(:,:,n) = ustr(:,:,n)/rhoref
+                  vstr(:,:,n) = vstr(:,:,n)/rhoref
+              end select
             end if
           end if
 
@@ -2625,21 +2646,41 @@ module air
                          , start, edge ) /= NF90_NOERR ) then
               lheat(:,:,n) = 0.
               call msg_print("", 2, "Latent heat is set to zero.")
+            else
+              select case ( trim(att_read( file_id, lheat_name, "units" )) )
+                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2" )
+                  lheat(:,:,n) = lheat(:,:,n)/rho_cpw
+              end select
             end if
             if ( var_read( file_id,  lrad_name,  lrad(:,:,n)  &
                          , start, edge ) /= NF90_NOERR ) then
               lrad(:,:,n) = 0.
               call msg_print("", 2, "Net longrad. is set to zero.")
+            else
+              select case ( trim(att_read( file_id, lrad_name, "units" )) )
+                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2" )
+                  lrad(:,:,n) = lrad(:,:,n)/rho_cpw
+              end select
             end if
             if ( var_read( file_id, sheat_name, sheat(:,:,n)  &
                          , start, edge ) /= NF90_NOERR ) then
               sheat(:,:,n) = 0.
               call msg_print("", 2, "Sensible heat is set to zero.")
+            else
+              select case ( trim(att_read( file_id, sheat_name, "units" )) )
+                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2" )
+                  sheat(:,:,n) = sheat(:,:,n)/rho_cpw
+              end select
             end if
             if ( var_read( file_id,  srad_name,  srad(:,:,n)  &
                          , start, edge ) /= NF90_NOERR ) then
               srad(:,:,n) = 0.
               call msg_print("", 2, "Net shortrad. is set to zero.")
+            else
+              select case ( trim(att_read( file_id, srad_name, "units" )) )
+                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2" )
+                  srad(:,:,n) = srad(:,:,n)/rho_cpw
+              end select
             end if
           end if
 

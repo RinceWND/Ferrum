@@ -342,6 +342,7 @@
 !
         use config     , only: do_restart
         use model_run  , only: dtime, time, time0, time_start
+     &                       , update_time
         use module_time
 
         implicit none
@@ -350,6 +351,8 @@
 ! Initialize time
         dtime = str2date( time_start ) + int(time*86400.)
         time0 = time
+
+        call update_time
 
 
       end subroutine
