@@ -1007,8 +1007,8 @@ module tide
 
 
       specify_constituent % name  = name
-      specify_constituent % speed = speed
-      specify_constituent % freq  = 360./speed
+      specify_constituent % speed = max( speed, 1.e-4_rk )
+      specify_constituent % freq  = 360. / specify_constituent % speed
       specify_constituent % k     = wavenumber
 
       specify_constituent % V     = real( V_arg, rk )
@@ -1028,7 +1028,9 @@ module tide
 
       integer i
 
+
       get_constituent = specify_constituent( "n/a", 0._rk, 0, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] )
+
       do i =  1, CONS_OVERALL
         if ( name == trim( con(i)%name ) ) then
           get_constituent = con(i)
@@ -1360,7 +1362,7 @@ module tide
                   wgt = wgt + .5
                 end if
               end if
-              if ( i /= src_x_n ) then
+              if ( i /= 1 ) then
                 if ( src(i-1,j) /= 0._rk ) then
                   val = val + src(i-1,j)
                   wgt = wgt + 1.

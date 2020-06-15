@@ -76,7 +76,7 @@ module bry
   , bcIMPEDANCE       = 10 & !  impedance condition
   , bcFLATHER_SSH     = 11
 
-  character(4), dimension(-1:10), parameter :: & ! Boundary conditions name strings (first four characters are index keys)
+  character(4), dimension(-1:11), parameter :: & ! Boundary conditions name strings (first four characters are index keys)
     bcTITLES = [  &
       "NULL"      & ! Null
     , "GRAD"      & ! Zero gradient
@@ -89,7 +89,8 @@ module bry
     , "ERAD"      & ! Enhanced radiation
     , "GFLA"      & ! Generalized Flather
     , "CHAP"      & ! Chapman
-    , "TEST"      & !
+    , "IMPD"      & !
+    , "ZFLA"      & !
     ]
 
 !----------------------------------------------------------------------
@@ -801,6 +802,7 @@ module bry
 
       else
 
+        year = -1
         record = [ 1, 1, 2 ]
         a = 0._rk
 
@@ -899,6 +901,8 @@ module bry
           record(1) = record(1) + 1
 
         else
+
+          year = -1
 
           record(1) = int( iint*dti / read_int ) + 1
           record(2) = record(1)
@@ -1435,7 +1439,7 @@ module bry
 
       file_id = file_open( trim( get_filename( bry_path, year(n) ) )  &
                          , NF90_NOWRITE )
-      if ( file_id /= NF90_NOERR ) return
+      if ( file_id < 0 ) return
 
 ! EAST
       if ( hasEAST ) then

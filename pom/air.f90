@@ -2597,8 +2597,6 @@ module air
               call msg_print("", 2, "Cloud cover is defaulted to zero.")
             end if
           end if
-        else
-          cloud(:,:,n) = 0.
         end if
 
         file_id = file_close( file_id )
@@ -2648,7 +2646,7 @@ module air
               call msg_print("", 2, "Latent heat is set to zero.")
             else
               select case ( trim(att_read( file_id, lheat_name, "units" )) )
-                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2" )
+                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2", "W m-2" )
                   lheat(:,:,n) = lheat(:,:,n)/rho_cpw
               end select
             end if
@@ -2658,7 +2656,7 @@ module air
               call msg_print("", 2, "Net longrad. is set to zero.")
             else
               select case ( trim(att_read( file_id, lrad_name, "units" )) )
-                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2" )
+                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2", "W m-2" )
                   lrad(:,:,n) = lrad(:,:,n)/rho_cpw
               end select
             end if
@@ -2668,7 +2666,7 @@ module air
               call msg_print("", 2, "Sensible heat is set to zero.")
             else
               select case ( trim(att_read( file_id, sheat_name, "units" )) )
-                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2" )
+                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2", "W m-2" )
                   sheat(:,:,n) = sheat(:,:,n)/rho_cpw
               end select
             end if
@@ -2678,7 +2676,7 @@ module air
               call msg_print("", 2, "Net shortrad. is set to zero.")
             else
               select case ( trim(att_read( file_id, srad_name, "units" )) )
-                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2" )
+                case ( "W/m2", "W/m^2", "W m**-2", "W m^-2", "W m-2" )
                   srad(:,:,n) = srad(:,:,n)/rho_cpw
               end select
             end if
