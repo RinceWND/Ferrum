@@ -593,8 +593,8 @@ module clim
       if ( .not.RELAX_TS ) return
 
       where ( hz .gt. h_thres )
-        temp = deep_rel * ( tclim - temp )
-        salt = deep_rel * ( sclim - salt )
+        temp = temp + deep_rel * ( tclim - temp )
+        salt = salt + deep_rel * ( sclim - salt )
       end where
 
 
