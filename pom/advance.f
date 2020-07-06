@@ -390,20 +390,22 @@
         end do
       end do
 
+      if ( use_tide ) call tide_advance( dtime ) ! update tide boundaries before applying boundary conditions
+
       call bc_vel_ext ! bcond(2)
 
       call exchange2d_mpi(uaf,im,jm)
       call exchange2d_mpi(vaf,im,jm)
 
-      if ( use_tide ) then
+      ! if ( use_tide ) then
         ! uaf = uaf - tide_ua
         ! vaf = vaf - tide_va
-        call apply_tide(-1._rk)
-        call tide_advance( dtime + int(iext*dte) )
-        call apply_tide(1._rk)
+        ! call apply_tide(-1._rk)
+        ! call tide_advance( dtime + int(iext*dte) )
+        ! call apply_tide(1._rk)
         ! uaf = uaf + tide_ua! - tide_ua_b
         ! vaf = vaf + tide_va! - tide_va_b
-      end if
+      ! end if
 
       if     ( iext == (isplit-2) ) then
 

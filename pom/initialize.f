@@ -281,6 +281,7 @@
       call msg_print("", 6, "Read restart file: `"
      &                      //trim(initial_file)//"`")
       file_id = file_open( trim(initial_file), NF90_NOWRITE )
+
       if ( .not.is_error(file_id) ) then
         status = var_read(file_id,'time'  ,time  , start(3:3) )
         status = var_read(file_id,'wusurf',wusurf, start(1:2),edge(1:2))
@@ -1489,12 +1490,14 @@
       integer i,j,k
 
 
-      if ( .not.do_restart .and. use_tide ) then
+      if ( use_tide ) then
         call tide_advance( dtime )
-        uab = tide_ua
-        vab = tide_va
-        elb = tide_el
-        etb = elb
+        if ( .not.do_restart ) then
+          uab = tide_ua
+          vab = tide_va
+          elb = tide_el
+          etb = elb
+        end if
       end if
       ua = uab
       va = vab

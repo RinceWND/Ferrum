@@ -832,7 +832,6 @@ module bry
 !
       use config     , only: use_tide
 !      use glob_grid  , only: dz
-!      use glob_domain, only: is_master
       use model_run  , only: dti, iint, mid_in_month, mid_in_nbr      &
                            , secs => sec_of_year, sec_of_month
       use module_time
@@ -881,44 +880,44 @@ module bry
           print *, "[!!!] ", sec_of_month, mid_in_month, dti
         end if
 
-        elseif ( USE_CALENDAR ) then
+      elseif ( USE_CALENDAR ) then
 
-          year = d_in%year
+        year = d_in%year
 
-          max_in_this = max_chunks_in_year( d_in%year  , read_int )
-          max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
+        max_in_this = max_chunks_in_year( d_in%year  , read_int )
+        max_in_prev = max_chunks_in_year( d_in%year-1, read_int )
 
 ! Decide on the record to read
-          chunk     = chunk_of_year( d_in, read_int )
-          record(1) = int(chunk)
+        chunk     = chunk_of_year( d_in, read_int )
+        record(1) = int(chunk)
 
-          if ( secs - record(1)*read_int < dti ) then ! TODO: test this one as well.
-            ADVANCE_REC = .true.
-          end if
+        if ( secs - record(1)*read_int < dti ) then ! TODO: test this one as well.
+          ADVANCE_REC = .true.
+        end if
 
 !      if ( is_master ) print *, "III", secs-record(1)*read_int, dti, ADVANCE_REC
 
-          record(1) = record(1) + 1
+        record(1) = record(1) + 1
 
-        else
+      else
 
-          year = -1
+        year = -1
 
-          record(1) = int( iint*dti / read_int ) + 1
-          record(2) = record(1)
-          record(3) = record(2) + 1
+        record(1) = int( iint*dti / read_int ) + 1
+        record(2) = record(1)
+        record(3) = record(2) + 1
 
 ! TODO: right now it interpolates between records (edges of rec1-rec2 span). Implement interpolation between the centers of record spans.
-          a = modulo( real(iint*dti), real(read_int) )
-          if ( a < dti ) then
-            if ( a >= 0. ) then
-              ADVANCE_REC = .true.
-            end if
+        a = modulo( real(iint*dti), real(read_int) )
+        if ( a < dti ) then
+          if ( a >= 0. ) then
+            ADVANCE_REC = .true.
           end if
-          a = a / read_int
+        end if
+        a = a / read_int
 !        print *, "A: ", a
 
-          ADVANCE_REC_INT = ADVANCE_REC
+        ADVANCE_REC_INT = ADVANCE_REC
 
       end if
 
@@ -927,14 +926,14 @@ module bry
         if ( INTERP_BRY .and. ADVANCE_REC_INT ) then
           call advance_record
           call read_all( ADVANCE_REC_INT, 3, year, record )
-          call interpolate
         end if
         if ( ADVANCE_REC ) then
           call read_all( ADVANCE_REC    , 1, year, record )
         end if
-        if ( DERIVE_2D ) call derive_barotropic_velocities
       end if
 
+      if ( INTERP_BRY ) call interpolate
+      if ( DERIVE_2D ) call derive_barotropic_velocities
 ! Fill in climate to boundaries
       if ( CLIM_BRY ) call clim_to_bry
 
@@ -1352,7 +1351,7 @@ module bry
 
         UA_bry % EST = 0.
         VA_bry % EST = 0.
-        do k = 1, kb
+        do k = 1, kbm1
           UA_bry % EST = UA_bry % EST                &
                        +  U_bry % EST(:,:,k) * dz(k)
           VA_bry % EST = VA_bry % EST                &
@@ -1365,7 +1364,7 @@ module bry
 
         UA_bry % NTH = 0.
         VA_bry % NTH = 0.
-        do k = 1, kb
+        do k = 1, kbm1
           UA_bry % NTH = UA_bry % NTH                &
                        +  U_bry % NTH(:,:,k) * dz(k)
           VA_bry % NTH = VA_bry % NTH                &
@@ -1378,7 +1377,7 @@ module bry
 
         UA_bry % STH = 0.
         VA_bry % STH = 0.
-        do k = 1, kb
+        do k = 1, kbm1
           UA_bry % STH = UA_bry % STH                &
                        +  U_bry % STH(:,:,k) * dz(k)
           VA_bry % STH = VA_bry % STH                &
@@ -1391,7 +1390,7 @@ module bry
 
         UA_bry % WST = 0.
         VA_bry % WST = 0.
-        do k = 1, kb
+        do k = 1, kbm1
           UA_bry % WST = UA_bry % WST                &
                        +  U_bry % WST(:,:,k) * dz(k)
           VA_bry % WST = VA_bry % WST                &
@@ -2007,7 +2006,7 @@ module bry
 
             case ( bcCHAPMAN )
               do j = 2,jmm1
-                cff = dte/dx(imm1,j)
+                cff = 2.*dte/dx(imm1,j)
                 cx  = cff*sqrt( g*d(imm1,j) )
                 elf(im,j) = ( el(im,j) + cx*elf(imm1,j) )/(1.+cx)
               end do
@@ -2061,7 +2060,7 @@ module bry
 
             case ( bcCHAPMAN )
               do j = 2,jmm1
-                cff = dte/dx(2,j)
+                cff = 2.*dte/dx(2,j)
                 cx  = cff*sqrt( g*d(2,j) )
                 elf(1,j) = ( el(1,j) + cx*elf(2,j) )/(1.+cx)
               end do
@@ -2125,7 +2124,7 @@ module bry
 
             case ( bcCHAPMAN )
               do i = 2,imm1
-                cff = dte/dy(i,jmm1)
+                cff = 2.*dte/dy(i,jmm1)
                 cy  = cff*sqrt( g*d(i,jmm1) )
                 elf(i,jm) = ( el(i,jm) + cy*elf(i,jmm1) )/(1.+cy)
               end do
@@ -2202,7 +2201,7 @@ module bry
  
             case ( bcCHAPMAN )
               do i = 2,imm1
-                cff = dte/dy(i,2)
+                cff = 2.*dte/dy(i,2)
                 cy  = cff*sqrt( g*d(i,2) )
                 elf(i,1) = ( el(i,1) + cy*elf(i,2) )/(1.+cy)
               end do
@@ -2259,9 +2258,12 @@ module bry
 !______________________________________________________________________
 !
       use air        , only: wusurf, wvsurf
+      use config     , only: use_tide
       use glob_const , only: GRAV
+      use glob_domain, only: im, jm
       use grid       , only: dum, dvm, h, dx, dy
       use glob_ocean , only: d, dt, el, elf, uaf, ua, vaf, va, wubot, wvbot
+      use tide       , only: tide_el, tide_ua, tide_va
       use model_run  , only: dte, ramp
 
       implicit none
@@ -2307,10 +2309,17 @@ module bry
 
             case ( bcFLATHER )
               cx(2:jmm1) = sqrt( 2.*GRAV / (d(imm1,2:jmm1)+d(im,2:jmm1)) )
-              uaf(im,2:jmm1) = UA_bry%EST(1,2:jmm1)                    &
-                             + cx(2:jmm1)                              &
-                               * ( .5*(el(imm1,2:jmm1)+el(im,2:jmm1))  &
-                                 - EL_bry%EST(1,2:jmm1) )
+              if ( use_tide ) then
+                uaf(im,2:jmm1) = UA_bry%EST(1,2:jmm1) + tide_ua(im,2:jmm1)  &
+                               + cx(2:jmm1)                                 &
+                                 * ( .5*(el(imm1,2:jmm1)+el(im,2:jmm1))     &
+                                   - EL_bry%EST(1,2:jmm1) - tide_el(im,2:jmm1) )
+              else
+                uaf(im,2:jmm1) = UA_bry%EST(1,2:jmm1)                    &
+                               + cx(2:jmm1)                              &
+                                 * ( .5*(el(imm1,2:jmm1)+el(im,2:jmm1))  &
+                                   - EL_bry%EST(1,2:jmm1) )
+              end if
 
             case ( bcFLATHER_SSH )
               cx(2:jmm1) = -GRAV*2._rk*( EL_bry%EST(1,2:jmm1)-el(imm1,2:jmm1) )  &
@@ -2393,10 +2402,17 @@ module bry
 
             case ( bcFLATHER )
               cx(2:jmm1) = sqrt( 2.*GRAV / (d(1,2:jmm1)+d(2,2:jmm1)) )
-              uaf(2,2:jmm1) = UA_bry%WST(1,2:jmm1)                &
-                            - cx(2:jmm1)                          &
-                              * ( .5*(el(1,2:jmm1)+el(2,2:jmm1))  &
-                                 - EL_bry%WST(1,2:jmm1) )
+              if ( use_tide ) then
+                uaf(2,2:jmm1) = UA_bry%WST(1,2:jmm1) + tide_ua(2,2:jmm1)  &
+                              - cx(2:jmm1)                                &
+                                * ( .5*(el(1,2:jmm1)+el(2,2:jmm1))        &
+                                  - EL_bry%WST(1,2:jmm1) - tide_el(1,2:jmm1) )
+              else
+                uaf(2,2:jmm1) = UA_bry%WST(1,2:jmm1)                &
+                              - cx(2:jmm1)                          &
+                                * ( .5*(el(1,2:jmm1)+el(2,2:jmm1))  &
+                                   - EL_bry%WST(1,2:jmm1) )
+              end if
 
             case ( bcFLATHER_SSH )
               cx(2:jmm1) = -GRAV*2._rk*( el(2,2:jmm1)-EL_bry%WST(1,2:jmm1) )  &
@@ -2500,10 +2516,17 @@ module bry
 
             case ( bcFLATHER )
               ce(2:imm1) = sqrt( 2.*GRAV / (d(2:imm1,jmm1)+d(2:imm1,jm)) )
-              vaf(2:imm1,jm) = VA_bry%NTH(2:imm1,1)                    &
-                             + ce(2:imm1)                              &
-                               * ( .5*(el(2:imm1,jmm1)+el(2:imm1,jm))  &
-                                  - EL_bry%NTH(2:imm1,1) )
+              if ( use_tide ) then
+                vaf(2:imm1,jm) = VA_bry%NTH(2:imm1,1) + tide_va(2:imm1,jm) &
+                               + ce(2:imm1)                                &
+                                 * ( .5*(el(2:imm1,jmm1)+el(2:imm1,jm))    &
+                                    - EL_bry%NTH(2:imm1,1) - tide_el(2:imm1,jm) )
+              else
+                vaf(2:imm1,jm) = VA_bry%NTH(2:imm1,1)                    &
+                               + ce(2:imm1)                              &
+                                 * ( .5*(el(2:imm1,jmm1)+el(2:imm1,jm))  &
+                                    - EL_bry%NTH(2:imm1,1) )
+              end if
 
             case ( bcFLATHER_SSH )
               ce(2:imm1) = -GRAV*2._rk*( EL_bry%NTH(2:imm1,1)-el(2:imm1,jmm1) )  &
@@ -2584,10 +2607,17 @@ module bry
 
             case ( bcFLATHER )
               ce(2:imm1) = sqrt( 2.*GRAV / (d(2:imm1,1)+d(2:imm1,2)) )
-              vaf(2:imm1,2) = VA_bry%STH(2:imm1,1)                &
-                            - ce(2:imm1)                          &
-                              * ( .5*(el(2:imm1,1)+el(2:imm1,2))  &
-                                 - EL_bry%STH(2:imm1,1) )
+              if ( use_tide ) then
+                vaf(2:imm1,2) = VA_bry%STH(2:imm1,1) + tide_va(2:imm1,2)  &
+                              - ce(2:imm1)                                &
+                                * ( .5*(el(2:imm1,1)+el(2:imm1,2))        &
+                                   - EL_bry%STH(2:imm1,1) - tide_el(2:imm1,1) )
+              else
+                vaf(2:imm1,2) = VA_bry%STH(2:imm1,1)                &
+                              - ce(2:imm1)                          &
+                                * ( .5*(el(2:imm1,1)+el(2:imm1,2))  &
+                                   - EL_bry%STH(2:imm1,1) )
+              end if
 
             case ( bcFLATHER_SSH )
               ce(2:imm1) = -GRAV*2._rk*( el(2:imm1,2)-EL_bry%STH(2:imm1,1) )  &
@@ -3325,7 +3355,6 @@ module bry
       use grid       , only: dum, dvm, dx, dy, fsm, zz
       use glob_ocean , only: dt, s, t, u, uf, v, vf, w
       use model_run  , only: dti
-      use glob_domain,only:is_master!REM:
 
       implicit none
 
