@@ -581,7 +581,7 @@ module tide
       if ( DISABLED ) return
 
 ! Shrink free surface mask
-      tide_mask = fsm
+      tide_mask = fsm(:,:,1)
       allocate( tmp(im,jm,1) )
       do k = 1, 8
         tmp(:,:,1) = tide_mask
@@ -889,7 +889,7 @@ module tide
 !______________________________________________________________________
 !
       use glob_const , only: DEG2RAD, GRAV
-      use glob_domain, only: im, jm
+      use glob_domain, only: im, imm1, jm
       use grid       , only: fsm
       use module_time
       use model_run  , only: dti, iint, sec_of_year
@@ -932,13 +932,19 @@ module tide
         tide_el(im,:) = tide_el(im,:) + f*el_amp(im,:,i)*cos( (this_con%speed*tick + uv - el_pha(im,:,i))*DEG2RAD )
         tide_ua(im,:) = tide_ua(im,:) + f*ua_amp(im,:,i)*cos( (this_con%speed*tick + uv - ua_pha(im,:,i))*DEG2RAD )
         tide_va(im,:) = tide_va(im,:) + f*va_amp(im,:,i)*cos( (this_con%speed*tick + uv - va_pha(im,:,i))*DEG2RAD )
-        tide_el(:,jm) = tide_el(:,jm) + f*el_amp(:,jm,i)*cos( (this_con%speed*tick + uv - el_pha(:,jm,i))*DEG2RAD )
+        tide_el(2:imm1,jm) = tide_el(2:imm1,jm)                   &
+                           + f*el_amp(2:imm1,jm,i)                &
+                            *cos( ( this_con%speed*tick + uv      &
+                                  - el_pha(2:imm1,jm,i) )*DEG2RAD )
         tide_ua(:,jm) = tide_ua(:,jm) + f*ua_amp(:,jm,i)*cos( (this_con%speed*tick + uv - ua_pha(:,jm,i))*DEG2RAD )
         tide_va(:,jm) = tide_va(:,jm) + f*va_amp(:,jm,i)*cos( (this_con%speed*tick + uv - va_pha(:,jm,i))*DEG2RAD )
         tide_el( 1,:) = tide_el( 1,:) + f*el_amp( 1,:,i)*cos( (this_con%speed*tick + uv - el_pha( 1,:,i))*DEG2RAD )
         tide_ua( 2,:) = tide_ua( 2,:) + f*ua_amp( 2,:,i)*cos( (this_con%speed*tick + uv - ua_pha( 2,:,i))*DEG2RAD )
         tide_va( 1,:) = tide_va( 1,:) + f*va_amp( 1,:,i)*cos( (this_con%speed*tick + uv - va_pha( 1,:,i))*DEG2RAD )
-        tide_el(:, 1) = tide_el(:, 1) + f*el_amp(:, 1,i)*cos( (this_con%speed*tick + uv - el_pha(:, 1,i))*DEG2RAD )
+        tide_el(2:imm1, 1) = tide_el(2:imm1, 1)                   &
+                           + f*el_amp(2:imm1, 1,i)                &
+                            *cos( ( this_con%speed*tick + uv      &
+                                  - el_pha(2:imm1, 1,i) )*DEG2RAD )
         tide_ua(:, 1) = tide_ua(:, 1) + f*ua_amp(:, 1,i)*cos( (this_con%speed*tick + uv - ua_pha(:, 1,i))*DEG2RAD )
         tide_va(:, 2) = tide_va(:, 2) + f*va_amp(:, 2,i)*cos( (this_con%speed*tick + uv - va_pha(:, 2,i))*DEG2RAD )
       end do

@@ -312,7 +312,7 @@ module air
       call allocate_arrays
 
       if ( n_east==-1 ) then
-        where ( fsm(im,:) /= 0. )
+        where ( fsm(im,:,1) /= 0. )
           taper_mask(im  ,:) = 0.
           taper_mask(im-1,:) = 0.2
           taper_mask(im-2,:) = 0.5
@@ -321,7 +321,7 @@ module air
       end if
 
       if ( n_west==-1 ) then
-        where ( fsm(1,:) /= 0. )
+        where ( fsm(1,:,1) /= 0. )
           taper_mask(1,:) = 0.
           taper_mask(2,:) = 0.
           taper_mask(3,:) = 0.2
@@ -331,7 +331,7 @@ module air
       end if
 
       if ( n_north==-1 ) then
-        where ( fsm(:,jm) /= 0. )
+        where ( fsm(:,jm,1) /= 0. )
           taper_mask(:,jm  ) = 0.
           taper_mask(:,jm-1) = 0.2*taper_mask(:,jm-1)
           taper_mask(:,jm-2) = 0.5*taper_mask(:,jm-2)
@@ -340,7 +340,7 @@ module air
       end if
 
       if ( n_south==-1 ) then
-        where ( fsm(:,1) /= 0. )
+        where ( fsm(:,1,1) /= 0. )
           taper_mask(:,1) = 0.
           taper_mask(:,2) = 0.
           taper_mask(:,3) = 0.2*taper_mask(:,3)
@@ -1089,7 +1089,7 @@ module air
       do j = 1,jm
       do i = 1,im
 
-        if ( fsm(i,j) == 0. ) cycle
+        if ( fsm(i,j,1) == 0. ) cycle
 
         unow      = uwnd(i,j,1)
         vnow      = vwnd(i,j,1)
@@ -1372,10 +1372,10 @@ module air
 ! Multiply all fluxes by model mask
 !---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !
-        wusurf(i,j) = wusurf(i,j)*fsm(i,j)
-        wvsurf(i,j) = wvsurf(i,j)*fsm(i,j)
-        wtsurf(i,j) = wtsurf(i,j)*fsm(i,j)
-        wssurf(i,j) = pme(i,j)*(s(i,j,1)+sbias)*fsm(i,j) ! sb? vf?
+        wusurf(i,j) = wusurf(i,j) !*fsm(i,j,1) ! REM:? No need to apply mask, since we do not execute the loop cycle if the mask is 0.
+        wvsurf(i,j) = wvsurf(i,j) !*fsm(i,j,1)
+        wtsurf(i,j) = wtsurf(i,j) !*fsm(i,j,1)
+        wssurf(i,j) = pme(i,j)*(s(i,j,1)+sbias) !*fsm(i,j,1) ! sb? vf?
 !        if ( abs(wssurf(i,j)).gt.1.e-2 ) then
 !          print *, wssurf(i,j), pme(i,j), s(i,j,1)
 !          stop

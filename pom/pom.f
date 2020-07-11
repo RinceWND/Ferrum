@@ -34,7 +34,6 @@
 ! main loop
       do iint = 1,iend
 
-
 !     advance model
         call advance
 !        call ice_advance

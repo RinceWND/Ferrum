@@ -309,7 +309,7 @@ module clim
 !  Reads forcing fields before experiment's start.
 !______________________________________________________________________
 !
-      use glob_domain, only: is_master    ,my_task
+      use glob_domain, only: is_master
       use io
       use module_time
       use model_run  , only: sec_of_month, mid_in_month, mid_in_nbr
@@ -676,7 +676,7 @@ module clim
 
       character(PATH_LEN)                    :: tmp_str
       integer(MPI_OFFSET_KIND), dimension(4) :: edge, start
-      integer k, file_id
+      integer file_id
 
 
       tmp_str = ""
@@ -694,21 +694,19 @@ module clim
       end if
 
 ! define domain to read
-      start = [ i_global(1), j_global(1),  1, record ]
-      edge  = [ im         , jm         , kb,      1 ]
+      start = [ i_global(1), j_global(1),    1, record ]
+      edge  = [ im         , jm         , kbm1,      1 ]
 
 ! get data
       read_clim = var_read( file_id, temp_name, temp, start, edge )
       read_clim = var_read( file_id, salt_name, salt, start, edge )
 
-      do k = 1,kbm1
-        where ( fsm == 0. )
-          temp(:,:,k) = 0.
-          salt(:,:,k) = 0.
-        end where
-      end do
-      temp(:,:,kb) = temp(:,:,kbm1)
-      salt(:,:,kb) = salt(:,:,kbm1)
+      where ( fsm == 0. )
+        temp = 0.
+        salt = 0.
+      end where
+      ! temp(:,:,kb) = temp(:,:,kbm1)
+      ! salt(:,:,kb) = salt(:,:,kbm1)
 
 ! close file
       read_clim = file_close( file_id )

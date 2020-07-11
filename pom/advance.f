@@ -248,12 +248,14 @@
         dry2d = 0.
         aam2d = 0.
 
-        do k=1,kbm1
-          adx2d = adx2d +  advx(:,:,k)*dz(k)
-          ady2d = ady2d +  advy(:,:,k)*dz(k)
-          drx2d = drx2d + drhox(:,:,k)*dz(k)
-          dry2d = dry2d + drhoy(:,:,k)*dz(k)
-          aam2d = aam2d +   aam(:,:,k)*dz(k)
+        do k = 1, kbm1
+
+          adx2d = adx2d +  advx(:,:,k)*dz(:,:,k)
+          ady2d = ady2d +  advy(:,:,k)*dz(:,:,k)
+          drx2d = drx2d + drhox(:,:,k)*dz(:,:,k)
+          dry2d = dry2d + drhoy(:,:,k)*dz(:,:,k)
+          aam2d = aam2d +   aam(:,:,k)*dz(:,:,k)
+
         end do
 
         call advave(tps)
@@ -339,53 +341,52 @@
 
       do j=2,jmm1
         do i=2,im
-          uaf(i,j)=adx2d(i,j)+advua(i,j)
-     $              -aru(i,j)*.25
-     $                *(cor(i,j)*d(i,j)*(va(i,j+1)+va(i,j))
-     $                 +cor(i-1,j)*d(i-1,j)*(va(i-1,j+1)+va(i-1,j)))
-     $              +.25*grav*(dy(i,j)+dy(i-1,j))
-     $                *(d(i,j)+d(i-1,j))
-     $                *((1.-2.*alpha)
-     $                   *(el(i,j)-el(i-1,j))
-     $                  +alpha*(elb(i,j)-elb(i-1,j)
-     $                         +elf(i,j)-elf(i-1,j))
-     $                  +(e_atmos(i,j)-e_atmos(i-1,j)))
-     $              +drx2d(i,j)+aru(i,j)*(wusurf(i,j)-wubot(i,j))
+          uaf(i,j) = adx2d(i,j) + advua(i,j)
+     $             - aru(i,j)*.25_rk
+     $              *( cor(i  ,j)*d(i  ,j)*(va(i  ,j+1)+va(i  ,j))
+     $               + cor(i-1,j)*d(i-1,j)*(va(i-1,j+1)+va(i-1,j)) )
+     $             + .25_rk*grav*(dy(i,j)+dy(i-1,j))
+     $                          *(d (i,j)+d (i-1,j))
+     $              *( (1._rk - 2._rk*alpha)*(el (i,j)-el (i-1,j))
+     $                +               alpha *(elb(i,j)-elb(i-1,j)
+     $                                       +elf(i,j)-elf(i-1,j))
+     $                + (e_atmos(i,j)-e_atmos(i-1,j)) )
+     $             + drx2d(i,j) + aru(i,j)*(wusurf(i,j)-wubot(i,j))
         end do
       end do
 
       do j=2,jmm1
         do i=2,im
-          uaf(i,j)=((h(i,j)+elb(i,j)+h(i-1,j)+elb(i-1,j))
-     $                *aru(i,j)*uab(i,j)
-     $              -4.*dte*uaf(i,j))
-     $             /((h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
+          uaf(i,j) = ( (h(i,j)+elb(i,j)+h(i-1,j)+elb(i-1,j))
+     $                * aru(i,j)*uab(i,j)
+     $               - 4._rk*dte*uaf(i,j) )
+     $               /((h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
      $                 *aru(i,j))
         end do
       end do
 
       do j=2,jm
         do i=2,imm1
-          vaf(i,j)=ady2d(i,j)+advva(i,j)
-     $              +arv(i,j)*.25
-     $                *(cor(i,j)*d(i,j)*(ua(i+1,j)+ua(i,j))
-     $                 +cor(i,j-1)*d(i,j-1)*(ua(i+1,j-1)+ua(i,j-1)))
-     $              +.25*grav*(dx(i,j)+dx(i,j-1))
-     $                *(d(i,j)+d(i,j-1))
-     $                *((1.-2.*alpha)*(el(i,j)-el(i,j-1))
-     $                  +alpha*(elb(i,j)-elb(i,j-1)
-     $                         +elf(i,j)-elf(i,j-1))
-     $                  +(e_atmos(i,j)-e_atmos(i,j-1)))
-     $              +dry2d(i,j)+arv(i,j)*(wvsurf(i,j)-wvbot(i,j))
+          vaf(i,j) = ady2d(i,j) + advva(i,j)
+     $             + arv(i,j)*.25_rk
+     $              *( cor(i,j  )*d(i,j  )*(ua(i+1,j  )+ua(i,j  ))
+     $               + cor(i,j-1)*d(i,j-1)*(ua(i+1,j-1)+ua(i,j-1)) )
+     $             + .25_rk*grav*(dx(i,j)+dx(i,j-1))
+     $                          *(d (i,j)+d (i,j-1))
+     $              *( (1._rk - 2._rk*alpha)*(el (i,j)-el (i,j-1))
+     $                +               alpha *(elb(i,j)-elb(i,j-1)
+     $                                       +elf(i,j)-elf(i,j-1))
+     $                + (e_atmos(i,j)-e_atmos(i,j-1)) )
+     $             + dry2d(i,j) + arv(i,j)*(wvsurf(i,j)-wvbot(i,j))
         end do
       end do
 
       do j=2,jm
         do i=2,imm1
-          vaf(i,j)=((h(i,j)+elb(i,j)+h(i,j-1)+elb(i,j-1))
-     $                *vab(i,j)*arv(i,j)
-     $              -4.*dte*vaf(i,j))
-     $             /((h(i,j)+elf(i,j)+h(i,j-1)+elf(i,j-1))
+          vaf(i,j) = ( (h(i,j)+elb(i,j)+h(i,j-1)+elb(i,j-1))
+     $                * vab(i,j)*arv(i,j)
+     $               - 4._rk*dte*vaf(i,j) )
+     $               /((h(i,j)+elf(i,j)+h(i,j-1)+elf(i,j-1))
      $                 *arv(i,j))
         end do
       end do
@@ -417,7 +418,7 @@
 
       elseif ( iext ==  isplit    ) then
 
-        etf = ( etf + .5*elf )*fsm
+        etf = ( etf + .5*elf )*fsm(:,:,1)
 
       end if
 
@@ -444,7 +445,7 @@
 ! update bottom friction
       do j=1,jm
         do i=1,im
-          cbc(i,j)=(Kappa/log((.1+(1.0+zz(kbm1))*d(i,j))/z0b))**2
+          cbc(i,j)=(Kappa/log((.1+(1.+zz(i,j,kbm1))*d(i,j))/z0b))**2
           cbc(i,j)=max(cbcmin,cbc(i,j))
           cbc(i,j)=min(cbcmax,cbc(i,j))
         end do
@@ -519,7 +520,7 @@
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              tps(i,j)=tps(i,j)+u(i,j,k)*dz(k)
+              tps(i,j)=tps(i,j)+u(i,j,k)*dz(i,j,k)
             end do
           end do
         end do
@@ -544,7 +545,7 @@
         do k=1,kbm1
           do j=1,jm
             do i=1,im
-              tps(i,j)=tps(i,j)+v(i,j,k)*dz(k)
+              tps(i,j)=tps(i,j)+v(i,j,k)*dz(i,j,k)
             end do
           end do
         end do
@@ -675,7 +676,7 @@
           do j=1,jm
             do i=1,im
               tps(i,j)=tps(i,j)
-     $                  +(uf(i,j,k)+ub(i,j,k)-2.*u(i,j,k))*dz(k)
+     $              +(uf(i,j,k)+ub(i,j,k)-2.*u(i,j,k))*dz(i,j,k)
             end do
           end do
         end do
@@ -696,7 +697,7 @@
           do j=1,jm
             do i=1,im
               tps(i,j)=tps(i,j)
-     $                  +(vf(i,j,k)+vb(i,j,k)-2.*v(i,j,k))*dz(k)
+     $              +(vf(i,j,k)+vb(i,j,k)-2.*v(i,j,k))*dz(i,j,k)
             end do
           end do
         end do
@@ -759,25 +760,25 @@
         wr = 0.
 
         do k=1,kbm1
-          do j=1,jm
-            do i=1,im
-              tps(i,j) = zz(k)*dt(i,j) + et(i,j)
-            end do
-          end do
+
+          tps = zz(:,:,k)*dt + et
+ 
           do j=2,jmm1
             do i=2,imm1
-              dxr=2.0/(dx(i+1,j)+dx(i,j))
-              dxl=2.0/(dx(i,j)+dx(i-1,j))
-              dyt=2.0/(dy(i,j+1)+dy(i,j))
-              dyb=2.0/(dy(i,j)+dy(i,j-1))
-              wr(i,j,k)=0.5*(w(i,j,k)+w(i,j,k+1))+0.5*
-     $                (u(i+1,j,k)*(tps(i+1,j)-tps(i,j))*dxr+
-     $                 u(i,j,k)*(tps(i,j)-tps(i-1,j))*dxl+
-     $                 v(i,j+1,k)*(tps(i,j+1)-tps(i,j))*dyt+
-     $                 v(i,j,k)*(tps(i,j)-tps(i,j-1))*dyb)
-     $                +(1.0+zz(k))*(etf(i,j)-etb(i,j))/dti2
+              dxr = 2._rk/(dx(i+1,j)+dx(i  ,j))
+              dxl = 2._rk/(dx(i  ,j)+dx(i-1,j))
+              dyt = 2._rk/(dy(i,j+1)+dy(i,j  ))
+              dyb = 2._rk/(dy(i,j  )+dy(i,j-1))
+              wr(i,j,k) = .5_rk*(w(i,j,k)+w(i,j,k+1))
+     $                  + .5_rk*
+     $                   ( u(i+1,j,k)*(tps(i+1,j)-tps(i  ,j))*dxr
+     $                   + u(i  ,j,k)*(tps(i  ,j)-tps(i-1,j))*dxl
+     $                   + v(i,j+1,k)*(tps(i,j+1)-tps(i,j  ))*dyt
+     $                   + v(i,j  ,k)*(tps(i,j  )-tps(i,j-1))*dyb )
+     $                  + (1._rk+zz(i,j,k))*(etf(i,j)-etb(i,j))/dti2
             end do
           end do
+
         end do
 
         call exchange3d_mpi(wr(:,:,1:kbm1),im,jm,kbm1)
@@ -795,13 +796,8 @@
           end do
         end do
 
-        do k=1,kbm1
-          do j=1,jm
-            do i=1,im
-              wr(i,j,k)=fsm(i,j)*wr(i,j,k)
-            end do
-          end do
-        end do
+        wr = fsm*wr
+
 
       end ! subroutine geopotential_vertical_velocity
 !
@@ -859,22 +855,14 @@
         elev_ave = 0.
 
         do k=1,kbm1
-          do j=1,jm
-            do i=1,im
-              d_vol    = art(i,j) * dt(i,j) * dz(k) * fsm(i,j)
-              vol_tot  = vol_tot + d_vol
-              temp_ave = temp_ave + tb(i,j,k)*d_vol
-              salt_ave = salt_ave + sb(i,j,k)*d_vol
-            end do
-          end do
+          d_vol    = sum(art*dt*dz(:,:,k)*fsm(:,:,k))
+          vol_tot  = vol_tot + d_vol
+          temp_ave = temp_ave + sum(tb(:,:,k)*d_vol)
+          salt_ave = salt_ave + sum(sb(:,:,k)*d_vol)
         end do
 
-        do j=1,jm
-          do i=1,im
-            area_tot = area_tot + art(i,j)
-            elev_ave = elev_ave + et(i,j) * art(i,j)
-          end do
-        end do
+        area_tot = sum( art )
+        elev_ave = sum( et*art )
 
 
         call sum0d_mpi( temp_ave, master_task )
@@ -889,6 +877,7 @@
           temp_ave = temp_ave / vol_tot
           salt_ave = salt_ave / vol_tot
           elev_ave = elev_ave / area_tot
+
           print '(a,e15.8,2(a,f11.8),a)'
      &        , "mean ; et = ", elev_ave, " m, tb = "
      &        , temp_ave + tbias, " deg, sb = "
@@ -1163,6 +1152,7 @@
 ! called by: check_nan [advance.f]
 !______________________________________________________________________
 !
+      use ieee_arithmetic, only: ieee_is_nan
       use glob_const , only: rk
       use glob_domain, only: i_global, im, j_global, jm, kb
       use grid       , only: h
@@ -1265,13 +1255,15 @@
       end do
 
       if ( num_nan /= 0 ) then
-         print'(2a,2(a,i6))',
+
+        print'(2a,2(a,i6))',
      $        " detect_nan : ", varname,
      $        "j_global(1) = ", j_global(1),
      $        ",   num_nan = ", num_nan
 !         call finalize_mpi
          stop
-      endif
+
+      end if
 
 
       end ! subroutine detect_nan_2d

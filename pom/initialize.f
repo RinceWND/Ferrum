@@ -194,6 +194,7 @@
 
       implicit none
 
+
       logical                      fexist
       integer                      file_id, i, j, k, record, status
       integer(MPI_OFFSET_KIND)
@@ -236,18 +237,18 @@
 ! Derive barotropic velocities
       uab = 0.
       vab = 0.
+      sb = sb * fsm
+      tb = tb * fsm
       do k = 1, kbm1
-        sb(:,:,k) = sb(:,:,k) * fsm
-        tb(:,:,k) = tb(:,:,k) * fsm
-        uab(:,:)  = uab(:,:) + ub(:,:,k)*dz(k)
-        vab(:,:)  = vab(:,:) + vb(:,:,k)*dz(k)
+        uab(:,:)  = uab(:,:) + ub(:,:,k)*dz(:,:,k)
+        vab(:,:)  = vab(:,:) + vb(:,:,k)*dz(:,:,k)
       end do
 
 ! Calculate initial density.
       call dens(sb,tb,rho)
 
 
-      end
+      end ! subroutine initial_conditions
 !
 !______________________________________________________________________
 !
@@ -419,7 +420,7 @@
      &                    , -1, 0., '' )
 
         varid = var_define( file_id, 'z'
-     &                    , NF90_FLOAT, [ z_dimid ]
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
      &                    , 'sigma of cell face'
      &                    , 'sigma_level'
      &                    , -1, 0., '' )
@@ -431,7 +432,7 @@
      &                    , 'sigma: z eta: elb depth: h' )
 
         varid = var_define( file_id, 'zz'
-     &                    , NF90_FLOAT, [ z_dimid ]
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
      &                    , 'sigma of cell centre'
      &                    , 'sigma_level'
      &                    , -1, 0., '' )
@@ -483,20 +484,20 @@
      &                    , 'metre'
      &                    , -1, 0., 'east_e north_e' )
         varid = var_define( file_id, 'fsm'
-     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
      &                    , 'free surface mask'
      &                    , 'dimensionless'
-     &                    , -1, 0., 'east_e north_e' )
+     &                    , -1, 0., 'east_e north_e zz' )
         varid = var_define( file_id, 'dum'
-     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
      &                    , 'u - free surface mask'
      &                    , 'dimensionless'
-     &                    , -1, 0., 'east_u north_u' )
+     &                    , -1, 0., 'east_u north_u zz' )
         varid = var_define( file_id, 'dvm'
-     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
      &                    , 'v - free surface mask'
      &                    , 'dimensionless'
-     &                    , -1, 0., 'east_v north_v' )
+     &                    , -1, 0., 'east_v north_v zz' )
         call define_tide_init( file_id, [ x_dimid, y_dimid ]
      &                       , NF90_FLOAT )
 
@@ -594,13 +595,10 @@
         call file_end_definition( file_id )
 
 ! write static data
-        start = [  1, 1,1,1 ]
-        edge  = [ kb, 1,1,1 ]
-        call var_write( file_id, "z" , z , start, edge )
-        call var_write( file_id, "zz", zz, start, edge )
-
-        start(1:2) = [ i_global(1), j_global(1) ]
-        edge (1:2) = [  im        , jm          ]
+        start = [ i_global(1), j_global(1),  1, 1 ]
+        edge  = [  im        , jm         , kb, 1 ]
+        call var_write( file_id, "z"      , z      , start, edge )
+        call var_write( file_id, "zz"     , zz     , start, edge )
         call var_write( file_id, "east_u" , east_u , start, edge )
         call var_write( file_id, "east_v" , east_v , start, edge )
         call var_write( file_id, "east_e" , east_e , start, edge )
@@ -1547,8 +1545,8 @@
       do k=1,kbm1
         do j=1,jm
           do i=1,im
-            drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(k)
-            dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)*dz(k)
+            drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(i,j,k)
+            dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)*dz(i,j,k)
           end do
         end do
       end do
@@ -1602,7 +1600,7 @@
       do j=1,jm
         do i=1,im
 !lyo:correct:cbc(i,j)=(Kappa/log((1.+zz(kbm1))*h(i,j)/z0b))**2 !lyo:bug:
-          cbc(i,j)=(Kappa/log(1.+(1.0+zz(kbm1))*h(i,j)/z0b))**2
+          cbc(i,j)=(Kappa/log(1._rk+(1._rk+zz(i,j,kbm1))*h(i,j)/z0b))**2
           cbc(i,j)=max(cbcmin,cbc(i,j))
 ! if the following is invoked, then it is probable that the wrong
 ! choice of z0b or vertical spacing has been made:
@@ -1881,19 +1879,19 @@
 
 ! generate grid
       do k = 1,kb
-        z(k)  = -real(k-1)/real(kb-1)
+        z(:,:,k)  = -real(k-1)/real(kb-1)
       end do
       do k = 1,kb-1
-        zz(k) = .5*(z(k+1)+z(k))
+        zz(:,:,k) = .5*(z(:,:,k+1)+z(:,:,k))
       end do
-      zz(kb) = 2.*zz(kb-1)-zz(kb-2)
+      zz(:,:,kb) = 2.*zz(:,:,kb-1)-zz(:,:,kb-2)
 
       do k=1,kb-1
-        dz(k) = z(k)- z(k+1)
-        dzz(k)=zz(k)-zz(k+1)
+        dz(:,:,k) = z(:,:,k)- z(:,:,k+1)
+        dzz(:,:,k)=zz(:,:,k)-zz(:,:,k+1)
       end do
-      dz(kb) = dz(kb-1)
-      dzz(kb)=dzz(kb-1)
+      dz(:,:,kb) = dz(:,:,kb-1)
+      dzz(:,:,kb)=dzz(:,:,kb-1)
 
 
       do j = 1,jm
@@ -1979,25 +1977,29 @@
       end do
 
       fsm = 1.
-      if (n_west==-1) fsm( 1,:) = 0.
-      if (n_east==-1) fsm(im,:) = 0.
-      if (n_south==-1) fsm(:, 1) = 0.
-      if (n_north==-1) fsm(:,jm) = 0.
+      if (n_west==-1) fsm( 1,:,:) = 0.
+      if (n_east==-1) fsm(im,:,:) = 0.
+      if (n_south==-1) fsm(:, 1,:) = 0.
+      if (n_north==-1) fsm(:,jm,:) = 0.
 
       dvm = fsm
       dum = fsm
-      do j=1,jm-1
-        do i=1,im
-          if (fsm(i,j)==0..and.fsm(i,j+1)/=0.) dvm(i,j+1) = 0.
+      do k = 1, kb
+        do j = 1, jm-1
+          do i = 1, im
+            if (fsm(i,j,k)==0..and.fsm(i,j+1,k)/=0.) dvm(i,j+1,k) = 0.
+          end do
         end do
       end do
-      do j=1,jm
-        do i=1,im-1
-          if (fsm(i,j)==0..and.fsm(i+1,j)/=0.) dum(i+1,j) = 0.
+      do k = 1, kb
+        do j=1,jm
+          do i=1,im-1
+            if (fsm(i,j,k)==0..and.fsm(i+1,j,k)/=0.) dum(i+1,j,k) = 0.
+          end do
         end do
       end do
-      call exchange2d_mpi(dum,im,jm)
-      call exchange2d_mpi(dvm,im,jm)
+      call exchange3d_mpi(dum,im,jm,kb)
+      call exchange3d_mpi(dvm,im,jm,kb)
 !     The followings are read in read_grid_pnetcdf:
 !     z,zz,dx,dy
 !     east_u,east_v,east_e,east_c
@@ -2114,7 +2116,8 @@
         cfl = 0.
         cflmin = 1.d10
 
-        cfl = fsm*.5 / sqrt(1./dx**2+1./dy**2) / sqrt(grav*(h+SMALL))
+        cfl = fsm(:,:,1)*.5 / sqrt(1./dx**2+1./dy**2)
+     &                      / sqrt(grav*(h+SMALL))
 
         cflmin = minval(cfl, cfl>0.)
 

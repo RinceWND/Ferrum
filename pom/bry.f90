@@ -1352,10 +1352,12 @@ module bry
         UA_bry % EST = 0.
         VA_bry % EST = 0.
         do k = 1, kbm1
-          UA_bry % EST = UA_bry % EST                &
-                       +  U_bry % EST(:,:,k) * dz(k)
-          VA_bry % EST = VA_bry % EST                &
-                       +  V_bry % EST(:,:,k) * dz(k)
+          UA_bry % EST = UA_bry % EST             &
+                       +  U_bry % EST(1:NFE,:,k)  &
+                        * dz(im:im-NFE+1:-1,:,k)
+          VA_bry % EST = VA_bry % EST             &
+                       +  V_bry % EST(1:NFE,:,k)  &
+                        * dz(im:im-NFE+1:-1,:,k)
         end do
 
       end if
@@ -1365,10 +1367,12 @@ module bry
         UA_bry % NTH = 0.
         VA_bry % NTH = 0.
         do k = 1, kbm1
-          UA_bry % NTH = UA_bry % NTH                &
-                       +  U_bry % NTH(:,:,k) * dz(k)
-          VA_bry % NTH = VA_bry % NTH                &
-                       +  V_bry % NTH(:,:,k) * dz(k)
+          UA_bry % NTH = UA_bry % NTH             &
+                       +  U_bry % NTH(:,1:NFN,k)  &
+                        * dz(:,jm:jm-NFN+1:-1,k)
+          VA_bry % NTH = VA_bry % NTH             &
+                       +  V_bry % NTH(:,1:NFN,k)  &
+                        * dz(:,jm:jm-NFN+1:-1,k)
         end do
 
       end if
@@ -1378,10 +1382,12 @@ module bry
         UA_bry % STH = 0.
         VA_bry % STH = 0.
         do k = 1, kbm1
-          UA_bry % STH = UA_bry % STH                &
-                       +  U_bry % STH(:,:,k) * dz(k)
-          VA_bry % STH = VA_bry % STH                &
-                       +  V_bry % STH(:,:,k) * dz(k)
+          UA_bry % STH = UA_bry % STH             &
+                       +  U_bry % STH(:,1:NFS,k)  &
+                        * dz(:,1:NFS,k)
+          VA_bry % STH = VA_bry % STH             &
+                       +  V_bry % STH(:,1:NFS,k)  &
+                        * dz(:,1:NFS,k)
         end do
 
       end if
@@ -1391,10 +1397,12 @@ module bry
         UA_bry % WST = 0.
         VA_bry % WST = 0.
         do k = 1, kbm1
-          UA_bry % WST = UA_bry % WST                &
-                       +  U_bry % WST(:,:,k) * dz(k)
-          VA_bry % WST = VA_bry % WST                &
-                       +  V_bry % WST(:,:,k) * dz(k)
+          UA_bry % WST = UA_bry % WST             &
+                       +  U_bry % WST(1:NFW,:,k)  &
+                        * dz(1:NFW,:,k)
+          VA_bry % WST = VA_bry % WST             &
+                       +  V_bry % WST(1:NFW,:,k)  &
+                        * dz(1:NFW,:,k)
         end do
 
       end if
@@ -2013,7 +2021,7 @@ module bry
 
             case ( bcIMPEDANCE )
               do j = 2,jmm1
-                if ( dum(imm1,j) /= 0. ) then
+                if ( dum(imm1,j,1) /= 0. ) then
                   cx = sqrt( d(imm1,j)/g )
                   elf(imm1,j) = EL_bry%EST(1,j) + cx*( uaf(imm1,j)-UA_bry%EST(1,j) )
                   elf(im,j) = elf(imm1,j)
@@ -2067,7 +2075,7 @@ module bry
 
             case ( bcIMPEDANCE )
               do j = 2,jmm1
-                if ( dum(2,j) /= 0. ) then
+                if ( dum(2,j,1) /= 0. ) then
                   cx = sqrt( d(2,j)/g )
                   elf(2,j) = EL_bry%WST(1,j) - cx*( uaf(3,j)-UA_bry%WST(1,j) )
                   elf(1,j) = elf(2,j)
@@ -2131,12 +2139,12 @@ module bry
 
             case ( bcIMPEDANCE )
               do i = 2,imm1
-                if ( dvm(i,jm) /= 0. ) then
+                if ( dvm(i,jm,1) /= 0. ) then
                   ! cy = sqrt( d(i,jm)/g )*dvm(i,jm)
                   ! elf(i,jmm1) = EL_bry%NTH(i,1) + cy*( vaf(i,jmm1)-VA_bry%NTH(i,1) )
                   ! elf(i,jmm1) = elf(i,jmm1) + 2._rk*EL_bry%NTH(i,1) - elf(i,jmm2)!WIP:
                   ! elf(i,jm) = 2._rk*EL_bry%NTH(i,1) - elf(i,jmm1)
-                  cy = .5_rk*sqrt( 2._rk*d(i,jm)/(d(i,jm)+d(i,jmm1)) )*dvm(i,jm)
+                  cy = .5_rk*sqrt( 2._rk*d(i,jm)/(d(i,jm)+d(i,jmm1)) )
                   elf(i,jm) = EL_bry%NTH(i,1) + cy*( elf(i,jmm1) - EL_bry%NTH(i,1) )
                 end if
               end do
@@ -2208,7 +2216,7 @@ module bry
 
             case ( bcIMPEDANCE )
               do i = 2,imm1
-                if ( dvm(i,2) /= 0. ) then
+                if ( dvm(i,2,1) /= 0. ) then
                   cy = sqrt( d(i,2)/g )
                   elf(i,2) = - cy*( vaf(i,3)-VA_bry%STH(i,1) )
                   elf(i,2) = elf(i,2) + 2._rk*EL_bry%STH(i,1) - elf(i,3)
@@ -2246,7 +2254,7 @@ module bry
       end if
 
 ! Apply rho-mask (TODO: needed?)
-      elf = elf*fsm
+      elf = elf*fsm(:,:,1)
 
 
     end ! subroutine bc_zeta
@@ -2280,13 +2288,13 @@ module bry
         if ( hasNORTH ) then
           if ( BC % VEL2D % TANG % NORTH == bc0GRADIENT ) then
             uaf(:,jm) = uaf(:,jmm1)
-            dum(:,jm) = 1.
+            dum(:,jm,:) = dum(:,jmm1,:)
           end if
         end if
         if ( hasSOUTH ) then
           if ( BC % VEL2D % TANG % SOUTH == bc0GRADIENT ) then
             uaf(:,1) = uaf(:,2)
-            dum(:,1) = 1.
+            dum(:,1,:) = dum(:,2,:)
           end if
         end if
 
@@ -2372,7 +2380,7 @@ module bry
 
             case ( bcCHAPMAN )
               cx(2:jmm1) = dte*.5*(1./dx(imm1,1:jmm2)+1./dx(imm1,2:jmm1))  &
-                         * sqrt( dvm(imm1,2:jmm1)*.5*GRAV                  &
+                         * sqrt( dvm(imm1,2:jmm1,1)*.5*GRAV                & ! TODO: test for landmask case (it shouldn't be zero, right?)
                                * (d(imm1,1:jmm2)+d(imm1,2:jmm1)) )
               vaf(im,2:jmm1) = (va(im,2:jmm1)+cx(2:jmm1)*vaf(imm1,2:jmm1))  &
                              / (1.+cx(2:jmm1))
@@ -2464,7 +2472,7 @@ module bry
 
             case ( bcCHAPMAN )
               cx(2:jmm1) = dte*.5*(1./dx(2,1:jmm2)+1./dx(2,2:jmm1))  &
-                         * sqrt( dvm(2,2:jmm1)*.5*GRAV               &
+                         * sqrt( dvm(2,2:jmm1,1)*.5*GRAV             &
                                * (d(2,1:jmm2)+d(2,2:jmm1)) )
               vaf(1,2:jmm1) = (va(1,2:jmm1)+cx(2:jmm1)*vaf(2,2:jmm1))  &
                             / (1.+cx(2:jmm1))
@@ -2486,13 +2494,13 @@ module bry
         if ( hasEAST ) then
           if ( BC % VEL2D % TANG % EAST == bc0GRADIENT ) then
             vaf(im,:) = vaf(imm1,:)
-            dvm(im,:) = 1.0
+            dvm(im,:,:) = dvm(imm1,:,:) ! TODO: this isn't right, though...
           end if
         end if
         if ( hasWEST ) then
           if ( BC % VEL2D % TANG % WEST == bc0GRADIENT ) then
             vaf(1,:) = vaf(2,:)
-            dvm(1,:) = 1.0
+            dvm(1,:,:) = dvm(2,:,:)
           end if
         end if
 
@@ -2577,7 +2585,7 @@ module bry
 
             case ( bcCHAPMAN )
               ce(2:imm1) = dte*.5*(1./dy(1:imm2,jmm1)+1./dy(2:imm1,jmm1))  &
-                         * sqrt( dum(2:imm1,jmm1)*.5*GRAV                  &
+                         * sqrt( dum(2:imm1,jmm1,1)*.5*GRAV                &
                                * (d(1:imm2,jmm1)+d(2:imm1,jmm1)) )
               uaf(2:imm1,jm) = (ua(2:imm1,jm)+ce(2:imm1)*uaf(2:imm1,jmm1))  &
                              / (1.+ce(2:imm1))
@@ -2669,7 +2677,7 @@ module bry
 
             case ( bcCHAPMAN )
               ce(2:imm1) = dte*.5*(1./dy(1:imm2,2)+1./dy(2:imm1,2))  &
-                         * sqrt( dum(2:imm1,2)*.5*GRAV               &
+                         * sqrt( dum(2:imm1,2,1)*.5*GRAV             &
                                * (d(1:imm2,2)+d(2:imm1,2)) )
               uaf(2:imm1,1) = (ua(2:imm1,1)+ce(2:imm1)*uaf(2:imm1,2))  &
                              / (1.+ce(2:imm1))
@@ -2713,8 +2721,8 @@ module bry
       end if
 
 ! Apply u- and v-masks
-      uaf = uaf*dum
-      vaf = vaf*dvm
+      uaf = uaf*dum(:,:,1)
+      vaf = vaf*dvm(:,:,1)
 
 
     end ! subroutine bc_vel_ext
@@ -2806,12 +2814,12 @@ module bry
               case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = ( u(imm1,j,k)-u(imm1,j-1,k) )*dvm(imm1,j)
-                  grdy(2,j) = ( u(im  ,j,k)-u(im  ,j-1,k) )*dvm(im  ,j)
+                  grdy(1,j) = ( u(imm1,j,k)-u(imm1,j-1,k) )*dvm(imm1,j,k)
+                  grdy(2,j) = ( u(im  ,j,k)-u(im  ,j-1,k) )*dvm(im  ,j,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    u(imm1,j,k)-uf(imm1,j,k)
-                  dvdx = ( uf(imm1,j,k)-uf(imm2,j,k) )*dum(imm1,j)
+                  dvdx = ( uf(imm1,j,k)-uf(imm2,j,k) )*dum(imm1,j,k)
                   if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
                     dvdy = grdy(1,j  )
                   else
@@ -2860,12 +2868,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 1,jmm1
-                  grdy(1,j) = ( v(imm1,j+1,k)-v(imm1,j,k) )*dvm(imm1,j+1)
-                  grdy(2,j) = ( v(im  ,j+1,k)-v(im  ,j,k) )*dvm(im  ,j+1)
+                  grdy(1,j) = ( v(imm1,j+1,k)-v(imm1,j,k) )*dvm(imm1,j+1,k)
+                  grdy(2,j) = ( v(im  ,j+1,k)-v(im  ,j,k) )*dvm(im  ,j+1,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    v(imm1,j,k)-vf(imm1,j,k)
-                  dvdx = ( vf(imm1,j,k)-vf(imm2,j,k) )*dum(imm1,j)
+                  dvdx = ( vf(imm1,j,k)-vf(imm2,j,k) )*dum(imm1,j,k)
                   if ( dvdt*(grdy(1,j-1)+grdy(1,j)) > 0. ) then
                     dvdy = grdy(1,j-1)
                   else
@@ -2933,12 +2941,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = ( u(2,j,k)-u(2,j-1,k) )*dvm(2,j)
-                  grdy(2,j) = ( u(3,j,k)-u(3,j-1,k) )*dvm(3,j)
+                  grdy(1,j) = ( u(2,j,k)-u(2,j-1,k) )*dvm(2,j,k)
+                  grdy(2,j) = ( u(3,j,k)-u(3,j-1,k) )*dvm(3,j,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    u(3,j,k)-uf(3,j,k)
-                  dvdx = ( uf(3,j,k)-uf(4,j,k) )*dum(4,j)
+                  dvdx = ( uf(3,j,k)-uf(4,j,k) )*dum(4,j,k)
                   if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
                     dvdy = grdy(2,j  )
                   else
@@ -2989,12 +2997,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 1,jmm1
-                  grdy(1,j) = ( v(1,j+1,k)-v(1,j,k) )*dvm(1,j+1)
-                  grdy(2,j) = ( v(2,j+1,k)-v(2,j,k) )*dvm(2,j+1)
+                  grdy(1,j) = ( v(1,j+1,k)-v(1,j,k) )*dvm(1,j+1,k)
+                  grdy(2,j) = ( v(2,j+1,k)-v(2,j,k) )*dvm(2,j+1,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    v(2,j,k)-vf(2,j,k)
-                  dvdx = ( vf(2,j,k)-vf(3,j,k) )*dum(3,j)
+                  dvdx = ( vf(2,j,k)-vf(3,j,k) )*dum(3,j,k)
                   if ( dvdt*(grdy(2,j-1)+grdy(2,j)) > 0. ) then
                     dvdy = grdy(2,j-1)
                   else
@@ -3090,12 +3098,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = ( v(i,jmm1,k)-v(i-1,jmm1,k) )*dum(i,jmm1)*dum(i,jm)
-                  grdx(i,2) = ( v(i,jm  ,k)-v(i-1,jm  ,k) )*dum(i,jmm1)*dum(i,jm)
+                  grdx(i,1) = ( v(i,jmm1,k)-v(i-1,jmm1,k) )*dum(i,jmm1,k)*dum(i,jm,k) ! TODO: WTH?
+                  grdx(i,2) = ( v(i,jm  ,k)-v(i-1,jm  ,k) )*dum(i,jmm1,k)*dum(i,jm,k)
                 end do
                 do i = 2,imm1
                   dvdt =    v(i,jmm1,k)-vf(i,jmm1,k)
-                  dvdy = ( vf(i,jmm1,k)-vf(i,jmm2,k) )*dvm(i,jmm1)*dvm(i,jmm2)
+                  dvdy = ( vf(i,jmm1,k)-vf(i,jmm2,k) )*dvm(i,jmm1,k)*dvm(i,jmm2,k)
                   if ( dvdt*dvdy < 0. ) dvdt = 0.
                   if ( dvdt*(grdx(i,1)+grdx(i+1,1)) > 0. ) then
                     dvdx = grdx(i  ,1)
@@ -3144,12 +3152,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 1,imm1
-                  grdx(i,1) = ( u(i+1,jmm1,k)-u(i,jmm1,k) )*dum(i,jmm1)*dum(i+1,jmm1)
-                  grdx(i,2) = ( u(i+1,jm  ,k)-u(i,jm  ,k) )*dum(i,jm  )*dum(i+1,jm  )
+                  grdx(i,1) = ( u(i+1,jmm1,k)-u(i,jmm1,k) )*dum(i,jmm1,k)*dum(i+1,jmm1,k) ! TODO: WTH?
+                  grdx(i,2) = ( u(i+1,jm  ,k)-u(i,jm  ,k) )*dum(i,jm  ,k)*dum(i+1,jm  ,k)
                 end do
                 do i = 2,imm1
                   dvdt =    u(i,jmm1,k)-uf(i,jmm1,k)
-                  dvdy = ( uf(i,jmm1,k)-uf(i,jmm2,k) )*dvm(i,jmm1)*dvm(i,jmm2)
+                  dvdy = ( uf(i,jmm1,k)-uf(i,jmm2,k) )*dvm(i,jmm1,k)*dvm(i,jmm2,k)
                   if ( dvdt*(grdx(i-1,1)+grdx(i,1)) > 0. ) then
                     dvdx = grdx(i-1,1)
                   else
@@ -3217,12 +3225,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = ( v(i,2,k)-v(i-1,2,k) )*dum(i,2)
-                  grdx(i,2) = ( v(i,3,k)-v(i-1,3,k) )*dum(i,3)
+                  grdx(i,1) = ( v(i,2,k)-v(i-1,2,k) )*dum(i,2,k)
+                  grdx(i,2) = ( v(i,3,k)-v(i-1,3,k) )*dum(i,3,k)
                 end do
                 do i = 2,imm1
                   dvdt =    v(i,3,k)-vf(i,3,k)
-                  dvdy = ( vf(i,3,k)-vf(i,4,k) )*dvm(i,4)
+                  dvdy = ( vf(i,3,k)-vf(i,4,k) )*dvm(i,4,k)
                   if ( dvdt*dvdy < 0. ) dvdt = 0.
                   if ( dvdt*(grdx(i,2)+grdx(i+1,2)) > 0. ) then
                     dvdx = grdx(i  ,2)
@@ -3273,12 +3281,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 1,imm1
-                  grdx(i,1) = ( u(i+1,1,k)-u(i,1,k) )*dum(i+1,1)
-                  grdx(i,2) = ( u(i+1,2,k)-u(i,2,k) )*dum(i+1,2)
+                  grdx(i,1) = ( u(i+1,1,k)-u(i,1,k) )*dum(i+1,1,k)
+                  grdx(i,2) = ( u(i+1,2,k)-u(i,2,k) )*dum(i+1,2,k)
                 end do
                 do i = 2,imm1
                   dvdt =    u(i,2,k)-uf(i,2,k)
-                  dvdy = ( uf(i,2,k)-uf(i,3,k) )*dvm(i,3)
+                  dvdy = ( uf(i,2,k)-uf(i,3,k) )*dvm(i,3,k)
                   if ( dvdt*(grdx(i-1,2)+grdx(i,2)) > 0. ) then
                     dvdx = grdx(i-1,2)
                   else
@@ -3334,10 +3342,8 @@ module bry
       end if
 
 ! Apply u- nd v-masks
-      do k = 1,kbm1
-        uf(:,:,k) = uf(:,:,k)*dum
-        vf(:,:,k) = vf(:,:,k)*dvm
-      end do
+      uf = uf*dum
+      vf = vf*dvm
 
 
     end ! subroutine bc_vel_int
@@ -3417,7 +3423,7 @@ module bry
                                - u1*(s(im,j,k)-s(imm1,j,k))
                     if ( k/=1 .and. k/=kbm1 ) then
                       wm = .5 * (w(imm1,j,k)+w(imm1,j,k+1))*dti   &
-                              / ( (zz(k-1)-zz(k+1))*dt(imm1,j) )
+                              / ( (zz(imm1,j,k-1)-zz(imm1,j,k+1))*dt(imm1,j) )
                       uf(im,j,k) = uf(im,j,k)                     &
                            - wm*(t(imm1,j,k-1)-t(imm1,j,k+1))
                       vf(im,j,k) = vf(im,j,k)                     &
@@ -3444,12 +3450,12 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = ( t(imm1,j,k)-t(imm1,j-1,k) )*dvm(imm1,j)
-                  grdy(2,j) = ( t(im  ,j,k)-t(im  ,j-1,k) )*dvm(im  ,j)
+                  grdy(1,j) = ( t(imm1,j,k)-t(imm1,j-1,k) )*dvm(imm1,j,k)
+                  grdy(2,j) = ( t(im  ,j,k)-t(im  ,j-1,k) )*dvm(im  ,j,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    t(imm1,j,k)-uf(imm1,j,k)
-                  dvdx = ( uf(imm1,j,k)-uf(imm2,j,k) )*dum(imm1,j)
+                  dvdx = ( uf(imm1,j,k)-uf(imm2,j,k) )*dum(imm1,j,k)
                   if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
                     dvdy = grdy(1,j  )
                   else
@@ -3468,12 +3474,12 @@ module bry
 
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = ( s(imm1,j,k)-s(imm1,j-1,k) )*dvm(imm1,j)
-                  grdy(2,j) = ( s(im  ,j,k)-s(im  ,j-1,k) )*dvm(im  ,j)
+                  grdy(1,j) = ( s(imm1,j,k)-s(imm1,j-1,k) )*dvm(imm1,j,k)
+                  grdy(2,j) = ( s(im  ,j,k)-s(im  ,j-1,k) )*dvm(im  ,j,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    s(imm1,j,k)-vf(imm1,j,k)
-                  dvdx = ( vf(imm1,j,k)-vf(imm2,j,k) )*dum(imm1,j)
+                  dvdx = ( vf(imm1,j,k)-vf(imm2,j,k) )*dum(imm1,j,k)
                   if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
                     dvdy = grdy(1,j  )
                   else
@@ -3539,7 +3545,7 @@ module bry
                               - u1*(s(2,j,k)-s(1,j,k))
                     if ( k/=1 .and. k/=kbm1 ) then
                       wm = .5 * ( w(2,j,k)+w(2,j,k+1) )*dti     &
-                              / ( (zz(k-1)-zz(k+1))*dt(2,j) )
+                              / ( (zz(2,j,k-1)-zz(2,j,k+1))*dt(2,j) )
                       uf(1,j,k) = uf(1,j,k)                     &
                            - wm*(t(2,j,k-1)-t(2,j,k+1))
                       vf(1,j,k) = vf(1,j,k)                     &
@@ -3565,12 +3571,12 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = ( t(1,j,k)-t(1,j-1,k) )*dvm(1,j)
-                  grdy(2,j) = ( t(2,j,k)-t(2,j-1,k) )*dvm(2,j)
+                  grdy(1,j) = ( t(1,j,k)-t(1,j-1,k) )*dvm(1,j,k)
+                  grdy(2,j) = ( t(2,j,k)-t(2,j-1,k) )*dvm(2,j,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    t(2,j,k)-uf(2,j,k)
-                  dvdx = ( uf(2,j,k)-uf(3,j,k) )*dum(3,j)
+                  dvdx = ( uf(2,j,k)-uf(3,j,k) )*dum(3,j,k)
                   if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
                     dvdy = grdy(2,j  )
                   else
@@ -3589,12 +3595,12 @@ module bry
 
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = ( s(1,j,k)-s(1,j-1,k) )*dvm(1,j)
-                  grdy(2,j) = ( s(2,j,k)-s(2,j-1,k) )*dvm(2,j)
+                  grdy(1,j) = ( s(1,j,k)-s(1,j-1,k) )*dvm(1,j,k)
+                  grdy(2,j) = ( s(2,j,k)-s(2,j-1,k) )*dvm(2,j,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    s(2,j,k)-vf(2,j,k)
-                  dvdx = ( vf(2,j,k)-vf(3,j,k) )*dum(3,j)
+                  dvdx = ( vf(2,j,k)-vf(3,j,k) )*dum(3,j,k)
                   if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
                     dvdy = grdy(2,j  )
                   else
@@ -3669,7 +3675,7 @@ module bry
                                - u1*(s(i,jm,k)-s(i,jmm1,k))
                     if ( k/=1 .and. k/=kbm1 ) then
                       wm = .5 * (w(i,jmm1,k)+w(i,jmm1,k+1))*dti   &
-                              / ( (zz(k-1)-zz(k+1))*dt(i,jmm1) )
+                              / ( (zz(i,jmm1,k-1)-zz(i,jmm1,k+1))*dt(i,jmm1) )
                       uf(i,jm,k) = uf(i,jm,k)                     &
                                  - wm*(t(i,jmm1,k-1)-t(i,jmm1,k+1))
                       vf(i,jm,k) = vf(i,jm,k)                     &
@@ -3696,12 +3702,12 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = ( t(i,jmm1,k)-t(i-1,jmm1,k) )*dum(i,jmm1)
-                  grdx(i,2) = ( t(i,jm  ,k)-t(i-1,jm  ,k) )*dum(i,jm  )
+                  grdx(i,1) = ( t(i,jmm1,k)-t(i-1,jmm1,k) )*dum(i,jmm1,k)
+                  grdx(i,2) = ( t(i,jm  ,k)-t(i-1,jm  ,k) )*dum(i,jm  ,k)
                 end do
                 do i = 2,imm1
                   dvdt =    t(i,jmm1,k)-uf(i,jmm1,k)
-                  dvdy = ( uf(i,jmm1,k)-uf(i,jmm2,k) )*dvm(i,jmm1)
+                  dvdy = ( uf(i,jmm1,k)-uf(i,jmm2,k) )*dvm(i,jmm1,k)
                   if ( dvdt*(grdx(i,1)+grdx(i+1,1)) > 0. ) then
                     dvdx = grdx(i  ,1)
                   else
@@ -3720,12 +3726,12 @@ module bry
 
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = ( s(i,jmm1,k)-s(i-1,jmm1,k) )*dum(i,jmm1)
-                  grdx(i,2) = ( s(i,jm  ,k)-s(i-1,jm  ,k) )*dum(i,jm  )
+                  grdx(i,1) = ( s(i,jmm1,k)-s(i-1,jmm1,k) )*dum(i,jmm1,k)
+                  grdx(i,2) = ( s(i,jm  ,k)-s(i-1,jm  ,k) )*dum(i,jm  ,k)
                 end do
                 do i = 2,imm1
                   dvdt =    s(i,jmm1,k)-vf(i,jmm1,k)
-                  dvdy = ( vf(i,jmm1,k)-vf(i,jmm2,k) )*dvm(i,jmm1)
+                  dvdy = ( vf(i,jmm1,k)-vf(i,jmm2,k) )*dvm(i,jmm1,k)
                   if ( dvdt*(grdx(i,1)+grdx(i+1,1)) > 0. ) then
                     dvdx = grdx(i  ,1)
                   else
@@ -3791,7 +3797,7 @@ module bry
                               - u1*(s(i,2,k)-s(i,1,k))
                     if ( k/=1 .and. k/=kbm1 ) then
                       wm = .5 * ( w(i,2,k)+w(i,2,k+1) )*dti     &
-                              / ( (zz(k-1)-zz(k+1))*dt(i,2) )
+                              / ( (zz(i,2,k-1)-zz(i,2,k+1))*dt(i,2) )
                       uf(i,1,k) = uf(i,1,k)                     &
                                 - wm*(t(i,2,k-1)-t(i,2,k+1))
                       vf(i,1,k) = vf(i,1,k)                     &
@@ -3817,12 +3823,12 @@ module bry
             case ( bcRADIATION )
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = ( t(i,1,k)-t(i-1,1,k) )*dum(i,1)
-                  grdx(i,2) = ( t(i,2,k)-t(i-1,2,k) )*dum(i,2)
+                  grdx(i,1) = ( t(i,1,k)-t(i-1,1,k) )*dum(i,1,k)
+                  grdx(i,2) = ( t(i,2,k)-t(i-1,2,k) )*dum(i,2,k)
                 end do
                 do i = 2,imm1
                   dvdt =    t(i,2,k)-uf(i,2,k)
-                  dvdy = ( uf(i,2,k)-uf(i,3,k) )*dvm(i,3)
+                  dvdy = ( uf(i,2,k)-uf(i,3,k) )*dvm(i,3,k)
                   if ( dvdt*(grdx(i,2)+grdx(i+1,2)) > 0. ) then
                     dvdx = grdx(i  ,2)
                   else
@@ -3841,12 +3847,12 @@ module bry
 
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = ( s(i,1,k)-s(i-1,1,k) )*dum(i,1)
-                  grdx(i,2) = ( s(i,2,k)-s(i-1,2,k) )*dum(i,2)
+                  grdx(i,1) = ( s(i,1,k)-s(i-1,1,k) )*dum(i,1,k)
+                  grdx(i,2) = ( s(i,2,k)-s(i-1,2,k) )*dum(i,2,k)
                 end do
                 do i = 2,imm1
                   dvdt =    s(i,2,k)-vf(i,2,k)
-                  dvdy = ( vf(i,2,k)-vf(i,3,k) )*dvm(i,3)
+                  dvdy = ( vf(i,2,k)-vf(i,3,k) )*dvm(i,3,k)
                   if ( dvdt*(grdx(i,2)+grdx(i+1,2)) > 0. ) then
                     dvdx = grdx(i  ,2)
                   else
@@ -3894,10 +3900,8 @@ module bry
 
       end if
 ! Apply rho-mask
-      do k = 1,kbm1
-        uf(:,:,k) = uf(:,:,k)*fsm
-        vf(:,:,k) = vf(:,:,k)*fsm
-      end do
+      uf = uf*fsm
+      vf = vf*fsm
 
 
     end ! subroutine bc_ts
@@ -3915,9 +3919,7 @@ module bry
 
 
 ! Apply rho-mask
-      do k = 1,kbm1
-        w(:,:,k) = w(:,:,k)*fsm
-      end do
+      w = w*fsm
 
 
     end ! subroutine bc_vel_vert
@@ -4046,10 +4048,8 @@ module bry
 
 
 ! Apply rho-mask
-      do k=1,kb
-        uf(:,:,k) = uf(:,:,k)*fsm + 1.e-10
-        vf(:,:,k) = vf(:,:,k)*fsm + 1.e-10
-      end do
+      uf = uf*fsm + 1.e-10
+      vf = vf*fsm + 1.e-10
 
 
     end ! subroutine bc_turb
