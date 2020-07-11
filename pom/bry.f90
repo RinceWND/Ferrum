@@ -2362,6 +2362,9 @@ module bry
 
             case ( bcCLAMPED )
               vaf(im,2:jmm1) = VA_bry%EST(1,2:jmm1)
+              if ( use_tide ) then
+                vaf(im,2:jmm1) = vaf(im,2:jmm1) + tide_va(im,2:jmm1)
+              end if
 
             case ( bcFLATHER ) ! ??? Zero out tangential velocity gradient at imm1 point
                                ! (So we assume {partial U^T} over {partial n} = {partial U^T_exterior) over {partial n} = 0)
@@ -2455,6 +2458,9 @@ module bry
 
             case ( bcCLAMPED )
               vaf(1,2:jmm1) = VA_bry%WST(1,2:jmm1)
+              if ( use_tide ) then
+                vaf(1,2:jmm1) = vaf(1,2:jmm1) + tide_va(1,2:jmm1)
+              end if
 
             case ( bcFLATHER ) ! ??? (See east boundary)
 !              vaf(1,2:jmm1) = vaf(3,2:jmm1)
@@ -2568,6 +2574,9 @@ module bry
 
             case ( bcCLAMPED )
               uaf(2:imm1,jm) = UA_bry%NTH(2:imm1,1)
+              if ( use_tide ) then
+                uaf(2:imm1,jm) = uaf(2:imm1,jm) + tide_ua(2:imm1,jm)
+              end if
 
             case ( bcFLATHER ) ! ??? (See east boundary)
 !              uaf(2:imm1,jm) = uaf(2:imm1,jmm2)
@@ -2660,6 +2669,9 @@ module bry
 
             case ( bcCLAMPED )
               uaf(2:imm1,1) = UA_bry%STH(2:imm1,1)
+              if ( use_tide ) then
+                uaf(2:imm1,1) = uaf(2:imm1,1) + tide_ua(2:imm1,1)
+              end if
 
             case ( bcFLATHER ) ! ??? (See east boundary)
 !              uaf(2:imm1,1) = uaf(2:imm1,3)
