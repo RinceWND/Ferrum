@@ -889,7 +889,7 @@ module tide
 !______________________________________________________________________
 !
       use glob_const , only: DEG2RAD, GRAV
-      use glob_domain, only: im, imm1, jm
+      use glob_domain, only: im, imm1, jm, jmm1
       use grid       , only: fsm
       use module_time
       use model_run  , only: dti, iint, sec_of_year
@@ -936,16 +936,19 @@ module tide
                            + f*el_amp(2:imm1,jm,i)                &
                             *cos( ( this_con%speed*tick + uv      &
                                   - el_pha(2:imm1,jm,i) )*DEG2RAD )
-        tide_ua(2:imm1,jm) = tide_ua(2:imm1,jm)                   &
-                           + f*ua_amp(2:imm1,jm,i)                &
+        tide_ua(1:imm1,jm) = tide_ua(1:imm1,jm)                   &
+                           + f*ua_amp(1:imm1,jm,i)                &
                             *cos( ( this_con%speed*tick + uv      &
-                                  - ua_pha(2:imm1,jm,i) )*DEG2RAD )
+                                  - ua_pha(1:imm1,jm,i) )*DEG2RAD )
         tide_va(2:imm1,jm) = tide_va(2:imm1,jm)                   &
                            + f*va_amp(2:imm1,jm,i)                &
                             *cos( ( this_con%speed*tick + uv      &
                                   - va_pha(2:imm1,jm,i) )*DEG2RAD )
         tide_el( 1,:) = tide_el( 1,:) + f*el_amp( 1,:,i)*cos( (this_con%speed*tick + uv - el_pha( 1,:,i))*DEG2RAD )
-        tide_ua( 2,:) = tide_ua( 2,:) + f*ua_amp( 2,:,i)*cos( (this_con%speed*tick + uv - ua_pha( 2,:,i))*DEG2RAD )
+        tide_ua( 2,2:jmm1) = tide_ua( 2,2:jmm1)                   &
+                           + f*ua_amp( 2,2:jmm1,i)                &
+                            *cos( ( this_con%speed*tick + uv      &
+                                  - ua_pha( 2,2:jmm1,i) )*DEG2RAD )
         tide_va( 1,:) = tide_va( 1,:) + f*va_amp( 1,:,i)*cos( (this_con%speed*tick + uv - va_pha( 1,:,i))*DEG2RAD )
         tide_el(2:imm1, 1) = tide_el(2:imm1, 1)                   &
                            + f*el_amp(2:imm1, 1,i)                &
