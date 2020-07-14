@@ -936,8 +936,14 @@ module tide
                            + f*el_amp(2:imm1,jm,i)                &
                             *cos( ( this_con%speed*tick + uv      &
                                   - el_pha(2:imm1,jm,i) )*DEG2RAD )
-        tide_ua(:,jm) = tide_ua(:,jm) + f*ua_amp(:,jm,i)*cos( (this_con%speed*tick + uv - ua_pha(:,jm,i))*DEG2RAD )
-        tide_va(:,jm) = tide_va(:,jm) + f*va_amp(:,jm,i)*cos( (this_con%speed*tick + uv - va_pha(:,jm,i))*DEG2RAD )
+        tide_ua(2:imm1,jm) = tide_ua(2:imm1,jm)                   &
+                           + f*ua_amp(2:imm1,jm,i)                &
+                            *cos( ( this_con%speed*tick + uv      &
+                                  - ua_pha(2:imm1,jm,i) )*DEG2RAD )
+        tide_va(2:imm1,jm) = tide_va(2:imm1,jm)                   &
+                           + f*va_amp(2:imm1,jm,i)                &
+                            *cos( ( this_con%speed*tick + uv      &
+                                  - va_pha(2:imm1,jm,i) )*DEG2RAD )
         tide_el( 1,:) = tide_el( 1,:) + f*el_amp( 1,:,i)*cos( (this_con%speed*tick + uv - el_pha( 1,:,i))*DEG2RAD )
         tide_ua( 2,:) = tide_ua( 2,:) + f*ua_amp( 2,:,i)*cos( (this_con%speed*tick + uv - ua_pha( 2,:,i))*DEG2RAD )
         tide_va( 1,:) = tide_va( 1,:) + f*va_amp( 1,:,i)*cos( (this_con%speed*tick + uv - va_pha( 1,:,i))*DEG2RAD )
@@ -945,8 +951,14 @@ module tide
                            + f*el_amp(2:imm1, 1,i)                &
                             *cos( ( this_con%speed*tick + uv      &
                                   - el_pha(2:imm1, 1,i) )*DEG2RAD )
-        tide_ua(:, 1) = tide_ua(:, 1) + f*ua_amp(:, 1,i)*cos( (this_con%speed*tick + uv - ua_pha(:, 1,i))*DEG2RAD )
-        tide_va(:, 2) = tide_va(:, 2) + f*va_amp(:, 2,i)*cos( (this_con%speed*tick + uv - va_pha(:, 2,i))*DEG2RAD )
+        tide_ua(2:imm1, 1) = tide_ua(2:imm1, 1)                   &
+                           + f*ua_amp(2:imm1, 1,i)                &
+                            *cos( ( this_con%speed*tick + uv      &
+                                  - ua_pha(2:imm1, 1,i) )*DEG2RAD )
+        tide_va(2:imm1, 2) = tide_va(2:imm1, 2)                   &
+                           + f*va_amp(2:imm1, 2,i)                &
+                            *cos( ( this_con%speed*tick + uv      &
+                                  - va_pha(2:imm1, 2,i) )*DEG2RAD )
       end do
       !tide_el = tide_el*fsm!tide_mask
       !tide_ua = tide_ua*fsm!tide_mask
