@@ -286,8 +286,9 @@ module config
 !______________________________________________________________________
 !
       use glob_const , only: rk
-      use glob_out   , only: prtd1, prtd2, write_rst
-      use model_run  , only: days, dte, isplit, initialize_model_run, time_start
+      use glob_out   , only: prtd1, prtd2, swtch , write_rst
+      use model_run  , only: days , dte  , isplit, initialize_model_run  &
+                           , time_start
 
       implicit none
 
@@ -311,8 +312,8 @@ module config
 
       namelist/output_nml/                                     &
         append_output, monthly_flag, netcdf_file, output_flag  &
-      , output_means , prtd1       , prtd2      , write_rst    &
-      , SURF_flag
+      , output_means , prtd1       , prtd2      , swtch        &
+      , write_rst    , SURF_flag
 
       namelist/modules_nml/                             &
         USE_AIR, USE_BRY, USE_ICE, USE_RIVER, USE_TIDE

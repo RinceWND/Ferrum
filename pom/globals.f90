@@ -218,12 +218,14 @@ module glob_out
     nums           &
   , iprint         & ! interval [iint] at which variables are printed
   , iprints        & ! interval [iint] for writing SURF?
+  , iswtch         & ! interval [iint] to switch prtd1 to prtd2 for main output
   , irestart       & ! restart file writing time step [in iint]
   , iouts
 
   real(rk)         &
     prtd1          & ! output interval (days)
   , prtd2          & ! output interval for SURF.* file (days)
+  , swtch          & ! time step interval(days)  to switch from prtd1 to prtd2
   , write_rst        ! restart output interval [days]
 
 !----------------------------------------------------------------------
@@ -279,6 +281,8 @@ module glob_out
 
       num        = 0
       out_record = 1
+
+      swtch      = huge(swtch)
 
       allocate(             &
         elb_mean   (im,jm)  &
@@ -392,8 +396,8 @@ module model_run
 
     subroutine initialize_model_run
 
-      use glob_out, only: iprint, iprints, irestart   &
-                        , prtd1 , prtd2  , write_rst
+      use glob_out, only: iprint, iprints, irestart, iswtch     &
+                        , prtd1 , prtd2  , swtch   , write_rst
 
       implicit none
 
@@ -413,6 +417,7 @@ module model_run
       iprint  = max( nint(      prtd1*86400._rk/dti), 1 )
       irestart= max( nint(  write_rst*86400._rk/dti), 1 )
       iprints = max( nint(      prtd2*86400._rk/dti), 1 )
+      iswtch  =      nint(      swtch*86400._rk/dti)
 
       ispi = 1._rk/       real(isplit)
       isp2i= 1._rk/(2._rk*real(isplit))
@@ -422,9 +427,12 @@ module model_run
 
     subroutine update_time
 
+      use glob_out, only: iprint, iswtch, prtd2
+
       implicit none
 
       time = dti*real(iint)/86400._rk + time0
+      if ( iint >= iswtch ) iprint = nint( prtd2*86400._rk/dti )
 
       if( is_leap( dtime%year ) ) then
         days_in_month(2) = 29
