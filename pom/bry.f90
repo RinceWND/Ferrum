@@ -3436,6 +3436,7 @@ module bry
                     if ( k/=1 .and. k/=kbm1 ) then
                       wm = .5 * (w(imm1,j,k)+w(imm1,j,k+1))*dti   &
                               / ( (zz(imm1,j,k-1)-zz(imm1,j,k+1))*dt(imm1,j) )
+                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
                       uf(im,j,k) = uf(im,j,k)                     &
                            - wm*(t(imm1,j,k-1)-t(imm1,j,k+1))
                       vf(im,j,k) = vf(im,j,k)                     &
@@ -3558,6 +3559,7 @@ module bry
                     if ( k/=1 .and. k/=kbm1 ) then
                       wm = .5 * ( w(2,j,k)+w(2,j,k+1) )*dti     &
                               / ( (zz(2,j,k-1)-zz(2,j,k+1))*dt(2,j) )
+                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
                       uf(1,j,k) = uf(1,j,k)                     &
                            - wm*(t(2,j,k-1)-t(2,j,k+1))
                       vf(1,j,k) = vf(1,j,k)                     &
@@ -3688,6 +3690,7 @@ module bry
                     if ( k/=1 .and. k/=kbm1 ) then
                       wm = .5 * (w(i,jmm1,k)+w(i,jmm1,k+1))*dti   &
                               / ( (zz(i,jmm1,k-1)-zz(i,jmm1,k+1))*dt(i,jmm1) )
+                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
                       uf(i,jm,k) = uf(i,jm,k)                     &
                                  - wm*(t(i,jmm1,k-1)-t(i,jmm1,k+1))
                       vf(i,jm,k) = vf(i,jm,k)                     &
@@ -3810,6 +3813,7 @@ module bry
                     if ( k/=1 .and. k/=kbm1 ) then
                       wm = .5 * ( w(i,2,k)+w(i,2,k+1) )*dti     &
                               / ( (zz(i,2,k-1)-zz(i,2,k+1))*dt(i,2) )
+                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
                       uf(i,1,k) = uf(i,1,k)                     &
                                 - wm*(t(i,2,k-1)-t(i,2,k+1))
                       vf(i,1,k) = vf(i,1,k)                     &
