@@ -44,20 +44,20 @@ module tide
 !----------------------------------------------------------------------
 ! Input variables' names
 !----------------------------------------------------------------------
-  character(len=VAR_LEN)  &
-      cons_name           & ! Downward longwave radiation
-  , el_amp_name           & ! Downward longwave radiation
-  , el_pha_name           & ! Latent heat flux
-  ,    lat_name           & ! Latitude at z-points
-  ,  lat_u_name           & ! Latitude at u-points
-  ,  lat_v_name           & ! Latitude at v-points
-  ,    lon_name           & ! Longitude at z-points
-  ,  lon_u_name           & ! Longitude at u-points
-  ,  lon_v_name           & ! Longitude at v-points
-  , ua_amp_name           & ! Longwave net radiation
-  , ua_pha_name           & ! Relative humidity
-  , va_amp_name           & ! Atm. pressure
-  , va_pha_name             ! Precipitation rate
+  character(VAR_LEN)  &
+      cons_name       & ! Downward longwave radiation
+  , el_amp_name       & ! Downward longwave radiation
+  , el_pha_name       & ! Latent heat flux
+  ,    lat_name       & ! Latitude at z-points
+  ,  lat_u_name       & ! Latitude at u-points
+  ,  lat_v_name       & ! Latitude at v-points
+  ,    lon_name       & ! Longitude at z-points
+  ,  lon_u_name       & ! Longitude at u-points
+  ,  lon_v_name       & ! Longitude at v-points
+  , ua_amp_name       & ! Longwave net radiation
+  , ua_pha_name       & ! Relative humidity
+  , va_amp_name       & ! Atm. pressure
+  , va_pha_name         ! Precipitation rate
 
 
 !----------------------------------------------------------------------
@@ -66,7 +66,7 @@ module tide
   character(4)               &
        , allocatable         &
        , dimension(:)   ::   &
-    constituent
+    constituent                ! All constituents defined in an input file
 
   real(rk)                   &
        , allocatable         &
@@ -115,10 +115,11 @@ module tide
   , jv_top
 
   integer(8)           &
-    ncons
+    ncons                ! Number of cunstituents defined in an input file
 
-  character(6)         &
-       , dimension(12) :: active_cons
+  character(6)                       &
+       , dimension(CONS_OVERALL) ::  &
+    active_cons                      ! All constituents selected for calculations
 
   type T_constituent
     character(6)              name   ! Name of constituent
@@ -222,104 +223,130 @@ module tide
 ! Allocate necessary arrays
       call allocate_arrays
 
-! Generate tidal constituents:       name, period       , t,   [  a,  s,  h, p ]
-!                                                              [ c1, c2, c3 ]
+! Generate tidal constituents:       name, 360*t/period , t,   [  a,  s,  h, p ]
+!                                         (angular speed)      [ c1, c2, c3 ]
 !                                                              [ c0, c1, c2, c3, pow ]
 !  - semidiurnal:
-      con( 1) = specify_constituent( "m2", 28.9841042_rk, 2, [   0.    , -2.    ,  2.    , 0.     ]      &
+      con( 1) = specify_constituent( "m2", 28.9841042_rk, 2, [   0.    , -2.    ,  2.    ,  0.    ]      &
                                                            , [ - 2.14  ,  0.    ,  0.    ]               &
                                                            , [   1.0004, -0.0373,  0.0002,  0.    , 1. ] ) ! Principal lunar semidiurnal
-      con( 2) = specify_constituent( "s2", 30.       _rk, 2, [   0.    ,  0.    ,  0.    , 0.     ]      &
+      con( 2) = specify_constituent( "s2", 30.       _rk, 2, [   0.    ,  0.    ,  0.    ,  0.    ]      &
                                                            , [   0.    ,  0.    ,  0.    ]               &
                                                            , [   1.    ,  0.    ,  0.    ,  0.    , 1. ] ) ! Principal solar semidiurnal
-      con( 3) = specify_constituent( "n2", 28.4397295_rk, 2, [   0.    , -3.    ,  2.    , 1.     ]      &
+      con( 3) = specify_constituent( "n2", 28.4397295_rk, 2, [   0.    , -3.    ,  2.    ,  1.    ]      &
                                                            , [ - 2.14  ,  0.    ,  0.    ]               &
                                                            , [   1.0004, -0.0373,  0.0002,  0.    , 1. ] ) ! Larger lunar elliptic semidiurnal
-      con( 4) = specify_constituent( "k2", 30.0821373_rk, 2, [   0.    ,  0.    ,  2.    , 0.     ]      &
+      con( 4) = specify_constituent( "k2", 30.0821373_rk, 2, [   0.    ,  0.    ,  2.    ,  0.    ]      &
                                                            , [ -17.74  ,  0.68  , -0.04  ]               &
                                                            , [   1.0241,  0.2863,  0.0083, -0.0015, 1. ] ) ! Lunisolar declinational semidiurnal
 !  - diurnal:
-      con( 5) = specify_constituent( "o1", 13.9430356_rk, 1, [ 270.    , -2.    ,  1.    , 0.     ]      &
+      con( 5) = specify_constituent( "o1", 13.9430356_rk, 1, [ 270.    , -2.    ,  1.    ,  0.    ]      &
                                                            , [  10.8   , -1.34  ,  0.19  ]               &
                                                            , [   1.0089,  0.1871, -0.0147,  0.0014, 1. ] ) ! Lunar diurnal
-      con( 6) = specify_constituent( "p1", 14.9589314_rk, 1, [ 270.    ,  0.    , -1.    , 0.     ]      &
+      con( 6) = specify_constituent( "p1", 14.9589314_rk, 1, [ 270.    ,  0.    , -1.    ,  0.    ]      &
                                                            , [   0.    ,  0.    ,  0.    ]               &
                                                            , [   1.    ,  0.    ,  0.    ,  0.    , 1. ] ) ! Solar diurnal
-      con( 7) = specify_constituent( "q1", 13.3986609_rk, 1, [ 270.    , -3.    ,  1.    , 1.     ]      &
+      con( 7) = specify_constituent( "q1", 13.3986609_rk, 1, [ 270.    , -3.    ,  1.    ,  1.    ]      &
                                                            , [  10.8   , -1.34  ,  0.19  ]               &
                                                            , [   1.0089,  0.1871, -0.0147,  0.0014, 1. ] ) ! Larger lunar elliptic diurnal
-      con( 8) = specify_constituent( "k1", 15.0410686_rk, 1, [  90.    ,  0.    ,  1.    , 0.     ]      &
+      con( 8) = specify_constituent( "k1", 15.0410686_rk, 1, [  90.    ,  0.    ,  1.    ,  0.    ]      &
                                                            , [ - 8.86  ,  0.68  , -0.07  ]               &
                                                            , [   1.006 ,  0.115 , -0.0088,  0.0006, 1. ] ) ! Lunisolar declinational diurnal
 !  - shallow water:
       con( 9) = specify_constituent( "m4" ,  57.9682084_rk, 4, [   0.    , -4.    ,  4.    , 0.     ]      &
                                                              , [ - 4.28  ,  0.    ,  0.    ]               &
-                                                             , [   1.0004, -0.0373,  0.0002,  0.    , 2. ] ) ! Shallow water overtides of principal lunar constituent, quarter-diurnal
+                                                             , [   1.0004, -0.0373,  0.0002, 0.     , 2. ] ) ! Shallow water overtides of principal lunar constituent, quarter-diurnal
       con(10) = specify_constituent( "m6" ,  86.9523127_rk, 6, [   0.    , -6.    ,  6.    , 0.     ]      &
-                                                             , [ - 2.14  ,  0.    ,  0.    ]               &
-                                                             , [   1.0004, -0.0373,  0.0002,  0.    , 1. ] ) ! Shallow water overtides of principal lunisolar constituent, sixth-diurnal
+                                                             , [ - 6.42  ,  0.    ,  0.    ]               &
+                                                             , [   1.0004, -0.0373,  0.0002, 0.     , 3. ] ) ! Shallow water overtides of principal lunisolar constituent, sixth-diurnal
       con(11) = specify_constituent( "ms4",  58.9841042_rk, 4, [   0.    , -2.    ,  2.    , 0.     ]      &
-                                                             , [  10.8   , -1.34  ,  0.19  ]               &
-                                                             , [   1.0004, -0.0373,  0.0002,  0.    , 3. ] ) ! Shallow water lunisolar quarter-diurnal
+                                                             , [ - 2.14  ,  0.    ,  0.    ]               &
+                                                             , [   1.0004, -0.0373,  0.0002,  0.    , 1. ] ) ! Shallow water lunisolar quarter-diurnal
       con(12) = specify_constituent( "m8" , 115.93642  _rk, 8, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water lunar eighth-diurnal
       con(13) = specify_constituent( "s8" , 120.       _rk, 8, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water solar eighth-diurnal
       con(14) = specify_constituent( "k3" ,  43.31412  _rk, 3, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water lunisolar declinational third-diurnal
       con(15) = specify_constituent( "m3" ,  43.4761563_rk, 3, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water lunar third-diurnal
 !  - low-frequency:
-      con(16) = specify_constituent( "msf", 1.0158958_rk, 2, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Lunisolar synodic fortnightly
-      con(17) = specify_constituent( "mf" , 1.0980331_rk, 2, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Lunar fortnightly
-      con(18) = specify_constituent( "mm" ,  .5443747_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Lunar monthly
+      con(16) = specify_constituent( "msf", 1.0158958_rk, 2, [   0.    ,  2.    , -2.    ,  0. ]      &
+                                                           , [   2.14  ,  0.    ,  0.    ]            &
+                                                           , [   1.0004, -0.0373,  0.0002,  0. , 1. ] ) ! Lunisolar synodic fortnightly
+      con(17) = specify_constituent( "mf" , 1.0980331_rk, 2, [   0.    ,  2.    ,  0.    ,  0. ]      &
+                                                           , [ -23.74  ,  2.68  , -0.38  ]            &
+                                                           , [   1.043 ,  0.414 ,  0.    ,  0. , 1. ] ) ! Lunar fortnightly
+      con(18) = specify_constituent( "mm" ,  .5443747_rk, 1, [   0.    ,  1.    ,  0.    , -1. ]      &
+                                                           , [   0.    ,  0.    ,  0.    ]            &
+                                                           , [   1.    , -0.13  ,  0.    ,  0. , 1. ] ) ! Lunar monthly
       con(19) = specify_constituent( "msm",  .4716   _rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Solar monthly
-      con(20) = specify_constituent( "ssa",  .0821373_rk, 2, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Solar semiannual
-      con(21) = specify_constituent( "sa" ,  .0410686_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Solar annual
+      con(20) = specify_constituent( "ssa",  .0821373_rk, 2, [   0.    ,  0.    ,  2.    ,  0. ]      &
+                                                           , [   0.    ,  0.    ,  0.    ]            &
+                                                           , [   1.    ,  0.    ,  0.    ,  0. , 1. ] ) ! Solar semiannual
+      con(21) = specify_constituent( "sa" ,  .0410686_rk, 1, [   0.    ,  0.    ,  1.    ,  0. ]      &
+                                                           , [   0.    ,  0.    ,  0.    ]            &
+                                                           , [   1.    ,  0.    ,  0.    ,  0. , 1. ] ) ! Solar annual
 !  - superimposed:
-      con(22) = specify_constituent( "mu2" ,  27.9682084_rk, 1, [0.,0.,0.,0.]                 &
-                                                              , [0.,0.,0.]                    &
-                                                              , [1.0004,-0.0373,0.0002,0.,1.] ) ! Variational (M2,S2)
-      con(23) = specify_constituent( "j1"  ,  15.5854433_rk, 1, [0.,0.,0.,0.]              &
-                                                              , [0.,0.,0.]                 &
-                                                              , [1.013,0.168,-0.017,0.,1.] ) ! Smaller lunar elliptic diurnal
-      con(24) = specify_constituent( "nu2" ,  28.5125831_rk, 1, [0.,0.,0.,0.]                 &
-                                                              , [0.,0.,0.]                    &
-                                                              , [1.0004,-0.0373,0.0002,0.,1.] ) ! Larger lunar evectional
+      con(22) = specify_constituent( "mu2" ,  27.9682084_rk, 2, [   0.    , -4.    ,  4.    ,  0. ]      &
+                                                              , [ - 2.14  ,  0.    ,  0.    ]            &
+                                                              , [   1.0004, -0.0373,  0.0002,  0. , 1. ] ) ! Variational (M2,S2)
+      con(23) = specify_constituent( "j1"  ,  15.5854433_rk, 1, [  90.    ,  1.    ,  1.    , -1. ]      &
+                                                              , [ -12.94  , -1.34  ,  0.19  ]            &
+                                                              , [   1.013 ,  0.168 , -0.017 ,  0. , 1. ] ) ! Smaller lunar elliptic diurnal
+      con(24) = specify_constituent( "nu2" ,  28.5125831_rk, 2, [   0.    , -3.    ,  4.    ,  1. ]      &
+                                                              , [ - 2.14  ,  0.    ,  0.    ]            &
+                                                              , [   1.0004, -0.0373,  0.0002,  0. , 1. ] ) ! Larger lunar evectional
       con(25) = specify_constituent( "oo1" ,  16.1391017_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Lunar diurnal
-      con(26) = specify_constituent( "2n2" ,  27.8953548_rk, 1, [0.,0.,0.,0.]                 &
-                                                              , [0.,0.,0.]                    &
-                                                              , [1.0004,-0.0373,0.0002,0.,1.] ) ! Lunar elliptical semidiurnal second-order
+      con(26) = specify_constituent( "2n2" ,  27.8953548_rk, 2, [   0.    , -4.    ,  2.    ,  2. ]      &
+                                                              , [ - 2.14  ,  0.    ,  0.    ]            &
+                                                              , [   1.0004, -0.0373,  0.0002,  0. , 1. ] ) ! Lunar elliptical semidiurnal second-order
       con(27) = specify_constituent( "m1"  ,  14.4920521_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Smaller lunar elliptic diurnal ! or 14.496694
-      con(28) = specify_constituent( "t2"  ,  29.9589333_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Larger solar elliptic
-      con(29) = specify_constituent( "l2"  ,  29.5284789_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Smaller lunar elliptic semidiurnal
-      con(30) = specify_constituent( "mn4" ,  57.4238337_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water quarter diurnal
+      con(28) = specify_constituent( "t2"  ,  29.9589333_rk, 2, [   0.    ,  0.    ,  1.    ,  1. ]      & ! here, p is printed as p' in Duvanin
+                                                              , [   0.    ,  0.    ,  0.    ]            &
+                                                              , [   1.    ,  0.    ,  0.    ,  0. , 1. ] ) ! Larger solar elliptic
+      con(29) = specify_constituent( "l2"  ,  29.5284789_rk, 2, [ 180.    , -1.    ,  2.    ,  0. ]      &
+                                                              , [   0.    ,  0.    ,  0.    ]            & ! L2 needs special treatment for u and f arguments
+                                                              , [   1.    ,  0.    ,  0.    ,  0. , 1. ] ) ! Smaller lunar elliptic semidiurnal
+      con(30) = specify_constituent( "mn4" ,  57.4238337_rk, 1, [   0.    , -5.    ,  4.    ,  1. ]      &
+                                                              , [ - 4.28  ,  0.    ,  0.    ]            &
+                                                              , [   1.0004, -0.0373,  0.0002,  0. , 2. ] ) ! Shallow water quarter diurnal
       con(31) = specify_constituent( "pi1" ,  14.9178647_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(32) = specify_constituent( "2sm2",  31.0158958_rk, 1, [0.,0.,0.,0.]                 &
-                                                              , [0.,0.,0.]                    &
-                                                              , [1.0004,-0.0373,0.0002,0.,1.] ) ! Shallow water semidiurnal
+      con(32) = specify_constituent( "2sm2",  31.0158958_rk, 2, [   0.    ,  2.    ,  2.    ,  0. ]      &
+                                                              , [   2.14  ,  0.    ,  0.    ]            &
+                                                              , [   1.0004, -0.0373,  0.0002,  0. , 1. ] ) ! Shallow water semidiurnal
       con(33) = specify_constituent( "phi1",  15.1232059_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(34) = specify_constituent( "2ms6",  87.9682084_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(35) = specify_constituent( "sn4" ,  58.4397295_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(34) = specify_constituent( "2ms6",  87.9682084_rk, 6, [   0.    , -4.    ,  4.    ,  0. ]      &
+                                                              , [ - 4.28  ,  0.    ,  0.    ]            &
+                                                              , [   1.0004, -0.0373,  0.0002,  0. , 2. ] ) ! ?
+      con(35) = specify_constituent( "sn4" ,  58.4397295_rk, 4, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
       con(36) = specify_constituent( "ksi1",  14.5695476_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(37) = specify_constituent( "mo3" ,  42.9271398_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(38) = specify_constituent( "2mn6",  96.407938 _rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(39) = specify_constituent( "mk3" ,  44.0251729_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water terdiurnal
-      con(40) = specify_constituent( "msn6",  87.4238337_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(41) = specify_constituent( "2sm6",  88.9841042_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(42) = specify_constituent( "s9"  , 135.       _rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallowwater overtides of the principal solar, ninth-diurnal
-      con(43) = specify_constituent( "s7"  , 105.       _rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallowwater overtides of the principal solar, seventh-diurnal
-      con(44) = specify_constituent( "s6"  ,  90.       _rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallowwater overtides of the principal solar, sixth-diurnal
-      con(45) = specify_constituent( "s5"  ,  75.       _rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallowwater overtides of the principal solar, fifth-diurnal
-      con(46) = specify_constituent( "msk6",  89.066241 _rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(47) = specify_constituent( "2mk6",  88.0503457_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(48) = specify_constituent( "sk4" ,  60.0821373_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(49) = specify_constituent( "s4"  ,  60.       _rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water overtides of principal solar constituent
-      con(50) = specify_constituent( "mk4" ,  59.0662415_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(51) = specify_constituent( "sk3" ,  45.0410686_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(52) = specify_constituent( "so3" ,  43.943036 _rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(53) = specify_constituent( "kj2" ,  30.626512 _rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(54) = specify_constituent( "msn2",  30.5443747_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(55) = specify_constituent( "mks2",  29.0662415_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(56) = specify_constituent( "op2" ,  28.9019669_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(57) = specify_constituent( "mns2",  27.4238337_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(58) = specify_constituent( "oq2" ,  27.3416964_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(37) = specify_constituent( "mo3" ,  42.9271398_rk, 3, [  90.    , -4.    ,  3.    ,  0. ]      &
+                                                              , [   8.66  , -1.34  ,  0.19  ]            & ! This wave needs special treatment for f argument (fM2*fO1)
+                                                              , [   1.    ,  0.    ,  0.    ,  0. , 1. ] ) ! ?
+      con(38) = specify_constituent( "2mn6",  96.407938 _rk, 6, [   0.    , -7.    ,  6.    ,  1. ]      &
+                                                              , [ - 6.42  ,  0.    ,  0.    ]            &
+                                                              , [   1.0004, -0.0373,  0.0002,  0. , 3. ] ) ! ?
+      con(39) = specify_constituent( "mk3" ,  44.0251729_rk, 3, [  90.    , -2.    ,  3.    ,  0. ]      &
+                                                              , [ -11.    ,  0.68  ,  0.07  ]            & ! This wave needs special treatment for f argument (fM2*fK1)
+                                                              , [   1.    ,  0.    ,  0.    ,  0. , 1. ] ) ! Shallow water terdiurnal
+      con(40) = specify_constituent( "msn6",  87.4238337_rk, 6, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(41) = specify_constituent( "2sm6",  88.9841042_rk, 6, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(42) = specify_constituent( "s9"  , 135.       _rk, 9, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallowwater overtides of the principal solar, ninth-diurnal
+      con(43) = specify_constituent( "s7"  , 105.       _rk, 7, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallowwater overtides of the principal solar, seventh-diurnal
+      con(44) = specify_constituent( "s6"  ,  90.       _rk, 6, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallowwater overtides of the principal solar, sixth-diurnal
+      con(45) = specify_constituent( "s5"  ,  75.       _rk, 5, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallowwater overtides of the principal solar, fifth-diurnal
+      con(46) = specify_constituent( "msk6",  89.066241 _rk, 6, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(47) = specify_constituent( "2mk6",  88.0503457_rk, 6, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(48) = specify_constituent( "sk4" ,  60.0821373_rk, 4, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(49) = specify_constituent( "s4"  ,  60.       _rk, 4, [   0.    ,  0.    ,  0.    ,  0. ]      &
+                                                              , [   0.    ,  0.    ,  0.    ]            &
+                                                              , [   2.    ,  0.    ,  0.    ,  0. , 1. ] ) ! Shallow water overtides of principal solar constituent
+      con(50) = specify_constituent( "mk4" ,  59.0662415_rk, 4, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(51) = specify_constituent( "sk3" ,  45.0410686_rk, 3, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(52) = specify_constituent( "so3" ,  43.943036 _rk, 3, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(53) = specify_constituent( "kj2" ,  30.626512 _rk, 2, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(54) = specify_constituent( "msn2",  30.5443747_rk, 2, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(55) = specify_constituent( "mks2",  29.0662415_rk, 2, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(56) = specify_constituent( "op2" ,  28.9019669_rk, 2, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(57) = specify_constituent( "mns2",  27.4238337_rk, 2, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
+      con(58) = specify_constituent( "oq2" ,  27.3416964_rk, 2, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
       con(59) = specify_constituent( "so1" ,  16.0569644_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
       con(60) = specify_constituent( "mp1" ,  14.0251729_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
       con(61) = specify_constituent( "s3"  ,  45.       _rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
@@ -1333,7 +1360,7 @@ module tide
       real(rk), dimension(dst_x_n,dst_y_n)                            &
                                 , intent(  out) :: dst
 
-      integer                  i, j, num
+      integer(8)               i, j, num
       integer, dimension(2) :: x_bl, x_tl, x_tr, x_br  &
                              , y_bl, y_tl, y_tr, y_br, pos
       real(rk)                 wgt, val
