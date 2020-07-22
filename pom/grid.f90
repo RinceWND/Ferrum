@@ -17,6 +17,9 @@ module grid
 
   public
 
+  integer(1), parameter ::  &
+    vSIGMA        = 0       &  ! Native sigma coordinates
+  , vGEOPOTENTIAL = 1          ! Z-coordinates
 !----------------------------------------------------------------------
 ! Paths configuration
 !----------------------------------------------------------------------
@@ -27,6 +30,9 @@ module grid
 ! then these files will be read as <path>YYYY.<FORMAT_EXT>.
 !  If any path ends with `/` then the default filename will be
 ! appended to the path.
+
+! Vertical discretisation switch
+  integer(1) v_type
 
 !----------------------------------------------------------------------
 ! Varnames configuration
@@ -65,6 +71,7 @@ module grid
   , east_u           & ! horizontal coordinate of U points in x
   , east_v           & ! horizontal coordinate of V points in x
   , h                & ! bottom depth
+  , norm_h           & ! sigma-coordinate normalization values (for averages correction)
   , north_c          & ! horizontal coordinate of cell corner points in y
   , north_e          & ! horizontal coordinate of elevation points in y
   , north_u          & ! horizontal coordinate of U points in y
@@ -95,11 +102,11 @@ module grid
 
       character(*), intent(in) :: config_nml
 
-      namelist/grid/                                             &
-          grid_path                                              &
-        ,  dx_name, dy_name, ec_name, ee_name, eu_name, ev_name  &
-        , fsm_name,  h_name, nc_name, ne_name, nu_name, nv_name  &
-        , rot_name,  z_name, zz_name
+      namelist/grid/                                              &
+          grid_path, v_type                                       &
+        ,  dx_name , dy_name, ec_name, ee_name, eu_name, ev_name  &
+        , fsm_name ,  h_name, nc_name, ne_name, nu_name, nv_name  &
+        , rot_name ,  z_name, zz_name
 
       integer pos
 
@@ -108,6 +115,8 @@ module grid
 
 ! Initialize with default values
       grid_path = "in/grid/"
+
+      v_type = 0
 
       h_name  = "h"
       z_name  = "z"
@@ -130,7 +139,7 @@ module grid
       read ( 73, nml = grid )
       close( 73 )
 
-! Manage inmput_files values
+! Manage input_files values
       pos = len(trim(grid_path))
       if ( grid_path(pos:pos) == "/" ) then
         grid_path = trim(grid_path)//"grid.nc"
@@ -167,6 +176,7 @@ module grid
       , east_u (im,jm)  &
       , east_v (im,jm)  &
       , h      (im,jm)  &
+      , norm_h (im,jm)  &
       , north_c(im,jm)  &
       , north_e(im,jm)  &
       , north_u(im,jm)  &
@@ -251,6 +261,13 @@ module grid
         end do
       end if
 
+      norm_h = 1.
+      do k = kbm1, 1, -1
+        where( fsm(:,:,k) == 0. ) norm_h = -z(:,:,k)
+      end do
+      where( norm_h == 0. ) norm_h = 1.
+      norm_h = 1./norm_h
+
       call check( var_read( file_id,  dx_name, dx                 &
                           , start(1:3), stride(1:3) )             &
                 , '[grid]:read_grid:var_read `'//trim(dx_name) )
@@ -289,8 +306,8 @@ module grid
 ! derive u- and v-mask from rho-mask
       dum(2:im,:,:) = fsm(2:im,:,:)*fsm(1:imm1,:,:)
       dvm(:,2:jm,:) = fsm(:,2:jm,:)*fsm(:,1:jmm1,:)
-      call exchange2d_mpi(dum,im,jm)
-      call exchange2d_mpi(dvm,im,jm)
+      call exchange3d_mpi(dum,im,jm,kb)
+      call exchange3d_mpi(dvm,im,jm,kb)
       dwm(:,:,2:kb) = fsm(:,:,2:kb)*fsm(:,:,1:kbm1)
       
       if ( n_west  == -1 ) dum(1,:,:) = dum(2,:,:)
