@@ -47,6 +47,7 @@ OUTDIR = out
         air.o            \
         tide.o           \
         bry.o            \
+        river.o          \
         parallel_mpi.o   \
         advance.o        \
         solver.o         \

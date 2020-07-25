@@ -1565,6 +1565,7 @@
       use clim  , only: initialize_clm => initialize_mod
       use seaice, only: initialize_ice => initialize_mod
       use tide  , only: initialize_tide=> initialize_mod
+      use river , only: initialize_riv => initialize_mod
 
       implicit none
 
@@ -1574,6 +1575,7 @@
       call initialize_air( 'config.nml' )
       call initialize_ice( 'config.nml' )
       call initialize_tide('config.nml' )
+      call initialize_riv( 'config.nml' )
 
 
       end ! subroutine initialize_modules
