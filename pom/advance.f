@@ -124,6 +124,7 @@
       use bry      , only: bry_step => step
       use clim     , only: clm_step => step
       use seaice   , only: ice_step => step
+      use river    , only: riv_step => step
       use model_run, only: dtime
 
       implicit none
@@ -133,6 +134,7 @@
       call ice_step( dtime )
       call air_step( dtime )
       call bry_step( dtime )
+      call riv_step( dtime )
 
 
       end ! subroutine update_bc
