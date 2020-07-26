@@ -2146,6 +2146,7 @@
         use air        , only: air_init => init
         use bry        , only: bry_init => init
         use clim       , only: clm_init => init
+        use river      , only: riv_init => init
         use seaice     , only: ice_init => init
         use tide       , only: tide_init=> init
         use module_time
@@ -2160,6 +2161,7 @@
         call bry_init( dtime )
         call ice_init( dtime )
         call tide_init(dtime )
+        call riv_init( dtime )
 
 
       end ! subroutine

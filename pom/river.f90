@@ -160,7 +160,7 @@ module river
                   , "[river]: var_read" )
       end if
 
-      call msg_print("TIDE INITIALIZED", 1, "")
+      call msg_print("RIVER INITIALIZED", 1, "")
 
 
     end ! subroutine init
