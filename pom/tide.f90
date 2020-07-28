@@ -946,8 +946,8 @@ module tide
       tide_va = 0.
 
       tmp = get_astronomy( d_in )
-      h = tmp(1)
-      s = tmp(2)
+      s = tmp(1)
+      h = tmp(2)
       p = tmp(3)
       N = tmp(4)
 
