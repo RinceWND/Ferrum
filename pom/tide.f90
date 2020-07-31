@@ -223,9 +223,9 @@ module tide
 ! Allocate necessary arrays
       call allocate_arrays
 
-! Generate tidal constituents:       name, 360*t/period , t,   [  a,  s,  h, p ]
-!                                         (angular speed)      [ c1, c2, c3 ]
-!                                                              [ c0, c1, c2, c3, pow ]
+! Generate tidal constituents:       name, 360*t/period , t,   [  a,  s,  h, p ]       | V_arg
+!                                         (angular speed)      [ c1, c2, c3 ]          | u_arg
+!                                                              [ c0, c1, c2, c3, pow ] | f_arg
 !  - semidiurnal:
       con( 1) = specify_constituent( "m2", 28.9841042_rk, 2, [   0.    , -2.    ,  2.    ,  0.    ]      &
                                                            , [ - 2.14  ,  0.    ,  0.    ]               &
@@ -1119,17 +1119,21 @@ module tide
 
 
       day_of_year    = seconds_of_year( cur_date )/86400 + 1
-      time_remainder = seconds_of_year( cur_date )/86400.+ 1. - day_of_year
+      ! time_remainder = seconds_of_year( cur_date )/86400.+ 1. - day_of_year
 
       year           = cur_date % year
-      time_remainder = time_remainder + real(day_of_year+(year-1901)/4,rk)
+      time_remainder = real(day_of_year+(year-1901)/4,rk)
 
+      ! s
       get_astronomy(1) = 277.025_rk + 129.3848 _rk*real(year-1900,rk)  &
                                     +  13.1764 _rk*time_remainder
+      ! h
       get_astronomy(2) = 280.19 _rk -    .23872_rk*real(year-1900,rk)  &
                                     +    .98565_rk*time_remainder
+      ! p
       get_astronomy(3) = 334.385_rk +  40.66249_rk*real(year-1900,rk)  &
                                     +    .1114 _rk*time_remainder
+      ! N
       get_astronomy(4) = 259.157_rk -  19.32818_rk*real(year-1900,rk)  &
                                     -    .05295_rk*time_remainder
       get_astronomy = modulo( get_astronomy, 360._rk )
@@ -1440,6 +1444,7 @@ module tide
         end do
         !num = count( src_b == 0._rk )
       end do
+
       do j = 1, dst_y_n
         do i = 1, dst_x_n
           pos = get_bottom_left( dst_x(i,j), dst_y(i,j), src_x, src_y, src_x_n, src_y_n )
