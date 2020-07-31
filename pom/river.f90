@@ -124,10 +124,10 @@ module river
 !
     subroutine init( d_in )
 !----------------------------------------------------------------------
-!  TODO: Fill up
+!  Read monthly river dishcarge for the whole domain
 !______________________________________________________________________
 !
-      use glob_domain, only: im, i_global, jm, j_global, my_task, POM_COMM
+      use glob_domain, only: im, i_global, jm, j_global, is_master
       use grid       , only: fsm, east_e, east_u, east_v, rot  &
                            , north_e, north_u, north_v
       use io
@@ -158,6 +158,11 @@ module river
         call check( var_read( file_id, trim(discharge_name)  &
                             , discharge, start, edge )       &
                   , "[river]: var_read" )
+      end if
+      file_id = file_close( file_id )
+
+      if ( is_master ) then
+        print *, "[ ] Max discharge: ", maxval(discharge)
       end if
 
       call msg_print("RIVER INITIALIZED", 1, "")
