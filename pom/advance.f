@@ -500,8 +500,8 @@
       use bry        , only: bc_ts, bc_turb, bc_vel_int, bc_vel_vert
       use clim       , only: tclim, sclim, relax_to_clim
       use glob_const , only: rk, small
-      use config     , only: mode, nadv, nbcs, nbct, do_restart
-     &                     , smoth, t_lo, t_hi
+      use config     , only: mode , nadv, nbcs, nbct, do_restart
+     &                     , smoth, s_hi, s_lo, t_hi, t_lo
       use glob_domain
       use grid       , only: dz, h  ,fsm
       use glob_ocean
@@ -641,6 +641,13 @@
           end if
           if ( t_hi <  999. ) then
             where ( uf > t_hi ) uf = t_hi
+          end if
+
+          if ( s_lo > -999. ) then
+            where ( vf < s_lo ) vf = s_lo
+          end if
+          if ( s_hi <  999. ) then
+            where ( vf > s_hi ) vf = s_hi
           end if
 
           call relax_to_clim( uf, vf )
