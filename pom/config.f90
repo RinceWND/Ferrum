@@ -45,13 +45,12 @@ module config
   , xs,ys,fak          ! set lono or lato=999.     to skip !lyo:pac10:
 ! , period           & ! inertial period
 
-  character(len=VAR_LEN)  &
-    source                & ! TODO: Remove; unused var
-  , title
+  character(VAR_LEN)  &
+    title
 
-  character(len=PATH_LEN) &
-    netcdf_file           & ! output netcdf filename
-  , initial_file            ! restart filename to read from
+  character(PATH_LEN) &
+    netcdf_file       & ! output netcdf filename
+  , initial_file        ! restart filename to read from
 
 
   parameter( lono=999.0,lato=999.0, xs=1.5,ys=1.5, fak=0.5)
@@ -83,7 +82,7 @@ module config
 !----------------------------------------------------------------------
 ! Strings
 !----------------------------------------------------------------------
-  character(len=4) &
+  character(4) &
     windf      ! TODO: remove this path
 
   logical          &
@@ -94,13 +93,14 @@ module config
   , SURF_flag      & ! TODO: move to potential output module?.. (glob_out rework)
   , monthly_flag
 
-  real(kind=rk)    &
+  real(rk)         &
     sf_bf          & ! boundary flux (barotropic velocities) factor
   , sf_hf          & ! heat flux factor
   , sf_wi            ! wind velocity factor
 
-  real(kind=rk)    &
-    t_lo, t_hi
+  real(rk)         &
+    s_hi, s_lo     & ! thresholds for salinity and temperature
+  , t_hi, t_lo
 
 !----------------------------------------------------------------------
 ! Tide parameters
@@ -257,9 +257,9 @@ module config
 
 ! Thresholds for temperature and salinity
       t_hi =  999.
-      t_lo = -2. !-999.
-!      s_hi =  999.
-!      s_lo = -999.
+      t_lo =   -2. ! allow water to overcool a bit
+      s_hi =  999.
+      s_lo =    0.
 
 ! Module switches
       USE_AIR   = .false.
@@ -293,7 +293,7 @@ module config
       implicit none
 
 
-      character(len=*), intent(in) :: config
+      character(*), intent(in) :: config
 
 !      include 'io.h'
 !      include 'bulk.h'
@@ -306,9 +306,10 @@ module config
         aam_init, alpha , cbcmax, cbcmin      &
       , horcon  , ispadv, mode  , nadv        &
       , nbcs    , nbct  , nitera, npg         &
-      , ntp     , sbias , smoth , sw          &
-      , t_hi    , t_lo  , tbias , tprni       &
-      , umol    , vmaxl , z0b
+      , ntp     , s_hi  , s_lo  , sbias       &
+      , smoth   , sw    , t_hi  , t_lo        &
+      , tbias   , tprni , umol  , vmaxl       &
+      , z0b
 
       namelist/output_nml/                                     &
         append_output, monthly_flag, netcdf_file, output_flag  &
@@ -357,8 +358,6 @@ module config
       use model_run
 
       implicit none
-
-      integer i
 
 
       if ( .not.is_master ) return
