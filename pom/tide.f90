@@ -28,8 +28,6 @@ module tide
   logical, private :: DISABLED   & ! Is set according to the external flag `use_air`.
                     , TPXO_FILE    ! Original TPXO Netcdf file used.
 
-  real   , private :: a         ! time-interpolation factor
-
   character(10)                           &
        , parameter                        &
        , private   :: FORMAT_EXT = ".nc"
@@ -1374,10 +1372,9 @@ module tide
 
       src_b = src_raw
       num = count( src_b == 0._rk )
+      src = src_b
 
       do while ( num > 0 )
-
-        src = src_b
 
         do j = 1, src_y_n
           do i = 1, src_x_n
@@ -1442,6 +1439,8 @@ module tide
             end if
           end do
         end do
+
+        src = src_b
         !num = count( src_b == 0._rk )
       end do
 
