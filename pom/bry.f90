@@ -652,6 +652,11 @@ module bry
                                     , bcTITLES(BC%ts%EAST)   &
                                     , bcTITLES(BC%ts%SOUTH)  &
                                     , bcTITLES(BC%ts%WEST)
+        print '(a7,": ",4(1x,a,4x))', "Turbulence"             &
+                                    , bcTITLES(BC%turb%NORTH)  &
+                                    , bcTITLES(BC%turb%EAST)   &
+                                    , bcTITLES(BC%turb%SOUTH)  &
+                                    , bcTITLES(BC%turb%WEST)
       end if
 
       call msg_print("BRY MODULE INITIALIZED", 1, "")
@@ -2826,12 +2831,12 @@ module bry
               case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = ( u(imm1,j,k)-u(imm1,j-1,k) )*dvm(imm1,j,k)
-                  grdy(2,j) = ( u(im  ,j,k)-u(im  ,j-1,k) )*dvm(im  ,j,k)
+                  grdy(1,j) = u(imm1,j,k)-u(imm1,j-1,k)
+                  grdy(2,j) = u(im  ,j,k)-u(im  ,j-1,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    u(imm1,j,k)-uf(imm1,j,k)
-                  dvdx = ( uf(imm1,j,k)-uf(imm2,j,k) )*dum(imm1,j,k)
+                  dvdx = ( uf(imm1,j,k)-uf(imm2,j,k) )*dum(imm1,j,k)*dum(imm2,j,k)
                   if ( dvdt*(grdy(1,j)+grdy(1,j+1)) > 0. ) then
                     dvdy = grdy(1,j  )
                   else
@@ -2880,12 +2885,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 1,jmm1
-                  grdy(1,j) = ( v(imm1,j+1,k)-v(imm1,j,k) )*dvm(imm1,j+1,k)
-                  grdy(2,j) = ( v(im  ,j+1,k)-v(im  ,j,k) )*dvm(im  ,j+1,k)
+                  grdy(1,j) = v(imm1,j+1,k)-v(imm1,j,k)
+                  grdy(2,j) = v(im  ,j+1,k)-v(im  ,j,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    v(imm1,j,k)-vf(imm1,j,k)
-                  dvdx = ( vf(imm1,j,k)-vf(imm2,j,k) )*dum(imm1,j,k)
+                  dvdx = ( vf(imm1,j,k)-vf(imm2,j,k) )*dum(imm1,j,k)*dum(imm2,j,k)
                   if ( dvdt*(grdy(1,j-1)+grdy(1,j)) > 0. ) then
                     dvdy = grdy(1,j-1)
                   else
@@ -2953,12 +2958,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 2,jm
-                  grdy(1,j) = ( u(2,j,k)-u(2,j-1,k) )*dvm(2,j,k)
-                  grdy(2,j) = ( u(3,j,k)-u(3,j-1,k) )*dvm(3,j,k)
+                  grdy(1,j) = u(2,j,k)-u(2,j-1,k)
+                  grdy(2,j) = u(3,j,k)-u(3,j-1,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    u(3,j,k)-uf(3,j,k)
-                  dvdx = ( uf(3,j,k)-uf(4,j,k) )*dum(4,j,k)
+                  dvdx = ( uf(3,j,k)-uf(4,j,k) )*dum(4,j,k)*dum(3,j,k)
                   if ( dvdt*(grdy(2,j)+grdy(2,j+1)) > 0. ) then
                     dvdy = grdy(2,j  )
                   else
@@ -3009,12 +3014,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do j = 1,jmm1
-                  grdy(1,j) = ( v(1,j+1,k)-v(1,j,k) )*dvm(1,j+1,k)
-                  grdy(2,j) = ( v(2,j+1,k)-v(2,j,k) )*dvm(2,j+1,k)
+                  grdy(1,j) = v(1,j+1,k)-v(1,j,k)
+                  grdy(2,j) = v(2,j+1,k)-v(2,j,k)
                 end do
                 do j = 2,jmm1
                   dvdt =    v(2,j,k)-vf(2,j,k)
-                  dvdx = ( vf(2,j,k)-vf(3,j,k) )*dum(3,j,k)
+                  dvdx = ( vf(2,j,k)-vf(3,j,k) )*dum(3,j,k)*dum(2,j,k)
                   if ( dvdt*(grdy(2,j-1)+grdy(2,j)) > 0. ) then
                     dvdy = grdy(2,j-1)
                   else
@@ -3110,8 +3115,8 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = ( v(i,jmm1,k)-v(i-1,jmm1,k) )*dum(i,jmm1,k)*dum(i,jm,k) ! TODO: WTH?
-                  grdx(i,2) = ( v(i,jm  ,k)-v(i-1,jm  ,k) )*dum(i,jmm1,k)*dum(i,jm,k)
+                  grdx(i,1) = v(i,jmm1,k)-v(i-1,jmm1,k)
+                  grdx(i,2) = v(i,jm  ,k)-v(i-1,jm  ,k)
                 end do
                 do i = 2,imm1
                   dvdt =    v(i,jmm1,k)-vf(i,jmm1,k)
@@ -3164,8 +3169,8 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 1,imm1
-                  grdx(i,1) = ( u(i+1,jmm1,k)-u(i,jmm1,k) )*dum(i,jmm1,k)*dum(i+1,jmm1,k) ! TODO: WTH?
-                  grdx(i,2) = ( u(i+1,jm  ,k)-u(i,jm  ,k) )*dum(i,jm  ,k)*dum(i+1,jm  ,k)
+                  grdx(i,1) = u(i+1,jmm1,k)-u(i,jmm1,k)
+                  grdx(i,2) = u(i+1,jm  ,k)-u(i,jm  ,k)
                 end do
                 do i = 2,imm1
                   dvdt =    u(i,jmm1,k)-uf(i,jmm1,k)
@@ -3237,12 +3242,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 2,im
-                  grdx(i,1) = ( v(i,2,k)-v(i-1,2,k) )*dum(i,2,k)
-                  grdx(i,2) = ( v(i,3,k)-v(i-1,3,k) )*dum(i,3,k)
+                  grdx(i,1) = v(i,2,k)-v(i-1,2,k)
+                  grdx(i,2) = v(i,3,k)-v(i-1,3,k)
                 end do
                 do i = 2,imm1
                   dvdt =    v(i,3,k)-vf(i,3,k)
-                  dvdy = ( vf(i,3,k)-vf(i,4,k) )*dvm(i,4,k)
+                  dvdy = ( vf(i,3,k)-vf(i,4,k) )*dvm(i,4,k)*dvm(i,3,k)
                   if ( dvdt*dvdy < 0. ) dvdt = 0.
                   if ( dvdt*(grdx(i,2)+grdx(i+1,2)) > 0. ) then
                     dvdx = grdx(i  ,2)
@@ -3293,12 +3298,12 @@ module bry
             case ( bcRADIATION_ENH )
               do k = 1,kbm1
                 do i = 1,imm1
-                  grdx(i,1) = ( u(i+1,1,k)-u(i,1,k) )*dum(i+1,1,k)
-                  grdx(i,2) = ( u(i+1,2,k)-u(i,2,k) )*dum(i+1,2,k)
+                  grdx(i,1) = u(i+1,1,k)-u(i,1,k)
+                  grdx(i,2) = u(i+1,2,k)-u(i,2,k)
                 end do
                 do i = 2,imm1
                   dvdt =    u(i,2,k)-uf(i,2,k)
-                  dvdy = ( uf(i,2,k)-uf(i,3,k) )*dvm(i,3,k)
+                  dvdy = ( uf(i,2,k)-uf(i,3,k) )*dvm(i,3,k)*dvm(i,2,k)
                   if ( dvdt*(grdx(i-1,2)+grdx(i,2)) > 0. ) then
                     dvdx = grdx(i-1,2)
                   else
@@ -3950,13 +3955,16 @@ module bry
 !______________________________________________________________________
 !
       use glob_const , only: SMALL
-      use grid       , only: dx, dy, fsm
+      use grid       , only: dum, dvm, dx, dy, fsm
       use glob_ocean , only: kh, km, kq, l, q2, q2l, u, uf, v, vf
       use model_run  , only: dti
 
       implicit none
 
       real(rk) u1
+      real(rk), dimension(im,2) :: grdx
+      real(rk), dimension(2,jm) :: grdy
+      real(rk)                  :: cff, cx, cy, dqdt, dqdx, dqdy
 
 
 ! Apply periodic BC in x-dimension
@@ -3973,38 +3981,150 @@ module bry
 ! EAST
         if ( hasEAST ) then
 
-          do k = 1,kb
-            do j = 1,jm
-              u1 = 2.*u(im,j,k)*dti / (dx(im,j)+dx(imm1,j))
-              if ( u1 <= 0. ) then
-                uf(im,j,k) = q2(im,j,k)  - u1*(SMALL-q2(im,j,k))
-                vf(im,j,k) = q2l(im,j,k) - u1*(SMALL-q2l(im,j,k))
-              else
-                uf(im,j,k) = q2(im,j,k)                      &
-                           - u1*(q2(im,j,k)-q2(imm1,j,k))
-                vf(im,j,k) = q2l(im,j,k)                     &
-                           - u1*(q2l(im,j,k)-q2l(imm1,j,k))
-              end if
-            end do
-          end do
+          select case ( BC % TURB % EAST )
+
+            case ( bc0GRADIENT )
+
+              uf(im,:,:) = uf(imm1,:,:)
+              vf(im,:,:) = vf(imm1,:,:)
+
+            case ( bcINOUTFLOW )
+
+              do k = 1,kb
+                do j = 1,jm
+                  u1 = 2.*u(im,j,k)*dti / (dx(im,j)+dx(imm1,j))
+                  if ( u1 <= 0. ) then
+                    uf(im,j,k) = q2 (im,j,k) - u1*(SMALL-q2 (im,j,k))
+                    vf(im,j,k) = q2l(im,j,k) - u1*(SMALL-q2l(im,j,k))
+                  else
+                    uf(im,j,k) = q2(im,j,k)                      &
+                              - u1*(q2 (im,j,k)-q2 (imm1,j,k))
+                    vf(im,j,k) = q2l(im,j,k)                     &
+                              - u1*(q2l(im,j,k)-q2l(imm1,j,k))
+                  end if
+                end do
+              end do
+
+            case ( bcRADIATION )
+
+              do k = 1, kb
+                do j = 2, jm
+                  grdy(2,j) = dvm(imm1,j,k)*(q2(imm1,j,k)-q2(imm1,j-1,k))
+                  grdy(1,j) = dvm(im  ,j,k)*(q2(im  ,j,k)-q2(im  ,j-1,k))
+                end do
+                do j = 2, jmm1
+                  dqdt = q2(imm1,j,k)-uf(imm1,j,k)
+                  dqdx = uf(imm1,j,k)-uf(imm2,j,k)
+                  if ( dqdt*(grdy(2,j)+grdy(2,j+1)) > 0._rk ) then
+                    dqdy = grdy(2,j  )
+                  else
+                    dqdy = grdy(2,j+1)
+                  end if
+                  cff = max( dqdx*dqdx + dqdy*dqdy, SMALL )
+                  if ( dqdt*dqdx < 0._rk ) dqdt = 0._rk
+                  cx = dqdt*dqdx
+                  cy = min( cff, max(dqdt*dqdy,-cff) )
+                  uf(im,j,k) = ( cff*q2(im,j,k) + cx*uf(imm1,j,k)        &
+                               - max(cy,0._rk)*grdy(1,j  )               &
+                               - min(cy,0._rk)*grdy(1,j+1) ) / (cff+cx)
+                end do
+                do j = 2, jm
+                  grdy(2,j) = dvm(imm1,j,k)*(q2l(imm1,j,k)-q2l(imm1,j-1,k))
+                  grdy(1,j) = dvm(im  ,j,k)*(q2l(im  ,j,k)-q2l(im  ,j-1,k))
+                end do
+                do j = 2, jmm1
+                  dqdt = q2l(imm1,j,k)-vf(imm1,j,k)
+                  dqdx =  vf(imm1,j,k)-vf(imm2,j,k)
+                  if ( dqdt*(grdy(2,j)+grdy(2,j+1)) > 0._rk ) then
+                    dqdy = grdy(2,j  )
+                  else
+                    dqdy = grdy(2,j+1)
+                  end if
+                  cff = max( dqdx*dqdx + dqdy*dqdy, SMALL )
+                  if ( dqdt*dqdx < 0._rk ) dqdt = 0._rk
+                  cx = dqdt*dqdx
+                  cy = min( cff, max(dqdt*dqdy,-cff) )
+                  vf(im,j,k) = ( cff*q2l(im,j,k) + cx*vf(imm1,j,k)       &
+                               - max(cy,0._rk)*grdy(1,j  )               &
+                               - min(cy,0._rk)*grdy(1,j+1) ) / (cff+cx)
+                end do
+              end do
+
+          end select
 
         end if
 
 ! WEST
         if ( hasWEST ) then
 
-          do k = 1,kb
-            do j = 1,jm
-              u1 = 2.*u(2,j,k)*dti / (dx(1,j)+dx(2,j))
-              if ( u1 >= 0. ) then
-                uf(1,j,k) = q2(1,j,k)  - u1*(q2(1,j,k)-SMALL)
-                vf(1,j,k) = q2l(1,j,k) - u1*(q2l(1,j,k)-SMALL)
-              else
-                uf(1,j,k) = q2(1,j,k)  - u1*(q2(2,j,k)-q2(1,j,k))
-                vf(1,j,k) = q2l(1,j,k) - u1*(q2l(2,j,k)-q2l(1,j,k))
-              end if
-            end do
-          end do
+          select case ( BC % TURB % WEST )
+
+            case ( bc0GRADIENT )
+
+              uf(1,:,:) = uf(2,:,:)
+              vf(1,:,:) = vf(2,:,:)
+
+            case ( bcINOUTFLOW )
+
+              do k = 1,kb
+                do j = 1,jm
+                  u1 = 2.*u(2,j,k)*dti / (dx(1,j)+dx(2,j))
+                  if ( u1 >= 0. ) then
+                    uf(1,j,k) = q2 (1,j,k) - u1*(q2 (1,j,k)-SMALL)
+                    vf(1,j,k) = q2l(1,j,k) - u1*(q2l(1,j,k)-SMALL)
+                  else
+                    uf(1,j,k) = q2 (1,j,k) - u1*(q2 (2,j,k)-q2 (1,j,k))
+                    vf(1,j,k) = q2l(1,j,k) - u1*(q2l(2,j,k)-q2l(1,j,k))
+                  end if
+                end do
+              end do
+
+            case ( bcRADIATION )
+
+              do k = 1, kb
+                do j = 2, jm
+                  grdy(1,j) = dvm(1,j,k)*(q2(1,j,k)-q2(1,j-1,k))
+                  grdy(2,j) = dvm(2,j,k)*(q2(2,j,k)-q2(2,j-1,k))
+                end do
+                do j = 2, jmm1
+                  dqdt = q2(2,j,k)-uf(2,j,k)
+                  dqdx = uf(2,j,k)-uf(3,j,k)
+                  if ( dqdt*(grdy(2,j)+grdy(2,j+1)) > 0._rk ) then
+                    dqdy = grdy(2,j  )
+                  else
+                    dqdy = grdy(2,j+1)
+                  end if
+                  cff = max( dqdx*dqdx + dqdy*dqdy, SMALL )
+                  if ( dqdt*dqdx < 0._rk ) dqdt = 0._rk
+                  cx = dqdt*dqdx
+                  cy = min( cff, max(dqdt*dqdy,-cff) )
+                  uf(1,j,k) = ( cff*q2(1,j,k) + cx*uf(2,j,k)            &
+                              - max(cy,0._rk)*grdy(1,j  )               &
+                              - min(cy,0._rk)*grdy(1,j+1) ) / (cff+cx)
+                end do
+                do j = 2, jm
+                  grdy(1,j) = dvm(1,j,k)*(q2l(1,j,k)-q2l(1,j-1,k))
+                  grdy(2,j) = dvm(2,j,k)*(q2l(2,j,k)-q2l(2,j-1,k))
+                end do
+                do j = 2, jmm1
+                  dqdt = q2l(2,j,k)-vf(2,j,k)
+                  dqdx =  vf(2,j,k)-vf(3,j,k)
+                  if ( dqdt*(grdy(2,j)+grdy(2,j+1)) > 0._rk ) then
+                    dqdy = grdy(2,j  )
+                  else
+                    dqdy = grdy(2,j+1)
+                  end if
+                  cff = max( dqdx*dqdx + dqdy*dqdy, SMALL )
+                  if ( dqdt*dqdx < 0._rk ) dqdt = 0._rk
+                  cx = dqdt*dqdx
+                  cy = min( cff, max(dqdt*dqdy,-cff) )
+                  vf(1,j,k) = ( cff*q2l(1,j,k) + cx*vf(2,j,k)           &
+                              - max(cy,0._rk)*grdy(1,j  )               &
+                              - min(cy,0._rk)*grdy(1,j+1) ) / (cff+cx)
+                end do
+              end do
+
+            end select
 
         end if
 
@@ -4025,38 +4145,150 @@ module bry
 ! NORTH
         if ( hasNORTH ) then
 
-          do k = 1,kb
-            do i = 1,im
-              u1 = 2.*v(i,jm,k)*dti / (dy(i,jm)+dy(i,jmm1))
-              if ( u1 <= 0. ) then
-                uf(i,jm,k) = q2(i,jm,k)  - u1*(SMALL-q2(i,jm,k))
-                vf(i,jm,k) = q2l(i,jm,k) - u1*(SMALL-q2l(i,jm,k))
-              else
-                uf(i,jm,k) = q2(i,jm,k)                      &
-                           - u1*(q2(i,jm,k)-q2(i,jmm1,k))
-                vf(i,jm,k) = q2l(i,jm,k)                     &
-                           - u1*(q2l(i,jm,k)-q2l(i,jmm1,k))
-              end if
-            end do
-          end do
+          select case ( BC % TURB % NORTH )
+
+            case ( bc0GRADIENT )
+
+              uf(:,jm,:) = uf(:,jmm1,:)
+              vf(:,jm,:) = vf(:,jmm1,:)
+
+            case ( bcINOUTFLOW )
+
+              do k = 1,kb
+                do i = 1,im
+                  u1 = 2.*v(i,jm,k)*dti / (dy(i,jm)+dy(i,jmm1))
+                  if ( u1 <= 0. ) then
+                    uf(i,jm,k) = q2 (i,jm,k) - u1*(SMALL-q2 (i,jm,k))
+                    vf(i,jm,k) = q2l(i,jm,k) - u1*(SMALL-q2l(i,jm,k))
+                  else
+                    uf(i,jm,k) = q2 (i,jm,k)                     &
+                              - u1*(q2 (i,jm,k)-q2 (i,jmm1,k))
+                    vf(i,jm,k) = q2l(i,jm,k)                     &
+                              - u1*(q2l(i,jm,k)-q2l(i,jmm1,k))
+                  end if
+                end do
+              end do
+
+            case ( bcRADIATION )
+
+              do k = 1, kb
+                do i = 2, im
+                  grdx(i,2) = dum(i,jmm1,k)*(q2(i,jmm1,k)-q2(i-1,jmm1,k))
+                  grdx(i,1) = dum(i,jm  ,k)*(q2(i,jm  ,k)-q2(i-1,jm  ,k))
+                end do
+                do i = 2, imm1
+                  dqdt = q2(i,jmm1,k)-uf(i,jmm1,k)
+                  dqdy = uf(i,jmm1,k)-uf(i,jmm2,k)
+                  if ( dqdt*(grdx(i,2)+grdx(i+1,2)) > 0._rk ) then
+                    dqdx = grdx(i  ,2)
+                  else
+                    dqdx = grdx(i+1,2)
+                  end if
+                  cff = max( dqdx*dqdx + dqdy*dqdy, SMALL )
+                  if ( dqdt*dqdy < 0._rk ) dqdt = 0._rk
+                  cx = min( cff, max(dqdt*dqdx,-cff) )
+                  cy = dqdt*dqdy
+                  uf(i,jm,k) = ( cff*q2(i,jm,k) + cy*uf(i,jmm1,k)         &
+                               - max(cx,0._rk)*grdx(i  ,1)                &
+                               - min(cx,0._rk)*grdx(i+1,1) ) / (cff+cy)
+                end do
+                do i = 2, im
+                  grdx(i,2) = dvm(i,jmm1,k)*(q2l(i,jmm1,k)-q2l(i-1,jmm1,k))
+                  grdx(i,1) = dvm(i,jm  ,k)*(q2l(i,jm  ,k)-q2l(i-1,jm  ,k))
+                end do
+                do i = 2, imm1
+                  dqdt = q2l(i,jmm1,k)-vf(i,jmm1,k)
+                  dqdy =  vf(i,jmm1,k)-vf(i,jmm2,k)
+                  if ( dqdt*(grdx(i,2)+grdx(i+1,2)) > 0._rk ) then
+                    dqdx = grdx(i  ,2)
+                  else
+                    dqdx = grdx(i+1,2)
+                  end if
+                  cff = max( dqdx*dqdx + dqdy*dqdy, SMALL )
+                  if ( dqdt*dqdy < 0._rk ) dqdt = 0._rk
+                  cx = min( cff, max(dqdt*dqdx,-cff) )
+                  cy = dqdt*dqdy
+                  vf(i,jm,k) = ( cff*q2l(i,jm,k) + cy*vf(i,jmm1,k)       &
+                               - max(cx,0._rk)*grdx(i  ,1)               &
+                               - min(cx,0._rk)*grdx(i+1,1) ) / (cff+cy)
+                end do
+              end do
+
+          end select
 
         end if
 
 ! SOUTH
         if ( hasSOUTH ) then
 
-          do k=1,kb
-            do i=1,im
-              u1 = 2.*v(i,2,k)*dti / (dy(i,1)+dy(i,2))
-              if ( u1 >= 0. ) then
-                uf(i,1,k) = q2(i,1,k)  - u1*(q2(i,1,k)-SMALL)
-                vf(i,1,k) = q2l(i,1,k) - u1*(q2l(i,1,k)-SMALL)
-              else
-                uf(i,1,k) = q2(i,1,k)  - u1*(q2(i,2,k)-q2(i,1,k))
-                vf(i,1,k) = q2l(i,1,k) - u1*(q2l(i,2,k)-q2l(i,1,k))
-              end if
-            end do
-          end do
+          select case ( BC % TURB % SOUTH )
+
+            case ( bc0GRADIENT )
+
+              uf(:,1,:) = uf(:,2,:)
+              vf(:,1,:) = vf(:,2,:)
+
+            case ( bcINOUTFLOW )
+
+              do k=1,kb
+                do i=1,im
+                  u1 = 2.*v(i,2,k)*dti / (dy(i,1)+dy(i,2))
+                  if ( u1 >= 0. ) then
+                    uf(i,1,k) = q2(i,1,k)  - u1*(q2(i,1,k)-SMALL)
+                    vf(i,1,k) = q2l(i,1,k) - u1*(q2l(i,1,k)-SMALL)
+                  else
+                    uf(i,1,k) = q2(i,1,k)  - u1*(q2(i,2,k)-q2(i,1,k))
+                    vf(i,1,k) = q2l(i,1,k) - u1*(q2l(i,2,k)-q2l(i,1,k))
+                  end if
+                end do
+              end do
+
+            case ( bcRADIATION )
+
+              do k = 1, kb
+                do i = 2, im
+                  grdx(i,1) = dum(i,1,k)*(q2(i,1,k)-q2(i-1,1,k))
+                  grdx(i,2) = dum(i,2,k)*(q2(i,2,k)-q2(i-1,2,k))
+                end do
+                do i = 2, imm1
+                  dqdt = q2(i,2,k)-uf(i,2,k)
+                  dqdy = uf(i,2,k)-uf(i,3,k)
+                  if ( dqdt*(grdx(i,2)+grdx(i+1,2)) > 0._rk ) then
+                    dqdx = grdx(i  ,2)
+                  else
+                    dqdx = grdx(i+1,2)
+                  end if
+                  cff = max( dqdx*dqdx + dqdy*dqdy, SMALL )
+                  if ( dqdt*dqdy < 0._rk ) dqdt = 0._rk
+                  cx = min( cff, max(dqdt*dqdx,-cff) )
+                  cy = dqdt*dqdy
+                  uf(i,1,k) = ( cff*q2(i,1,k) + cy*uf(i,2,k)            &
+                              - max(cx,0._rk)*grdx(i  ,1)               &
+                              - min(cx,0._rk)*grdx(i+1,1) ) / (cff+cy)
+                end do
+                do i = 2, im
+                  grdx(i,1) = dvm(i,1,k)*(q2l(i,1,k)-q2l(i-1,1,k))
+                  grdx(i,2) = dvm(i,2,k)*(q2l(i,2,k)-q2l(i-1,2,k))
+                end do
+                do i = 2, imm1
+                  dqdt = q2l(i,2,k)-vf(i,2,k)
+                  dqdy =  vf(i,2,k)-vf(i,3,k)
+                  if ( dqdt*(grdx(i,2)+grdx(i+1,2)) > 0._rk ) then
+                    dqdx = grdx(i  ,2)
+                  else
+                    dqdx = grdx(i+1,2)
+                  end if
+                  cff = max( dqdx*dqdx + dqdy*dqdy, SMALL )
+                  if ( dqdt*dqdy < 0._rk ) dqdt = 0._rk
+                  cx = min( cff, max(dqdt*dqdx,-cff) )
+                  cy = dqdt*dqdy
+                  vf(i,1,k) = ( cff*q2l(i,1,k) + cy*vf(i,2,k)           &
+                              - max(cx,0._rk)*grdx(i  ,1)               &
+                              - min(cx,0._rk)*grdx(i+1,1) ) / (cff+cy)
+                end do
+              end do
+
+          end select
 
         end if
 
