@@ -99,6 +99,7 @@ module air
   , lheat_name       & ! Latent heat flux
   ,  lrad_name       & ! Longwave net radiation
   , humid_name       & ! Relative humidity
+  ,   pbl_name       & ! Planetary Boundary Layer
   ,  pres_name       & ! Atm. pressure
   ,  rain_name       & ! Precipitation rate
   , sheat_name       & ! Sensible heat flux
@@ -111,7 +112,7 @@ module air
   ,  uwnd_name       & ! U-component of wind
   ,  vstr_name       & ! V-component of momentum flux
   ,  vwnd_name       & ! V-component of wind
-  ,  wgst_name         ! Wind gustiness [NOT IMPLEMENTED]
+  ,  wgst_name         ! Wind gust
 
 
 !----------------------------------------------------------------------
@@ -150,10 +151,12 @@ module air
        , dimension(:,:,:) :: &
     cloud                    & ! Total cloud cover [fraction 0..1]
   , dlrad                    & ! Downward longwave radiation [W/m^2]
+  , gust                     & ! Wind gust [m/s]
   , humid                    & ! Relative humidity [%]
                                !  or specific humidity [kg/??]
   , lheat                    & ! Latent heat flux [W/m^2]
   , lrad                     & ! Net longwave radiation [W/m^2]
+  , pbl                      & ! Planetary Boundary Layer [m]
   , pres                     & ! Atmospheric pressure [Pa]
   , rain                     & ! Precipitation rate [m/s]
   , sheat                    & ! Sensible heat flux [W/m^2]
@@ -206,11 +209,12 @@ module air
       , USE_DQDSST   , USE_FLUXES   , USE_RAMP     , LWRAD_FORMULA  &
       , bulk_path    , flux_path    , wind_path    , read_int
 
-      namelist/air_vars_nml/                           &
-        dlrad_name, lheat_name,  lrad_name, rain_name  &
-      ,  pres_name, humid_name, sheat_name,  sst_name  &
-      ,  srad_name,  tair_name,  tcld_name, ustr_name  &
-      ,  uwnd_name,  vstr_name,  vwnd_name, wgst_name
+      namelist/air_vars_nml/                            &
+        dlrad_name, humid_name, lheat_name,  lrad_name  &
+      ,   pbl_name,  pres_name,  rain_name, sheat_name  &
+      ,  srad_name,   sst_name,  tair_name,  tcld_name  &
+      ,  ustr_name,  uwnd_name,  vstr_name,  vwnd_name  &
+      ,  wgst_name
 
 
       DISABLED = .false.
@@ -248,6 +252,7 @@ module air
       lheat_name = "lht"
       lrad_name  = "lwr"
       rain_name  = "prate"
+      pbl_name   = ""
       pres_name  = "pres"
       humid_name = "rhum"
       sheat_name = "sht"
@@ -408,9 +413,11 @@ module air
       allocate(         &
         uwnd(im,jm,N)   &
       , vwnd(im,jm,N)   &
+      , gust(im,jm,N)   &
        )
       uwnd = 0.
       vwnd = 0.
+      gust = 0.
 
       if ( interp_tair ) then
         allocate( temp(im,jm,3) )
@@ -475,8 +482,10 @@ module air
         , lrad(im,jm,N)   &
          )
       end if
-      allocate( dlrad(im,jm,N) )
+      allocate( dlrad(im,jm,N)    &
+              ,   pbl(im,jm,N) )
       dlrad = 370.
+      pbl   = 600.
 
 
     end ! subroutine allocate_arrays
@@ -572,6 +581,7 @@ module air
                          , a                         &
                          , uwnd(:,:,1), vwnd(:,:,1)  &
                          )
+          gust(:,:,1) = (1.-a)*gust(:,:,2) + a*gust(:,:,3)
         end if
 
 ! TODO: Are these surface arrays even needed?
@@ -579,12 +589,14 @@ module air
         vwsrf = vwnd(:,:,1)
 
 ! Calculate wind stress
-        call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+        call wind_to_stress(  uwsrf,  vwsrf, gust(:,:,1)   &
+                           , wusurf, wvsurf, 1           )
 
         if ( USE_BULK ) then
           if ( READ_HEAT ) then
             dlrad(:,:,1) = ( 1. - a ) * dlrad(:,:,2) + a * dlrad(:,:,3)
           end if
+          pbl(:,:,1) = ( 1. - a ) * pbl(:,:,2) + a * pbl(:,:,3)
           call calculate_fluxes
         end if
 
@@ -739,6 +751,7 @@ module air
         if ( interp_wind ) then
           uwnd(:,:,2) = uwnd(:,:,3)
           vwnd(:,:,2) = vwnd(:,:,3)
+          gust(:,:,2) = gust(:,:,3)
         end if
         if ( .not.CALC_SWR .and. INTERP_HEAT ) then
           srad(:,:,2)  = srad(:,:,3)
@@ -762,6 +775,7 @@ module air
           if ( INTERP_CLOUD ) cloud(:,:,2) = cloud(:,:,3)
           if ( INTERP_HUMID ) humid(:,:,2) = humid(:,:,3)
           if ( INTERP_SST   ) sst(:,:,2)   = sst(:,:,3)
+          pbl(:,:,2) = pbl(:,:,3)
         end if
       end if
 
@@ -781,6 +795,7 @@ module air
                          , a                         &
                          , uwnd(:,:,1), vwnd(:,:,1)  &
                          )
+          gust(:,:,1) = (1.-a)*gust(:,:,2) + a*gust(:,:,3)
         end if
 
 ! TODO: Are these surface arrays even needed?
@@ -788,7 +803,8 @@ module air
         vwsrf = vwnd(:,:,1)
 
 ! Calculate wind stress
-        call wind_to_stress( uwsrf, vwsrf, wusurf, wvsurf, 1 )
+        call wind_to_stress(  uwsrf,  vwsrf, gust(:,:,1)   &
+                           , wusurf, wvsurf, 1           )
 
         if ( .not.CALC_SWR ) then
           swrad = ( 1. - a ) * srad(:,:,2) + a * srad(:,:,3)
@@ -867,7 +883,7 @@ module air
 !
 !______________________________________________________________________
 !
-    subroutine wind_to_stress( uwnd, vwnd, ustr, vstr, mode )
+    subroutine wind_to_stress( uwnd, vwnd, gust, ustr, vstr, mode )
 !----------------------------------------------------------------------
 !  Calculates momentum flux (m^2/s^2) from wind velocity (m/s).
 !----------------------------------------------------------------------
@@ -882,7 +898,7 @@ module air
       implicit none
 
       integer                   , intent(in   ) :: mode
-      real(rk), dimension(im,jm), intent(in   ) :: uwnd, vwnd
+      real(rk), dimension(im,jm), intent(in   ) :: gust, uwnd, vwnd
       real(rk), dimension(im,jm), intent(  out) :: ustr, vstr
 
       integer  i, j
@@ -896,6 +912,7 @@ module air
 
           uvabs = sqrt( (uwnd(i,j)-u(i,j,1))**2  &
                       + (vwnd(i,j)-v(i,j,1))**2 )
+          uvabs = sqrt( uvabs*uvabs + gust(i,j)*gust(i,j)/(uvabs*uvabs) ) ! Increase wind speed by adding gustiness
 
           select case ( mode )
 
@@ -925,7 +942,7 @@ module air
 
 !  Assume that free moving ice packs even at 10/10 concentrations pass at least half the momentum from atmosphere.
 ! TODO: If info about fast ice is available, damp any momentum flux over such areas to zero.
-          ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-u(i,j,1)) *(1.-icec(i,j)*0.5)
+          ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-u(i,j,1)) *(1.-icec(i,j)*0.5) ! TODO: This is also dampened elsewhere...?
           vstr(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j)-v(i,j,1)) *(1.-icec(i,j)*0.5)
 
         end do
@@ -1074,8 +1091,8 @@ module air
       real(rk) ce2, ch2, const               &
              , deltemp                       &
              , ea12, esatair, esatoce, evap  &
-             , fe, fh, humnow                &
-             , Qe, Qh, Qu                    &
+             , fe, fh, gnow, humnow          &
+             , pblh, Qe, Qh, Qu              &
              , rhom, rnow                    &
              , sol_net, sp, ss, sstk, stp    &
              , tnowk                         &
@@ -1093,6 +1110,7 @@ module air
 
         unow      = uwnd(i,j,1)
         vnow      = vwnd(i,j,1)
+        gnow      = gust(i,j,1)
         tnow      = temp(i,j,1)
         pnow      = pres(i,j,1)
         rnow      =  rho(i,j,1)*rhoref + 1000._rk
@@ -1101,6 +1119,7 @@ module air
         cld       = maxval((/0._rk,cloud(i,j,1)/100._rk/)) ! rwnd: total cloud cover from % to tenths
         sst_model = t(i,j,1) + tbias
         lwrd      = dlrad(i,j,1)
+        pblh      =  pbl(i,j,1)
 
         if ( i < im ) then
           usrf = .5_rk*(u(i+1,j,1)+u(i,j,1))
@@ -1119,6 +1138,8 @@ module air
 ! --- compute wind speed magnitude for bulk coeff.
 !
         SP = sqrt(unow*unow+vnow*vnow)
+        gnow = gnow/SP
+        SP = sqrt(  SP*SP  +gnow*gnow)
 
 !
 ! --- SST data converted in Kelvin degrees
@@ -1229,7 +1250,7 @@ module air
           call coare( (sqrt((unow-usrf)**2+(vnow-vsrf)**2)),      &
                       10._rk, temp(i,j,1), 2._rk, humnow, 2._rk,  &
                       pnow,sst_model,sol_net,lwrd,north_e(i,j),   &
-                      600._rk, (3.6e6_rk*precip), 0._rk, 0._rk,   &
+                      pblh, (3.6e6_rk*precip), 0._rk, 0._rk,   &
                       QH, QE, Evap, ch2, ce2 )
 !            Evap = Evap*rho/3.6e6
 !            if (my_task==1.and.i==50.and.j==50) then
@@ -2104,7 +2125,7 @@ module air
       if ( sol_rad > qtot ) sol_rad = qtot
 
 
-    end ! funtion sol_rad
+    end ! function sol_rad
 !
 !______________________________________________________________________
 !
@@ -2518,6 +2539,11 @@ module air
             vwnd(:,:,n) = 0.
             call msg_print("", 2, "Wind is defaulted to zero.")
           end if
+          if ( var_read( file_id, wgst_name, gust(:,:,n)  &
+                       , start, edge ) /= NF90_NOERR ) then
+            gust(:,:,n) = 0.
+            call msg_print("", 2, "Gust is defaulted to zero.")
+          end if
 
           file_id = file_close( file_id )
 
@@ -2596,6 +2622,14 @@ module air
               cloud(:,:,n) = 0.
               call msg_print("", 2, "Cloud cover is defaulted to zero.")
             end if
+          end if
+        end if
+
+        if ( n>=2 ) then
+          if ( var_read( file_id, pbl_name, pbl(:,:,n)     &
+                       , start, edge ) /= NF90_NOERR ) then
+            pbl(:,:,n) = 600.
+            call msg_print("", 2, "PBL is defaulted to 600 m.")
           end if
         end if
 
