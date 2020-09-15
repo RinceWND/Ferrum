@@ -1032,7 +1032,7 @@ module tide
 !
 !  The corresponding coefficients are derived from u formulation for
 ! each constituent as in Table II of "Руководство по обработке и
-! предсказанию приливов", 1941 (in Russian).
+! предсказанию приливов", Vladimirskiy, Stakhevich, 1941 (in Russian).
 !
 !  In this application "u" and "f" arguments have forms of:
 !               c1*sin(N) + c2*sin(2*N) + c3*sin(3*N), and
@@ -1042,7 +1042,7 @@ module tide
 !
 !   V = 2t+2h-2s (and V_0 = 2h_0-2s_0),
 ! so a (in degrees) = 0, p = 0, s = -2 and h = 2.
-! Coefficient for t siginifies wavenumber;
+! Coefficient for t signifies wavenumber;
 !
 !   u = 2ξ-2ν,
 ! where ξ = 11.87*sin(N) - 1.34*sin(2*N) + 0.19*sin(3*N),
@@ -1099,7 +1099,13 @@ module tide
 !______________________________________________________________________
 !
     function get_astronomy( cur_date )
-
+!----------------------------------------------------------------------
+!  Calculates astronomical variables for specific date using
+! Task-2000 formulation ("POL/PSMSL tidal analysis software kit 2000
+! (TASK-2000)", Belle et al., 1999)
+!  This implementation is suitable only for 1900-2099 period. 
+!______________________________________________________________________
+!
       use glob_const , only: DEG2RAD
       use module_time
 
@@ -1109,31 +1115,27 @@ module tide
 
       type(date), intent(in) :: cur_date
 
-      integer, dimension(12), parameter ::                             &
-               monthly_day_of_year = [   0,  31,  59,  90, 120, 151    &
-                                     , 181, 212, 243, 273, 304, 334 ]
-      integer  day_of_year   , year
-      real(rk) time_remainder
+      integer  day_of_year
+      real(rk) days_acc, year_rel
 
 
-      day_of_year    = seconds_of_year( cur_date )/86400 + 1
-      ! time_remainder = seconds_of_year( cur_date )/86400.+ 1. - day_of_year
+      day_of_year = seconds_of_year( cur_date )/86400
 
-      year           = cur_date % year
-      time_remainder = real(day_of_year+(year-1901)/4,rk)
+      year_rel = real( cur_date%year - 1900, rk )
+      days_acc = real( day_of_year + (year_rel-1)/4, rk )
 
       ! s
-      get_astronomy(1) = 277.025_rk + 129.3848 _rk*real(year-1900,rk)  &
-                                    +  13.1764 _rk*time_remainder
+      get_astronomy(1) = 277.0247_rk + 129.38481_rk*year_rel  &
+                                     +  13.17639_rk*days_acc
       ! h
-      get_astronomy(2) = 280.19 _rk -    .23872_rk*real(year-1900,rk)  &
-                                    +    .98565_rk*time_remainder
+      get_astronomy(2) = 280.1895_rk -    .23872_rk*year_rel  &
+                                     +    .98565_rk*days_acc
       ! p
-      get_astronomy(3) = 334.385_rk +  40.66249_rk*real(year-1900,rk)  &
-                                    +    .1114 _rk*time_remainder
+      get_astronomy(3) = 334.3853_rk +  40.66249_rk*year_rel  &
+                                     +    .11140_rk*days_acc
       ! N
-      get_astronomy(4) = 259.157_rk -  19.32818_rk*real(year-1900,rk)  &
-                                    -    .05295_rk*time_remainder
+      get_astronomy(4) = 259.1568_rk -  19.32818_rk*year_rel  &
+                                     -    .05295_rk*days_acc
       get_astronomy = modulo( get_astronomy, 360._rk )
       get_astronomy(4) = get_astronomy(4)*DEG2RAD
 
@@ -1489,7 +1491,7 @@ module tide
 !
     function get_bottom_left( tgt_x, tgt_y, x, y, x_n, y_n ) result( pos )
 !----------------------------------------------------------------------
-!  Finds indicies of the bottom left corner cell in x and y
+!  Finds indices of the bottom left corner cell in x and y
 ! curvilinear coordinates.
 !  NOTE: geographical degrees are not converted to meters.
 !______________________________________________________________________
