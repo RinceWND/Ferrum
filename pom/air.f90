@@ -505,6 +505,7 @@ module air
 !
 !      use glob_domain, only: is_master
       use module_time
+      use clim       , only: sclim, tclim
       use config     , only: nbct, spinup
       use seaice     , only: icec!, itsurf
       use glob_ocean , only: s, ssurf, t, tsurf
@@ -519,8 +520,8 @@ module air
 
 
 ! Initialize mandatory arrays
-      tsurf = t(:,:,1)
-      ssurf = s(:,:,1)
+      tsurf = tclim(:,:,1)
+      ssurf = sclim(:,:,1)
 
 ! Quit if the module is not used.
       if ( DISABLED ) return
@@ -2460,6 +2461,7 @@ module air
 !
     subroutine linint_vec( u1, v1, u2, v2, a, u_int, v_int )
 
+      use glob_const , only: pi
       use glob_domain, only: im, jm
 
       implicit none
@@ -2470,12 +2472,18 @@ module air
       real(rk), dimension(im,jm)                :: dir, spd
 
 
-      u_int = ( 1. - a ) * u1 + a * u2
-      v_int = ( 1. - a ) * v1 + a * v2
+! Interpolate wind as in averaging
+!      u_int = ( 1. - a ) * u1 + a * u2
+!      v_int = ( 1. - a ) * v1 + a * v2
+! Interpolate wind direction
+      u_int = atan2(v1,u1)
+      v_int = atan2(v2,u2)
+      where ( abs(u_int-v_int) > pi ) v_int = v_int + 2.*pi
+      dir = ( 1. - a ) * u_int + a * v_int
 ! Do not interpolate wind linearly with rough temporal resolution or moderately variable wind direction.
 ! First, get the "correct" direction from linear interpolation, and then recalculate the absolute value.
 ! The obvious caveat is when w(n+1) and w(n) are perfectly in opposite to one another the resulted direction defaults to zero.
-      dir = atan2(v_int,u_int)
+!      dir = atan2(v_int,u_int)
 !          where ( dir /= 0. ) ! TODO: Catch opposites with a condition, maybe?
       spd = ( 1. - a ) * sqrt( u1*u1 + v1*v1 )  &
            +       a   * sqrt( u2*u2 + v2*v2 )
