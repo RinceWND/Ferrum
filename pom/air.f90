@@ -2478,7 +2478,7 @@ module air
 ! Interpolate wind direction
       u_int = atan2(v1,u1)
       v_int = atan2(v2,u2)
-      where ( abs(u_int-v_int) > pi ) v_int = v_int + 2.*pi
+      where ( abs(u_int-v_int) > pi ) v_int = v_int + sign(1._rk,u_int)*2.*pi
       dir = ( 1. - a ) * u_int + a * v_int
 ! Do not interpolate wind linearly with rough temporal resolution or moderately variable wind direction.
 ! First, get the "correct" direction from linear interpolation, and then recalculate the absolute value.
