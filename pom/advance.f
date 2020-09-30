@@ -834,7 +834,8 @@
 
       implicit none
 
-      real(rk) area_tot, vol_tot, d_vol
+      real(rk), dimension(im,jm) :: d_vol
+      real(rk) area_tot, vol_tot
       real(rk) elev_ave, temp_ave, salt_ave
       integer i,j,k
 
@@ -864,8 +865,8 @@
         elev_ave = 0.
 
         do k=1,kbm1
-          d_vol    = sum(art*dt*dz(:,:,k)*fsm(:,:,k))
-          vol_tot  = vol_tot + d_vol
+          d_vol    = art*dt*dz(:,:,k)*fsm(:,:,k)
+          vol_tot  = vol_tot + sum(d_vol)
           temp_ave = temp_ave + sum(tb(:,:,k)*d_vol)
           salt_ave = salt_ave + sum(sb(:,:,k)*d_vol)
         end do
