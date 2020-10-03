@@ -32,7 +32,7 @@ module glob_const
 
     subroutine initialize_constants !( constants_override_nml ) : TODO
 
-      c2k     = 273.16        _rk  ! Celcius to Kelvin offset
+      c2k     = 273.15        _rk  ! Celcius to Kelvin offset
       cpw     = 3986.         _rk  ! Specific heat of water (J/kg)
       pi      = atan(1._rk)*4._rk  ! PI
       rad2deg = 180._rk/pi         ! radians to degrees conversion factor
