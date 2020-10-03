@@ -1573,9 +1573,7 @@ module air
       a1     =   .0016_rk !   .0017
       a2     =-  .0035_rk !-  .0050
 
-      charnC = a1*u10 + a2
-      if ( u10 > umax ) charnC = a1*umax+a2
-      if ( charnC < .011 ) charnC = .011_rk
+      charnC = max( a1*min(u10,umax)+a2, .011_rk )
 
       A = .114_rk   ! wave-age dependent coefficients
       B = .622_rk
@@ -1652,12 +1650,10 @@ module air
         dqer = wetc*dter
         Rnl  = .97_rk*( 5.67e-8_rk*(ts-dter*jcool+tdk)**4 - Rl ) ! update dter
         u10N = usr/von/gf*log(10._rk/zo)
-        charnC = a1*u10N+a2
-        if ( u10N > umax ) charnC = a1*umax+a2
+        charnC = max( a1*min(u10N,umax)+a2, .011_rk )
         charnW = A*(usr/cp)**B
         zoS = sigH*Ad*(usr/cp)**Bd - .11_rk*visa/usr
         charnS = zoS*grav/usr/usr
-        if ( charnC < .011 ) charnC = .011_rk
 
       end do
 
