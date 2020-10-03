@@ -1,0 +1,88 @@
+#
+# Ferrum makefile (modifed sbPOM makefile)
+#
+
+#-----------------------------------------------------------------------
+# Settings that depend on the system and the compiler
+#-----------------------------------------------------------------------
+# Set macros
+CPP = cpp -P
+FC = mpifort
+LD = mpifort
+CLEAN = rm
+
+# Set miscellaneous compiler flags
+#MISCFLAGS = -Og -g -fcheck=all -fbacktrace -fbounds-check -Wall -march=native -std=f2018# -ffpe-trap=underflow,denormal,zero,overflow -ffpe-summary=all -Wall #-Warray-temporaries -Wcharacter-truncation -Wconversion-extra  -Wrealloc-lhs
+MISCFLAGS = -std=f2018 -O3 -ffast-math -funroll-loops -march=native
+
+# Set libraries and include files (the below should work for Ubuntu 20.04 if you install gfortran and pnetcdf from repositories (which in turn will require openmpi, not mpich)
+NETCDFINC = -I/usr/lib/x86_64-linux-gnu/fortran/gfortran-mod-15/ -I./
+NETCDFLIB = -L/usr/lib/x86_64-linux-gnu
+
+FFLAGS = $(NETCDFINC) $(MISCFLAGS)
+
+LIBS = $(NETCDFLIB) -lpnetcdf
+#-----------------------------------------------------------------------
+# Set the executable
+#-----------------------------------------------------------------------
+BIN = ferrum
+
+#-----------------------------------------------------------------------
+# Define directories
+#-----------------------------------------------------------------------
+SRCDIR = pom
+OBJDIR = obj
+OUTDIR = out
+
+#-----------------------------------------------------------------------
+# Define objects
+#-----------------------------------------------------------------------
+ OBJS = module_time.o    \
+        globals.o        \
+        io.o             \
+        config.o         \
+        grid.o           \
+        clim.o           \
+        seaice.o         \
+        air.o            \
+        tide.o           \
+        bry.o            \
+        river.o          \
+        parallel_mpi.o   \
+        advance.o        \
+        solver.o         \
+        initialize.o     \
+        pom.o
+VPATH = $(SRCDIR)
+
+#-----------------------------------------------------------------------
+# Set implicit rules for compilation
+#-----------------------------------------------------------------------
+%.o: %.f90
+	@echo
+	$(FC) -c $(FFLAGS) -ffree-form $<
+
+%.o: %.f
+	@echo
+	$(FC) -c $(FFLAGS) $<
+
+#-----------------------------------------------------------------------
+# Set implicit rules for dependencies
+#-----------------------------------------------------------------------
+%.f: %.F
+	@echo
+	$(CPP) $(FFLAGS) $< > $*.f
+
+#-----------------------------------------------------------------------
+# Create the executable
+#-----------------------------------------------------------------------
+$(BIN): $(OBJS)
+	@mkdir -p $(OUTDIR)
+	@echo
+	$(LD) $(FFLAGS) -o $(BIN) $(OBJS) $(LIBS)
+
+#-----------------------------------------------------------------------
+# Cleaning target
+#-----------------------------------------------------------------------
+clean:
+	@rm -f *.o *.mod $(BIN)
