@@ -709,7 +709,7 @@ module clim
       ! salt(:,:,kb) = salt(:,:,kbm1)
 
 ! close file
-      read_clim = file_close( file_id )
+      file_id = file_close( file_id )
 
 
     end ! function read_clim
