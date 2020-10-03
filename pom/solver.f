@@ -9,7 +9,7 @@
 !  Calculate horizontal advection and diffusion.
 !----------------------------------------------------------------------
 ! called by: mode_interaction [advance.f]
-!            mode_external    [advande.f]
+!            mode_external    [advance.f]
 !
 ! calls    : exchange2d_mpi   [parallel_mpi.f]
 !______________________________________________________________________
@@ -1275,8 +1275,8 @@
             drho(i,j,k)=   (rho(i,j,k)-rho(i-1,j,k))*dum(i,j,k)
             rhou(i,j,k)=.5*(rho(i,j,k)+rho(i-1,j,k))*dum(i,j,k)
           end do
-          ddx(i,j)=   (d(i,j)-d(i-1,j))*dum(i,j,k)
-          d4(i,j) =.5*(d(i,j)+d(i-1,j))*dum(i,j,k)
+          ddx(i,j)=   (d(i,j)-d(i-1,j))*dum(i,j,1)
+          d4(i,j) =.5*(d(i,j)+d(i-1,j))*dum(i,j,1)
         end do
       end do
 
@@ -1293,12 +1293,12 @@
      $                     dum(i-1,j,k)*(rho(i-1,j,k)-rho(i-2,j,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dum(i+1,j,k)*(d(i+1,j)-d(i  ,j))-
+     $               (dum(i+1,j,1)*(d(i+1,j)-d(i  ,j))-
      $                       2._rk*(d(i  ,j)-d(i-1,j))+
-     $                dum(i-1,j,k)*(d(i-1,j)-d(i-2,j)))
+     $                dum(i-1,j,1)*(d(i-1,j)-d(i-2,j)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dum(i+1,j,k)*(d(i  ,j)-d(i+1,j))+
-     $               dum(i-1,j,k)*(d(i-1,j)-d(i-2,j)))
+     $              (dum(i+1,j,1)*(d(i  ,j)-d(i+1,j))+
+     $               dum(i-1,j,1)*(d(i-1,j)-d(i-2,j)))
           end do
         end do
       else
@@ -1314,12 +1314,12 @@
      $                     dum(i-1,j,k)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dum(i+1,j,k)*(d(i+1,j)-d   (i  ,j))-
+     $               (dum(i+1,j,1)*(d(i+1,j)-d   (i  ,j))-
      $                       2._rk*(d(i  ,j)-d   (i-1,j))+
-     $                dum(i-1,j,k)*(d(i-1,j)-d4th(i-2,j)))
+     $                dum(i-1,j,1)*(d(i-1,j)-d4th(i-2,j)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dum(i+1,j,k)*(d(i  ,j)-d   (i+1,j))+
-     $               dum(i-1,j,k)*(d(i-1,j)-d4th(i-2,j)))
+     $              (dum(i+1,j,1)*(d(i  ,j)-d   (i+1,j))+
+     $               dum(i-1,j,1)*(d(i-1,j)-d4th(i-2,j)))
           end do
         end do
       end if
@@ -1384,8 +1384,8 @@
             drho(i,j,k)=   (rho(i,j,k)-rho(i,j-1,k))*dvm(i,j,k)
             rhou(i,j,k)=.5*(rho(i,j,k)+rho(i,j-1,k))*dvm(i,j,k)
           end do
-          ddx(i,j)=   (d(i,j)-d(i,j-1))*dvm(i,j,k)
-          d4(i,j) =.5*(d(i,j)+d(i,j-1))*dvm(i,j,k)
+          ddx(i,j)=   (d(i,j)-d(i,j-1))*dvm(i,j,1)
+          d4(i,j) =.5*(d(i,j)+d(i,j-1))*dvm(i,j,1)
         end do
       end do
 
@@ -1402,12 +1402,12 @@
      $                     dvm(i,j-1,k)*(rho(i,j-1,k)-rho(i,j-2,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dvm(i,j+1,k)*(d(i,j+1)-d(i,j  ))-
+     $               (dvm(i,j+1,1)*(d(i,j+1)-d(i,j  ))-
      $                       2._rk*(d(i,j  )-d(i,j-1))+
-     $                dvm(i,j-1,k)*(d(i,j-1)-d(i,j-2)))
+     $                dvm(i,j-1,1)*(d(i,j-1)-d(i,j-2)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dvm(i,j+1,k)*(d(i,j  )-d(i,j+1))+
-     $               dvm(i,j-1,k)*(d(i,j-1)-d(i,j-2)))
+     $              (dvm(i,j+1,1)*(d(i,j  )-d(i,j+1))+
+     $               dvm(i,j-1,1)*(d(i,j-1)-d(i,j-2)))
           end do
         end do
       else
@@ -1423,12 +1423,12 @@
      $                     dvm(i,j-1,k)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
             end do
             ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dvm(i,j+1,k)*(d(i,j+1)-d   (i,j  ))-
+     $               (dvm(i,j+1,1)*(d(i,j+1)-d   (i,j  ))-
      $                       2._rk*(d(i,j  )-d   (i,j-1))+
-     $                dvm(i,j-1,k)*(d(i,j-1)-d4th(i,j-2)))
+     $                dvm(i,j-1,1)*(d(i,j-1)-d4th(i,j-2)))
             d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dvm(i,j+1,k)*(d(i,j  )-d   (i,j+1))+
-     $               dvm(i,j-1,k)*(d(i,j-1)-d4th(i,j-2)))
+     $              (dvm(i,j+1,1)*(d(i,j  )-d   (i,j+1))+
+     $               dvm(i,j-1,1)*(d(i,j-1)-d4th(i,j-2)))
           end do
         end do
       end if
