@@ -152,7 +152,7 @@
 !
       use config     , only: n1d
       use glob_const , only: DEG2RAD, Ohm, rk, SMALL
-      use glob_domain, only: im, imm1, jm, jmm1, kb, n_west, n_south
+      use glob_domain, only: im, imm1, jm, jmm1, km, n_west, n_south
       use grid
       use glob_ocean , only: d, dt, el, et
 
@@ -219,7 +219,7 @@
 !      record = dtime % month
 ! Set computational-thread-specific domain to read in parallel
       start = [ i_global(1), j_global(1),  1, record ]
-      edge  = [ im         , jm         , kb,      1 ]
+      edge  = [ im         , jm         , km,      1 ]
 
 ! Read initial file
       call msg_print("", 6, "Read initial conditions:")
@@ -239,7 +239,7 @@
       vab = 0.
       sb = sb * fsm
       tb = tb * fsm
-      do k = 1, kbm1
+      do k = 1, kmm1
         uab(:,:)  = uab(:,:) + ub(:,:,k)*dz(:,:,k)
         vab(:,:)  = vab(:,:) + vb(:,:,k)*dz(:,:,k)
       end do
@@ -276,7 +276,7 @@
 
 
       start = [ i_global(1), j_global(1),  1 ]
-      edge  = [ im         , jm         , kb ]
+      edge  = [ im         , jm         , km ]
 
 ! Read initial file
       call msg_print("", 6, "Read restart file: `"
@@ -315,7 +315,7 @@
         status = var_read(file_id,'s'     ,s     , start     ,edge     )
         status = var_read(file_id,'sb'    ,sb    , start     ,edge     )
         status = var_read(file_id,'rho'   ,rho   , start     ,edge     )
-        status = var_read(file_id,'km'    ,km    , start     ,edge     )
+        status = var_read(file_id,'km'    ,kmt   , start     ,edge     )
         status = var_read(file_id,'kh'    ,kh    , start     ,edge     )
         status = var_read(file_id,'kq'    ,kq    , start     ,edge     )
         status = var_read(file_id,'l'     ,l     , start     ,edge     )
@@ -407,7 +407,7 @@
 
 ! define dimensions
         time_dimid = dim_define( file_id, 'time',         0 )
-        z_dimid    = dim_define( file_id, 'z'   ,        kb )
+        z_dimid    = dim_define( file_id, 'z'   ,        km )
         y_dimid    = dim_define( file_id, 'y'   , jm_global )
         x_dimid    = dim_define( file_id, 'x'   , im_global )
 
@@ -763,7 +763,7 @@
 
 ! define dimensions
         time_dimid = dim_define( file_id, 'time',         1 )
-        z_dimid    = dim_define( file_id, 'z'   ,        kb )
+        z_dimid    = dim_define( file_id, 'z'   ,        km )
         y_dimid    = dim_define( file_id, 'y'   , jm_global )
         x_dimid    = dim_define( file_id, 'x'   , im_global )
 
@@ -937,7 +937,7 @@
         call var_write( file_id, "vwnd"   , vwsrf  , start, edge )
         call var_write( file_id, "swrad"  , swrad  , start, edge )
 
-        edge(3) = kb
+        edge(3) = km
 
         if ( mode /= MODE_BAROTROPIC ) then
           call var_write( file_id, "u"      , ub     , start, edge )
@@ -996,7 +996,7 @@
 
 ! define dimensions
         time_dimid = dim_define( file_id, 'time',         1 )
-        z_dimid    = dim_define( file_id, 'z'   ,        kb )
+        z_dimid    = dim_define( file_id, 'z'   ,        km )
         y_dimid    = dim_define( file_id, 'y'   , jm_global )
         x_dimid    = dim_define( file_id, 'x'   , im_global )
 
@@ -1248,7 +1248,7 @@
         call var_write( file_id, "s"      , s      , start, edge )
         call var_write( file_id, "sb"     , sb     , start, edge )
         call var_write( file_id, "rho"    , rho    , start, edge )
-        call var_write( file_id, "km"     , km     , start, edge )
+        call var_write( file_id, "km"     , kmt    , start, edge )
         call var_write( file_id, "kh"     , kh     , start, edge )
         call var_write( file_id, "kq"     , kq     , start, edge )
         call var_write( file_id, "l"      , l      , start, edge )
@@ -1473,12 +1473,12 @@
       use air        , only: vfluxf
       use config     , only: aam_init, npg  ,do_restart,use_tide
       use glob_const , only: rk, SMALL
-      use glob_domain, only: im, is_master, jm, kb, kbm1  ,my_task
+      use glob_domain, only: im, is_master, jm, km, kmm1  ,my_task
       use grid       , only: dz, h
-      use model_run,only:iint, dtime
+      use model_run  , only: iint, dtime
       use glob_ocean , only: aam, d, drhox, drhoy, drx2d, dry2d, dt
      &                     , el, elb, et, etb, etf
-     &                     , kh, km, kq, l, q2, q2b, q2l, q2lb
+     &                     , kh, kmt, kq, l, q2, q2b, q2l, q2lb
      &                     , rho, s, sb, t, tb, u, ua, ub, uab
      &                     , v, va, vb, vab, w
       use tide, only: tide_advance=>step, tide_el, tide_ua, tide_va
@@ -1507,18 +1507,18 @@
       d  = h + el
       dt = h + et
 
-      do k=1,kb
+      do k=1,km
         l(:,:,k) = .1*dt
       end do
 
       q2b = SMALL
       q2lb= l*q2b
       kh  = l*sqrt(q2b)
-      km  = kh
+      kmt = kh
       kq  = kh
       aam = aam_init
 
-      do k=1,kbm1
+      do k=1,kmm1
         do i=1,im
           do j=1,jm
             q2(i,j,k)=q2b(i,j,k)
@@ -1542,7 +1542,7 @@
 
       call pgscheme(npg)
 
-      do k=1,kbm1
+      do k=1,kmm1
         do j=1,jm
           do i=1,im
             drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(i,j,k)
@@ -1589,8 +1589,8 @@
 !
       use config     , only: cbcmax, cbcmin, z0b
       use glob_const , only: Kappa, rk
-      use glob_domain, only: im, jm, kbm1
-      use grid       , only: h, zz
+      use glob_domain, only: im, jm, kmm1
+      use grid       , only: h, kb, zz
       use glob_ocean , only: cbc
 
       implicit none
@@ -1601,8 +1601,7 @@
 ! calculate bottom friction
       do j=1,jm
         do i=1,im
-!lyo:correct:cbc(i,j)=(Kappa/log((1.+zz(kbm1))*h(i,j)/z0b))**2 !lyo:bug:
-          cbc(i,j)=(Kappa/log(1._rk+(1._rk+zz(i,j,kbm1))*h(i,j)/z0b))**2
+          cbc(i,j)=(Kappa/log(1._rk+(h(i,j)+zz(i,j,kb(i,j)-1))/z0b))**2
           cbc(i,j)=max(cbcmin,cbc(i,j))
 ! if the following is invoked, then it is probable that the wrong
 ! choice of z0b or vertical spacing has been made:
@@ -1864,7 +1863,7 @@
 !
       use glob_const , only: DEG2RAD, rk
       use glob_domain, only: i_global, im_global, is_master
-     &                     , j_global, jm_global, kb
+     &                     , j_global, jm_global, km
      &                     , n_east, n_north, n_south, n_west
       use grid
       use glob_ocean , only: d, dt, el, et
@@ -1880,20 +1879,20 @@
       end if 
 
 ! generate grid
-      do k = 1,kb
-        z(:,:,k)  = -real(k-1)/real(kb-1)
+      do k = 1,km
+        z(:,:,k)  = -real(k-1)/real(km-1)
       end do
-      do k = 1,kb-1
+      do k = 1,km-1
         zz(:,:,k) = .5*(z(:,:,k+1)+z(:,:,k))
       end do
-      zz(:,:,kb) = 2.*zz(:,:,kb-1)-zz(:,:,kb-2)
+      zz(:,:,km) = 2.*zz(:,:,km-1)-zz(:,:,km-2)
 
-      do k=1,kb-1
+      do k=1,km-1
         dz(:,:,k) = z(:,:,k)- z(:,:,k+1)
         dzz(:,:,k)=zz(:,:,k)-zz(:,:,k+1)
       end do
-      dz(:,:,kb) = dz(:,:,kb-1)
-      dzz(:,:,kb)=dzz(:,:,kb-1)
+      dz(:,:,km) = dz(:,:,km-1)
+      dzz(:,:,km)=dzz(:,:,km-1)
 
 
       do j = 1,jm
@@ -1986,22 +1985,22 @@
 
       dvm = fsm
       dum = fsm
-      do k = 1, kb
+      do k = 1, km
         do j = 1, jm-1
           do i = 1, im
             if (fsm(i,j,k)==0..and.fsm(i,j+1,k)/=0.) dvm(i,j+1,k) = 0.
           end do
         end do
       end do
-      do k = 1, kb
+      do k = 1, km
         do j=1,jm
           do i=1,im-1
             if (fsm(i,j,k)==0..and.fsm(i+1,j,k)/=0.) dum(i+1,j,k) = 0.
           end do
         end do
       end do
-      call exchange3d_mpi(dum,im,jm,kb)
-      call exchange3d_mpi(dvm,im,jm,kb)
+      call exchange3d_mpi(dum,im,jm,km)
+      call exchange3d_mpi(dvm,im,jm,km)
 !     The followings are read in read_grid_pnetcdf:
 !     z,zz,dx,dy
 !     east_u,east_v,east_e,east_c

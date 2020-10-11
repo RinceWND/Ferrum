@@ -11,7 +11,7 @@
 module clim
 
   use glob_const , only: PATH_LEN, rk, VAR_LEN
-  use glob_domain, only: im, is_master, jm, kb, kbm1
+  use glob_domain, only: im, is_master, jm, km, kmm1
 
   implicit none
 
@@ -250,14 +250,14 @@ module clim
 ! Allocate core arrays
       allocate(          &
         eclim(im,jm)     &
-      , rmean(im,jm,kb)  &
-      , sclim(im,jm,kb)  &
-      , smean(im,jm,kb)  &
-      , tclim(im,jm,kb)  &
-      , tmean(im,jm,kb)  &
-      , uclim(im,jm,kb)  &
+      , rmean(im,jm,km)  &
+      , sclim(im,jm,km)  &
+      , smean(im,jm,km)  &
+      , tclim(im,jm,km)  &
+      , tmean(im,jm,km)  &
+      , uclim(im,jm,km)  &
       , uaclim(im,jm)    &
-      , vclim(im,jm,kb)  &
+      , vclim(im,jm,km)  &
       , vaclim(im,jm)    &
        )
 
@@ -276,14 +276,14 @@ module clim
 ! Allocate interpolation arrays
       allocate(                 &
         el_int(im,jm,   2:N+1)  &
-      , sc_int(im,jm,kb,2:N+1)  &
-      , sm_int(im,jm,kb,2:N+1)  &
-      , tc_int(im,jm,kb,2:N+1)  &
-      , tm_int(im,jm,kb,2:N+1)  &
+      , sc_int(im,jm,km,2:N+1)  &
+      , sm_int(im,jm,km,2:N+1)  &
+      , tc_int(im,jm,km,2:N+1)  &
+      , tm_int(im,jm,km,2:N+1)  &
       , ua_int(im,jm,   2:N+1)  &
-      , uc_int(im,jm,kb,2:N+1)  &
+      , uc_int(im,jm,km,2:N+1)  &
       , va_int(im,jm,   2:N+1)  &
-      , vc_int(im,jm,kb,2:N+1)  &
+      , vc_int(im,jm,km,2:N+1)  &
        )
 
 ! Allocate depth-relaxation arrays
@@ -587,7 +587,7 @@ module clim
 
       implicit none
 
-      real(rk), dimension(im,jm,kb), intent(inout) :: salt, temp
+      real(rk), dimension(im,jm,km), intent(inout) :: salt, temp
 
 
       if ( .not.RELAX_TS ) return
@@ -671,7 +671,7 @@ module clim
 
       character(*), intent(in)          :: filepath, salt_name, temp_name
       integer     , intent(in)          :: record
-      real(rk)    , dimension(im,jm,kb)  &
+      real(rk)    , dimension(im,jm,km)  &
                   , intent(out)         :: temp, salt
 
       character(PATH_LEN)                    :: tmp_str
@@ -695,7 +695,7 @@ module clim
 
 ! define domain to read
       start = [ i_global(1), j_global(1),    1, record ]
-      edge  = [ im         , jm         , kbm1,      1 ]
+      edge  = [ im         , jm         , kmm1,      1 ]
 
 ! get data
       read_clim = var_read( file_id, temp_name, temp, start, edge )
@@ -705,8 +705,8 @@ module clim
         temp = 0.
         salt = 0.
       end where
-      ! temp(:,:,kb) = temp(:,:,kbm1)
-      ! salt(:,:,kb) = salt(:,:,kbm1)
+      ! temp(:,:,kb) = temp(:,:,kmm1)
+      ! salt(:,:,kb) = salt(:,:,kmm1)
 
 ! close file
       file_id = file_close( file_id )

@@ -11,7 +11,7 @@
 module grid
 
   use glob_const , only: PATH_LEN, rk, VAR_LEN
-  use glob_domain, only: im, jm, kb
+  use glob_domain, only: im, jm, km
 
   implicit none
 
@@ -57,6 +57,11 @@ module grid
 !----------------------------------------------------------------------
 ! Model discretisation
 !----------------------------------------------------------------------
+  integer                    &
+       , allocatable         &
+       , dimension(:,:)   :: &
+    kb                 ! water column bottom level indicies
+
   real(rk)                   &
        , allocatable         &
        , dimension(:,:)   :: &
@@ -84,11 +89,15 @@ module grid
     dum              & ! mask for u-velocity
   , dvm              & ! mask for v-velocity
   , dwm              & ! mask for w-velocity
-  , dz               & ! sigma-"layer" thickness (z(k)-z(k+1))
-  , dzz              & ! thickness of two halves of neigbour sigma-"layers" (zz(k)-zz(k+1))
+  , dz               & ! layer real thickness (z(k)-z(k+1)), m
+  , dzb              & ! layer real thickness at n-1, m
+  , dzf              & ! layer real thickness at n+1, m
+  , dzz              & ! thickness of two halves of adjacent layers (zz(k)-zz(k+1)), m
   , fsm              & ! mask for scalar variables
-  , z                & ! sigma coordinate from z=0 (surface) to z=-1 (bottom)
-  , zz                 ! sigma coordinate, intermediate between z
+  , sig              & ! sigma coordinate from z=0 (surface) to z=-1 (bottom)
+  , sigz             & ! sigma coordinate, intermediate between z
+  , z                & ! geopotential coordinate from z=-eta (surface) to z=-H (bottom)
+  , zz                 ! geopotential coordinate, intermediate between z
 
   contains
 !______________________________________________________________________
@@ -176,6 +185,7 @@ module grid
       , east_u (im,jm)  &
       , east_v (im,jm)  &
       , h      (im,jm)  &
+      , kb     (im,jm)  &
       , norm_h (im,jm)  &
       , north_c(im,jm)  &
       , north_e(im,jm)  &
@@ -185,14 +195,16 @@ module grid
       )
 
       allocate(         &
-        dz (im,jm,kb)   &
-      , dzz(im,jm,kb)   &
-      , dum(im,jm,kb)   &
-      , dvm(im,jm,kb)   &
-      , dwm(im,jm,kb)   &
-      , fsm(im,jm,kb)   &
-      , z  (im,jm,kb)   &
-      , zz (im,jm,kb)   &
+        dz (im,jm,km)   &
+      , dzb(im,jm,km)   &
+      , dzf(im,jm,km)   &
+      , dzz(im,jm,km)   &
+      , dum(im,jm,km)   &
+      , dvm(im,jm,km)   &
+      , dwm(im,jm,km)   &
+      , fsm(im,jm,km)   &
+      , z  (im,jm,km)   &
+      , zz (im,jm,km)   &
       )
 
 
@@ -211,7 +223,7 @@ module grid
       use io         , only: check   , file_close, file_open  &
                            , is_error, var_rank  , var_read
       use glob_domain, only: i_global, imm1  , is_master  &
-                           , j_global, jmm1  , kb, kbm1   &
+                           , j_global, jmm1  , km, kmm1   &
                            , n_south , n_west
       use pnetcdf    , only: NF90_NOWRITE
 
@@ -223,7 +235,7 @@ module grid
 
 
       start  = [ i_global(1), j_global(1),  1, 1 ]
-      stride = [ im         , jm         , kb, 1 ]
+      stride = [ im         , jm         , km, 1 ]
 
       if ( is_master ) then
         call msg_print("", 6, "Reading grid `"//trim( grid_path )//"`")
@@ -254,7 +266,7 @@ module grid
         call check( var_read( file_id, fsm_name, fsm(:,:,1)         &
                             , start(1:3), stride(1:3) )             &
                   , '[grid]:read_grid:var_read `'//trim(fsm_name) )
-        do k = 1, kb
+        do k = 1, km
           z (:,:,k) = z (1,1,k)
           zz(:,:,k) = zz(1,1,k)
           fsm(:,:,k) = fsm(:,:,1)
@@ -262,7 +274,7 @@ module grid
       end if
 
       norm_h = 1.
-      do k = kbm1, 1, -1
+      do k = kmm1, 1, -1
         where( fsm(:,:,k) == 0. ) norm_h = -z(:,:,k)
       end do
       where( norm_h == 0. ) norm_h = 1.
@@ -306,9 +318,9 @@ module grid
 ! derive u- and v-mask from rho-mask
       dum(2:im,:,:) = fsm(2:im,:,:)*fsm(1:imm1,:,:)
       dvm(:,2:jm,:) = fsm(:,2:jm,:)*fsm(:,1:jmm1,:)
-      call exchange3d_mpi(dum,im,jm,kb)
-      call exchange3d_mpi(dvm,im,jm,kb)
-      dwm(:,:,2:kb) = fsm(:,:,2:kb)*fsm(:,:,1:kbm1)
+      call exchange3d_mpi(dum,im,jm,km)
+      call exchange3d_mpi(dvm,im,jm,km)
+      dwm(:,:,2:km) = fsm(:,:,2:km)*fsm(:,:,1:kmm1)
       
       if ( n_west  == -1 ) dum(1,:,:) = dum(2,:,:)
       if ( n_south == -1 ) dvm(:,1,:) = dvm(:,2,:)
@@ -336,10 +348,10 @@ module grid
 !      zz(kb) = 2.*zz(kb-1)-zz(kb-2) ! :
 !!      if (my_task==1) fsm(:,jm-8:jm) = 0.
 !      h = 1500.
-      dz (:,:,1:kb-1) = z (:,:,1:kb-1) - z (:,:,2:kb)
-      dzz(:,:,1:kb-1) = zz(:,:,1:kb-1) - zz(:,:,2:kb)
-      dz (:,:,kb) = dz (:,:,kb-1)
-      dzz(:,:,kb) = dzz(:,:,kb-1)
+      dz (:,:,1:km-1) = z (:,:,1:km-1) - z (:,:,2:km)
+      dzz(:,:,1:km-1) = zz(:,:,1:km-1) - zz(:,:,2:km)
+      dz (:,:,km) = dz (:,:,km-1)
+      dzz(:,:,km) = dzz(:,:,km-1)
 
 ! set up Coriolis parameter
       cor = 2.*Ohm*sin(north_e*DEG2RAD)
@@ -394,7 +406,7 @@ module grid
 ! Print initial (core) summary
       print '(/a)', "---- VERTICAL DISCRETISATION --------------------"
       print '(/3x,a,9x,a,8x,a,8x,a,8x,a)', 'k','z','zz','dz','dzz'
-      do k = 1, kb
+      do k = 1, km
         print '(1x,i5,4f10.3)', k, z(2,2,k), zz(2,2,k)  &
                                  ,dz(2,2,k),dzz(2,2,k)
       end do

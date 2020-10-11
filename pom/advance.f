@@ -154,7 +154,8 @@
 !
       use config     , only: aam_init, horcon, mode, n1d, npg
       use bry        , only: aamfrz, USE_SPONGE
-      use glob_domain, only: im, imm1, jm, jmm1, kbm1
+      use glob_const , only: MODE_BAROTROPIC
+      use glob_domain, only: im, imm1, jm, jmm1, kmm1
       use grid       , only: dx, dy
       use glob_ocean , only: a, aam, aamfac, c, ee, u, v
 
@@ -172,7 +173,7 @@
 ! calculate Smagorinsky lateral viscosity:
 ! ( hor visc = horcon*dx*dy*sqrt((du/dx)**2+(dv/dy)**2
 !                                +.5*(du/dy+dv/dx)**2) )
-      if ( mode /= 2 ) then
+      if ( mode /= MODE_BAROTROPIC ) then
 
         call advct(a,c,ee)
 
@@ -182,7 +183,7 @@
         if ( n1d /= 0 ) then
           aam(:,:,:) = aam_init
         else
-          do k=1,kbm1
+          do k=1,kmm1
             do j=2,jmm1
               do i=2,imm1
                 aam(i,j,k) = horcon*dx(i,j)*dy(i,j)*aamfac(i,j)       !fhx:incmix
@@ -213,7 +214,7 @@
 !          end do
 !        end do
 
-        call exchange3d_mpi(aam(:,:,1:kbm1),im,jm,kbm1)
+        call exchange3d_mpi(aam(:,:,1:kmm1),im,jm,kmm1)
 
       end if
 
@@ -232,7 +233,8 @@
 !______________________________________________________________________
 !
       use config     , only: mode
-      use glob_domain, only: im, jm, kbm1
+      use glob_const , only: MODE_BAROTROPIC
+      use glob_domain, only: im, jm, kmm1
       use grid       , only: dz
       use glob_ocean
       use model_run  , only: isp2i, ispi
@@ -242,7 +244,7 @@
       integer i,j,k
 
 
-      if ( mode /= 2 ) then
+      if ( mode /= MODE_BAROTROPIC ) then
 
         adx2d = 0.
         ady2d = 0.
@@ -250,7 +252,7 @@
         dry2d = 0.
         aam2d = 0.
 
-        do k = 1, kbm1
+        do k = 1, kmm1
 
           adx2d = adx2d +  advx(:,:,k)*dz(:,:,k)
           ady2d = ady2d +  advy(:,:,k)*dz(:,:,k)
@@ -303,8 +305,8 @@
       use config     , only: alpha, cbcmax, cbcmin, ispadv, smoth
      &                     , use_tide, z0b
       use glob_const , only: grav, Kappa
-      use glob_domain, only: im, imm1, jm, jmm1, kbm1   , my_task
-      use grid       , only: art, aru, arv, cor, dx, dy, fsm, h, zz
+      use glob_domain, only: im, imm1, jm, jmm1, kmm1   , my_task
+      use grid       , only: art, aru, arv, cor, dx, dy, fsm, h, kb, zz
       use glob_ocean
       use tide       , only: tide_ua, tide_va, tide_advance => step
       use model_run  , only: dte, dte2, iext, isp2i, ispi, isplit,dtime
@@ -447,7 +449,7 @@
 ! update bottom friction
       do j=1,jm
         do i=1,im
-          cbc(i,j)=(Kappa/log((.1+(1.+zz(i,j,kbm1))*d(i,j))/z0b))**2
+          cbc(i,j)=(Kappa/log((.1+(d(i,j)-zz(i,j,kb(i,j)-1)))/z0b))**2
           cbc(i,j)=max(cbcmin,cbc(i,j))
           cbc(i,j)=min(cbcmax,cbc(i,j))
         end do
@@ -519,7 +521,7 @@
 ! adjust u(z) and v(z) such that depth average of (u,v) = (ua,va)
         tps = 0.
 
-        do k=1,kbm1
+        do k=1,kmm1
           do j=1,jm
             do i=1,im
               tps(i,j)=tps(i,j)+u(i,j,k)*dz(i,j,k)
@@ -527,7 +529,7 @@
           end do
         end do
 
-        do k=1,kbm1
+        do k=1,kmm1
           do j=1,jm
             u(1,j,k) = .5*( u(1,j,k) - tps(1,j) )
      &               +    ( utb(1,j) + utf(1,j) )/dt(1,j)
@@ -544,7 +546,7 @@
           end do
         end do
 
-        do k=1,kbm1
+        do k=1,kmm1
           do j=1,jm
             do i=1,im
               tps(i,j)=tps(i,j)+v(i,j,k)*dz(i,j,k)
@@ -552,7 +554,7 @@
           end do
         end do
 
-        do k=1,kbm1
+        do k=1,kmm1
           do i=1,im
             v(i,1,k) = .5*( v(i,1,k) - tps(i,1) )
      &               +    ( vtb(i,1) + vtf(i,1) )/dt(i,1)
@@ -582,7 +584,7 @@
 
         call bc_vel_vert ! bcond(5)
 
-        call exchange3d_mpi(w,im,jm,kb)
+        call exchange3d_mpi(w,im,jm,km)
 
 ! set uf and vf to zero
         uf = 0.
@@ -599,8 +601,8 @@
 
         call bc_turb ! bcond(6)
 
-        call exchange3d_mpi(uf(:,:,2:kbm1),im,jm,kbm2)
-        call exchange3d_mpi(vf(:,:,2:kbm1),im,jm,kbm2)
+        call exchange3d_mpi(uf(:,:,2:kmm1),im,jm,kmm2)
+        call exchange3d_mpi(vf(:,:,2:kmm1),im,jm,kmm2)
 
         q2  = q2  + .5*smoth*( q2b  -2.*q2  + uf )
         q2l = q2l + .5*smoth*( q2lb -2.*q2l + vf )
@@ -654,8 +656,8 @@
 
           call bc_ts ! bcond(4)
 
-          call exchange3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-          call exchange3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+          call exchange3d_mpi(uf(:,:,1:kmm1),im,jm,kmm1)
+          call exchange3d_mpi(vf(:,:,1:kmm1),im,jm,kmm1)
 
           t = t + .5*smoth*( tb + uf -2.*t )
           s = s + .5*smoth*( sb + vf -2.*s )
@@ -676,12 +678,12 @@
 
         call bc_vel_int ! bcond(3)
 
-        call exchange3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-        call exchange3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+        call exchange3d_mpi(uf(:,:,1:kmm1),im,jm,kmm1)
+        call exchange3d_mpi(vf(:,:,1:kmm1),im,jm,kmm1)
 
         tps = 0.
 
-        do k=1,kbm1
+        do k=1,kmm1
           do j=1,jm
             do i=1,im
               tps(i,j)=tps(i,j)
@@ -690,7 +692,7 @@
           end do
         end do
 
-        do k=1,kbm1
+        do k=1,kmm1
           do j=1,jm
             do i=1,im
               u(i,j,k)=u(i,j,k)
@@ -702,7 +704,7 @@
 
         tps = 0.
 
-        do k=1,kbm1
+        do k=1,kmm1
           do j=1,jm
             do i=1,im
               tps(i,j)=tps(i,j)
@@ -711,7 +713,7 @@
           end do
         end do
 
-        do k=1,kbm1
+        do k=1,kmm1
           do j=1,jm
             do i=1,im
               v(i,j,k)=v(i,j,k)
@@ -754,7 +756,7 @@
 !______________________________________________________________________
 !
         use glob_const , only: rk
-        use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+        use glob_domain, only: im, imm1, jm, jmm1, km, kmm1
      &                       , n_east, n_north, n_south, n_west
         use grid       , only: dx, dy, fsm, zz
         use glob_ocean , only: dt, et, etb, etf, tps, u, v, w, wr
@@ -768,7 +770,7 @@
 
         wr = 0.
 
-        do k=1,kbm1
+        do k=1,kmm1
 
           tps = zz(:,:,k)*dt + et
  
@@ -790,15 +792,15 @@
 
         end do
 
-        call exchange3d_mpi(wr(:,:,1:kbm1),im,jm,kbm1)
+        call exchange3d_mpi(wr(:,:,1:kmm1),im,jm,kmm1)
 
-        do k=1,kb
+        do k=1,km
           do i=1,im
             if(n_south.eq.-1) wr(i,1,k)=wr(i,2,k)
             if(n_north.eq.-1) wr(i,jm,k)=wr(i,jmm1,k)
           end do
         end do
-        do k=1,kb
+        do k=1,km
           do j=1,jm
             if(n_west.eq.-1) wr(1,j,k)=wr(2,j,k)
             if(n_east.eq.-1) wr(im,j,k)=wr(imm1,j,k)
@@ -864,7 +866,7 @@
         salt_ave = 0.
         elev_ave = 0.
 
-        do k=1,kbm1
+        do k=1,kmm1
           d_vol    = art*dt*dz(:,:,k)*fsm(:,:,k)
           vol_tot  = vol_tot + sum(d_vol)
           temp_ave = temp_ave + sum(tb(:,:,k)*d_vol)
@@ -957,9 +959,9 @@
 !______________________________________________________________________
 !
       use air        , only: wssurf, wtsurf, wusurf, wvsurf, swrad
-      use glob_domain, only: kb
+      use glob_domain, only: km
       use glob_ocean , only: aam, cbc  , elb  , kh
-     &                     , km , rho  , s    , t
+     &                     , kmt, rho  , s    , t
      &                     , u  , uab  , v    , vab
      &                     , w  , wubot, wvbot
       use glob_out
@@ -975,8 +977,8 @@
       wtsurf_mean = wtsurf_mean + wtsurf
       wssurf_mean = wssurf_mean + wssurf
       swrad_mean  = swrad_mean  + swrad
-      u(:,:,kb)   = wubot(:,:)        !fhx:20110318:store wvbot
-      v(:,:,kb)   = wvbot(:,:)        !fhx:20110318:store wvbot
+      u(:,:,km)   = wubot(:,:)        !fhx:20110318:store wvbot
+      v(:,:,km)   = wvbot(:,:)        !fhx:20110318:store wvbot
       u_mean      = u_mean      + u
       v_mean      = v_mean      + v
       w_mean      = w_mean      + w
@@ -984,7 +986,7 @@
       s_mean      = s_mean      + s
       rho_mean    = rho_mean    + rho
       kh_mean     = kh_mean     + kh
-      aam(:,:,kb) = cbc(:,:)          !lyo:20110315:botwavedrag:store cbc
+      aam(:,:,km) = cbc(:,:)          !lyo:20110315:botwavedrag:store cbc
       aam_mean    = aam_mean    + aam
 
       num = num + 1
@@ -1164,12 +1166,12 @@
 !
       use ieee_arithmetic, only: ieee_is_nan
       use glob_const , only: rk
-      use glob_domain, only: i_global, im, j_global, jm, kb
+      use glob_domain, only: i_global, im, j_global, jm, km
       use grid       , only: h
 
       implicit none
 
-      real(rk)        , intent(in) :: var(im,jm,kb)
+      real(rk)        , intent(in) :: var(im,jm,km)
       character(len=*), intent(in) :: varname
 
       integer i, j, k, num_nan
@@ -1177,7 +1179,7 @@
 
       num_nan = 0
 
-      do k=1,kb
+      do k=1,km
         do j=1,jm
           do i=1,im
             if ( var(i,j,k) == var(i,j,k)+1 ) then

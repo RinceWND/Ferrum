@@ -892,7 +892,7 @@ module air
 !______________________________________________________________________
 !
       use glob_const , only: rhow => rhoref
-      use glob_domain, only: im, jm, kb, my_task, i_global,j_global
+      use glob_domain, only: im, jm, my_task, i_global,j_global
       use glob_ocean , only: t, u, v
       use seaice     , only: icec !, tau_iw_u, tau_iw_v
 

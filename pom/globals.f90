@@ -63,7 +63,7 @@ module glob_domain
   integer            &
     im_global        & ! number of global grid points in x
   , jm_global        & ! number of global grid points in y
-  , kb               & ! number of grid points in z
+  , km               & ! number of grid points in z
   , im_local         & ! number of local grid points in x
   , jm_local         & ! number of local grid points in y
   , im_global_coarse & ! number of global grid points in x for coarse grids
@@ -94,8 +94,8 @@ module glob_domain
   , jm               & ! number of grid points used in local y domains
   , jmm1             & ! jm-1
   , jmm2             & ! jm-2
-  , kbm1             & ! kb-1
-  , kbm2             & ! kb-2
+  , kmm1             & ! km-1
+  , kmm2             & ! km-2
   , im_coarse        & ! number of coarse grid points used in local x domains
   , jm_coarse          ! number of coarse grid points used in local y domains
 
@@ -152,7 +152,7 @@ module glob_domain
       , jm_local_coarse    &
       , x_division         &
       , y_division         &
-      , kb, n_proc
+      , km, n_proc
 
       x_division = 2
       y_division = 1
@@ -193,7 +193,7 @@ module glob_domain
       character(48) str
 
 
-      write( str, '("Size: [",i5," x",i5," x",i4," ]")' ) im_global, jm_global, kb
+      write( str, '("Size: [",i5," x",i5," x",i4," ]")' ) im_global, jm_global, km
       call msg_print( "DOMAIN READ", 1, str )
 
 
@@ -274,7 +274,7 @@ module glob_out
 
     subroutine allocate_arrays
 
-      use glob_domain, only: im, jm, kb
+      use glob_domain, only: im, jm, km
 
       implicit none
 
@@ -305,15 +305,15 @@ module glob_out
       wvsurf_mean = 0.
 
       allocate(             &
-        aam_mean(im,jm,kb)  &
-      , kh_mean (im,jm,kb)  &
-      , km_mean (im,jm,kb)  &
-      , rho_mean(im,jm,kb)  &
-      , s_mean  (im,jm,kb)  &
-      , t_mean  (im,jm,kb)  &
-      , u_mean  (im,jm,kb)  &
-      , v_mean  (im,jm,kb)  &
-      , w_mean  (im,jm,kb)  &
+        aam_mean(im,jm,km)  &
+      , kh_mean (im,jm,km)  &
+      , km_mean (im,jm,km)  &
+      , rho_mean(im,jm,km)  &
+      , s_mean  (im,jm,km)  &
+      , t_mean  (im,jm,km)  &
+      , u_mean  (im,jm,km)  &
+      , v_mean  (im,jm,km)  &
+      , w_mean  (im,jm,km)  &
       )
 
       aam_mean = 0.
@@ -546,7 +546,7 @@ module glob_ocean
   , gg               & 
   , hz               & ! model cell depth [m]
   , kh               & ! vertical diffusivity
-  , km               & ! vertical kinematic viscosity
+  , kmt              & ! vertical kinematic viscosity
   , kq               & 
   , l                & ! turbulence length scale
   , q2b              & ! twice the turbulent kinetic energy at time n-1
@@ -576,7 +576,7 @@ module glob_ocean
 !  Allocates module arrays and initializes (some of) them
 !______________________________________________________________________
 !
-      use glob_domain, only: im, im_coarse, jm, jm_coarse, kb, kbm1
+      use glob_domain, only: im, im_coarse, jm, jm_coarse, km, kmm1
 
       implicit none
 
@@ -625,39 +625,39 @@ module glob_ocean
       )
 
       allocate(          &
-        aam  (im,jm,kb)  &
-      , advx (im,jm,kb)  &
-      , advy (im,jm,kb)  &
-      , a    (im,jm,kb)  &
-      , c    (im,jm,kb)  &
-      , drhox(im,jm,kb)  &
-      , drhoy(im,jm,kb)  &
-      , dtef (im,jm,kb)  &
-      , ee   (im,jm,kb)  &
-      , gg   (im,jm,kb)  &
-      , hz   (im,jm,kb)  &
-      , kh   (im,jm,kb)  &
-      , km   (im,jm,kb)  &
-      , kq   (im,jm,kb)  &
-      , l    (im,jm,kb)  &
-      , q2b  (im,jm,kb)  &
-      , q2   (im,jm,kb)  &
-      , q2lb (im,jm,kb)  &
-      , q2l  (im,jm,kb)  &
-      , rho  (im,jm,kb)  &
-      , sb   (im,jm,kb)  &
-      , s    (im,jm,kb)  &
-      , tb   (im,jm,kb)  &
-      , t    (im,jm,kb)  &
-      , ub   (im,jm,kb)  &
-      , uf   (im,jm,kb)  &
-      , u    (im,jm,kb)  &
-      , vb   (im,jm,kb)  &
-      , vf   (im,jm,kb)  &
-      , v    (im,jm,kb)  &
-      , w    (im,jm,kb)  &
-      , wr   (im,jm,kb)  &
-      , zflux(im,jm,kb)  &
+        aam  (im,jm,km)  &
+      , advx (im,jm,km)  &
+      , advy (im,jm,km)  &
+      , a    (im,jm,km)  &
+      , c    (im,jm,km)  &
+      , drhox(im,jm,km)  &
+      , drhoy(im,jm,km)  &
+      , dtef (im,jm,km)  &
+      , ee   (im,jm,km)  &
+      , gg   (im,jm,km)  &
+      , hz   (im,jm,km)  &
+      , kh   (im,jm,km)  &
+      , kmt  (im,jm,km)  &
+      , kq   (im,jm,km)  &
+      , l    (im,jm,km)  &
+      , q2b  (im,jm,km)  &
+      , q2   (im,jm,km)  &
+      , q2lb (im,jm,km)  &
+      , q2l  (im,jm,km)  &
+      , rho  (im,jm,km)  &
+      , sb   (im,jm,km)  &
+      , s    (im,jm,km)  &
+      , tb   (im,jm,km)  &
+      , t    (im,jm,km)  &
+      , ub   (im,jm,km)  &
+      , uf   (im,jm,km)  &
+      , u    (im,jm,km)  &
+      , vb   (im,jm,km)  &
+      , vf   (im,jm,km)  &
+      , v    (im,jm,km)  &
+      , w    (im,jm,km)  &
+      , wr   (im,jm,km)  &
+      , zflux(im,jm,km)  &
       )
 
 ! Initialize arrays

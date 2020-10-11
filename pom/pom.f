@@ -89,7 +89,7 @@
 
       use config     , only: calc_assim , netcdf_file
      &                     , output_flag, output_means
-      use glob_domain, only: im, jm, kb
+      use glob_domain, only: im, jm, km
       use glob_ocean , only: ssurf, tsurf
       use glob_out
       use model_run  , only: iint
@@ -136,8 +136,8 @@
 !     store tsurf & ssurf in rho(k=kb) & s(k=kb) respectively
 !     note that these will be satellite &/or monthly climatology
 
-          s_mean(:,:,kb)   = ssurf(:,:) !lyo:exp301!lyo:exp302:store ssurf!lyonew:
-          rho_mean(:,:,kb) = tsurf(:,:) !lyo:exp301!lyo:exp302:store tsurf!lyonew:
+          s_mean(:,:,km)   = ssurf(:,:) !lyo:exp301!lyo:exp302:store ssurf!lyonew:
+          rho_mean(:,:,km) = tsurf(:,:) !lyo:exp301!lyo:exp302:store tsurf!lyonew:
 
 !     fill up ghost cells before output
           call exchange2d_mpi( uab_mean, im, jm )
@@ -148,15 +148,15 @@
           call exchange2d_mpi( wtsurf_mean, im, jm )
           call exchange2d_mpi( wssurf_mean, im, jm )
           call exchange2d_mpi( swrad_mean, im, jm )
-          call exchange3d_mpi( u_mean, im, jm, kb )
-          call exchange3d_mpi( v_mean, im, jm, kb )
-          call exchange3d_mpi( w_mean, im, jm, kb )
-          call exchange3d_mpi( t_mean, im, jm, kb )
-          call exchange3d_mpi( s_mean, im, jm, kb )
-          call exchange3d_mpi( rho_mean, im, jm, kb )
-          call exchange3d_mpi( kh_mean, im, jm, kb )
-          call exchange3d_mpi( km_mean, im, jm, kb )
-          call exchange3d_mpi( aam_mean, im, jm, kb )
+          call exchange3d_mpi( u_mean, im, jm, km )
+          call exchange3d_mpi( v_mean, im, jm, km )
+          call exchange3d_mpi( w_mean, im, jm, km )
+          call exchange3d_mpi( t_mean, im, jm, km )
+          call exchange3d_mpi( s_mean, im, jm, km )
+          call exchange3d_mpi( rho_mean, im, jm, km )
+          call exchange3d_mpi( kh_mean, im, jm, km )
+          call exchange3d_mpi( km_mean, im, jm, km )
+          call exchange3d_mpi( aam_mean, im, jm, km )
 
 
           if ( output_flag == 1 ) then
@@ -260,9 +260,9 @@
       use air        , only: wusurf, wvsurf
       use config     , only: netcdf_file
       use glob_const , only: rk
-      use glob_domain, only: im, jm, kb
+      use glob_domain, only: im, jm, km
       use glob_ocean , only: aam, aam2d, advua, advva, adx2d, ady2d
-     &                     , egb, el, elb, et, etb, kh, km, kq, l
+     &                     , egb, el, elb, et, etb, kh, kmt, kq, l
      &                     , q2, q2b, q2l, q2lb, rho, s, sb, t, tb
      &                     , u, ua, uab, ub, utb, v, va, vab, vb, vtb
      &                     , w, wubot, wvbot
@@ -276,7 +276,7 @@
 
 !lyo:exp302:The following changes will create a restart 1day after the
 !     initial date_start0 to be used for next-day's ncast&fcast
-      real(kind=rk), parameter :: write_rst1d = 1.0
+      real(rk), parameter :: write_rst1d = 1.0
       integer irestart1d, ncount ! each run for next-day
       data ncount/0/             ! fcast
 
@@ -294,8 +294,8 @@
         call exchange2d_mpi(advva,im,jm)
         call exchange2d_mpi(adx2d,im,jm)
         call exchange2d_mpi(ady2d,im,jm)
-        call exchange2d_mpi(utb,im,jm)
-        call exchange2d_mpi(vtb,im,jm)
+        call exchange2d_mpi(utb  ,im,jm)
+        call exchange2d_mpi(vtb  ,im,jm)
 !        call exchange2d_mpi(q2(:,:,1),im,jm)
 !        call exchange2d_mpi(q2(:,:,kb),im,jm)
 !        call exchange2d_mpi(q2b(:,:,1),im,jm)
@@ -315,38 +315,38 @@
 
         call exchange2d_mpi(wusurf,im,jm)
         call exchange2d_mpi(wvsurf,im,jm)
-        call exchange2d_mpi(wubot,im,jm)
-        call exchange2d_mpi(wvbot,im,jm)
-        call exchange2d_mpi(aam2d,im,jm)
-        call exchange2d_mpi(ua,im,jm)
-        call exchange2d_mpi(uab,im,jm)
-        call exchange2d_mpi(va,im,jm)
-        call exchange2d_mpi(vab,im,jm)
-        call exchange2d_mpi(el,im,jm)
-        call exchange2d_mpi(elb,im,jm)
-        call exchange2d_mpi(et,im,jm)
-        call exchange2d_mpi(etb,im,jm)
-        call exchange2d_mpi(egb,im,jm)
+        call exchange2d_mpi(wubot ,im,jm)
+        call exchange2d_mpi(wvbot ,im,jm)
+        call exchange2d_mpi(aam2d ,im,jm)
+        call exchange2d_mpi(ua    ,im,jm)
+        call exchange2d_mpi(uab   ,im,jm)
+        call exchange2d_mpi(va    ,im,jm)
+        call exchange2d_mpi(vab   ,im,jm)
+        call exchange2d_mpi(el    ,im,jm)
+        call exchange2d_mpi(elb   ,im,jm)
+        call exchange2d_mpi(et    ,im,jm)
+        call exchange2d_mpi(etb   ,im,jm)
+        call exchange2d_mpi(egb   ,im,jm)
 
-        call exchange3d_mpi(u,im,jm,kb)
-        call exchange3d_mpi(v,im,jm,kb)
-        call exchange3d_mpi(ub,im,jm,kb)
-        call exchange3d_mpi(vb,im,jm,kb)
-        call exchange3d_mpi(w,im,jm,kb)
-        call exchange3d_mpi(t,im,jm,kb)
-        call exchange3d_mpi(tb,im,jm,kb)
-        call exchange3d_mpi(s,im,jm,kb)
-        call exchange3d_mpi(sb,im,jm,kb)
-        call exchange3d_mpi(rho,im,jm,kb)
-        call exchange3d_mpi(km,im,jm,kb)
-        call exchange3d_mpi(kh,im,jm,kb)
-        call exchange3d_mpi(kq,im,jm,kb)
-        call exchange3d_mpi(l,im,jm,kb)
-        call exchange3d_mpi(q2,im,jm,kb)
-        call exchange3d_mpi(q2b,im,jm,kb)
-        call exchange3d_mpi(aam,im,jm,kb)
-        call exchange3d_mpi(q2l,im,jm,kb)
-        call exchange3d_mpi(q2lb,im,jm,kb)
+        call exchange3d_mpi(u   ,im,jm,km)
+        call exchange3d_mpi(v   ,im,jm,km)
+        call exchange3d_mpi(ub  ,im,jm,km)
+        call exchange3d_mpi(vb  ,im,jm,km)
+        call exchange3d_mpi(w   ,im,jm,km)
+        call exchange3d_mpi(t   ,im,jm,km)
+        call exchange3d_mpi(tb  ,im,jm,km)
+        call exchange3d_mpi(s   ,im,jm,km)
+        call exchange3d_mpi(sb  ,im,jm,km)
+        call exchange3d_mpi(rho ,im,jm,km)
+        call exchange3d_mpi(kmt ,im,jm,km)
+        call exchange3d_mpi(kh  ,im,jm,km)
+        call exchange3d_mpi(kq  ,im,jm,km)
+        call exchange3d_mpi(l   ,im,jm,km)
+        call exchange3d_mpi(q2  ,im,jm,km)
+        call exchange3d_mpi(q2b ,im,jm,km)
+        call exchange3d_mpi(aam ,im,jm,km)
+        call exchange3d_mpi(q2l ,im,jm,km)
+        call exchange3d_mpi(q2lb,im,jm,km)
 
 
         call create_restart(
@@ -370,8 +370,8 @@
 
         implicit none
 
-        character(len=*), intent(in) :: msg, desc
-        integer         , intent(in) :: status
+        character(*), intent(in) :: msg, desc
+        integer     , intent(in) :: status
 
         integer                 , parameter :: line_len = 56
         integer(2), dimension(6), parameter :: chr =

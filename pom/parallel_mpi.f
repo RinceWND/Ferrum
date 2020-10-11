@@ -139,8 +139,8 @@
       jmm1 = jm-1
       jmm2 = jm-2
 
-      kbm1 = kb-1
-      kbm2 = kb-2
+      kmm1 = km-1
+      kmm2 = km-2
 ! detemine global and local indices for coarse grids
 !      im_coarse=im_local_coarse
 !      do i=1,im_local_coarse
