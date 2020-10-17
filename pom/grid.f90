@@ -93,11 +93,14 @@ module grid
   , dzb              & ! layer real thickness at n-1, m
   , dzf              & ! layer real thickness at n+1, m
   , dzz              & ! thickness of two halves of adjacent layers (zz(k)-zz(k+1)), m
+  , dzzf             & ! thickness of two halves of adjacent layers at time n+1, m
   , fsm              & ! mask for scalar variables
   , sig              & ! sigma coordinate from z=0 (surface) to z=-1 (bottom)
   , sigz             & ! sigma coordinate, intermediate between z
   , z                & ! geopotential coordinate from z=-eta (surface) to z=-H (bottom)
-  , zz                 ! geopotential coordinate, intermediate between z
+  , zf               & ! geopotential coordinate at time n+1
+  , zz               & ! geopotential coordinate, intermediate between z
+  , zzf                ! geopotential coordinate at time n+1, intermediate between z
 
   contains
 !______________________________________________________________________
@@ -194,17 +197,20 @@ module grid
       , rot    (im,jm)  &
       )
 
-      allocate(         &
-        dz (im,jm,km)   &
-      , dzb(im,jm,km)   &
-      , dzf(im,jm,km)   &
-      , dzz(im,jm,km)   &
-      , dum(im,jm,km)   &
-      , dvm(im,jm,km)   &
-      , dwm(im,jm,km)   &
-      , fsm(im,jm,km)   &
-      , z  (im,jm,km)   &
-      , zz (im,jm,km)   &
+      allocate(          &
+        dz  (im,jm,km)   &
+      , dzb (im,jm,km)   &
+      , dzf (im,jm,km)   &
+      , dzz (im,jm,km)   &
+      , dzzf(im,jm,km)   &
+      , dum (im,jm,km)   &
+      , dvm (im,jm,km)   &
+      , dwm (im,jm,km)   &
+      , fsm (im,jm,km)   &
+      , z   (im,jm,km)   &
+      , zf  (im,jm,km)   &
+      , zz  (im,jm,km)   &
+      , zzf (im,jm,km)   &
       )
 
 
