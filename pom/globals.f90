@@ -282,7 +282,7 @@ module glob_out
       num        = 0
       out_record = 1
 
-      swtch      = huge(swtch)
+      swtch      = 36500.
 
       allocate(             &
         elb_mean   (im,jm)  &
@@ -432,7 +432,7 @@ module model_run
       implicit none
 
       time = dti*real(iint)/86400._rk + time0
-      if ( iint >= iswtch ) iprint = nint( prtd2*86400._rk/dti )
+      if ( iint > iswtch ) iprint = max( nint( prtd2*86400._rk/dti ), 1 )
 
       if( is_leap( dtime%year ) ) then
         days_in_month(2) = 29

@@ -11,7 +11,7 @@
 module grid
 
   use glob_const , only: PATH_LEN, rk, VAR_LEN
-  use glob_domain, only: im, jm, km
+  use glob_domain, only: im, jm, km, kmm1
 
   implicit none
 
@@ -207,6 +207,8 @@ module grid
       , dvm (im,jm,km)   &
       , dwm (im,jm,km)   &
       , fsm (im,jm,km)   &
+      , sig (im,jm,km)   &
+      , sigz(im,jm,km)   &
       , z   (im,jm,km)   &
       , zf  (im,jm,km)   &
       , zz  (im,jm,km)   &
@@ -263,28 +265,28 @@ module grid
                             , start(1:3), stride(1:3) )              &
                   , '[grid]:read_grid:var_read `'//trim(fsm_name) )
       else
-        call check( var_read( file_id,  z_name,  z(1,1,:)           &
+        call check( var_read( file_id,  z_name,  sig(1,1,:)         &
                             , start(3:3), stride(3:3) )             &
                   , '[grid]:read_grid:var_read `'//trim(z_name) )
-        call check( var_read( file_id, zz_name, zz(1,1,:)           &
+        call check( var_read( file_id, zz_name, sigz(1,1,:)         &
                             , start(3:3), stride(3:3) )             &
                   , '[grid]:read_grid:var_read `'//trim(zz_name) )
         call check( var_read( file_id, fsm_name, fsm(:,:,1)         &
-                            , start(1:3), stride(1:3) )             &
+                            , start(1:2), stride(1:2) )             &
                   , '[grid]:read_grid:var_read `'//trim(fsm_name) )
         do k = 1, km
-          z (:,:,k) = z (1,1,k)
-          zz(:,:,k) = zz(1,1,k)
-          fsm(:,:,k) = fsm(:,:,1)
+          sig (:,:,k) = sig (1,1,k)
+          sigz(:,:,k) = sigz(1,1,k)
+          fsm (:,:,k) = fsm (:,:,1)
         end do
       end if
 
-      norm_h = 1.
-      do k = kmm1, 1, -1
-        where( fsm(:,:,k) == 0. ) norm_h = -z(:,:,k)
+      kb = km
+      do k = 1, kmm1
+        where ( kb > k .and. fsm(:,:,k) < 1._rk ) ! FIXME: This doesn't correct the mask!
+          kb = max( k, 3 )
+        end where
       end do
-      where( norm_h == 0. ) norm_h = 1.
-      norm_h = 1./norm_h
 
       call check( var_read( file_id,  dx_name, dx                 &
                           , start(1:3), stride(1:3) )             &
@@ -319,6 +321,55 @@ module grid
 
 ! close file:
       file_id = file_close( file_id )
+
+! manage vertical coordinates
+      if ( z_rnk == 3 ) then
+
+        select case ( v_type )
+
+          case ( vSIGMA )
+
+            sig  = z
+            sigz = zz
+            do k = 1, km
+              z (:,:,k) = sig (:,:,k)*h
+              zz(:,:,k) = sigz(:,:,k)*h
+            end do
+
+          case ( vGEOPOTENTIAL )
+
+            do k = 1, km
+              sig (:,:,k) = z (:,:,k)/h
+              sigz(:,:,k) = zz(:,:,k)/h
+            end do
+
+        end select
+
+      else
+
+        select case ( v_type )
+
+          case ( vSIGMA )
+
+            do k = 1, km
+              z (:,:,k) = sig (:,:,k)*h
+              zz(:,:,k) = sigz(:,:,k)*h
+            end do
+
+          case ( vGEOPOTENTIAL )
+
+            do k = 1, km
+              do j = 1, jm
+                do i = 1, im
+                  z (i,j,k) = -sig (i,j,k)*h(i,j)/sig(i,j,kb(i,j))
+                  zz(i,j,k) = -sigz(i,j,k)*h(i,j)/sig(i,j,kb(i,j))
+                end do
+              end do
+            end do
+
+        end select
+
+      end if
 
 
 ! derive u- and v-mask from rho-mask
@@ -358,6 +409,7 @@ module grid
       dzz(:,:,1:km-1) = zz(:,:,1:km-1) - zz(:,:,2:km)
       dz (:,:,km) = dz (:,:,km-1)
       dzz(:,:,km) = dzz(:,:,km-1)
+      dzb = dz
 
 ! set up Coriolis parameter
       cor = 2.*Ohm*sin(north_e*DEG2RAD)
@@ -392,6 +444,58 @@ module grid
 
 
     end ! subroutine read_grid
+!
+!______________________________________________________________________
+!
+    subroutine update_vcoord
+!----------------------------------------------------------------------
+!  Updates vertical discretisation.
+!______________________________________________________________________
+!
+      use glob_ocean, only: et, etf
+
+      implicit none
+
+      integer i,j,k
+
+
+      select case ( v_type )
+
+        case ( vSIGMA )
+
+          do k = 1, km
+            z  (:,:,k) = sig (:,:,k)*( h + et  )
+            zf (:,:,k) = sig (:,:,k)*( h + etf )
+            zz (:,:,k) = sigz(:,:,k)*( h + et  )
+            zzf(:,:,k) = sigz(:,:,k)*( h + etf )
+          end do
+          print *, "==etf=",etf(186,17)
+          print *, "==dzf=",zf(186,17,:)
+
+        case ( vGEOPOTENTIAL )
+
+          do k = 1, km
+            do j = 1, jm
+              do i = 1, im
+                z  (i,j,k) = -sig (i,j,k)*( h(i,j)+et (i,j) )/sig(i,j,kb(i,j))
+                zf (i,j,k) = -sig (i,j,k)*( h(i,j)+etf(i,j) )/sig(i,j,kb(i,j))
+                zz (i,j,k) = -sigz(i,j,k)*( h(i,j)+et (i,j) )/sig(i,j,kb(i,j))
+                zzf(i,j,k) = -sigz(i,j,k)*( h(i,j)+etf(i,j) )/sig(i,j,kb(i,j))
+              end do
+            end do
+          end do
+
+        end select
+
+
+        do k = 1, kmm1
+          dzz (:,:,k) = zz (:,:,k) - zz (:,:,k+1)
+          dzf (:,:,k) = zf (:,:,k) - zf (:,:,k+1)
+          dzzf(:,:,k) = zzf(:,:,k) - zzf(:,:,k+1)
+        end do
+
+
+    end subroutine update_vcoord
 !
 !______________________________________________________________________
 !

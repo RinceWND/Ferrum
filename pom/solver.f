@@ -551,7 +551,7 @@
         do i = 1, im
           k = kb(i,j)
           f (i,j,k) = f (i,j,k-1)
-!          fb(i,j,k) = fb(i,j,k-1)
+          fb(i,j,k) = fb(i,j,k-1)
         end do
       end do
 
@@ -579,10 +579,10 @@
      $                   - tprni*( aam(i,j,k) + aam(i,j-1,k) )
      $                          *( fb(i,j,k) - fb(i,j-1,k) )*dvm(i,j,k)
      $                          /( dy(i,j) + dy(i,j-1) )
-            xflux(i,j,k) = .25*(dz(i,j,k)+dz(i-1,j,k))
-     &                        *(dy(i,j)+dy(i-1,j))*xflux(i,j,k)
-            yflux(i,j,k) = .25*(dz(i,j,k)+dz(i,j-1,k))
-     &                        *(dx(i,j)+dx(i,j-1))*yflux(i,j,k)
+            xflux(i,j,k) = .25*( dz(i,j,k) + dz(i-1,j  ,k) )
+     &                        *( dy(i,j) + dy(i-1,j) )*xflux(i,j,k)
+            yflux(i,j,k) = .25*( dz(i,j,k) + dz(i  ,j-1,k) )
+     &                        *( dx(i,j) + dx(i,j-1) )*yflux(i,j,k)
           end do
         end do
       end do
@@ -620,12 +620,15 @@
             relax = 6.43e-8*(1.-exp(zz(i,j,k)*2.e-3)) !180 days, 500m
 !           relax=0.0 !lyo:pac10:debug:
             ff(i,j,k) = xflux(i+1,j  ,k) - xflux(i,j,k)
-     $                + yflux(i  ,j+1,k) - yflux(i,j,k)
-     $                + ( zflux(i,j,k) - zflux(i,j,k+1)
-     $                  - relax*fclim(i,j,k)*dt(i,j) )*art(i,j)
+     &                + yflux(i  ,j+1,k) - yflux(i,j,k)
+     &                + ( zflux(i,j,k) - zflux(i,j,k+1)
+     &                  - relax*fclim(i,j,k)*dt(i,j)
+     &                  )*art(i,j)
             ff(i,j,k) = ( fb(i,j,k)*dzb(i,j,k)*art(i,j)
-     $                  - dti2*ff(i,j,k) )
-     $                 /( dzf(i,j,k)*art(i,j)*(1.+relax*dti2) )
+     &                  - dti2*ff(i,j,k) )
+     &                 /( dzf(i,j,k)*art(i,j)
+     &                              *(1.+relax*dti2)
+     &                  )
           end do
         end do
       end do
@@ -3435,7 +3438,7 @@
      &       ,     p,   sef,    sp,    tp
      &       ,cbcnst, surfl,  shiw
      &       , utau2
-      integer i, j, k, ki
+      integer i, j, k
 
       data a1,b1,a2,b2,c1/0.92,16.6,0.74,10.1,0.08/
       data e1/1.8/,e2/1.33/
@@ -3484,8 +3487,9 @@
           gg(i,j,1) = (15.8*cbcnst)**(2./3.)*utau2
           ! surface length scale following Stacey (1999).
           l0(i,j) = surfl*utau2/grav
-          uf(i,j,km)=sqrt( (.5*(wubot(i,j)+wubot(i+1,j)) )**2
-     $                   + (.5*(wvbot(i,j)+wvbot(i,j+1)) )**2 )*const1
+          uf(i,j,kb(i,j)) = sqrt( (.5*(wubot(i,j)+wubot(i+1,j)) )**2
+     &                          + (.5*(wvbot(i,j)+wvbot(i,j+1)) )**2 )
+     &                     *const1
         end do
       end do
       call exchange2d_mpi(ee(:,:,1),im,jm)
@@ -3502,8 +3506,9 @@
             p = -grav*rhoref*zzf(i,j,k)*1.e-4_rk
             cc(i,j,k) = 1449.1  _rk       +  .00821_rk*p + 4.55_rk*tp
      $                -     .045_rk*tp**2 + 1.34   _rk*(sp-35._rk)
-            cc(i,j,k) = cc(i,j,k)/sqrt( (1.-.01642*p/cc(i,j,k))
-     $                                 *(1.-.40   *p/cc(i,j,k)**2) )
+            cc(i,j,k) = cc(i,j,k)
+     &                 /sqrt( ( 1._rk - .01642_rk*p/cc(i,j,k)    )
+     &                       *( 1._rk - .40   _rk*p/cc(i,j,k)**2 ) )
           end do
         end do
       end do
@@ -3517,7 +3522,8 @@
             boygr(i,j,k) = grav*( rho(i,j,k-1) - rho(i,j,k) )
      $                         /dzzf(i,j,k-1)
          ! note: comment out next line if dens does not include pressure
-     $                   + (grav**2)*2./(cc(i,j,k-1)**2+cc(i,j,k)**2)
+     $                   + (grav**2)*2.*rhoref*1.e-3
+     &                                 /(cc(i,j,k-1)**2+cc(i,j,k)**2)
           end do
         end do
       end do
@@ -3528,7 +3534,7 @@
 !            l(i,j,k)=abs(q2lb(i,j,k)/q2b(i,j,k))
 ! ayumi 2010/4/12
             l(i,j,k) = abs(q2lb(i,j,k)/(q2b(i,j,k)+small))*fsm(i,j,k-1)
-            if ( z(i,j,k) > -.5 ) l(i,j,k) = max(l(i,j,k),kappa*l0(i,j)) ! FIXME: WTH? Since z is now actual depth in meters, this shouldn't be -.5
+            !if ( z(i,j,k) > -.5 ) l(i,j,k) = max(l(i,j,k),kappa*l0(i,j)) ! FIXME: WTH? Since z is now actual depth in meters, this shouldn't be -.5
 !            gh(i,j,k)=(l(i,j,k)**2)*boygr(i,j,k)/q2b(i,j,k)
 ! ayumi 2010/4/12
             gh(i,j,k) = (l(i,j,k)**2)*boygr(i,j,k)
@@ -3580,6 +3586,8 @@
 !           if(gh(i,j,k).lt.ghc) stf(i,j,k)=0.1e0
             dtef(i,j,k) = sqrt(abs(q2b(i,j,k)))*stf(i,j,k)
      $                                         /(b1*l(i,j,k)+small)
+            dtef(i,j,k) = q2b(i,j,k)*sqrt(abs(q2b(i,j,k)))*stf(i,j,k)
+     &                              /(b1*q2lb(i,j,k)+small) ! FIXME: ???
           end do
         end do
       end do
@@ -3587,10 +3595,10 @@
       do k = 2, kmm1
         do j = 1, jm
           do i = 1, im
-            gg(i,j,k) = 1./( a(i,j,k) + c(i,j,k)*(1.-ee(i,j,k-1))
-     $                     - (2.*dti2*dtef(i,j,k)+1.) )
+            gg(i,j,k) = 1./( a(i,j,k) + c(i,j,k)*(1._rk-ee(i,j,k-1))
+     $                     - (2._rk*dti2*dtef(i,j,k)+1._rk) )
             ee(i,j,k) = a(i,j,k)*gg(i,j,k)*fsm(i,j,k-1)
-            gg(i,j,k) = ( -2.*dti2*prod(i,j,k) + c(i,j,k)*gg(i,j,k-1)
+            gg(i,j,k) = ( -2._rk*dti2*prod(i,j,k) + c(i,j,k)*gg(i,j,k-1)
      $                  - uf(i,j,k) )*gg(i,j,k)*fsm(i,j,k)
           end do
         end do
@@ -3611,20 +3619,21 @@
           vf(i,j,      1) = 0.
           vf(i,j,kb(i,j)) = 0.
           ee(i,j,      2) = 0.
-          gg(i,j,        2) = -kappa*z(i,j,2)*q2(i,j,2)
+          gg(i,j,        2) = -kappa*z(i,j,2)*q2(i,j,2) ! FIXME: What should be here for `z`?
           vf(i,j,kb(i,j)-1) =  kappa*(1.+z(i,j,kb(i,j)-1))
      &                              *q2(i,j,kb(i,j)-1)
         end do
       end do
-      do k = 2, kmm1
-        do j = 1, jm
-          do i = 1, im
+
+      do j = 1, jm
+        do i = 1, im
+          do k = 2, kb(i,j)-1
             dtef(i,j,k) = dtef(i,j,k)
-     &                   *( 1. + e2*( ( 1./abs( zf(i,j,k)
-     &                                        - zf(i,j,1) )
-     &                                + 1./abs( zf(i,j,k)
-     &                                        - zf(i,j,kb(i,j)) )
-     &                                )*l(i,j,k)/kappa )**2 )
+     &                   *( 1._rk + e2*( ( 1._rk/abs( zf(i,j,k      )
+     &                                              - zf(i,j,      1) )
+     &                                   + 1._rk/abs( zf(i,j,k      )
+     &                                              - zf(i,j,kb(i,j)) )
+     &                                   )*l(i,j,k)/kappa )**2 )
           end do
         end do
       end do
@@ -3633,7 +3642,7 @@
           do i = 1, im
             gg(i,j,k) = 1./( a(i,j,k) + c(i,j,k)*(1.-ee(i,j,k-1))
      $                                - ( dti2*dtef(i,j,k)+1. ) )
-            ee(i,j,k) = a(i,j,k)*gg (i,j,k)
+            ee(i,j,k) = a(i,j,k)*gg (i,j,k)*fsm(i,j,k-1)
             gg(i,j,k) = gg(i,j,k)*fsm(i,j,k-1)
      &                 *( dti2*(-prod(i,j,k)*l(i,j,k)*e1)
      &                  + c(i,j,k)*gg(i,j,k-1)-vf(i,j,k) )
@@ -3800,6 +3809,7 @@
       rad = 0.
 
       if ( nbc == 2 .or. nbc == 4 ) then
+        print *, ">>>", minval(zf), maxval(zf)
         do k = 1, kmm1
           do j = 1, jm
             do i = 1, im
@@ -3934,7 +3944,7 @@
 
       do k = 2, kmm1
         do j = 1, jm
-          do i = 1, im
+          do i = 2, im
             a(i,j,k-1) = -dti2*4._rk*( c(i,j,k) + umol )
      &                        /( ( dzf (i,j,k-1) + dzf (i-1,j,k-1) )
      &                          *( dzzf(i,j,k-1) + dzzf(i-1,j,k-1) ) )
@@ -3945,8 +3955,11 @@
         end do
       end do
 
+      call exchange3d_mpi(a(:,:,1:kmm2),im,jm,kmm2)   ! FIXME: Needed?
+      call exchange3d_mpi(c(:,:,2:kmm1),im,jm,kmm2)
+
       do j = 1, jm
-        do i = 1, im
+        do i = 2, im
           ee(i,j,1) = a(i,j,1)/(a(i,j,1)-1._rk)
           gg(i,j,1) = ( -dti2*wusurf(i,j)*2._rk
      &                       /(dzf(i,j,1)+dzf(i-1,j,1))
@@ -3957,7 +3970,7 @@
 
       do k = 2, kmm2
         do j = 1, jm
-          do i = 1, im
+          do i = 2, im
             gg(i,j,k) = 1._rk/( a(i,j,k)
      &                        + c(i,j,k)*( 1._rk-ee(i,j,k-1) ) - 1._rk )
             ee(i,j,k) = a(i,j,k)*gg(i,j,k)*dum(i,j,k)
@@ -3999,7 +4012,7 @@
 
       do j = 2, jmm1
         do i = 2, imm1
-          wubot(i,j) = -tps(i,j)*uf(i,j,kb(i,j)-1)*dum(i,j,k)
+          wubot(i,j) = -tps(i,j)*uf(i,j,kb(i,j)-1)
         end do
       end do
       call exchange2d_mpi(wubot,im,jm)
@@ -4047,7 +4060,7 @@
       end do
 
       do k = 2, kmm1
-        do j = 1, jm
+        do j = 2, jm
           do i = 1, im
             a(i,j,k-1) = -dti2*4._rk*( c(i,j,k) + umol )
      &                        /( ( dzf (i,j,k-1) + dzf (i,j-1,k-1) )
@@ -4059,7 +4072,10 @@
         end do
       end do
 
-      do j = 1, jm
+      call exchange3d_mpi(a(:,:,1:kmm2),im,jm,kmm2)   ! FIXME: Needed?
+      call exchange3d_mpi(c(:,:,2:kmm1),im,jm,kmm2)
+
+      do j = 2, jm
         do i = 1, im
           ee(i,j,1) = a(i,j,1)/(a(i,j,1)-1._rk)
           gg(i,j,1) = ( dti2*2._rk*wvsurf(i,j)

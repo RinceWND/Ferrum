@@ -26,6 +26,7 @@
 !______________________________________________________________________
 !
         use config   , only: spinup, use_ice
+        use grid     , only: update_vcoord
         use model_run, only: iext, isplit
      &                     , update_time
         use seaice
@@ -52,6 +53,9 @@
           call check_nan_2d  !fhx:tide:debug
 !          if (use_ice) call ice_advance
         end do
+
+! refresh vertical coordinates
+        call update_vcoord
 
 ! internal (3-D) mode calculation
         call mode_internal
@@ -152,7 +156,7 @@
 !            pgscheme       [advance.f]
 !______________________________________________________________________
 !
-      use config     , only: aam_init, horcon, mode, n1d, npg
+      use config     , only: aam_init, horcon, mode, n1d, npg, rk
       use bry        , only: aamfrz, USE_SPONGE
       use glob_const , only: MODE_BAROTROPIC
       use glob_domain, only: im, imm1, jm, jmm1, kmm1
@@ -183,20 +187,24 @@
         if ( n1d /= 0 ) then
           aam(:,:,:) = aam_init
         else
-          do k=1,kmm1
-            do j=2,jmm1
-              do i=2,imm1
+          do k = 1, kmm1
+            do j = 2, jmm1
+              do i = 2, imm1
                 aam(i,j,k) = horcon*dx(i,j)*dy(i,j)*aamfac(i,j)       !fhx:incmix
-     $                    *sqrt( ((u(i+1,j,k)-u(i,j,k))/dx(i,j))**2
-     $                          +((v(i,j+1,k)-v(i,j,k))/dy(i,j))**2
-     $                    +.5*( .25*(u(i,j+1,k)+u(i+1,j+1,k)
-     $                              -u(i,j-1,k)-u(i+1,j-1,k))
-     $                              /dy(i,j)
-     $                         +.25*(v(i+1,j,k)+v(i+1,j+1,k)
-     $                              -v(i-1,j,k)-v(i-1,j+1,k))
-     $                              /dx(i,j) )**2)
+     &                      *sqrt( ( (u(i+1,j,k)-u(i,j,k))/dx(i,j) )**2
+     &                           + ( (v(i,j+1,k)-v(i,j,k))/dy(i,j) )**2
+     &                           +.5_rk*( .25_rk*( u(i  ,j+1,k)
+     &                                           + u(i+1,j+1,k)
+     &                                           - u(i  ,j-1,k)
+     &                                           - u(i+1,j-1,k) )
+     &                                          /dy(i,j)
+     &                                  + .25_rk*( v(i+1,j  ,k)
+     &                                           + v(i+1,j+1,k)
+     &                                           - v(i-1,j  ,k)
+     &                                           - v(i-1,j+1,k) )
+     &                                          /dx(i,j) )**2 )
                 if ( USE_SPONGE ) then
-                  aam(i,j,k) = aam(i,j,k)*(1.+aamfrz(i,j))
+                  aam(i,j,k) = aam(i,j,k)*( 1._rk + aamfrz(i,j) )
                 end if
               end do
             end do
@@ -235,8 +243,11 @@
       use config     , only: mode
       use glob_const , only: MODE_BAROTROPIC
       use glob_domain, only: im, jm, kmm1
-      use grid       , only: dz
-      use glob_ocean
+      use grid       , only: dz, fsm, h
+      use glob_ocean , only: aam  , aam2d, advua, advva, advx , advy
+     &                     , adx2d, ady2d, d    , drhox, drhoy, drx2d
+     &                     , dry2d, egf  , el   , et   , tps  , ua
+     &                     , utf  , va   , vtf
       use model_run  , only: isp2i, ispi
 
       implicit none
@@ -254,13 +265,14 @@
 
         do k = 1, kmm1
 
-          adx2d = adx2d +  advx(:,:,k)*dz(:,:,k)
-          ady2d = ady2d +  advy(:,:,k)*dz(:,:,k)
-          drx2d = drx2d + drhox(:,:,k)*dz(:,:,k)
-          dry2d = dry2d + drhoy(:,:,k)*dz(:,:,k)
-          aam2d = aam2d +   aam(:,:,k)*dz(:,:,k)
+          adx2d = adx2d +  advx(:,:,k)
+          ady2d = ady2d +  advy(:,:,k)
+          drx2d = drx2d + drhox(:,:,k)
+          dry2d = dry2d + drhoy(:,:,k)
+          aam2d = aam2d +   aam(:,:,k)*dz(:,:,k)*fsm(:,:,k)
 
         end do
+        aam2d = aam2d/( h + et )
 
         call advave(tps)
 
@@ -271,14 +283,14 @@
 
       egf = el*ispi
 
-      do j=1,jm
-        do i=2,im
-          utf(i,j)=ua(i,j)*(d(i,j)+d(i-1,j))*isp2i
+      do j = 1, jm
+        do i = 2, im
+          utf(i,j) = ua(i,j)*( d(i,j) + d(i-1,j) )*isp2i
         end do
       end do
-      do j=2,jm
-        do i=1,im
-          vtf(i,j)=va(i,j)*(d(i,j)+d(i,j-1))*isp2i
+      do j = 2, jm
+        do i = 1, im
+          vtf(i,j) = va(i,j)*( d(i,j) + d(i,j-1) )*isp2i
         end do
       end do
 
@@ -306,7 +318,8 @@
      &                     , use_tide, z0b
       use glob_const , only: grav, Kappa
       use glob_domain, only: im, imm1, jm, jmm1, kmm1   , my_task
-      use grid       , only: art, aru, arv, cor, dx, dy, fsm, h, kb, zz
+      use grid       , only: art, aru, arv, cor, dx, dy, dzb, fsm, h, kb
+     &                     , zz
       use glob_ocean
       use tide       , only: tide_ua, tide_va, tide_advance => step
       use model_run  , only: dte, dte2, iext, isp2i, ispi, isplit,dtime
@@ -317,25 +330,30 @@
       integer i,j
 
 
-      do j=2,jm
-        do i=2,im
-          fluxua(i,j)=.25*( d(i,j)+ d(i-1,j))
-     $                   *(dy(i,j)+dy(i-1,j))*ua(i,j)
-          fluxva(i,j)=.25*( d(i,j)+ d(i,j-1))
-     $                   *(dx(i,j)+dx(i,j-1))*va(i,j)
+      do j = 2, jm
+        do i = 2, im
+          fluxua(i,j) = .25_rk*(  d(i,j) +  d(i-1,j) )
+     &                        *( dy(i,j) + dy(i-1,j) )*ua(i,j)
+          fluxva(i,j) = .25_rk*(  d(i,j) +  d(i,j-1) )
+     &                        *( dx(i,j) + dx(i,j-1) )*va(i,j)
         end do
       end do
 
 ! NOTE addition of surface freshwater flux, w(i,j,1)=vflux, compared
 ! with pom98.f. See also modifications to subroutine vertvl
-      do j=2,jmm1
-        do i=2,imm1
-          elf(i,j)=elb(i,j)
-     $              +dte2*(-(fluxua(i+1,j)-fluxua(i,j)
-     $                      +fluxva(i,j+1)-fluxva(i,j))/art(i,j)
-     $                      -vfluxf(i,j))
+      do j = 2, jmm1
+        do i = 2, imm1
+          elf(i,j) = elb(i,j)
+     &             - dte2*( fluxua(i+1,j  ) - fluxua(i,j)
+     &                    + fluxva(i  ,j+1) - fluxva(i,j) )/art(i,j)
+     &             - vfluxf(i,j)
         end do
       end do
+!      print *, "!!!elf: ", elf(186,17), elb(186,17)
+!      print *, "!!!flu: ", fluxua(186,17), fluxua(187,17)
+!      print *, "!!!flv: ", fluxva(186,17), fluxva(186,18)
+!      print *, "!!!art: ", art(186,17)
+!      print *, "!!!flz: ", vfluxf(186,17)
 
       call bc_zeta ! bcond(1)
 
@@ -343,57 +361,66 @@
 
       if ( mod(iext,ispadv) == 0 ) call advave(tps)
 
-      do j=2,jmm1
-        do i=2,im
+!      print *, "===", minval(uaf), maxval(uaf), minval(vaf), maxval(vaf)
+
+      do j = 2, jmm1
+        do i = 2, im
           uaf(i,j) = adx2d(i,j) + advua(i,j)
-     $             - aru(i,j)*.25_rk
-     $              *( cor(i  ,j)*d(i  ,j)*(va(i  ,j+1)+va(i  ,j))
-     $               + cor(i-1,j)*d(i-1,j)*(va(i-1,j+1)+va(i-1,j)) )
-     $             + .25_rk*grav*(dy(i,j)+dy(i-1,j))
-     $                          *(d (i,j)+d (i-1,j))
-     $              *( (1._rk - 2._rk*alpha)*(el (i,j)-el (i-1,j))
-     $                +               alpha *(elb(i,j)-elb(i-1,j)
-     $                                       +elf(i,j)-elf(i-1,j))
-     $                + (e_atmos(i,j)-e_atmos(i-1,j)) )
-     $             + drx2d(i,j) + aru(i,j)*(wusurf(i,j)-wubot(i,j))
+     &             - aru(i,j)*.25_rk
+     &              *( cor(i  ,j)*d(i  ,j)*(va(i  ,j+1)+va(i  ,j))
+     &               + cor(i-1,j)*d(i-1,j)*(va(i-1,j+1)+va(i-1,j)) )
+     &             + .25_rk*grav*(dy(i,j)+dy(i-1,j))
+     &                          *(d (i,j)+d (i-1,j))
+     &              *( (1._rk - 2._rk*alpha)*(el (i,j)-el (i-1,j))
+     &               +                alpha *(elb(i,j)-elb(i-1,j)
+     &                                       +elf(i,j)-elf(i-1,j))
+     &               + (e_atmos(i,j)-e_atmos(i-1,j)) )
+     &             + drx2d(i,j) + aru(i,j)*(wusurf(i,j)-wubot(i,j))
         end do
       end do
 
-      do j=2,jmm1
-        do i=2,im
-          uaf(i,j) = ( (h(i,j)+elb(i,j)+h(i-1,j)+elb(i-1,j))
-     $                * aru(i,j)*uab(i,j)
-     $               - 4._rk*dte*uaf(i,j) )
-     $               /((h(i,j)+elf(i,j)+h(i-1,j)+elf(i-1,j))
-     $                 *aru(i,j))
+!      print *, "=+=", maxval(abs(adx2d)), maxval(abs(advua))
+!     &       , maxval(abs(va)), maxval(abs(d)), maxval(abs(el))
+!     &       , maxval(abs(elb)), maxval(abs(elf)), maxval(abs(e_atmos))
+!     &       , maxval(abs(drx2d)), maxval(abs(wusurf))
+!     &       , maxval(abs(wubot))
+
+      do j = 2, jmm1
+        do i = 2, im
+          uaf(i,j) = ( ( h(i,j) + elb(i,j) + h(i-1,j) + elb(i-1,j) )
+     &                *aru(i,j)*uab(i,j)
+     &               - 4._rk*dte*uaf(i,j) )
+     &              /( ( h(i,j) + elf(i,j) + h(i-1,j) + elf(i-1,j) )
+     &                *aru(i,j) )
         end do
       end do
 
-      do j=2,jm
-        do i=2,imm1
+      do j = 2, jm
+        do i = 2, imm1
           vaf(i,j) = ady2d(i,j) + advva(i,j)
-     $             + arv(i,j)*.25_rk
-     $              *( cor(i,j  )*d(i,j  )*(ua(i+1,j  )+ua(i,j  ))
-     $               + cor(i,j-1)*d(i,j-1)*(ua(i+1,j-1)+ua(i,j-1)) )
-     $             + .25_rk*grav*(dx(i,j)+dx(i,j-1))
-     $                          *(d (i,j)+d (i,j-1))
-     $              *( (1._rk - 2._rk*alpha)*(el (i,j)-el (i,j-1))
-     $                +               alpha *(elb(i,j)-elb(i,j-1)
-     $                                       +elf(i,j)-elf(i,j-1))
-     $                + (e_atmos(i,j)-e_atmos(i,j-1)) )
-     $             + dry2d(i,j) + arv(i,j)*(wvsurf(i,j)-wvbot(i,j))
+     &             + arv(i,j)*.25_rk
+     &              *( cor(i,j  )*d(i,j  )*(ua(i+1,j  )+ua(i,j  ))
+     &               + cor(i,j-1)*d(i,j-1)*(ua(i+1,j-1)+ua(i,j-1)) )
+     &             + .25_rk*grav*(dx(i,j)+dx(i,j-1))
+     &                          *(d (i,j)+d (i,j-1))
+     &              *( (1._rk - 2._rk*alpha)*(el (i,j)-el (i,j-1))
+     &               +                alpha *(elb(i,j)-elb(i,j-1)
+     &                                       +elf(i,j)-elf(i,j-1))
+     &               + (e_atmos(i,j)-e_atmos(i,j-1)) )
+     &             + dry2d(i,j) + arv(i,j)*(wvsurf(i,j)-wvbot(i,j))
         end do
       end do
 
-      do j=2,jm
-        do i=2,imm1
-          vaf(i,j) = ( (h(i,j)+elb(i,j)+h(i,j-1)+elb(i,j-1))
-     $                * vab(i,j)*arv(i,j)
-     $               - 4._rk*dte*vaf(i,j) )
-     $               /((h(i,j)+elf(i,j)+h(i,j-1)+elf(i,j-1))
-     $                 *arv(i,j))
+      do j = 2, jm
+        do i = 2, imm1
+          vaf(i,j) = ( ( h(i,j) + elb(i,j) + h(i,j-1) + elb(i,j-1) )
+     &                *vab(i,j)*arv(i,j)
+     &               - 4._rk*dte*vaf(i,j) )
+     &              /( ( h(i,j) + elf(i,j) + h(i,j-1) + elf(i,j-1) )
+     &                *arv(i,j) )
         end do
       end do
+!      print *, "==>", minval(uaf), maxval(uaf), minval(vaf), maxval(vaf)
 
       if ( use_tide ) call tide_advance( dtime ) ! update tide boundaries before applying boundary conditions
 
@@ -425,11 +452,13 @@
         etf = ( etf + .5*elf )*fsm(:,:,1)
 
       end if
+!!!      print *, "===", minval(uaf), maxval(uaf), minval(elf), maxval(elf)
 
 ! apply filter to remove time split
-      ua = ua + .5*smoth*( uab + uaf - 2.*ua )
-      va = va + .5*smoth*( vab + vaf - 2.*va )
-      el = el + .5*smoth*( elb + elf - 2.*el )
+      ua = ua + .5_rk*smoth*( uab + uaf - 2._rk*ua )
+      va = va + .5_rk*smoth*( vab + vaf - 2._rk*va )
+      el = el + .5_rk*smoth*( elb + elf - 2._rk*el )
+!!!      print *, "==>", minval(uaf), maxval(uaf), minval(elf), maxval(elf)
       ! if (iint>2) then
       ! print *, iint,"=",my_task, ": UA : ", maxval(abs(va))
       ! print *, iint,"=",my_task, ": UAB: ", maxval(abs(vab))
@@ -447,11 +476,15 @@
       va  = vaf
 
 ! update bottom friction
-      do j=1,jm
-        do i=1,im
-          cbc(i,j)=(Kappa/log((.1+(d(i,j)-zz(i,j,kb(i,j)-1)))/z0b))**2
-          cbc(i,j)=max(cbcmin,cbc(i,j))
-          cbc(i,j)=min(cbcmax,cbc(i,j))
+      !rewind( 50+my_task )
+!      write( *, *) "186;17;",dzb(186,17,kb(186,17)-1)
+      do j = 1, jm
+        do i = 1, im
+          cbc(i,j) = ( Kappa/log( ( .1_rk
+     &                            + ( .5_rk*dzb(i,j,kb(i,j)-1) ) )
+     &                           /z0b ) )**2
+          cbc(i,j) = max(cbcmin,cbc(i,j))
+          cbc(i,j) = min(cbcmax,cbc(i,j))
         end do
       end do
 
@@ -459,14 +492,14 @@
 
         egf = egf + el*ispi
 
-        do j=1,jm
-          do i=2,im
-            utf(i,j)=utf(i,j)+ua(i,j)*(d(i,j)+d(i-1,j))*isp2i
+        do j = 1, jm
+          do i = 2, im
+            utf(i,j) = utf(i,j) + ua(i,j)*( d(i,j) + d(i-1,j) )*isp2i
           end do
         end do
-        do j=2,jm
-          do i=1,im
-            vtf(i,j)=vtf(i,j)+va(i,j)*(d(i,j)+d(i,j-1))*isp2i
+        do j = 2, jm
+          do i = 1, im
+            vtf(i,j) = vtf(i,j) + va(i,j)*( d(i,j) + d(i,j-1) )*isp2i
           end do
         end do
 
@@ -501,68 +534,74 @@
       use air        , only: vfluxb, vfluxf, wssurf, wtsurf
       use bry        , only: bc_ts, bc_turb, bc_vel_int, bc_vel_vert
       use clim       , only: tclim, sclim, relax_to_clim
-      use glob_const , only: rk, small
+      use glob_const , only: MODE_BAROTROPIC, MODE_DIAGNOSTIC, rk, small
       use config     , only: mode , nadv, nbcs, nbct, do_restart
      &                     , smoth, s_hi, s_lo, t_hi, t_lo
       use glob_domain
-      use grid       , only: dz, h  ,fsm
+      use grid       , only: dum, dvm, dz, dzb, dzf, h
       use glob_ocean
       use model_run
 
       implicit none
 
-      integer i,j,k
+      real(rk), dimension(im,jm) :: col
+      real(rk)                      col_h
+      integer                       i,j,k
 
 
-      if ( mode /= 2 ) then
+      if ( mode /= MODE_BAROTROPIC ) then
       if ( ( iint>2 .and. .not.do_restart )
      &               .or.      do_restart ) then
 
 ! adjust u(z) and v(z) such that depth average of (u,v) = (ua,va)
         tps = 0.
+        col = 0.
 
-        do k=1,kmm1
-          do j=1,jm
-            do i=1,im
-              tps(i,j)=tps(i,j)+u(i,j,k)*dz(i,j,k)
+        do k = 1, kmm1
+          do j = 1, jm
+            do i = 2, im
+              col_h = .5_rk*( dz(i,j,k) + dz(i-1,j,k) )*dum(i,j,k)
+              col(i,j) = col(i,j) + col_h
+              tps(i,j) = tps(i,j) + u(i,j,k)*col_h
             end do
           end do
         end do
 
-        do k=1,kmm1
-          do j=1,jm
-            u(1,j,k) = .5*( u(1,j,k) - tps(1,j) )
-     &               +    ( utb(1,j) + utf(1,j) )/dt(1,j)
-            do i=2,im
-              u(i,j,k)=(u(i,j,k)-tps(i,j))+
-     $                 (utb(i,j)+utf(i,j))/(dt(i,j)+dt(i-1,j))
+        do k = 1, kmm1
+          do j = 1, jm
+            do i = 2, im
+              if ( dum(i,j,1) > 0._rk ) then
+                u(i,j,k) = u(i,j,k)
+     &                   + ( .5_rk*( utb(i,j) + utf(i,j) ) - tps(i,j) )
+     &                    /col(i,j)
+              end if
+              u(i,j,k) = u(i,j,k)*dum(i,j,k)
             end do
           end do
         end do
 
-        do j=1,jm
-          do i=1,im
-            tps(i,j)=0.
-          end do
-        end do
+        tps = 0.
+        col = 0.
 
-        do k=1,kmm1
-          do j=1,jm
-            do i=1,im
-              tps(i,j)=tps(i,j)+v(i,j,k)*dz(i,j,k)
+        do k = 1, kmm1
+          do j = 2, jm
+            do i = 1, im
+              col_h = .5_rk*( dz(i,j,k) + dz(i,j-1,k) )*dvm(i,j,k)
+              col(i,j) = col(i,j) + col_h
+              tps(i,j) = tps(i,j) + v(i,j,k)*col_h
             end do
           end do
         end do
 
-        do k=1,kmm1
-          do i=1,im
-            v(i,1,k) = .5*( v(i,1,k) - tps(i,1) )
-     &               +    ( vtb(i,1) + vtf(i,1) )/dt(i,1)
-          end do
-          do j=2,jm
-            do i=1,im
-              v(i,j,k)=(v(i,j,k)-tps(i,j))+
-     $                 (vtb(i,j)+vtf(i,j))/(dt(i,j)+dt(i,j-1))
+        do k = 1, kmm1
+          do j = 2, jm
+            do i = 1, im
+              if ( dvm(i,j,1) > 0._rk ) then
+                v(i,j,k) = v(i,j,k)
+     &                   + ( .5_rk*( vtb(i,j) + vtf(i,j) ) - tps(i,j) )
+     &                    /col(i,j)
+              end if
+              v(i,j,k) = v(i,j,k)*dvm(i,j,k)
             end do
           end do
         end do
@@ -596,16 +635,16 @@
         call profq(a,c,tps,dtef)
 
 ! an attempt to prevent underflow (DEBUG)
-        where(q2l.lt..5*small) q2l = .5*small
-        where(q2lb.lt..5*small) q2lb = .5*small
+        where ( q2l  < .5_rk*small ) q2l  = .5_rk*small
+        where ( q2lb < .5_rk*small ) q2lb = .5_rk*small
 
         call bc_turb ! bcond(6)
 
         call exchange3d_mpi(uf(:,:,2:kmm1),im,jm,kmm2)
         call exchange3d_mpi(vf(:,:,2:kmm1),im,jm,kmm2)
 
-        q2  = q2  + .5*smoth*( q2b  -2.*q2  + uf )
-        q2l = q2l + .5*smoth*( q2lb -2.*q2l + vf )
+        q2  = q2  + .5_rk*smoth*( q2b  + uf -2._rk*q2  )
+        q2l = q2l + .5_rk*smoth*( q2lb + vf -2._rk*q2l )
         q2b = q2
         q2  = uf
         q2lb= q2l
@@ -614,7 +653,7 @@
 
 ! calculate tf and sf using uf, vf, a and c as temporary variables
 !        if( mode /= 4 .and. ( iint > 2 .or. do_restart ) ) then
-        if( mode /= 4 ) then
+        if( mode /= MODE_DIAGNOSTIC ) then
 
           if     ( nadv == 1 ) then
 
@@ -632,10 +671,14 @@
             print *, '(/''Error: invalid value for nadv'')'
 
           end if
+          print *, "=3>", maxval(abs(tb)), maxval(abs(t))
+     &     , maxval(abs(uf))
 
 
           call proft(uf,wtsurf,tsurf,nbct,tps)
           call proft(vf,wssurf,ssurf,nbcs,tps)
+          print *, "=4>", maxval(abs(tb)), maxval(abs(t))
+     &     , maxval(abs(uf))
 
 
           if ( t_lo > -999. ) then
@@ -653,14 +696,20 @@
           end if
 
           call relax_to_clim( uf, vf )
+          print *, "=5>", maxval(abs(tb)), maxval(abs(t))
+     &     , maxval(abs(uf))
 
           call bc_ts ! bcond(4)
 
           call exchange3d_mpi(uf(:,:,1:kmm1),im,jm,kmm1)
           call exchange3d_mpi(vf(:,:,1:kmm1),im,jm,kmm1)
 
-          t = t + .5*smoth*( tb + uf -2.*t )
-          s = s + .5*smoth*( sb + vf -2.*s )
+          where ( dz > 0. )
+            t = t + .5_rk*smoth*( dzb*tb + dzf*uf -2._rk*dz*t )/dz
+            s = s + .5_rk*smoth*( dzb*sb + dzf*vf -2._rk*dz*s )/dz
+          end where
+          print *, "=6>", maxval(abs(tb)), maxval(abs(t))
+     &     , maxval(abs(uf))
           tb = t
           t  = uf
           sb = s
@@ -683,42 +732,52 @@
 
         tps = 0.
 
-        do k=1,kmm1
-          do j=1,jm
-            do i=1,im
-              tps(i,j)=tps(i,j)
-     $              +(uf(i,j,k)+ub(i,j,k)-2.*u(i,j,k))*dz(i,j,k)
+        do k = 1, kmm1
+          do j = 1, jm
+            do i = 2, im
+              tps(i,j) = tps(i,j)
+     &                 + ( uf(i,j,k) + ub(i,j,k) -2._rk*u(i,j,k) )
+     &                  *( dz(i,j,k) + dz(i-1,j,k) )*dum(i,j,k)
             end do
           end do
         end do
 
-        do k=1,kmm1
-          do j=1,jm
-            do i=1,im
-              u(i,j,k)=u(i,j,k)
-     $                  +.5*smoth*(uf(i,j,k)+ub(i,j,k)
-     $                               -2.*u(i,j,k)-tps(i,j))
+        tps(2:im,1:jm) = tps(2:im,1:jm)
+     &                  /( h(2:im  ,1:jm) + et(2:im  ,1:jm)
+     &                   + h(1:imm1,1:jm) + et(1:imm1,1:jm) )
+
+        do k = 1, kmm1
+          do j = 1, jm
+            do i = 2, im
+              u(i,j,k) = u(i,j,k)
+     &                 + .5_rk*smoth*( uf(i,j,k) + ub(i,j,k)
+     &                               - 2._rk*u(i,j,k) - tps(i,j) )
             end do
           end do
         end do
 
         tps = 0.
 
-        do k=1,kmm1
-          do j=1,jm
-            do i=1,im
-              tps(i,j)=tps(i,j)
-     $              +(vf(i,j,k)+vb(i,j,k)-2.*v(i,j,k))*dz(i,j,k)
+        do k = 1, kmm1
+          do j = 2, jm
+            do i = 1, im
+              tps(i,j) = tps(i,j)
+     &                 + ( vf(i,j,k) + vb(i,j,k) - 2._rk*v(i,j,k) )
+     &                  *( dz(i,j,k) + dz(i,j-1,k) )*dvm(i,j,k)
             end do
           end do
         end do
 
-        do k=1,kmm1
-          do j=1,jm
-            do i=1,im
-              v(i,j,k)=v(i,j,k)
-     $                  +.5*smoth*(vf(i,j,k)+vb(i,j,k)
-     $                               -2.*v(i,j,k)-tps(i,j))
+        tps(1:im,2:jm) = tps(1:im,2:jm)
+     &                  /( h(1:im,2:jm  ) + et(1:im,2:jm  )
+     &                   + h(1:im,1:jmm1) + et(1:im,1:jmm1) )
+
+        do k = 1, kmm1
+          do j = 1, jm
+            do i = 1, im
+              v(i,j,k) = v(i,j,k)
+     &                 + .5_rk*smoth*( vf(i,j,k) + vb(i,j,k)
+     &                               - 2._rk*v(i,j,k) - tps(i,j) )
             end do
           end do
         end do
@@ -740,6 +799,9 @@
       utb = utf
       vtb = vtf
       vfluxb = vfluxf
+
+      dzb = dz
+      dz  = dzf
 
 
       end ! subroutine mode_internal
@@ -894,6 +956,8 @@
      &        , "mean ; et = ", elev_ave, " m, tb = "
      &        , temp_ave + tbias, " deg, sb = "
      &        , salt_ave + sbias, " psu"
+
+          call findpsi
 
         end if
 
@@ -1318,3 +1382,59 @@
 
 
       end ! subroutine pgscheme
+!
+!______________________________________________________________________
+!
+      subroutine findpsi
+!----------------------------------------------------------------------
+!  Calculates the stream function, first assuming zero on the southern
+! boundary and then, using the values on the western boundary,
+! the stream function is calculated again. If the elevation field
+! is near steady state, the two calculations should agree;
+! otherwise not.
+!  TODO: Modify for MPI
+!----------------------------------------------------------------------
+! called by: TODO: fill in
+!
+! calls    : TODO: fiil in
+!______________________________________________________________________
+!
+      use glob_const , only: rk
+      use glob_domain, only: im, imm1, jm, jmm1
+      use grid       , only: dx, dy
+      use glob_ocean , only: d, uab, vab
+
+      implicit none
+
+      real(rk), dimension(im,jm) :: psi_u, psi_v
+      integer i, j
+
+
+      psi_u = 0.
+      psi_v = 0.
+
+! Sweep northward:
+      do j = 2, jmm1
+        do i = 2, im
+          psi_u(i,j+1) = psi_u(i,j)
+     &                 + .25_rk*uab(i,j)*(  d(i,j) +  d(i-1,j) )
+     &                                  *( dy(i,j) + dy(i-1,j) )
+        end do
+      end do
+
+! Sweep eastward:
+      do j = 2, jm
+        do i = 2, imm1
+          psi_v(i+1,j) = psi_v(i,j)
+     &                 - .25_rk*vab(i,j)*(  d(i,j) +  d(i,j-1) )
+     &                                  *( dx(i,j) + dx(i,j-1) )
+        end do
+      end do
+
+! Calculate the difference
+      psi_u = abs( psi_u - psi_v )
+
+      print *, "Streamfunction stability index: ", maxval(psi_u)
+
+
+      end subroutine findpsi

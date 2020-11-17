@@ -807,12 +807,11 @@ module air
         call wind_to_stress(  uwsrf,  vwsrf, gust(:,:,1)   &
                            , wusurf, wvsurf, 1           )
 
-        if ( .not.CALC_SWR ) then
-          swrad = ( 1. - a ) * srad(:,:,2) + a * srad(:,:,3)
-        end if
-
 ! Calculate surface fluxes
         if ( USE_BULK ) then
+          if ( .not.CALC_SWR ) then
+            swrad = ( 1. - a ) * srad(:,:,2) + a * srad(:,:,3)
+          end if
           call calculate_fluxes
         end if
 
@@ -849,7 +848,9 @@ module air
       if ( .false. ) call river_flux
 
 ! Relax surface to climatology
-      call relax_surface( wssurf, wtsurf, sss, sst )
+      if ( read_bulk ) then
+        call relax_surface( wssurf, wtsurf, sss, sst )
+      end if
 
 
     end ! subroutine step

@@ -85,9 +85,6 @@
 ! read laterel boundary conditions
        !call lateral_boundary_conditions !ayumi:20100407
 
-! read M2 tidal amplitude & phase
-        if ( use_tide ) call read_tide  ! TODO: move to initialize_modules?
-
       else
 
 ! read restart data from a previous run TODO: Shoul be in init module as a variation of read_initial
@@ -186,7 +183,7 @@
       use config     , only: initial_file
       use glob_const , only: rk
       use glob_domain
-      use grid       , only: dz, fsm
+      use grid       , only: dum, dvm, dz, fsm, h
       use io
       use mpi        , only: MPI_OFFSET_KIND
       use glob_ocean , only: elb, rho, s, sb, t, tb, uab, ub, vab, vb
@@ -202,11 +199,11 @@
       character(32) :: el_name, s_name, t_name, u_name, v_name
 
 
-      el_name = "elev"
+      el_name = "eclim_z"
        s_name = "mean_s" !"salt"
        t_name = "mean_t" !"temp"
-       u_name = "u"
-       v_name = "v"
+       u_name = "uclim_z"
+       v_name = "vclim_z"
       record = 1
 
 ! Initialize main parameters with "common" values
@@ -225,7 +222,9 @@
       call msg_print("", 6, "Read initial conditions:")
       file_id = file_open( trim(initial_file), NF90_NOWRITE )
       if ( .not.is_error(file_id) ) then
+        print *, trim(initial_file)
         status = var_read( file_id,  t_name,  tb, start, edge )
+        print *, "==", status, maxval(abs(tb))
         status = var_read( file_id,  s_name,  sb, start, edge )
         status = var_read( file_id,  u_name,  ub, start, edge )
         status = var_read( file_id,  v_name,  vb, start, edge )
@@ -240,9 +239,11 @@
       sb = sb * fsm
       tb = tb * fsm
       do k = 1, kmm1
-        uab(:,:)  = uab(:,:) + ub(:,:,k)*dz(:,:,k)
-        vab(:,:)  = vab(:,:) + vb(:,:,k)*dz(:,:,k)
+        uab(:,:)  = uab(:,:) + ub(:,:,k)*dz(:,:,k)*dum(:,:,k)
+        vab(:,:)  = vab(:,:) + vb(:,:,k)*dz(:,:,k)*dvm(:,:,k)
       end do
+      uab = uab/(h+elb)
+      vab = vab/(h+elb)
 
 ! Calculate initial density.
       call dens(sb,tb,rho)
@@ -265,7 +266,7 @@
       use mpi        , only: MPI_OFFSET_KIND
       use model_run  , only: time
       use glob_ocean
-      use pnetcdf    , only: NF90_NOWRITE
+      use pnetcdf    , only: nf90mpi_strerror, NF90_NOWRITE
 
       implicit none
 
@@ -596,7 +597,7 @@
 
 ! write static data
         start = [ i_global(1), j_global(1),  1, 1 ]
-        edge  = [  im        , jm         , kb, 1 ]
+        edge  = [  im        , jm         , km, 1 ]
         call var_write( file_id, "z"      , z      , start, edge )
         call var_write( file_id, "zz"     , zz     , start, edge )
         call var_write( file_id, "east_u" , east_u , start, edge )
@@ -692,7 +693,7 @@
 
         if ( mode /= MODE_BAROTROPIC ) then
           start(3:4) = [  1, record ]
-          edge (3:4) = [ kb,      1 ]
+          edge (3:4) = [ km,      1 ]
           if ( write_means ) then
             call var_write( file_id, "u"   , u_mean  , start, edge )
             call var_write( file_id, "v"   , v_mean  , start, edge )
@@ -917,7 +918,7 @@
 
 ! write static data
         start = [  1, 1,1,1 ]
-        edge  = [ kb, 1,1,1 ]
+        edge  = [ km, 1,1,1 ]
         call var_write( file_id, "z" , z , start, edge )
         call var_write( file_id, "zz", zz, start, edge )
 
@@ -1209,7 +1210,7 @@
 
 ! write data
         start = [ i_global(1), j_global(1),  1, 1 ]
-        edge  = [ im         , jm         , kb, 1 ]
+        edge  = [ im         , jm         , km, 1 ]
 
         if ( spinup ) then
           call var_write( file_id, "time", time0, start(4:4) )
@@ -1444,26 +1445,6 @@
 !
 !______________________________________________________________________
 !
-      subroutine read_tide
-!----------------------------------------------------------------------
-!fhx:tide:read tidal amplitude & phase at the eastern boundary for PROFS
-!______________________________________________________________________
-!
-        use glob_const , only: rk
-
-
-!      call read_tide_east_pnetcdf(ampe,phae)
-!        call read_tide_east_pnetcdf(ampe,phae,amue,phue)
-
-!      if(my_task.eq.0)print*,ampe(10,1),phae(10,1),amue(10,1),phue(10,1)
-!      if(my_task.eq.0)print*,ampe(10,2),phae(10,2),amue(10,2),phue(10,2)
-
-
-      end
-!fhx:tide:read_tide end
-!
-!______________________________________________________________________
-!
       subroutine update_initial
 !----------------------------------------------------------------------
 !  Updates the initial conditions and sets the remaining
@@ -1590,7 +1571,7 @@
       use config     , only: cbcmax, cbcmin, z0b
       use glob_const , only: Kappa, rk
       use glob_domain, only: im, jm, kmm1
-      use grid       , only: h, kb, zz
+      use grid       , only: h, kb, dzb
       use glob_ocean , only: cbc
 
       implicit none
@@ -1599,13 +1580,15 @@
 
 
 ! calculate bottom friction
-      do j=1,jm
-        do i=1,im
-          cbc(i,j)=(Kappa/log(1._rk+(h(i,j)+zz(i,j,kb(i,j)-1))/z0b))**2
-          cbc(i,j)=max(cbcmin,cbc(i,j))
+      do j = 1, jm
+        do i = 1, im
+          cbc(i,j) = ( Kappa/log( 1._rk
+     &                          + ( dzb(i,j,kb(i,j)-1) )/z0b )
+     &               )**2
+          cbc(i,j) = max(cbcmin,cbc(i,j))
 ! if the following is invoked, then it is probable that the wrong
 ! choice of z0b or vertical spacing has been made:
-          cbc(i,j)=min(cbcmax,cbc(i,j))
+          cbc(i,j) = min(cbcmax,cbc(i,j))
         end do
       end do
 

@@ -383,10 +383,8 @@ module clim
                         , tm_int(:,:,:,2)   , sm_int(:,:,:,2) )
       if ( status /= 0 ) then
         NO_MEAN = .true.
-        print *, "NO_MEAN: ", status
-        call msg_print("", 2, "BACKGROUND MEANS TO BE SET TO CLIMATOLOGY! HIGHLY UNDESIRABLE!")
-        tm_int = tc_int
-        sm_int = sc_int
+        tm_int =  5._rk
+        sm_int = 32._rk
       elseif ( INTERP_CLIM ) then
         status = read_clim( trim(ts_mean_path), record(3)          &
                           , t_mean_name       , s_mean_name        &
