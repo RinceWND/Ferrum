@@ -469,8 +469,6 @@ module grid
             zz (:,:,k) = sigz(:,:,k)*( h + et  )
             zzf(:,:,k) = sigz(:,:,k)*( h + etf )
           end do
-          print *, "==etf=",etf(186,17)
-          print *, "==dzf=",zf(186,17,:)
 
         case ( vGEOPOTENTIAL )
 

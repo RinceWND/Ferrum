@@ -1171,7 +1171,7 @@
 ! calculate y-component of baroclinic pressure gradient
       do j = 2, jmm1
         do i = 2, imm1
-          drhoy(i,j,1) = .5_rk*grav*(-zz(i,j,1)- zz(i,j-1,k))
+          drhoy(i,j,1) = .5_rk*grav*(-zz(i,j,1)- zz(i,j-1,1))
      $                             *(rho(i,j,1)-rho(i,j-1,1))
         end do
       end do
@@ -3522,7 +3522,7 @@
             boygr(i,j,k) = grav*( rho(i,j,k-1) - rho(i,j,k) )
      $                         /dzzf(i,j,k-1)
          ! note: comment out next line if dens does not include pressure
-     $                   + (grav**2)*2.*rhoref*1.e-3
+     $                   + (grav**2)*2.!*rhoref*1.e-3 ! FIXME: gsc has 1.025 here for some reason... Probably, gcs veraion had rho as (rho-1000.) and not divided by rhoref
      &                                 /(cc(i,j,k-1)**2+cc(i,j,k)**2)
           end do
         end do
@@ -3586,8 +3586,8 @@
 !           if(gh(i,j,k).lt.ghc) stf(i,j,k)=0.1e0
             dtef(i,j,k) = sqrt(abs(q2b(i,j,k)))*stf(i,j,k)
      $                                         /(b1*l(i,j,k)+small)
-            dtef(i,j,k) = q2b(i,j,k)*sqrt(abs(q2b(i,j,k)))*stf(i,j,k)
-     &                              /(b1*q2lb(i,j,k)+small) ! FIXME: ???
+!            dtef(i,j,k) = q2b(i,j,k)*sqrt(abs(q2b(i,j,k)))*stf(i,j,k)
+!     &                              /(b1*q2lb(i,j,k)+small) ! FIXME: ???
           end do
         end do
       end do

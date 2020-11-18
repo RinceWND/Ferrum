@@ -1526,8 +1526,8 @@
       do k=1,kmm1
         do j=1,jm
           do i=1,im
-            drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(i,j,k)
-            dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)*dz(i,j,k)
+            drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)!*dz(i,j,k)
+            dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)!*dz(i,j,k)
           end do
         end do
       end do
