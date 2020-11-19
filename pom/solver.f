@@ -3420,7 +3420,7 @@
      &                     , n_east, n_north, n_south, n_west
       use grid       , only: dz, dzf, dzz, dzzf, fsm, h, kb
      &                     ,  z,  zf,  zz,  zzf
-      use glob_ocean , only: a, c, dtef, ee, etf, gg, kh, kmt, kq, l
+      use glob_ocean , only: a, c, dt, dtef, ee, etf, gg, kh, kmt, kq, l
      &                     , q2, q2b, q2lb, rho, s, t
      &                     , u, uf, v, vf, wubot, wvbot
       use model_run  , only: dti2
@@ -3619,8 +3619,8 @@
           vf(i,j,      1) = 0.
           vf(i,j,kb(i,j)) = 0.
           ee(i,j,      2) = 0.
-          gg(i,j,        2) = -kappa*z(i,j,2)*q2(i,j,2) ! FIXME: What should be here for `z`?
-          vf(i,j,kb(i,j)-1) =  kappa*(1.+z(i,j,kb(i,j)-1))
+          gg(i,j,        2) = -kappa*z(i,j,2)/dt(i,j)*q2(i,j,2) ! FIXME: What should be here for `z`?
+          vf(i,j,kb(i,j)-1) =  kappa*(1.+z(i,j,kb(i,j)-1)/dt(i,j))
      &                              *q2(i,j,kb(i,j)-1)
         end do
       end do
