@@ -908,8 +908,8 @@ module air
 
       cda = .00125 ! Default value and compiler warning eliminator
 
-      do j = 1,jm
-        do i = 1,im
+      do j = 2,jm
+        do i = 2,im
 
           uvabs = sqrt( (uwnd(i,j)-u(i,j,1))**2  &
                       + (vwnd(i,j)-v(i,j,1))**2 )
@@ -943,11 +943,13 @@ module air
 
 !  Assume that free moving ice packs even at 10/10 concentrations pass at least half the momentum from atmosphere.
 ! TODO: If info about fast ice is available, damp any momentum flux over such areas to zero.
-          ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-u(i,j,1)) *(1.-icec(i,j)*0.5) ! TODO: This is also dampened elsewhere...?
-          vstr(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j)-v(i,j,1)) *(1.-icec(i,j)*0.5)
+          ustr(i,j) = -rhoa/rhow*cda*uvabs * (uwnd(i,j)-0.5_rk*(u(i-1,j,1)+u(i,j,1))) *(1.-icec(i,j)*0.5) ! TODO: This is also dampened elsewhere...?
+          vstr(i,j) = -rhoa/rhow*cda*uvabs * (vwnd(i,j)-0.5_rk*(v(i,j-1,1)+v(i,j,1))) *(1.-icec(i,j)*0.5)
 
         end do
       end do
+      call exchange2d_mpi(ustr,im,jm)
+      call exchange2d_mpi(vstr,im,jm)
 
 
     end ! subroutine wind_to_stress
@@ -1138,7 +1140,7 @@ module air
 !
 ! --- compute wind speed magnitude for bulk coeff.
 !
-        SP = sqrt(unow*unow+vnow*vnow)
+        SP = sqrt(usrf*usrf+vsrf*vsrf)
         gnow = gnow/SP
         SP = sqrt(  SP*SP  +gnow*gnow)
 
@@ -1248,10 +1250,9 @@ module air
 
         if ( USE_COARE ) then
 
-          call coare( (sqrt((unow-usrf)**2+(vnow-vsrf)**2)),      &
-                      10._rk, temp(i,j,1), 2._rk, humnow, 2._rk,  &
-                      pnow,sst_model,sol_net,lwrd,north_e(i,j),   &
-                      pblh, (3.6e6_rk*precip), 0._rk, 0._rk,   &
+          call coare( SP, 10._rk, temp(i,j,1), 2._rk, humnow, 2._rk,  &
+                      pnow,sst_model,sol_net,lwrd,north_e(i,j),       &
+                      pblh, (3.6e6_rk*precip), 0._rk, 0._rk,          &
                       QH, QE, Evap, ch2, ce2 )
 !            Evap = Evap*rho/3.6e6
 !            if (my_task==1.and.i==50.and.j==50) then
