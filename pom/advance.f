@@ -157,11 +157,12 @@
 !______________________________________________________________________
 !
       use config     , only: aam_init, horcon, mode, n1d, npg, rk
+     &                     , pressure_gradient
       use bry        , only: aamfrz, USE_SPONGE
       use glob_const , only: MODE_BAROTROPIC
       use glob_domain, only: im, imm1, jm, jmm1, kmm1
       use grid       , only: dx, dy
-      use glob_ocean , only: a, aam, aamfac, c, ee, u, v
+      use glob_ocean , only: a, aam, aamfac, c, ee, u, v   ,drhox,dt
 
       implicit none
 
@@ -181,7 +182,8 @@
 
         call advct(a,c,ee)
 
-        call pgscheme(npg)
+        call pressure_gradient
+        print *, "drhox_lateral : ", drhox(178,2,1)*dt(178,2)
 
 !lyo:scs1d:
         if ( n1d /= 0 ) then
@@ -410,6 +412,14 @@
      &             + dry2d(i,j) + arv(i,j)*(wvsurf(i,j)-wvbot(i,j))
         end do
       end do
+!      print *, "vaf :", ady2d(178,2), advva(178,2), arv(178,2)
+!     &                , cor(178,2), d(178,2), ua(179,2), ua(178,2)
+!     &                , cor(178,1), d(178,1), ua(179,1), ua(178,1)
+!     &                , dx(178,2), dx(178,1), el(178,2), el(178,1)
+!     &                , elb(178,2), elb(178,1), elf(178,2), elf(178,1)
+!     &                , e_atmos(178,2), e_atmos(178,1), dry2d(178,2)
+!     &                , wusurf(178,2), wubot(178,2), vaf(178,2)
+!      if ( iint > 2 ) stop
 
       do j = 2, jm
         do i = 2, imm1
@@ -420,6 +430,10 @@
      &                *arv(i,j) )
         end do
       end do
+!      print *, "vupd:", vaf(178,2), h(178,2), elb(178,2), h(178,1)
+!     &                , elb(178,1), vab(178,2), arv(178,2), elf(178,2)
+!     &                , elf(178,1)
+!      stop
 !      print *, "==>", minval(uaf), maxval(uaf), minval(vaf), maxval(vaf)
 
       if ( use_tide ) call tide_advance( dtime ) ! update tide boundaries before applying boundary conditions
@@ -458,6 +472,10 @@
       ua = ua + .5_rk*smoth*( uab + uaf - 2._rk*ua )
       va = va + .5_rk*smoth*( vab + vaf - 2._rk*va )
       el = el + .5_rk*smoth*( elb + elf - 2._rk*el )
+!      print *, "ua: ", uab(178,2), ua(178,2), uaf(178,2)
+!      print *, "va: ", vab(178,2), va(178,2), vaf(178,2)
+!      print *, "el: ", elb(178,2), el(178,2), elf(178,2)
+!      if ( iint > 2 ) stop
 !!!      print *, "==>", minval(uaf), maxval(uaf), minval(elf), maxval(elf)
       ! if (iint>2) then
       ! print *, iint,"=",my_task, ": UA : ", maxval(abs(va))
@@ -487,6 +505,7 @@
           cbc(i,j) = min(cbcmax,cbc(i,j))
         end do
       end do
+!      print *, "cbc: ", cbc(178,2)
 
       if ( iext /= isplit ) then
 
@@ -566,6 +585,7 @@
             end do
           end do
         end do
+!        print *, "u   : ", u(178,2,:)
 
         do k = 1, kmm1
           do j = 1, jm
@@ -579,6 +599,10 @@
             end do
           end do
         end do
+!        print *, "utps: ", u(178,2,:)
+!        print *, "tps : ", tps(178,2)
+!        print *, "utb : ", utb(178,2), utf(178,2)
+!        print *, "dt  : ", dt(178,2), dt(177,2)
 
         tps = 0.
         col = 0.
@@ -755,6 +779,11 @@
             end do
           end do
         end do
+!        print *, "u2  : ", u(178,2,:)
+!        print *, "uf  : ", uf(178,2,:)
+!        print *, "ub  : ", ub(178,2,:)
+!        print *, "tps : ", tps(178,2)
+!        if ( iint > 2 ) stop
 
         tps = 0.
 

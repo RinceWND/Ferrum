@@ -1034,6 +1034,11 @@
           end do
         end do
       end do
+!      print *, "[adv]uf  :", uf(178,2,1), advx(178,2,1)
+!     &                , dz(178,2,1), v(178,3,1), v(178,2,1)
+!     &                , dz(177,2,1), v(177,3,1), v(177,2,1)
+!     &                , egf(178,2), egf(177,2), egb(178,2)
+!     &                , egb(177,2), drhox(178,2,1)
 
 
       end ! subroutine advu
@@ -1157,6 +1162,7 @@
           end do
         end do
       end do
+!      print *, "drhox= ", drhox(178,2,:)
 
       do k = 1, kmm1
         do j = 2, jmm1
@@ -1228,103 +1234,104 @@
       use glob_const , only: grav, rk
       use glob_domain, only: im, imm1, jm, jmm1, km, kmm1    ,my_task!REM:
      &                     , n_south, n_west
-      use grid       , only: dum, dvm, dx, dy, dzz, zz
+      use grid       , only: dum, dvm, dx, dy, dz, dzz, zz
       use glob_ocean , only: d, drhox, drhoy, dt, density => rho
       use model_run  , only: ramp
 
       implicit none
 
-      integer                              i     , j   , k
-      real(rk), dimension(  im,  jm   ) :: d4    , ddx
-      real(rk), dimension(  im,  jm,km) :: drho  , rhou, rho
-      real(rk), dimension(0:im,0:jm   ) :: d4th
-      real(rk), dimension(0:im,0:jm,km) :: rho4th
+      integer                              i, j, k
+      real(rk), dimension(  im,  jm,km) :: z4  , zdl   , drho, rhou, rho
+      real(rk), dimension(0:im,0:jm,km) :: z4th, rho4th
 
 
       rho = density - rmean
 
 ! convert a 2nd order matrices to special 4th order
 ! special 4th order case
-      call order2d_mpi(d  ,d4th  ,im,jm)
+      call order3d_mpi(zz ,z4th  ,im,jm,km)
       call order3d_mpi(rho,rho4th,im,jm,km)
 
 ! compute terms correct to 4th order
-      ddx  = 0.
-      d4   = 0.
+      zdl  = 0.
+      z4   = 0.
       rhou = 0.
       drho = 0.
 
 ! compute DRHO, RHOU, DDX and D4
-      do j = 1, jm
-        do i = 2, im
-          do k = 1, kmm1 ! TODO: Non-optimal loop nesting. Conduct performance comparisons.
-            drho(i,j,k) =    (rho(i,j,k)-rho(i-1,j,k))*dum(i,j,k)
-            rhou(i,j,k) = .5*(rho(i,j,k)+rho(i-1,j,k))*dum(i,j,k)
+      do k = 1, kmm1
+        do j = 1, jm
+          do i = 2, im
+            drho(i,j,k) =       (rho(i,j,k)-rho(i-1,j,k))*dum(i,j,k)
+            rhou(i,j,k) = .5_rk*(rho(i,j,k)+rho(i-1,j,k))*dum(i,j,k)
+            zdl (i,j,k) =       (zz (i,j,k)-zz (i-1,j,k))*dum(i,j,k)
+            z4  (i,j,k) = .5_rk*(zz (i,j,k)+zz (i-1,j,k))*dum(i,j,k)
           end do
-          ddx(i,j) =    (d(i,j)-d(i-1,j))*dum(i,j,1)
-          d4(i,j)  = .5*(d(i,j)+d(i-1,j))*dum(i,j,1)
         end do
       end do
 
-      if ( n_west == -1 ) then
+      do k = 1, kmm1
         do j = 1, jm
-          do i = 3, imm1
-            do k = 1, kmm1
-              drho(i,j,k)=drho(i,j,k) - (1./24.)*
-     $                    (dum(i+1,j,k)*(rho(i+1,j,k)-rho(i  ,j,k))-
-     $                            2._rk*(rho(i  ,j,k)-rho(i-1,j,k))+
-     $                     dum(i-1,j,k)*(rho(i-1,j,k)-rho(i-2,j,k)))
-              rhou(i,j,k)=rhou(i,j,k) + (1./16.)*
-     $                    (dum(i+1,j,k)*(rho(i  ,j,k)-rho(i+1,j,k))+
-     $                     dum(i-1,j,k)*(rho(i-1,j,k)-rho(i-2,j,k)))
+          if ( n_west == -1 ) then
+            do i = 3, imm1
+              drho(i,j,k) = drho(i,j,k)
+     &                    - (1._rk/24._rk)
+     &                     *( dum(i+1,j,k)*(rho(i+1,j,k)-rho(i  ,j,k))
+     &                      -        2._rk*(rho(i  ,j,k)-rho(i-1,j,k))
+     &                      + dum(i-1,j,k)*(rho(i-1,j,k)-rho(i-2,j,k)) )
+              rhou(i,j,k) = rhou(i,j,k)
+     &                    + (1._rk/16._rk)
+     &                     *( dum(i+1,j,k)*(rho(i  ,j,k)-rho(i+1,j,k))
+     &                      + dum(i-1,j,k)*(rho(i-1,j,k)-rho(i-2,j,k)) )
+              zdl (i,j,k) = zdl(i,j,k)
+     &                    - (1._rk/24._rk)
+     &                     *( dum(i+1,j,k)*( zz(i+1,j,k)-zz(i  ,j,k) )
+     &                      -        2._rk*( zz(i  ,j,k)-zz(i-1,j,k) )
+     &                      + dum(i-1,j,k)*( zz(i-1,j,k)-zz(i-2,j,k) ) )
+              z4  (i,j,k) = z4(i,j,k)
+     &                    + (1._rk/16._rk)
+     &                     *( dum(i+1,j,k)*( zz(i  ,j,k)-zz(i+1,j,k) )
+     &                      + dum(i-1,j,k)*( zz(i-1,j,k)-zz(i-2,j,k) ) )
             end do
-            ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dum(i+1,j,1)*(d(i+1,j)-d(i  ,j))-
-     $                       2._rk*(d(i  ,j)-d(i-1,j))+
-     $                dum(i-1,j,1)*(d(i-1,j)-d(i-2,j)))
-            d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dum(i+1,j,1)*(d(i  ,j)-d(i+1,j))+
-     $               dum(i-1,j,1)*(d(i-1,j)-d(i-2,j)))
-          end do
-        end do
-      else
-        do j = 1, jm
-          do i = 2, imm1
-            do k = 1, kmm1
-              drho(i,j,k)=drho(i,j,k) - (1./24.)*
-     $                   (dum(i+1,j,k)*(rho(i+1,j,k)-rho   (i  ,j,k))-
-     $                           2._rk*(rho(i  ,j,k)-rho   (i-1,j,k))+
-     $                    dum(i-1,j,k)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
-              rhou(i,j,k)=rhou(i,j,k) + (1./16.)*
-     $                    (dum(i+1,j,k)*(rho(i  ,j,k)-rho   (i+1,j,k))+
-     $                     dum(i-1,j,k)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
+          else
+            do i = 2, imm1
+              drho(i,j,k) = drho(i,j,k)
+     &                  - (1._rk/24._rk)
+     &                   *( dum(i+1,j,k)*(rho(i+1,j,k)-rho   (i  ,j,k))
+     &                    -        2._rk*(rho(i  ,j,k)-rho   (i-1,j,k))
+     &                    + dum(i-1,j,k)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
+              rhou(i,j,k) = rhou(i,j,k)
+     &                  + (1._rk/16._rk)
+     &                   *( dum(i+1,j,k)*(rho(i  ,j,k)-rho   (i+1,j,k))
+     &                    + dum(i-1,j,k)*(rho(i-1,j,k)-rho4th(i-2,j,k)))
+              zdl (i,j,k) = zdl(i,j,k)
+     &                    - (1._rk/24._rk)
+     &                     *( dum(i+1,j,k)*(zz(i+1,j,k)-zz  (i  ,j,k))
+     &                      -        2._rk*(zz(i  ,j,k)-zz  (i-1,j,k))
+     &                      + dum(i-1,j,k)*(zz(i-1,j,k)-z4th(i-2,j,k)) )
+              z4  (i,j,k) = z4(i,j,k)
+     &                    + (1._rk/16._rk)
+     &                     *( dum(i+1,j,k)*(zz(i  ,j,k)-zz  (i+1,j,k))
+     &                      + dum(i-1,j,k)*(zz(i-1,j,k)-z4th(i-2,j,k)) )
             end do
-            ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dum(i+1,j,1)*(d(i+1,j)-d   (i  ,j))-
-     $                       2._rk*(d(i  ,j)-d   (i-1,j))+
-     $                dum(i-1,j,1)*(d(i-1,j)-d4th(i-2,j)))
-            d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dum(i+1,j,1)*(d(i  ,j)-d   (i+1,j))+
-     $               dum(i-1,j,1)*(d(i-1,j)-d4th(i-2,j)))
-          end do
+          end if
         end do
-      end if
+      end do
 ! calculate x-component of baroclinic pressure gradient
       do j = 2, jmm1
         do i = 2, imm1
-          drhox(i,j,1)=grav*(-zz(i,j,1))*d4(i,j)*drho(i,j,1)
+          drhox(i,j,1) = -grav*z4(i,j,1)*drho(i,j,1)
         end do
       end do
-
 
       do k = 2, kmm1
         do j = 2, jmm1
           do i = 2, imm1
-            drhox(i,j,k)=drhox(i,j,k-1)
-     $               +grav*0.5*dzz(i,j,k-1)*d4(i,j)
-     $               *(drho(i,j,k-1)+drho(i,j,k))
-     $               +grav*0.5*(zz(i,j,k-1)+zz(i,j,k))*ddx(i,j)
-     $               *(rhou(i,j,k)-rhou(i,j,k-1))
+            drhox(i,j,k) = drhox(i,j,k-1)
+     &                   + grav*.5_rk*( z4  (i,j,k-1) - z4  (i,j,k) )
+     &                               *( drho(i,j,k-1) + drho(i,j,k) )
+     &                   - grav*.5_rk*( zdl (i,j,k-1) + zdl (i,j,k) )
+     &                               *( rhou(i,j,k-1) - rhou(i,j,k) )
           end do
         end do
       end do
@@ -1332,9 +1339,9 @@
       do k = 1, kmm1
         do j = 2, jmm1
           do i = 2, imm1
-            drhox(i,j,k)=.25*(dt(i,j)+dt(i-1,j))
-     $                      *drhox(i,j,k)*dum(i,j,k)
-     $                      *(dy(i,j)+dy(i-1,j))
+            drhox(i,j,k) = .25_rk*( dz(i,j,k) + dz(i-1,j,k) )
+     &                           *drhox(i,j,k)*dum(i,j,k)
+     &                           *( dy(i,j) + dy(i-1,j) )
           end do
         end do
       end do
@@ -1348,82 +1355,88 @@
 !!      stop
 
 ! compute terms correct to 4th order
-      ddx = 0.
-      d4  = 0.
+      zdl = 0.
+      z4  = 0.
       rhou = 0.
       drho = 0.
 
 ! compute DRHO, RHOU, DDX and D4
-      do j = 2, jm
-        do i = 1, im
-          do k = 1, kmm1
-            drho(i,j,k) =    (rho(i,j,k)-rho(i,j-1,k))*dvm(i,j,k)
-            rhou(i,j,k) = .5*(rho(i,j,k)+rho(i,j-1,k))*dvm(i,j,k)
+      do k = 1, kmm1
+        do j = 2, jm
+          do i = 1, im
+            drho(i,j,k) =       (rho(i,j,k)-rho(i,j-1,k))*dvm(i,j,k)
+            rhou(i,j,k) = .5_rk*(rho(i,j,k)+rho(i,j-1,k))*dvm(i,j,k)
+            zdl (i,j,k) =       (zz (i,j,k)-zz (i,j-1,k))*dvm(i,j,k)
+            z4  (i,j,k) = .5_rk*(zz (i,j,k)+zz (i,j-1,k))*dvm(i,j,k)
           end do
-          ddx(i,j) =    (d(i,j)-d(i,j-1))*dvm(i,j,1)
-          d4(i,j)  = .5*(d(i,j)+d(i,j-1))*dvm(i,j,1)
         end do
       end do
 
-      if ( n_south == -1 ) then
-        do j = 3, jmm1
-          do i = 1, im
-            do k = 1, kmm1
-              drho(i,j,k)=drho(i,j,k)-(1./24.)*
-     $                    (dvm(i,j+1,k)*(rho(i,j+1,k)-rho(i,j  ,k))-
-     $                            2._rk*(rho(i,j  ,k)-rho(i,j-1,k))+
-     $                     dvm(i,j-1,k)*(rho(i,j-1,k)-rho(i,j-2,k)))
-              rhou(i,j,k)=rhou(i,j,k)+(1./16.)*
-     $                    (dvm(i,j+1,k)*(rho(i,j  ,k)-rho(i,j+1,k))+
-     $                     dvm(i,j-1,k)*(rho(i,j-1,k)-rho(i,j-2,k)))
+      do k = 1, kmm1
+        if ( n_south == -1 ) then
+          do j = 3, jmm1
+            do i = 1, im
+              drho(i,j,k) = drho(i,j,k)
+     &                    - (1._rk/24._rk)
+     &                     *( dvm(i,j+1,k)*(rho(i,j+1,k)-rho(i,j  ,k))
+     &                      -        2._rk*(rho(i,j  ,k)-rho(i,j-1,k))
+     &                      + dvm(i,j-1,k)*(rho(i,j-1,k)-rho(i,j-1,k)) )
+              rhou(i,j,k) = rhou(i,j,k)
+     &                    + (1._rk/16._rk)
+     &                     *( dvm(i,j+1,k)*(rho(i,j  ,k)-rho(i,j+1,k))
+     &                      + dvm(i,j-1,k)*(rho(i,j-1,k)-rho(i,j-2,k)) )
+              zdl (i,j,k) = zdl(i,j,k)
+     &                    - (1._rk/24._rk)
+     &                     *( dvm(i,j+1,k)*( zz(i,j+1,k)-zz(i,j  ,k) )
+     &                      -        2._rk*( zz(i,j  ,k)-zz(i,j-1,k) )
+     &                      + dvm(i,j-1,k)*( zz(i,j-1,k)-zz(i,j-2,k) ) )
+              z4  (i,j,k) = z4(i,j,k)
+     &                    + (1._rk/16._rk)
+     &                     *( dvm(i,j+1,k)*( zz(i,j  ,k)-zz(i,j+1,k) )
+     &                      + dvm(i,j-1,k)*( zz(i,j-1,k)-zz(i,j-2,k) ) )
             end do
-            ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dvm(i,j+1,1)*(d(i,j+1)-d(i,j  ))-
-     $                       2._rk*(d(i,j  )-d(i,j-1))+
-     $                dvm(i,j-1,1)*(d(i,j-1)-d(i,j-2)))
-            d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dvm(i,j+1,1)*(d(i,j  )-d(i,j+1))+
-     $               dvm(i,j-1,1)*(d(i,j-1)-d(i,j-2)))
           end do
-        end do
-      else
-        do j = 2, jmm1
-          do i = 1, im
-            do k = 1, kmm1
-              drho(i,j,k)=drho(i,j,k)-(1./24.)*
-     $                    (dvm(i,j+1,k)*(rho(i,j+1,k)-rho   (i,j  ,k))-
-     $                            2._rk*(rho(i,j  ,k)-rho   (i,j-1,k))+
-     $                     dvm(i,j-1,k)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
-              rhou(i,j,k)=rhou(i,j,k)+(1./16.)*
-     $                    (dvm(i,j+1,k)*(rho(i,j  ,k)-rho   (i,j+1,k))+
-     $                     dvm(i,j-1,k)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
+        else
+          do j = 2, jmm1
+            do i = 1, im
+              drho(i,j,k) = drho(i,j,k)
+     &                  - (1._rk/24._rk)
+     &                   *( dvm(i,j+1,k)*(rho(i,j+1,k)-rho   (i,j  ,k))
+     &                    -        2._rk*(rho(i,j  ,k)-rho   (i,j-1,k))
+     &                    + dvm(i,j-1,k)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
+              rhou(i,j,k) = rhou(i,j,k)
+     &                  + (1._rk/16._rk)
+     &                   *( dvm(i,j+1,k)*(rho(i,j  ,k)-rho   (i,j+1,k))
+     &                    + dvm(i,j-1,k)*(rho(i,j-1,k)-rho4th(i,j-2,k)))
+              zdl (i,j,k) = zdl(i,j,k)
+     &                    - (1._rk/24._rk)
+     &                     *( dvm(i,j+1,k)*(zz(i,j+1,k)-zz  (i,j  ,k))
+     &                      -        2._rk*(zz(i,j  ,k)-zz  (i,j-1,k))
+     &                      + dvm(i,j-1,k)*(zz(i,j-1,k)-z4th(i,j-2,k)) )
+              z4  (i,j,k) = z4(i,j,k)
+     &                    + (1._rk/16._rk)
+     &                     *( dvm(i,j+1,k)*(zz(i,j  ,k)-zz  (i,j+1,k))
+     &                      + dvm(i,j-1,k)*(zz(i,j-1,k)-z4th(i,j-2,k)) )
             end do
-            ddx(i,j)=ddx(i,j)-(1./24.)*
-     $               (dvm(i,j+1,1)*(d(i,j+1)-d   (i,j  ))-
-     $                       2._rk*(d(i,j  )-d   (i,j-1))+
-     $                dvm(i,j-1,1)*(d(i,j-1)-d4th(i,j-2)))
-            d4(i,j)=d4(i,j)+(1./16.)*
-     $              (dvm(i,j+1,1)*(d(i,j  )-d   (i,j+1))+
-     $               dvm(i,j-1,1)*(d(i,j-1)-d4th(i,j-2)))
           end do
-        end do
-      end if
+        end if
+      end do
 
 ! calculate y-component of baroclinic pressure gradient
       do j = 2, jmm1
         do i = 2, imm1
-          drhoy(i,j,1)=grav*(-zz(i,j,1))*d4(i,j)*drho(i,j,1)
+          drhoy(i,j,1) = -grav*z4(i,j,1)*drho(i,j,1)
         end do
       end do
 
       do k = 2, kmm1
         do j = 2, jmm1
-          do i=2,imm1
-            drhoy(i,j,k)=drhoy(i,j,k-1)
-     $               +grav*0.5*dzz(i,j,k-1)*d4(i,j)
-     $               *(drho(i,j,k-1)+drho(i,j,k))
-     $               +grav*0.5*(zz(i,j,k-1)+zz(i,j,k))*ddx(i,j)
-     $               *(rhou(i,j,k)-rhou(i,j,k-1))
+          do i = 2, imm1
+            drhoy(i,j,k) = drhoy(i,j,k-1)
+     &                   + grav*.5_rk*( z4  (i,j,k-1) - z4  (i,j,k) )
+     &                               *( drho(i,j,k-1) + drho(i,j,k) )
+     &                   - grav*.5_rk*( zdl (i,j,k-1) + zdl (i,j,k) )
+     &                               *( rhou(i,j,k-1) - rhou(i,j,k) )
           end do
         end do
       end do
@@ -1431,9 +1444,9 @@
       do k = 1, kmm1
         do j = 2, jmm1
           do i = 2, imm1
-            drhoy(i,j,k)=.25*(dt(i,j)+dt(i,j-1))
-     $                        *drhoy(i,j,k)*dvm(i,j,k)
-     $                        *(dx(i,j)+dx(i,j-1))
+            drhoy(i,j,k) = .25_rk*( dz(i,j,k) + dz(i,j-1,k) )
+     &                           *drhoy(i,j,k)*dvm(i,j,k)
+     &                           *( dx(i,j) + dx(i,j-1) )
           end do
         end do
       end do
@@ -3363,7 +3376,7 @@
             sr  = si(i,j,k) + sbias
             tr2 = tr*tr
             tr3 = tr2*tr
-            tr4 = tr3*tr
+            tr4 = tr3*tr ! FIXME: This approach accumulates error in 14th decimal digit at power of four
 
 ! approximate pressure in units of bars
             p = -grav*rhoref*zz(i,j,k)*1.e-5_rk
@@ -3826,7 +3839,7 @@
 
         do j = 1, jm
           do i = 1, im
-            if ( fsm(i,j,1) .lt. 1._rk ) cycle
+            if ( fsm(i,j,1) < 1._rk ) cycle
             ee(i,j,1) = a (i,j,1)/(a(i,j,1)-1._rk)
             gg(i,j,1) = dti2*wfsurf(i,j)/dzf(i,j,1) - f(i,j,1)
             gg(i,j,1) = gg(i,j,1)/(a(i,j,1)-1._rk)
@@ -3838,7 +3851,7 @@
 
         do j = 1, jm
           do i = 1, im
-            if ( fsm(i,j,1) .lt. 1._rk ) cycle
+            if ( fsm(i,j,1) < 1._rk ) cycle
             ee(i,j,1) = a (i,j,1)/(a(i,j,1)-1._rk)
             gg(i,j,1) = dti2*( wfsurf(i,j) + rad(i,j,1) - rad(i,j,2) )
      $                      /dzf(i,j,1)
@@ -3963,10 +3976,13 @@
           ee(i,j,1) = a(i,j,1)/(a(i,j,1)-1._rk)
           gg(i,j,1) = ( -dti2*wusurf(i,j)*2._rk
      &                       /(dzf(i,j,1)+dzf(i-1,j,1))
-     &                - uf(i,j,1)*dum(i,j,k) )
+     &                - uf(i,j,1)*dum(i,j,1) )
      &               /( a(i,j,1) - 1._rk )
         end do
       end do
+!      print *, "[prof]gg:", wusurf(178,2)
+!     &                 , 2._rk/(dzf(178,2,1)+dzf(177,2,1)), gg(178,2,1)
+!     &                    , uf(178,2,1), dum(178,2,1), a(178,2,1)
 
       do k = 2, kmm2
         do j = 1, jm
@@ -4009,6 +4025,8 @@
           end do
         end do
       end do
+!      print *, "[prof]uf:", uf(178,2,1), ee(178,2,1), gg(178,2,1)
+!     &                    , uf(178,2,2)
 
       do j = 2, jmm1
         do i = 2, imm1
@@ -4080,7 +4098,7 @@
           ee(i,j,1) = a(i,j,1)/(a(i,j,1)-1._rk)
           gg(i,j,1) = ( dti2*2._rk*wvsurf(i,j)
      &                      /( dzf(i,j,1) + dzf(i,j-1,1) )
-     &                - vf(i,j,1)*dvm(i,j,k) )
+     &                - vf(i,j,1)*dvm(i,j,1) )
      &               /( a(i,j,1) - 1._rk )
         end do
       end do
