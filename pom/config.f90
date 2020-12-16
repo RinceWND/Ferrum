@@ -52,6 +52,12 @@ module config
     netcdf_file       & ! output netcdf filename
   , initial_file        ! restart filename to read from
 
+  procedure(PROC_INTERFACE), pointer :: pressure_gradient, advection
+
+  abstract interface
+    subroutine PROC_INTERFACE
+    end subroutine PROC_INTERFACE
+  end interface
 
   parameter( lono=999.0,lato=999.0, xs=1.5,ys=1.5, fak=0.5)
 
@@ -275,8 +281,40 @@ module config
       output_flag  = 1
       output_means = .false.
 
-
     end ! subroutine
+!
+!______________________________________________________________________
+!
+    subroutine get_pgproc(id, proc)
+!----------------------------------------------------------------------
+!  Selects specified routine for pressure gradient.
+!______________________________________________________________________
+!
+      implicit none
+
+      procedure(), pointer, intent(out) :: proc
+      integer             , intent(in ) :: id
+
+      external :: baropg, baropg_mcc, baropg_lin, baropg_song_std, baropg_shch
+
+
+      select case (id)
+        case (1)
+          proc => baropg
+        case (2)
+          proc => baropg_mcc
+        case (3)
+          proc => baropg_lin
+        case (4)
+          proc => baropg_song_std
+        case (5)
+          proc => baropg_shch
+        case default
+          proc => baropg_mcc
+      end select
+
+
+    end subroutine
 !
 !______________________________________________________________________
 !
@@ -338,6 +376,9 @@ module config
 
 !  Initialise timestep-related variables
       call initialize_model_run
+
+! Set pressure gradient and advection schemes procedures
+      call get_pgproc (npg ,pressure_gradient)
 
 ! End of input of constants
       call print_config
