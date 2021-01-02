@@ -183,7 +183,6 @@
         call advct(a,c,ee)
 
         call pressure_gradient
-        print *, "drhox_lateral : ", drhox(178,2,1)*dt(178,2)
 
 !lyo:scs1d:
         if ( n1d /= 0 ) then
@@ -351,19 +350,12 @@
      &             - vfluxf(i,j)
         end do
       end do
-!      print *, "!!!elf: ", elf(186,17), elb(186,17)
-!      print *, "!!!flu: ", fluxua(186,17), fluxua(187,17)
-!      print *, "!!!flv: ", fluxva(186,17), fluxva(186,18)
-!      print *, "!!!art: ", art(186,17)
-!      print *, "!!!flz: ", vfluxf(186,17)
 
       call bc_zeta ! bcond(1)
 
       call exchange2d_mpi(elf,im,jm)
 
       if ( mod(iext,ispadv) == 0 ) call advave(tps)
-
-!      print *, "===", minval(uaf), maxval(uaf), minval(vaf), maxval(vaf)
 
       do j = 2, jmm1
         do i = 2, im
@@ -380,12 +372,6 @@
      &             + drx2d(i,j) + aru(i,j)*(wusurf(i,j)-wubot(i,j))
         end do
       end do
-
-!      print *, "=+=", maxval(abs(adx2d)), maxval(abs(advua))
-!     &       , maxval(abs(va)), maxval(abs(d)), maxval(abs(el))
-!     &       , maxval(abs(elb)), maxval(abs(elf)), maxval(abs(e_atmos))
-!     &       , maxval(abs(drx2d)), maxval(abs(wusurf))
-!     &       , maxval(abs(wubot))
 
       do j = 2, jmm1
         do i = 2, im
@@ -412,14 +398,6 @@
      &             + dry2d(i,j) + arv(i,j)*(wvsurf(i,j)-wvbot(i,j))
         end do
       end do
-!      print *, "vaf :", ady2d(178,2), advva(178,2), arv(178,2)
-!     &                , cor(178,2), d(178,2), ua(179,2), ua(178,2)
-!     &                , cor(178,1), d(178,1), ua(179,1), ua(178,1)
-!     &                , dx(178,2), dx(178,1), el(178,2), el(178,1)
-!     &                , elb(178,2), elb(178,1), elf(178,2), elf(178,1)
-!     &                , e_atmos(178,2), e_atmos(178,1), dry2d(178,2)
-!     &                , wusurf(178,2), wubot(178,2), vaf(178,2)
-!      if ( iint > 2 ) stop
 
       do j = 2, jm
         do i = 2, imm1
@@ -430,11 +408,6 @@
      &                *arv(i,j) )
         end do
       end do
-!      print *, "vupd:", vaf(178,2), h(178,2), elb(178,2), h(178,1)
-!     &                , elb(178,1), vab(178,2), arv(178,2), elf(178,2)
-!     &                , elf(178,1)
-!      stop
-!      print *, "==>", minval(uaf), maxval(uaf), minval(vaf), maxval(vaf)
 
       if ( use_tide ) call tide_advance( dtime ) ! update tide boundaries before applying boundary conditions
 
@@ -442,16 +415,6 @@
 
       call exchange2d_mpi(uaf,im,jm)
       call exchange2d_mpi(vaf,im,jm)
-
-      ! if ( use_tide ) then
-        ! uaf = uaf - tide_ua
-        ! vaf = vaf - tide_va
-        ! call apply_tide(-1._rk)
-        ! call tide_advance( dtime + int(iext*dte) )
-        ! call apply_tide(1._rk)
-        ! uaf = uaf + tide_ua! - tide_ua_b
-        ! vaf = vaf + tide_va! - tide_va_b
-      ! end if
 
       if     ( iext == (isplit-2) ) then
 
@@ -466,24 +429,11 @@
         etf = ( etf + .5*elf )*fsm(:,:,1)
 
       end if
-!!!      print *, "===", minval(uaf), maxval(uaf), minval(elf), maxval(elf)
 
 ! apply filter to remove time split
       ua = ua + .5_rk*smoth*( uab + uaf - 2._rk*ua )
       va = va + .5_rk*smoth*( vab + vaf - 2._rk*va )
       el = el + .5_rk*smoth*( elb + elf - 2._rk*el )
-!      print *, "ua: ", uab(178,2), ua(178,2), uaf(178,2)
-!      print *, "va: ", vab(178,2), va(178,2), vaf(178,2)
-!      print *, "el: ", elb(178,2), el(178,2), elf(178,2)
-!      if ( iint > 2 ) stop
-!!!      print *, "==>", minval(uaf), maxval(uaf), minval(elf), maxval(elf)
-      ! if (iint>2) then
-      ! print *, iint,"=",my_task, ": UA : ", maxval(abs(va))
-      ! print *, iint,"=",my_task, ": UAB: ", maxval(abs(vab))
-      ! print *, iint,"=",my_task, ": UAF: ", maxval(abs(vaf))
-      ! call finalize_mpi
-      ! stop
-      ! end if
 
       elb = el
       el  = elf
@@ -494,8 +444,6 @@
       va  = vaf
 
 ! update bottom friction
-      !rewind( 50+my_task )
-!      write( *, *) "186;17;",dzb(186,17,kb(186,17)-1)
       do j = 1, jm
         do i = 1, im
           cbc(i,j) = ( Kappa/log( ( .1_rk
@@ -505,7 +453,6 @@
           cbc(i,j) = min(cbcmax,cbc(i,j))
         end do
       end do
-!      print *, "cbc: ", cbc(178,2)
 
       if ( iext /= isplit ) then
 
@@ -585,7 +532,6 @@
             end do
           end do
         end do
-!        print *, "u   : ", u(178,2,:)
 
         do k = 1, kmm1
           do j = 1, jm
@@ -599,10 +545,6 @@
             end do
           end do
         end do
-!        print *, "utps: ", u(178,2,:)
-!        print *, "tps : ", tps(178,2)
-!        print *, "utb : ", utb(178,2), utf(178,2)
-!        print *, "dt  : ", dt(178,2), dt(177,2)
 
         tps = 0.
         col = 0.
@@ -677,7 +619,7 @@
 
 ! calculate tf and sf using uf, vf, a and c as temporary variables
 !        if( mode /= 4 .and. ( iint > 2 .or. do_restart ) ) then
-        if( mode /= MODE_DIAGNOSTIC ) then
+        if ( mode /= MODE_DIAGNOSTIC ) then
 
           if     ( nadv == 1 ) then
 
@@ -695,15 +637,9 @@
             print *, '(/''Error: invalid value for nadv'')'
 
           end if
-          print *, "=3>", maxval(abs(tb)), maxval(abs(t))
-     &     , maxval(abs(uf))
-
 
           call proft(uf,wtsurf,tsurf,nbct,tps)
           call proft(vf,wssurf,ssurf,nbcs,tps)
-          print *, "=4>", maxval(abs(tb)), maxval(abs(t))
-     &     , maxval(abs(uf))
-
 
           if ( t_lo > -999. ) then
             where ( uf < t_lo ) uf = t_lo
@@ -720,20 +656,18 @@
           end if
 
           call relax_to_clim( uf, vf )
-          print *, "=5>", maxval(abs(tb)), maxval(abs(t))
-     &     , maxval(abs(uf))
 
           call bc_ts ! bcond(4)
 
           call exchange3d_mpi(uf(:,:,1:kmm1),im,jm,kmm1)
           call exchange3d_mpi(vf(:,:,1:kmm1),im,jm,kmm1)
 
+! TODO: Make sure layer thickness cannot go infinitesimal
           where ( dz > 0. )
             t = t + .5_rk*smoth*( dzb*tb + dzf*uf -2._rk*dz*t )/dz
             s = s + .5_rk*smoth*( dzb*sb + dzf*vf -2._rk*dz*s )/dz
           end where
-          print *, "=6>", maxval(abs(tb)), maxval(abs(t))
-     &     , maxval(abs(uf))
+
           tb = t
           t  = uf
           sb = s
@@ -779,11 +713,6 @@
             end do
           end do
         end do
-!        print *, "u2  : ", u(178,2,:)
-!        print *, "uf  : ", uf(178,2,:)
-!        print *, "ub  : ", ub(178,2,:)
-!        print *, "tps : ", tps(178,2)
-!        if ( iint > 2 ) stop
 
         tps = 0.
 
