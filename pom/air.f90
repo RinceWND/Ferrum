@@ -617,16 +617,6 @@ module air
 ! If solar radiation does not penetrate water
       if ( nbct == 1 ) wtsurf = wtsurf + swrad
 
-! Simple parameterisation
-!  Assume that at least 10% solar penetration exists even at 10/10 sea ice concentration.
-! Scale linearly the rest.
-!  Assume that there is no thermal radiation from sea at 10/10 concentrations.
-! To adjust subice sea temperature surface relaxation is being used at the moment.
-!  Assume that there is no salt exchange at 10/10 concentrations.
-      swrad  =  swrad*(1.-icec*0.9)
-      wtsurf = wtsurf*(1.-icec)! + itsurf*icec
-      wssurf = wssurf*(1.-icec)
-
       if ( spinup ) then
         swrad  = 0.
         wssurf = 0.
@@ -831,18 +821,6 @@ module air
 
 ! If solar radiation does not penetrate water
       if ( nbct == 1 ) wtsurf = wtsurf + swrad
-
-! Simple parameterisation
-      swrad  =  swrad*(1.-icec*0.9)
-      wtsurf = wtsurf*(1.-icec)! + itsurf*icec ! [TODO] itsurf is unstable after spinup for some reason
-      wssurf = wssurf*(1.-icec)
-!      wusurf = icec*tauiwu/rhoref + (1.-icec)*wusurf
-!      wvsurf = icec*tauiwv/rhoref + (1.-icec)*wvsurf
-!      print *, "WT:", minval(wtsurf), maxval(wtsurf)
-!      print *, "WS:", minval(wssurf), maxval(wssurf)
-!      print *, "IT:", minval(itsurf), maxval(itsurf)
-!      print *, "SW:", minval(swrad) , maxval(swrad)
-!      print *, "Ci:", minval(icec)  , maxval(icec)
 
       if ( TAPER_BRY ) call taper_forcing
 
@@ -1078,6 +1056,7 @@ module air
       use glob_domain, only: im, jm !    , my_task
       use grid       , only: east_e, fsm, north_e
       use glob_ocean , only: rho, s, t, u, v
+      use seaice     , only: icec
       use config     , only: tbias, sbias
       use model_run  , only: dtime
 
@@ -1098,13 +1077,12 @@ module air
              , sol_net, sp, ss, sstk, stp    &
              , tnowk                         &
              , usrf, vsrf                    &
-             , wair, wflux, wsatair, wsatoce
-      real(rk), dimension(im,jm) :: pme ! Precipitation minus evaporation [m/s]
+             , wair, wsatair, wsatoce
 
 
       const = expsi/Ps ! 0.622/1013.
 
-      do j = 1,jm
+      do j = 1,jm ! TODO: Start from index 2?
       do i = 1,im
 
         if ( fsm(i,j,1) == 0. ) cycle
@@ -1166,27 +1144,10 @@ module air
 ! --- w(Ta)
 !
         wair = .01_rk * humnow * wsatair
-!            if ( isnan(wair) ) then
-!              print *, "[ WAIR ]"
-!              print *, "humnow", humnow
-!              print *, "wsatair", wsatair
-!              print *, "pnow", pnow
-!              print *, "esatair", esatair
-!              stop
-!            end if
 !
 ! --- calculates the density of  moist air
 !
-        rhom = 100._rk*(pnow/Rd)*(expsi*(1.+wair)/(tnowk*(expsi+wair)))
-!            if ( isnan(rhom) ) then
-!              print *, "[ RHOM ]"
-!              print *, "pnow", pnow
-!              print *, "Rd", Rd
-!              print *, "expsi", expsi
-!              print *, "wair", wair
-!              print *, "tnowk", tnowk
-!              stop
-!            end if
+        rhom = 100._rk*(pnow/Rd)*(expsi*(1._rk+wair)/(tnowk*(expsi+wair)))
 !
 !---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 ! Calculate the net longwave radiation flux at the sea surface (QBW)
@@ -1196,14 +1157,14 @@ module air
 ! Sea, J.Geophys Res., 100, 2501-2514.
 !---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !
-        ea12 = .01_rk*humnow*esatair
+        ea12 = .01_rk * humnow * esatair
 
         select case ( LWRAD_FORMULA )
 
           case ( lwBIGNAMI )
             QBW = .98_rk*sigma*sstk**4 - sigma*tnowk**4  &
                  *(  .653_rk + .00535_rk*ea12    )       &
-                 *( 1._rk    + .1762_rk *cld*cld )
+                 *( 1.   _rk + .1762 _rk*cld*cld )
 
           case ( lwMAY )
             if ( cld < 0._rk ) cld = 0._rk
@@ -1241,8 +1202,11 @@ module air
                            , DEG2RAD*east_e(i,j)                 &
                            , DEG2RAD*north_e(i,j), cld )
 
-! --- 1. Divide net solar radiation flux by rho*Cpw and reverse sign
-          swrad(i,j) = -sol_net/rho_cpw
+! 1. Divide net solar radiation flux by rho*Cpw and reverse sign
+! 2. Simple parameterisation:
+!   Assume that at least 10% solar penetration exists even at 10/10 sea ice concentration.
+!   Scale linearly the rest.
+          swrad(i,j) = -sol_net/rho_cpw*(1._rk-icec(i,j)*.9_rk)
         end if
 !
 
@@ -1321,7 +1285,7 @@ module air
 !
 ! --- calculates the term : esat(Ts)-r*esat(Ta)
 !
-          EVAP = esatoce - humnow*.01_rk*esatair
+          EVAP = esatoce - ea12
 !
 ! --- calculate the term : Ce*|V|*[esat(Ts)-r*esat(Ta)]0.622/1013
 ! --- Evaporation rate [kg/(m2*sec)]
@@ -1336,20 +1300,14 @@ module air
         end if
 !
 !---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-! Calculate the water flux (WFLUX) in m/sec
+!  Calculate the salt flux [psu m/s].
+! Assume that there is no salt exchange at 10/10 concentrations.
+! FIXME: This should be calculated using forward step salinity `vf`.
+!        However, this routine executes at the beginning of each step
+!       so it uses already filtered (now-step) salinity.
 !---- -- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !
-        WFLUX =  evap/rhoref - precip
-
-        pme(i,j)= -wflux
-!            if ( isnan(pme(i,j)) ) then
-!              print *, "[[[[[[]]]]]]"
-!              print *, "pme: ", pme(i,j)
-!              print *, "wflux: ", wflux
-!              print *, "evap: ", evap
-!              print *, "precip: ", precip
-!              stop
-!            end if
+        wssurf(i,j) = ( precip - evap/rhoref )*(s(i,j,1)+sbias)
 !
 ! Important note for Princeton Ocean Model users:
 ! THE SALT FLUX ( WSSURF() ) IN POM MAIN CODE (REQUIRED FOR PROFT) SHOULD
@@ -1390,19 +1348,7 @@ module air
 !            wusurf(i,j) = -taux/rho
 !            wvsurf(i,j) = -tauy/rho
 
-!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-! Multiply all fluxes by model mask
-!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-!
-        wusurf(i,j) = wusurf(i,j) !*fsm(i,j,1) ! REM:? No need to apply mask, since we do not execute the loop cycle if the mask is 0.
-        wvsurf(i,j) = wvsurf(i,j) !*fsm(i,j,1)
-        wtsurf(i,j) = wtsurf(i,j) !*fsm(i,j,1)
-        wssurf(i,j) = pme(i,j)*(s(i,j,1)+sbias) !*fsm(i,j,1) ! sb? vf?
-!        if ( abs(wssurf(i,j)).gt.1.e-2 ) then
-!          print *, wssurf(i,j), pme(i,j), s(i,j,1)
-!          stop
-!        end if
-
+! Apply DqDsst correction
         if ( USE_DQDSST ) then ! From Roms_tools (Penven, Pierrick, et al. "Software tools for pre-and post-processing of oceanic regional simulations." Environmental Modelling & Software 23.5 (2008): 660-662.)
           wtsurf(i,j) = wtsurf(i,j)                                 &
                       + ( 4._rk*sigma*tnowk**3                      &
@@ -1413,6 +1359,17 @@ module air
                            *.620689655_rk )                         &
                         ) * (sst_model-sst(i,j,1)) / rho_cpw
         end if
+
+!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+! Apply ice cover simple parameterisation.
+!  1. Assume that there is no thermal radiation from sea at 10/10 concentrations.
+!    To adjust subice sea temperature surface relaxation is being used at the moment.
+!  2. Assume that there is no salt exchange at 10/10 concentrations.
+!  NB: shortwave radiation applies right after computation.
+!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+!
+        wtsurf(i,j) = wtsurf(i,j)*( 1._rk - icec(i,j) )
+        wssurf(i,j) = wssurf(i,j)*( 1._rk - icec(i,j) )
 
       end do
       end do
