@@ -1342,11 +1342,12 @@ module air
 !  1. Assume that there is no thermal radiation from sea at 10/10 concentrations.
 !    To adjust subice sea temperature surface relaxation is being used at the moment.
 !  2. Assume that there is no salt exchange at 10/10 concentrations.
+!  3. Make square of free water fraction to make ice more impactful.
 !  NB: shortwave radiation applies right after computation.
 !---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !
-        wtsurf(i,j) = wtsurf(i,j)*( 1._rk - icec(i,j) )
-        wssurf(i,j) = wssurf(i,j)*( 1._rk - icec(i,j) )
+        wtsurf(i,j) = wtsurf(i,j)*( 1._rk - icec(i,j) )**2
+        wssurf(i,j) = wssurf(i,j)*( 1._rk - icec(i,j) )**2
 
       end do
       end do
