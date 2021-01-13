@@ -1366,7 +1366,7 @@ module air
 !    rh = relative humidity (%) at height zq(m)
 !     P = surface air pressure (mb) (default = 1015)
 !    ts = water temperature (degC)
-!    Rs = downward shortwave radiation (W/m^2) (default = 150)
+!    Rs = net shortwave radiation (W/m^2) (default = 130?)
 !    Rl = downward longwave radiation (W/m^2) (default = 370)
 !   lat = latitude
 !    zi = PBL height (m) (default = 600m)
@@ -1573,7 +1573,7 @@ module air
       hsb = hsb + RF
 
 ! Evaporation rate
-      wbar = 1.61_rk*hlb/(1._rk+1.61_rk*Q) + Le*hsb/(cpa*ta)
+      wbar = 1.61_rk*hlb + Le*hsb/(cpa*ta)*(1._rk+1.61_rk*Q)
       hlb  = hlb + wbar*Q
       Evap = hlb/Le          ! evaporation rate [kg/m^2/s]
 
