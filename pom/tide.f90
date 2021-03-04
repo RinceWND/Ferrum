@@ -126,7 +126,7 @@ module tide
     integer                   k      ! Wave number
     real(rk), dimension(4) :: V      ! Astronomical constants
     real(rk), dimension(3) :: u      ! Astronomical constants
-    real(rk), dimension(4) :: f      ! Reduction constants
+    real(rk), dimension(5) :: f      ! Reduction constants
   end type
 
   type(T_constituent), dimension(CONS_OVERALL) :: con
@@ -952,6 +952,7 @@ module tide
       do i = 1, int(ncons)
         this_con = get_constituent( constituent(i) )
         f  = this_con%f(1) + this_con%f(2)*cos(N) + this_con%f(3)*cos(2.*N) + this_con%f(4)*cos(3.*N)
+        f  = f**this_con%f(5) ! TODO: Make this more dynamic to include cases of other kinds of calculations for `f`.
         uv = this_con%V(1) + this_con%V(2)*s      + this_con%V(3)*h         + this_con%V(4)*p
         uv = uv            + this_con%u(1)*sin(N) + this_con%u(2)*sin(2.*N) + this_con%u(3)*sin(3.*N)
         tide_el(im,:) = tide_el(im,:) + f*el_amp(im,:,i)*cos( (this_con%speed*tick + uv - el_pha(im,:,i))*DEG2RAD )
@@ -1029,6 +1030,7 @@ module tide
 !  wavenumber - tidal wavenumber !TODO: Not sure about this word. Maybe tidal constituent subscript?
 !  V_arg      - constants of equilibrium argument (V + u): [ a, p, s, h ]
 !  u_arg      - coefficients for (V + u) argument
+!  f_arg      - coefficients for f argument
 !
 !  The corresponding coefficients are derived from u formulation for
 ! each constituent as in Table II of "Руководство по обработке и
@@ -1056,9 +1058,11 @@ module tide
       real(rk)    , intent(in) :: speed
       integer     , intent(in) :: wavenumber
       real        , dimension(4)  &
-                  , intent(in) :: V_arg, f_arg
+                  , intent(in) :: V_arg
       real        , dimension(3)  &
                   , intent(in) :: u_arg
+      real        , dimension(5)  &
+                  , intent(in) :: f_arg
 
 
       specify_constituent % name  = name
