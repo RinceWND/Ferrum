@@ -4140,8 +4140,8 @@
           vf(i,j,kb(i,j)-1) = ( c (i,j,kb(i,j)-1)*gg(i,j,kb(i,j)-2)
      &                        - vf(i,j,kb(i,j)-1) )
      &                       /( tps(i,j)*dti2*2._rk
-     &                                       /( -dzf(i  ,j,kb(i,j)-1)
-     &                                          -dzf(i-1,j,kb(i,j)-1) )
+     &                                       /( -dzf(i,j  ,kb(i,j)-1)
+     &                                          -dzf(i,j-1,kb(i,j)-1) )
      &                        - 1._rk
      &                        - ( ee(i,j,kb(i,j)-2)-1._rk )
      &                         *c (i,j,kb(i,j)-1) )
