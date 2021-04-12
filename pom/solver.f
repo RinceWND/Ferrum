@@ -3948,7 +3948,7 @@
       end do
 
       do j=2,jmm1
-        do i=2,imm1
+        do i=2,im
           tps(i,j)=0.5*(cbc(i,j)+cbc(i-1,j))
      $              *sqrt(ub(i,j,kbm1)**2
      $                +(.25*(vb(i,j,kbm1)+vb(i,j+1,kbm1)
@@ -3963,18 +3963,18 @@
       do k=2,kbm1
         ki=kb-k
         do j=2,jmm1
-          do i=2,imm1
+          do i=2,im
             uf(i,j,ki)=(ee(i,j,ki)*uf(i,j,ki+1)+gg(i,j,ki))*dum(i,j,k)
           end do
         end do
       end do
 
       do j=2,jmm1
-        do i=2,imm1
+        do i=2,im
           wubot(i,j)=-tps(i,j)*uf(i,j,kbm1)
         end do
       end do
-      call exchange2d_mpi(wubot,im,jm)
+!      call exchange2d_mpi(wubot,im,jm) ! FIXME: Needed? Calculation from 2 to im should cover every call to wubot for each thread. Right...? (Same for provf)
 
 
       end ! subroutine profu
@@ -4054,7 +4054,7 @@
         end do
       end do
 
-      do j=2,jmm1
+      do j=2,jm
         do i=2,imm1
           tps(i,j)=0.5*(cbc(i,j)+cbc(i,j-1))
      $              *sqrt((.25*(ub(i,j,kbm1)+ub(i+1,j,kbm1)
@@ -4069,19 +4069,19 @@
 
       do k=2,kbm1
         ki=kb-k
-        do j=2,jmm1
+        do j=2,jm
           do i=2,imm1
             vf(i,j,ki)=(ee(i,j,ki)*vf(i,j,ki+1)+gg(i,j,ki))*dvm(i,j,k)
           end do
         end do
       end do
 
-      do j=2,jmm1
+      do j=2,jm
         do i=2,imm1
           wvbot(i,j)=-tps(i,j)*vf(i,j,kbm1)
         end do
       end do
-      call exchange2d_mpi(wvbot,im,jm)
+!      call exchange2d_mpi(wvbot,im,jm)
 
 
       end ! subroutine profv
