@@ -3973,8 +3973,10 @@
         do i=2,im
           wubot(i,j)=-tps(i,j)*uf(i,j,kbm1)
         end do
+        wubot(1,j)=wubot(2,j) ! For domain boundaries
       end do
-!      call exchange2d_mpi(wubot,im,jm) ! FIXME: Needed? Calculation from 2 to im should cover every call to wubot for each thread. Right...? (Same for provf)
+      call exchange2d_mpi(wubot,im,jm) ! FIXME: This is needed since profq reads all range from 1 to im. So, naturally it needs (domain) boundary values as well.
+                                       ! TODO: Copy bottom stress to domain boundaries?
 
 
       end ! subroutine profu
@@ -4081,7 +4083,8 @@
           wvbot(i,j)=-tps(i,j)*vf(i,j,kbm1)
         end do
       end do
-!      call exchange2d_mpi(wvbot,im,jm)
+      wvbot(:,1) = wvbot(:,2) ! For domain boundaries
+      call exchange2d_mpi(wvbot,im,jm)
 
 
       end ! subroutine profv
