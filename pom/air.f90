@@ -656,6 +656,7 @@ module air
 !      use glob_domain, only: is_master
       use clim       , only: relax_surface
       use config     , only: nbct
+      use grid       , only: fsm
       use module_time
       use model_run  , only: dti, iint, sec_of_year
 !      use glob_const , only: rhoref
@@ -828,6 +829,8 @@ module air
 
 ! Relax surface to climatology
       call relax_surface( wssurf, wtsurf, sss, sst )
+      wtsurf = wtsurf*fsm(:,:,1)
+      wssurf = wssurf*fsm(:,:,1)
 
 
     end ! subroutine step
@@ -854,8 +857,8 @@ module air
       swrad  = swrad *taper_mask
       wssurf = wssurf*taper_mask
       wtsurf = wtsurf*taper_mask
-      wusurf = ramp*wusurf*taper_mask
-      wvsurf = ramp*wvsurf*taper_mask
+      !wusurf = ramp*wusurf*taper_mask
+      !wvsurf = ramp*wvsurf*taper_mask
 
 
     end ! subroutine
@@ -1511,7 +1514,7 @@ module air
 !          zet = von*grav*zu*(tsr*(1.+.61*Q))
         L  = zu/zet
         zo = charn*usr*usr/grav + .11_rk*visa/usr      ! surface roughness
-!          if (zo<1.d-10) zo = 1.d-10
+!        zo = max( zo, 1.e-10_rk )
         rr = zo*usr/visa
 !        zoq= min(1.6e-4_rk, 5.8e-5_rk/rr**.72)        ! These thermal roughness lengths give Stanton and
 !        zot= zoq                                      ! Dalton numbers that closely approximate COARE 3.0
@@ -1524,7 +1527,7 @@ module air
         cdhf = von    /(log(zu/zo) - psiu_26(zu/L))
         cqhf = von*fdg/(log(zq/zoq)- psit_26(zq/L))
         cthf = von*fdg/(log(zt/zot)- psit_26(zt/L))
-        usr  = ut*cdhf
+        usr  = max( 1.e-10_rk, ut*cdhf )
         qsr  =-(dq-wetc*dter*jcool)*cqhf
         tsr  =-(dt-     dter*jcool)*cthf
         tvsr = tsr+.61_rk*ta*qsr
