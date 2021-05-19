@@ -549,8 +549,7 @@
       use glob_const , only: rk
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
-      use mpi        , only: mpi_recv, mpi_send
-     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_REAL
      &                     , MPI_STATUS_SIZE
 
       implicit none
