@@ -2003,7 +2003,6 @@
       use glob_domain, only: im_global, im_local, my_task
      &                     , n_east, n_west, POM_COMM
       use mpi        , only: MPI_REAL, MPI_STATUS_SIZE
-     &                     , mpi_recv, mpi_send
 
       implicit none
 
@@ -2118,7 +2117,6 @@
       use glob_domain, only: im_global, im_local, my_task
      &                     , n_east, n_west, POM_COMM
       use mpi        , only: MPI_REAL, MPI_STATUS_SIZE
-     &                     , mpi_recv, mpi_send
 
       implicit none
 
@@ -2247,7 +2245,6 @@
       use glob_domain, only: jm_global, jm_local, my_task
      &                     , n_north, n_south, POM_COMM
       use mpi        , only: MPI_REAL, MPI_STATUS_SIZE
-     &                     , mpi_recv, mpi_send
 
       implicit none
 
@@ -2360,7 +2357,6 @@
       use glob_domain, only: jm_global, jm_local, my_task
      &                     , n_north, n_south, POM_COMM
       use mpi        , only: MPI_REAL, MPI_STATUS_SIZE
-     &                     , mpi_recv, mpi_send
 
       implicit none
 

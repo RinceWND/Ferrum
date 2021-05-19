@@ -2110,7 +2110,6 @@
         use grid       , only: dx, dy, fsm, h
         use model_run  , only: dte
         use mpi        , only: MPI_DOUBLE, MPI_MIN, MPI_REAL
-     &                       , mpi_reduce
 
         implicit none
 

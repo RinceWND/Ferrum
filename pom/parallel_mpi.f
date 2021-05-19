@@ -11,7 +11,7 @@
 
       use glob_domain, only: error_status, is_master, master_task
      &                     , my_task     , POM_COMM , POM_COMM_COARSE
-      use mpi        , only: mpi_comm_rank, mpi_init, MPI_COMM_WORLD
+      use mpi        , only: MPI_COMM_WORLD
 
       implicit none
 
@@ -301,8 +301,7 @@
 
       use glob_const , only: rk
       use glob_domain, only: POM_COMM
-      use mpi        , only: mpi_reduce
-     &                     , MPI_INTEGER, MPI_SUM
+      use mpi        , only: MPI_INTEGER, MPI_SUM
 
       implicit none
 
@@ -328,8 +327,7 @@
 
       use glob_const , only: rk
       use glob_domain, only: POM_COMM
-      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_REAL
-     &                     , mpi_reduce          , MPI_SUM
+      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_REAL, MPI_SUM
 
       implicit none
 
@@ -360,8 +358,7 @@
 
       use glob_const , only: rk
       use glob_domain, only: POM_COMM
-      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_MAX
-     &                     , MPI_REAL            , mpi_reduce
+      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_MAX, MPI_REAL
 
       implicit none
 
@@ -391,7 +388,7 @@
 !______________________________________________________________________
 
       use glob_domain, only: POM_COMM
-      use mpi        , only: mpi_bcast, MPI_INTEGER
+      use mpi        , only: MPI_INTEGER
 
       implicit none
 
@@ -415,8 +412,7 @@
 
       use glob_const , only: rk
       use glob_domain, only: POM_COMM
-      use mpi        , only: mpi_bcast
-     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_REAL
 
       implicit none
 
@@ -448,8 +444,7 @@
       use glob_const , only: rk
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
-      use mpi        , only: mpi_recv            , mpi_send
-     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_REAL
      &                     , MPI_STATUS_SIZE
 
       implicit none
@@ -683,8 +678,7 @@
 
       use glob_const , only: rk
       use glob_domain, only: is_master, n_proc, POM_COMM
-      use mpi        , only: MPI_DOUBLE_PRECISION, mpi_gather
-     &                     , MPI_REAL
+      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_REAL
 
       implicit none
 
@@ -732,8 +726,7 @@
       use glob_const , only: rk
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
-      use mpi        , only: mpi_recv            , mpi_send
-     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_REAL
      &                     , MPI_STATUS_SIZE
 
       implicit none
@@ -806,8 +799,7 @@
       use glob_const , only: rk
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
-      use mpi        , only: mpi_recv            , mpi_send
-     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_REAL
      &                     , MPI_STATUS_SIZE
 
       implicit none
