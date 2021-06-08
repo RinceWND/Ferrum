@@ -14,6 +14,9 @@ module glob_const
                          , MODE_BAROCLINIC = 3  & ! Baroclinic 3-D mode
                          , MODE_DIAGNOSTIC = 4    ! Diagnostic 3-D mode with time-invariant temperature and salinity
 
+  integer            &
+    MPI_RK             ! real precision for mpi routines
+
   real(rk)           &
     c2k              & ! Celcius to Kelvin
   , cpw              & ! seawater specific heat

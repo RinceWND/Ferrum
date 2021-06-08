@@ -849,24 +849,14 @@ module tide
         allocate( tmp( im, jm, ncons )    &
                 , var( im, jm, ncons ) )
 
-! MUST NOT rotate phases, but the resulting tidal vectors... TODO: Does rotation of amplitude do the job?
+! Rotating only the amplitudes does the job
         do i = 1, int(ncons)
           tmp(:,:,i) = ua_amp(:,:,i)*cos(rot) - va_amp(:,:,i)*sin(rot)
           var(:,:,i) = ua_amp(:,:,i)*sin(rot) + va_amp(:,:,i)*cos(rot)
         end do
+! Convert cm to meters
         ua_amp = tmp/100.
         va_amp = var/100.
-
-        ! do i = 1, int(ncons)
-          ! tmp(:,:,i) = ua_pha(:,:,i)*cos(rot) - va_pha(:,:,i)*sin(rot)
-          ! var(:,:,i) = ua_pha(:,:,i)*sin(rot) + va_pha(:,:,i)*cos(rot)
-        ! end do
-        ! where ( tmp >  180. ) tmp = tmp - 360.
-        ! where ( tmp < -180. ) tmp = tmp + 360.
-        ! where ( var >  180. ) var = var - 360.
-        ! where ( var < -180. ) var = var + 360.
-        ! ua_pha = tmp
-        ! va_pha = var
 
         deallocate( tmp, var )
 
