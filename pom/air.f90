@@ -617,16 +617,6 @@ module air
 ! If solar radiation does not penetrate water
       if ( nbct == 1 ) wtsurf = wtsurf + swrad
 
-! Simple parameterisation
-!  Assume that at least 10% solar penetration exists even at 10/10 sea ice concentration.
-! Scale linearly the rest.
-!  Assume that there is no thermal radiation from sea at 10/10 concentrations.
-! To adjust subice sea temperature surface relaxation is being used at the moment.
-!  Assume that there is no salt exchange at 10/10 concentrations.
-      swrad  =  swrad*(1.-icec*0.9)
-      wtsurf = wtsurf*(1.-icec)! + itsurf*icec
-      wssurf = wssurf*(1.-icec)
-
       if ( spinup ) then
         swrad  = 0.
         wssurf = 0.
@@ -666,6 +656,7 @@ module air
 !      use glob_domain, only: is_master
       use clim       , only: relax_surface
       use config     , only: nbct
+      use grid       , only: fsm
       use module_time
       use model_run  , only: dti, iint, sec_of_year
 !      use glob_const , only: rhoref
@@ -831,26 +822,14 @@ module air
 ! If solar radiation does not penetrate water
       if ( nbct == 1 ) wtsurf = wtsurf + swrad
 
-! Simple parameterisation
-      swrad  =  swrad*(1.-icec*0.9)
-      wtsurf = wtsurf*(1.-icec)! + itsurf*icec ! [TODO] itsurf is unstable after spinup for some reason
-      wssurf = wssurf*(1.-icec)
-!      wusurf = icec*tauiwu/rhoref + (1.-icec)*wusurf
-!      wvsurf = icec*tauiwv/rhoref + (1.-icec)*wvsurf
-!      print *, "WT:", minval(wtsurf), maxval(wtsurf)
-!      print *, "WS:", minval(wssurf), maxval(wssurf)
-!      print *, "IT:", minval(itsurf), maxval(itsurf)
-!      print *, "SW:", minval(swrad) , maxval(swrad)
-!      print *, "Ci:", minval(icec)  , maxval(icec)
-
       if ( TAPER_BRY ) call taper_forcing
 
       if ( .false. ) call river_flux
 
-! Relax surface to climatology
-      if ( read_bulk ) then
-        call relax_surface( wssurf, wtsurf, sss, sst )
-      end if
+! Relax surface to climatology (FIXME: should this call be screened with `read_bulk`?)
+      call relax_surface( wssurf, wtsurf, sss, sst )
+      wtsurf = wtsurf*fsm(:,:,1)
+      wssurf = wssurf*fsm(:,:,1)
 
 
     end ! subroutine step
@@ -877,8 +856,8 @@ module air
       swrad  = swrad *taper_mask
       wssurf = wssurf*taper_mask
       wtsurf = wtsurf*taper_mask
-      wusurf = ramp*wusurf*taper_mask
-      wvsurf = ramp*wvsurf*taper_mask
+      !wusurf = ramp*wusurf*taper_mask
+      !wvsurf = ramp*wvsurf*taper_mask
 
 
     end ! subroutine
@@ -1062,7 +1041,7 @@ module air
 ! 7.  VAIR() : Y-COMPONENT OF AIR VELOCITY (in m/s) AT 10m ABOVE SEA SURFACE
 ! 8.  TAIR() : AIR TEMPERATURE (in deg Kelvin) AT 2m ABOVE SEA SURFACE
 ! 9.  RHUM() : RELATIVE HUMIDITY (%) AT 2m ABOVE SEA SURFACE
-! 10. RAIN() : PRECIPITATION RATE (in m/s)
+! 10. RAIN() : PRECIPITATION RATE (in kg/m^2/s)
 ! 11. CLOUD()  : CLOUD COVERAGE IN TENTHS (0.-->1.)
 ! 12. PRES() : ATMOSPHERIC PRESSURE AT SURFACE (hPa)
 !
@@ -1079,6 +1058,7 @@ module air
       use glob_domain, only: im, jm !    , my_task
       use grid       , only: east_e, fsm, north_e
       use glob_ocean , only: rho, s, t, u, v
+      use seaice     , only: icec
       use config     , only: tbias, sbias
       use model_run  , only: dtime
 
@@ -1099,13 +1079,12 @@ module air
              , sol_net, sp, ss, sstk, stp    &
              , tnowk                         &
              , usrf, vsrf                    &
-             , wair, wflux, wsatair, wsatoce
-      real(rk), dimension(im,jm) :: pme ! Precipitation minus evaporation [m/s]
+             , wair, wsatair, wsatoce
 
 
       const = expsi/Ps ! 0.622/1013.
 
-      do j = 1,jm
+      do j = 1,jm ! TODO: Start from index 2?
       do i = 1,im
 
         if ( fsm(i,j,1) == 0. ) cycle
@@ -1117,7 +1096,7 @@ module air
         pnow      = pres(i,j,1)
         rnow      =  rho(i,j,1)*rhoref + 1000._rk
         humnow    = humid(i,j,1)
-        precip    = rain(i,j,1)/1000._rk ! rwnd: precipitation rate from kg/(m2*s) to m/s
+        precip    = rain(i,j,1)
         cld       = maxval((/0._rk,cloud(i,j,1)/100._rk/)) ! rwnd: total cloud cover from % to tenths
         sst_model = t(i,j,1) + tbias
         lwrd      = dlrad(i,j,1)
@@ -1167,27 +1146,10 @@ module air
 ! --- w(Ta)
 !
         wair = .01_rk * humnow * wsatair
-!            if ( isnan(wair) ) then
-!              print *, "[ WAIR ]"
-!              print *, "humnow", humnow
-!              print *, "wsatair", wsatair
-!              print *, "pnow", pnow
-!              print *, "esatair", esatair
-!              stop
-!            end if
 !
 ! --- calculates the density of  moist air
 !
-        rhom = 100._rk*(pnow/Rd)*(expsi*(1.+wair)/(tnowk*(expsi+wair)))
-!            if ( isnan(rhom) ) then
-!              print *, "[ RHOM ]"
-!              print *, "pnow", pnow
-!              print *, "Rd", Rd
-!              print *, "expsi", expsi
-!              print *, "wair", wair
-!              print *, "tnowk", tnowk
-!              stop
-!            end if
+        rhom = 100._rk*(pnow/Rd)*(expsi*(1._rk+wair)/(tnowk*(expsi+wair)))
 !
 !---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 ! Calculate the net longwave radiation flux at the sea surface (QBW)
@@ -1197,17 +1159,16 @@ module air
 ! Sea, J.Geophys Res., 100, 2501-2514.
 !---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !
-        ea12 = .01_rk*humnow*esatair
+        ea12 = .01_rk * humnow * esatair
 
         select case ( LWRAD_FORMULA )
 
           case ( lwBIGNAMI )
             QBW = .98_rk*sigma*sstk**4 - sigma*tnowk**4  &
                  *(  .653_rk + .00535_rk*ea12    )       &
-                 *( 1._rk    + .1762_rk *cld*cld )
+                 *( 1.   _rk + .1762 _rk*cld*cld )
 
           case ( lwMAY )
-            if ( cld < 0._rk ) cld = 0._rk
             QBW = ( 1._rk - .75_rk*(cld**3.4_rk) )                 &
                  *( sigma*(tnowk**4)*( .4_rk - .05_rk*sqrt(ea12) ) &
                   + 4._rk*sigma*(tnowk**3)*(sstk-tnowk) )
@@ -1242,41 +1203,22 @@ module air
                            , DEG2RAD*east_e(i,j)                 &
                            , DEG2RAD*north_e(i,j), cld )
 
-! --- 1. Divide net solar radiation flux by rho*Cpw and reverse sign
-          swrad(i,j) = -sol_net/rho_cpw
+! 1. Divide net solar radiation flux by rho*Cpw and reverse sign
+! 2. Simple parameterisation:
+!   Assume that at least 10% solar penetration exists even at 10/10 sea ice concentration.
+!   Scale linearly the rest.
+          swrad(i,j) = -sol_net/rho_cpw*(1._rk-icec(i,j)*.9_rk)
         end if
 !
 
         if ( USE_COARE ) then
 
-          call coare( (sqrt((unow-usrf)**2+(vnow-vsrf)**2)),      &
-                      10._rk, temp(i,j,1), 2._rk, humnow, 2._rk,  &
-                      pnow,sst_model,sol_net,lwrd,north_e(i,j),   &
-                      pblh, (3.6e6_rk*precip), 0._rk, 0._rk,   &
-                      QH, QE, Evap, ch2, ce2 )
-!            Evap = Evap*rho/3.6e6
-!            if (my_task==1.and.i==50.and.j==50) then
-!!            print *, "3.5 EVAP: ", Evap
-!            write(61, '(6(f12.7,x),f12.7)') QE,QH,QBW,sol_net,
-!     &                           (qbw+qh+qe-sol_net),lwrd,3.6e6*precip
-!            end if
-
-!            call coare30((unow-usurf(i,j)),(vnow-vsurf(i,j)),
-!     &                    10._rk, tair(i,j), 2._rk, rhnow, 2._rk,
-!     &                    pnow,sst_model,rnow,cld,precip*1000.,sol_net,
-!     &                   -QBW, QH, QE, Evap )
-
-!            if (my_task==1.and.i==50.and.j==50) then
-!!            print *, "3.5 EVAP: ", Evap
-!            write(62, '(6(f12.7,x),f12.7)') QE,QH,QBW,sol_net,
-!     &                           (qbw+qh+qe-sol_net),lwrd,precip*1000.
-!            end if
-!            if (i==50.and.j==50) then
-!            print *, "3.0 EVAP: ", Evap
-!            print *, "3.0 QE:   ", QE
-!            print *, "3.0 QH:   ", QH
-!            print *, "RAIN===   ", precip
-!            end if
+          call coare( (sqrt((unow-usrf)**2+(vnow-vsrf)**2)), 10._rk  &
+                    , temp(i,j,1), 2._rk, humnow, 2._rk, pnow        &
+                    , sst_model, -swrad(i,j)*rho_cpw, lwrd           &
+                    , north_e(i,j), pblh, precip                     &
+                    , QH, QE, Evap, ch2, ce2 )
+                    ! TODO: Add Cd return value for possible use.
 
         else
 ! Calculate turbulent exchange coefficients according to Kondo scheme
@@ -1322,7 +1264,7 @@ module air
 !
 ! --- calculates the term : esat(Ts)-r*esat(Ta)
 !
-          EVAP = esatoce - humnow*.01_rk*esatair
+          EVAP = esatoce - ea12
 !
 ! --- calculate the term : Ce*|V|*[esat(Ts)-r*esat(Ta)]0.622/1013
 ! --- Evaporation rate [kg/(m2*sec)]
@@ -1337,20 +1279,14 @@ module air
         end if
 !
 !---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-! Calculate the water flux (WFLUX) in m/sec
+!  Calculate the salt flux [psu m/s].
+! Assume that there is no salt exchange at 10/10 concentrations.
+! FIXME: This should be calculated using forward step salinity `vf`.
+!        However, this routine executes at the beginning of each step
+!       so it uses already filtered (now-step) salinity.
 !---- -- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !
-        WFLUX =  evap/rhoref - precip
-
-        pme(i,j)= -wflux
-!            if ( isnan(pme(i,j)) ) then
-!              print *, "[[[[[[]]]]]]"
-!              print *, "pme: ", pme(i,j)
-!              print *, "wflux: ", wflux
-!              print *, "evap: ", evap
-!              print *, "precip: ", precip
-!              stop
-!            end if
+        wssurf(i,j) = ( precip - evap )*( s(i,j,1)+sbias )/rhoref
 !
 ! Important note for Princeton Ocean Model users:
 ! THE SALT FLUX ( WSSURF() ) IN POM MAIN CODE (REQUIRED FOR PROFT) SHOULD
@@ -1391,19 +1327,7 @@ module air
 !            wusurf(i,j) = -taux/rho
 !            wvsurf(i,j) = -tauy/rho
 
-!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-! Multiply all fluxes by model mask
-!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-!
-        wusurf(i,j) = wusurf(i,j) !*fsm(i,j,1) ! REM:? No need to apply mask, since we do not execute the loop cycle if the mask is 0.
-        wvsurf(i,j) = wvsurf(i,j) !*fsm(i,j,1)
-        wtsurf(i,j) = wtsurf(i,j) !*fsm(i,j,1)
-        wssurf(i,j) = pme(i,j)*(s(i,j,1)+sbias) !*fsm(i,j,1) ! sb? vf?
-!        if ( abs(wssurf(i,j)).gt.1.e-2 ) then
-!          print *, wssurf(i,j), pme(i,j), s(i,j,1)
-!          stop
-!        end if
-
+! Apply DqDsst correction
         if ( USE_DQDSST ) then ! From Roms_tools (Penven, Pierrick, et al. "Software tools for pre-and post-processing of oceanic regional simulations." Environmental Modelling & Software 23.5 (2008): 660-662.)
           wtsurf(i,j) = wtsurf(i,j)                                 &
                       + ( 4._rk*sigma*tnowk**3                      &
@@ -1415,6 +1339,18 @@ module air
                         ) * (sst_model-sst(i,j,1)) / rho_cpw
         end if
 
+!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+! Apply ice cover simple parameterisation.
+!  1. Assume that there is no thermal radiation from sea at 10/10 concentrations.
+!    To adjust subice sea temperature surface relaxation is being used at the moment.
+!  2. Assume that there is no salt exchange at 10/10 concentrations.
+!  3. Make square of free water fraction to make ice more impactful.
+!  NB: shortwave radiation applies right after computation.
+!---- ------ ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+!
+        wtsurf(i,j) = wtsurf(i,j)*( 1._rk - icec(i,j) )**2
+        wssurf(i,j) = wssurf(i,j)*( 1._rk - icec(i,j) )**2
+
       end do
       end do
 
@@ -1424,7 +1360,7 @@ module air
 !______________________________________________________________________
 !
     subroutine coare( u, zu, t, zt, rh, zq, P, ts, Rs, Rl, lat        &
-                        ,zi, rain, cp, sigH, hsb, hlb, Evap, ch, ce )
+                        ,zi, rain, hsb, hlb, Evap, ch, ce )
 !----------------------------------------------------------------------
 ! Input:
 !
@@ -1433,15 +1369,13 @@ module air
 !    rh = relative humidity (%) at height zq(m)
 !     P = surface air pressure (mb) (default = 1015)
 !    ts = water temperature (degC)
-!    Rs = downward shortwave radiation (W/m^2) (default = 150)
+!    Rs = net shortwave radiation (W/m^2) (default = 130?)
 !    Rl = downward longwave radiation (W/m^2) (default = 370)
 !   lat = latitude
 !    zi = PBL height (m) (default = 600m)
 !  rain = rain rate (mm/hr)
-!    cp = phase speed of dominant waves (m/s)
-!  sigH =  significant wave height (m)
 !
-! jcool=0 if surface temperature is true surface skin temperature,
+! jcool equals 0 if surface temperature is true surface skin temperature,
 !         otherwise ts is assumed the bulk temperature.
 !
 ! Reference:
@@ -1455,36 +1389,27 @@ module air
       integer(1), parameter   :: jcool = 1
 
       real(rk), intent(in   ) :: u,zu, t,zt, rh,zq, P, ts       &
-                               , Rs,Rl, lat, zi, rain, cp,sigH
+                               , Rs,Rl, lat, zi, rain
       real(rk), intent(  out) :: Ce, Ch
 
-      real(rk)  A, a1, a2, ad, Al, alq                             &
-              , B, Bd, be, Bf, Beta, bigc                          &
-              , CC, Cd, Cd10, cdhf, Ch10                           &
-              , charn, charnC, charnS, charnW, cpa, cpv            &
-              , cpw, cqhf, Ct, Ct10, cthf                          &
-              , dels, dq, dqer, dt, dter                           &
-              , Evap, fdg, gf, grav                                &
-              , hbb, hlb, hlwebb, hsb, hsbb                        &
-              , L, L10, Le                                  &
-              , Pv, Q, qcol, qout       &
-              , Qs, qsr                          &
-              , Rgas, rhoa, rhodry, rhow           &
-              , Ribcu, Ribu, Rnl, Rns, rr        &
-              , ta, tau, tcw, tdk, tkt  &
-              , tsr, tssr, tvsr                  &
-              , u10, u10N, ug, umax     &
-              , usr, ut, visa, visw, von, wbar, wetc        &
-              , xlamx, zet, zetu, zo, zo10, zoq, zoS, zot, zot10   &
-              , zref
+      real(rk)  a1, a2, Al, alfac, alq, be, Bf, Beta, bigc         &
+              , CC, Cd, Cd10, cdhf, Ch10, charn                    &
+              , cpa, cpv, cpw, cqhf, Ct, Ct10, cthf                &
+              , dels, dq, dqer, dqs_dt, dt, dter, dtmp, dwat       &
+              , Evap, fdg, gf, grav, hbb, hlb, hsb, hsbb           &
+              , L, L10, Le, Pv, Q, qcol, qout, Qs, qsr             &
+              , RF, Rgas, rhoa, rhodry, rhow                       &
+              , Ribcu, Ribu, Rnl, Rns, rr                          &
+              , ta, tau, tcw, tdk, tkt, tsr, tssr, tvsr            &
+              , u10, u10N, ug, umax                                &
+              , usr, ut, visa, visw, von, wbar, wetc               &
+              , xlamx, zet, zetu, zo, zo10, zoq, zot, zot10, zref
 
       integer(1) nits, i
 
 
-      logical waveage, seastate
+      logical, parameter :: CLIMODE = .true.
 
-      waveage  = .false.
-      seastate = .false.
 
       L = 1.  ! compiler warning bypass
 
@@ -1518,14 +1443,14 @@ module air
       Al   = 2.1e-5_rk*( ts+3.2_rk )**.79_rk       ! Water thermal expansion coef.
       be   =  .026_rk                              ! Salinity expansion coef.
       cpw  = 4000._rk                              ! Specific heat of water [J/kg/K]
-      rhow = 1025._rk                              ! Seawater density
+      rhow = 1022._rk                              ! Seawater density
       visw = 1.e-6_rk                              ! Kinematic viscosity of water [m^2/s]
       tcw  =  .6  _rk                              ! Thermal conductivity of water [W/m/K]
       bigc = 16._rk*grav*cpw*(rhow*visw)**3 / (tcw**2 * rhoa**2)
       wetc =  .622_rk*Le*Qs / ( Rgas*(ts+tdk)**2 ) ! correction for dq;slope of sat. vap.
 
 !-----------  net radiation fluxes ---------------------------------------
-      Rns =  .945_rk * Rs                          ! albedo correction
+      Rns =  Rs !.945_rk * Rs                          ! albedo correction (Rs is already net SW rad)
       Rnl =  .97_rk*( 5.67e-8_rk*( ts-.3_rk*jcool+tdk )**4 - Rl) ! initial value
 
 !----------------  begin bulk loop --------------------------------------------
@@ -1569,30 +1494,13 @@ module air
 !  The following gives the new formulation for the
 !  Charnock variable
 !----------------------------------------------------------
-      charnC =   .011 _rk
+      charn  =   .011 _rk
       umax   = 22.    _rk ! 19.
       a1     =   .0016_rk !   .0017
       a2     =-  .0035_rk !-  .0050
 
-      charnC = max( a1*min(u10,umax)+a2, .011_rk )
+      charn  = max( a1*min(u10,umax)+a2, .011_rk )
 
-      A = .114_rk   ! wave-age dependent coefficients
-      B = .622_rk
-
-      Ad= .091_rk   ! Sea-state/wave-age dependent coefficients
-      Bd= 2.  _rk
-
-      charnW = A*(usr/cp)**B
-      zoS    = sigH*Ad*(usr/cp)**Bd
-      charnS = zoS*grav/usr/usr
-
-      charn = .011_rk !*ones(N,1);
-      if ( ut > 18. ) then
-        charn = .018_rk
-      elseif ( ut > 10. ) then
-        charn = .011_rk + (ut-10._rk)/8._rk*.007_rk ! ~/8. was ~/(18.-10.) and ~*.007 was ~*(.018-0.011)
-      end if
-!        charnC = charn ! Fix?
 
       nits = 10   ! number of iterations
 
@@ -1601,29 +1509,24 @@ module air
 
       do i = 1, nits
 
-        zet = von*grav*zu/ta*(tsr+.61_rk*ta*qsr)/(usr**2)
+        zet = von*grav*zu/ta*(tsr+.61_rk*ta*qsr)/(usr*usr)
 !          zet = von*grav*zu*(tsr*(1.+.61*Q))
-        if (waveage) then
-          if (seastate) then
-            charn = charnS
-          else
-            charn = charnW
-          end if
-        else
-          charn = charnC
-        end if
         L  = zu/zet
-        zo = charn*usr**2/grav + .11_rk*visa/usr      ! surface roughness
-!          if (zo<1.d-10) zo = 1.d-10
+        zo = charn*usr*usr/grav + .11_rk*visa/usr      ! surface roughness
+!        zo = max( zo, 1.e-10_rk )
         rr = zo*usr/visa
 !        zoq= min(1.6e-4_rk, 5.8e-5_rk/rr**.72)        ! These thermal roughness lengths give Stanton and
 !        zot= zoq                                      ! Dalton numbers that closely approximate COARE 3.0
-        zot = min( 1.00e-4_rk/rr**.55_rk, 2.4e-4_rk/rr**1.2_rk )
-        zoq = min( 1.15e-4_rk           , 5.5e-5_rk/rr** .6_rk )
+        zot = min( 1.e-4_rk/rr**.55_rk, 2.4e-4_rk/rr**1.2_rk )
+        if ( CLIMODE ) then
+          zoq = min( 2.e-5  _rk/rr**.22_rk, 1.1e-4_rk/rr**.9_rk )
+        else
+          zoq = min( 1.15e-4_rk           , 5.5e-5_rk/rr**.6_rk )
+        end if
         cdhf = von    /(log(zu/zo) - psiu_26(zu/L))
         cqhf = von*fdg/(log(zq/zoq)- psit_26(zq/L))
         cthf = von*fdg/(log(zt/zot)- psit_26(zt/L))
-        usr  = ut*cdhf
+        usr  = max( 1.e-10_rk, ut*cdhf )
         qsr  =-(dq-wetc*dter*jcool)*cqhf
         tsr  =-(dt-     dter*jcool)*cthf
         tvsr = tsr+.61_rk*ta*qsr
@@ -1651,10 +1554,7 @@ module air
         dqer = wetc*dter
         Rnl  = .97_rk*( 5.67e-8_rk*(ts-dter*jcool+tdk)**4 - Rl ) ! update dter
         u10N = usr/von/gf*log(10._rk/zo)
-        charnC = max( a1*min(u10N,umax)+a2, .011_rk )
-        charnW = A*(usr/cp)**B
-        zoS = sigH*Ad*(usr/cp)**Bd - .11_rk*visa/usr
-        charnS = zoS*grav/usr/usr
+        charn = max( a1*min(u10N,umax)+a2, .011_rk )
 
       end do
 
@@ -1664,13 +1564,24 @@ module air
       hlb  = -rhoa*Le*usr*qsr       ! latent heat flux [W/m^2]
       hbb  = -rhoa*cpa*usr*tvsr     ! buoyancy flux
       hsbb = -rhoa*cpa*usr*tssr     ! sonic heat flux
-      wbar = 1.61_rk*hlb/Le/(1._rk+1.61_rk*Q)/rhoa + hsb/rhoa/cpa/ta
-      hlwebb = hlb + rhoa*wbar*Q*Le
-      Evap   = hlwebb/Le          ! evaporation rate [kg/m^2/s]
-!        hlb = hlb + hlwebb ! ?????? Webb correction to latent heat flux already in ef via zoq/rr function so return hlwebb
+
+! Precipitation heat flux
+      dwat = 2.11e-5_rk*( (t+tdk)/tdk )**1.94_rk                      ! water vapour diffusivity
+      dtmp =  .02411_rk*( 1._rk + 3.309e-3_rk*t - 1.44e-6_rk*t*t )  & ! heat diffusivity
+                       /(rhoa*cpa)
+      dqs_dt = Q*Le/(Rgas*(t+tdk)**2)                                 ! Clausius-Clapeyron
+      alfac  = 1._rk/( 1._rk + .622_rk*(dqs_dt*Le*dwat)/(cpa*dtmp) )  ! wet bulb factor
+      RF     = rain*alfac*cpw*( (ts-t-dter*jcool)               &
+                              + (Qs-Q-dqer*jcool)*Le/cpa )
+      hsb = hsb + RF
+
+! Evaporation rate
+      wbar = 1.61_rk*hlb + Le*hsb/(cpa*ta)*(1._rk+1.61_rk*Q)
+      hlb  = hlb + wbar*Q
+      Evap = hlb/Le          ! evaporation rate [kg/m^2/s]
 
 !-----  compute transfer coeffs relative to ut @ meas. ht  --------------------
-      Cd = tau/rhoa/ut/max(.1_rk,u)
+      Cd = tau/(rhoa*ut*max(.1_rk,u)) ! FIXME: Possibly minimum u should be 1 m/s
       Ch =-usr*tsr/ut/(dt-dter*jcool)
       Ce =-usr*qsr/ut/(dq-dqer*jcool)
 
@@ -2155,7 +2066,7 @@ module air
 !
       implicit none
 
-      integer(1), parameter :: jcool = 0
+      integer(1), parameter :: jcool = 1
 
       real(rk), intent(in) ::  u,zu, t,zt, rh,zq, P, ts      &
                             , Rs,Rl, lat, zi, rain, cp,sigH
