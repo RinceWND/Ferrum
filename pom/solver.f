@@ -1242,7 +1242,7 @@
 !
       use clim       , only: rmean
       use glob_const , only: grav, rk
-      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
+      use glob_domain, only: im, imm1, jm, jmm1, km, kmm1
      &                     , n_south, n_west
       use grid       , only: dum, dvm, dx, dy, dz, dzz, zz
       use glob_ocean , only: d, drhox, drhoy, dt, density => rho

@@ -252,10 +252,10 @@
       if ( r_name == "" ) call dens(sb,tb,rho)
 
 ! Define depth in meters
-      do k = 1, kbm1
-        hz(:,:,k) = -z(:,:,k)*h(:,:)
-      end do
-      hz(:,:,kb) = h(:,:)
+!      do k = 1, kbm1
+!        hz(:,:,k) = -z(:,:,k)*h(:,:)
+!      end do
+!      hz(:,:,kb) = h(:,:)
 
 
       end ! subroutine initial_conditions
