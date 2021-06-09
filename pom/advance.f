@@ -846,11 +846,11 @@
 !            sum0i_mpi    [parallel_mpi.f]
 !______________________________________________________________________
 !
-      use config     , only: sbias, tbias
-      use glob_const , only: rk
+      use config     , only: mode, sbias, tbias
+      use glob_const , only: rk, MODE_DIAGNOSTIC
       use glob_domain
       use grid       , only: art, dz, fsm
-      use glob_ocean , only: et, dt, sb, tb
+      use glob_ocean , only: et, etb, dt, sb, tb, u, ub, v, vb
       use glob_out   , only: iprint
       use model_run
 
@@ -859,6 +859,7 @@
       real(rk), dimension(im,jm) :: d_vol
       real(rk) area_tot, vol_tot
       real(rk) elev_ave, temp_ave, salt_ave
+      real(rk) e_resid, u_resid
       integer i,j,k
 
 
@@ -885,6 +886,9 @@
         temp_ave = 0.
         salt_ave = 0.
         elev_ave = 0.
+! diagnostic residuals
+        e_resid = 0.
+        u_resid = 0.
 
         do k=1,kmm1
           d_vol    = art*dt*dz(:,:,k)*fsm(:,:,k)
@@ -903,6 +907,13 @@
         call sum0d_mpi(  vol_tot, master_task )
         call sum0d_mpi( area_tot, master_task )
 
+        if ( mode == MODE_DIAGNOSTIC ) then
+          u_resid = max( maxval(abs(u-ub)), maxval(abs(v-vb)) )
+          e_resid = maxval(abs(et-etb))
+          call max0d_mpi( u_resid, master_task )
+          call max0d_mpi( e_resid, master_task )
+        end if
+
 ! print averages
         if ( is_master ) then
 
@@ -910,10 +921,16 @@
           salt_ave = salt_ave / vol_tot
           elev_ave = elev_ave / area_tot
 
-          print '(a,e15.8,2(a,f11.8),a)'
+          if ( mode /= MODE_DIAGNOSTIC ) then
+            print '(a,e15.8,2(a,f11.8),a)'
      &        , "mean ; et = ", elev_ave, " m, tb = "
      &        , temp_ave + tbias, " deg, sb = "
      &        , salt_ave + sbias, " psu"
+          else
+            print '(a,e15.8,2(a,f11.8),a)'
+     &        , "residual: elev = ", e_resid, " m, velocity = "
+     &        , u_resid, " m/s"
+          end if
 
           call findpsi
 

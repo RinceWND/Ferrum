@@ -281,10 +281,10 @@ module grid
         end do
       end if
 
-      kb = km
+      kb(:,:) = km
       do k = 1, kmm1
-        where ( kb > k .and. fsm(:,:,k) < 1._rk ) ! FIXME: This doesn't correct the mask!
-          kb = max( k, 3 )
+        where ( kb(:,:) > k .and. fsm(:,:,k) < 1._rk ) ! FIXME: This doesn't correct the mask!
+          kb(:,:) = max( k, 3 )
         end where
       end do
 
@@ -338,9 +338,17 @@ module grid
 
           case ( vGEOPOTENTIAL )
 
+            if ( z(2,2,2) > z(2,2,1) ) then
+              z  = -z
+              zz = -zz
+            end if
             do k = 1, km
-              sig (:,:,k) = z (:,:,k)/h
-              sigz(:,:,k) = zz(:,:,k)/h
+              do j = 1, jm
+                do i = 1, im
+                  sig (i,j,k) = -z (i,j,k)/z(i,j,kb(i,j))
+                  sigz(i,j,k) = -zz(i,j,k)/z(i,j,kb(i,j))
+                end do
+              end do
             end do
 
         end select

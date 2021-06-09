@@ -195,8 +195,8 @@
 
 
       el_name = "eclim_z"
-       s_name = "mean_s" !"salt"
-       t_name = "mean_t" !"temp"
+       s_name = "s" !"salt"
+       t_name = "t" !"temp"
        u_name = "u"
        v_name = "v"
        r_name = ""
