@@ -429,6 +429,17 @@ module air
       if ( DISABLED ) return
 
 ! Allocate optional arrays
+      if ( interp_sss ) then
+        allocate( sss(im,jm,3) )
+      else
+        allocate( sss(im,jm,1) )
+      end if
+      if ( interp_sst ) then
+        allocate( sst(im,jm,3) )
+      else
+        allocate( sst(im,jm,1) )
+      end if
+
       if ( read_stress ) then
         N = 1
         if ( interp_stress ) N = 3
@@ -455,16 +466,6 @@ module air
           allocate( pres(im,jm,1) )
         end if
         pres = Ps
-        if ( interp_sss ) then
-          allocate( sss(im,jm,3) )
-        else
-          allocate( sss(im,jm,1) )
-        end if
-        if ( interp_sst ) then
-          allocate( sst(im,jm,3) )
-        else
-          allocate( sst(im,jm,1) )
-        end if
         if ( interp_rain ) then
           allocate( rain(im,jm,3) )
         else
@@ -798,7 +799,7 @@ module air
         call wind_to_stress(  uwsrf,  vwsrf, gust(:,:,1)   &
                            , wusurf, wvsurf, 1           )
 
-        if ( .not.CALC_SWR ) then
+        if ( READ_HEAT .and. .not.CALC_SWR ) then ! FIXME: Remove this bullcrap?
           swrad = ( 1. - a ) * srad(:,:,2) + a * srad(:,:,3)
         end if
 
