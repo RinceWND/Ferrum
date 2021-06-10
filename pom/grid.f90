@@ -495,6 +495,7 @@ module grid
 
 
         do k = 1, kmm1
+          dzb (:,:,k) = z  (:,:,k) - z  (:,:,k+1)
           dzz (:,:,k) = zz (:,:,k) - zz (:,:,k+1)
           dzf (:,:,k) = zf (:,:,k) - zf (:,:,k+1)
           dzzf(:,:,k) = zzf(:,:,k) - zzf(:,:,k+1)
