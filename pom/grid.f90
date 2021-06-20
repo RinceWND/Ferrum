@@ -283,8 +283,8 @@ module grid
 
       kb = km
       do k = 1, kmm1
-        where ( kb > k .and. fsm(:,:,k) < 1._rk ) ! FIXME: This doesn't correct the mask!
-          kb = max( k, 3 )
+        where ( fsm(:,:,k+1) < 1._rk .and. fsm(:,:,k) > 0._rk ) ! FIXME: This doesn't correct the mask!
+          kb = max( k+1, 3 )
         end where
       end do
 
@@ -322,6 +322,11 @@ module grid
 ! close file:
       file_id = file_close( file_id )
 
+      if ( z(2,2,2) > z(2,2,1) ) then
+        z  = -z
+        zz = -zz
+      end if
+
 ! manage vertical coordinates
       if ( z_rnk == 3 ) then
 
@@ -339,8 +344,18 @@ module grid
           case ( vGEOPOTENTIAL )
 
             do k = 1, km
-              sig (:,:,k) = z (:,:,k)/h
-              sigz(:,:,k) = zz(:,:,k)/h
+              do j = 1, jm
+                do i = 1, im
+                  sig (i,j,k) = -z (i,j,k)/z(i,j,kb(i,j))
+                  sigz(i,j,k) = -zz(i,j,k)/z(i,j,kb(i,j))
+                end do
+              end do
+            end do
+
+            do j = 1, jm
+              do i = 1, im
+                h(i,j) = -z(i,j,kb(i,j))
+              end do
             end do
 
         end select
@@ -487,6 +502,7 @@ module grid
 
 
         do k = 1, kmm1
+          dz  (:,:,k) = z  (:,:,k) - z  (:,:,k+1)
           dzz (:,:,k) = zz (:,:,k) - zz (:,:,k+1)
           dzf (:,:,k) = zf (:,:,k) - zf (:,:,k+1)
           dzzf(:,:,k) = zzf(:,:,k) - zzf(:,:,k+1)

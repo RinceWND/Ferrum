@@ -9,13 +9,22 @@
 !  Set up MPI execution environment and define the POM communicator
 !______________________________________________________________________
 
+      use glob_const , only: rk, MPI_RK
       use glob_domain, only: error_status, is_master, master_task
      &                     , my_task     , POM_COMM , POM_COMM_COARSE
-      use mpi        , only: mpi_comm_rank, mpi_init, MPI_COMM_WORLD
+      use mpi        , only: MPI_COMM_WORLD, MPI_DOUBLE, MPI_REAL
 
       implicit none
 
       integer ierr
+
+
+! initialize mpi data precision
+      if ( rk == 8 ) then
+        MPI_RK = MPI_DOUBLE
+      else
+        MPI_RK = MPI_REAL
+      end if
 
 ! initiate MPI environment
       call mpi_init(ierr)
@@ -30,7 +39,6 @@
 
       is_master = ( my_task == master_task )
 
-      return
 
       end
 
@@ -47,6 +55,7 @@
       implicit none
 
       integer ierr
+
 
 ! terminate MPI environment : TODO: Check returned error code?
       call mpi_finalize(ierr)
@@ -70,6 +79,7 @@
       implicit none
 
       integer i,j,ierr,nproc,nproc_x,nproc_y
+
 
 ! determine the number of processors
       call mpi_comm_size(POM_COMM,nproc,ierr)
@@ -186,7 +196,7 @@
       if (  n_north         /nproc_x == nproc_y ) n_north = -1
       if ( (n_south+nproc_x)/nproc_x == 0       ) n_south = -1
 
-      return
+
       end
 !______________________________________________________________________
 !fhx: a new distribute mpi for wind and assim data to do the interpolation.2010/12/06
@@ -202,6 +212,7 @@
       implicit none
 
       integer i,j,ierr,nproc,nproc_x,nproc_y
+
 
 ! determine the number of processors
       call mpi_comm_size(POM_COMM_coarse,nproc,ierr)
@@ -289,7 +300,7 @@
 !      kbm1=kb-1
 !      kbm2=kb-2
 
-      return
+
       end
 
 !______________________________________________________________________
@@ -301,8 +312,7 @@
 
       use glob_const , only: rk
       use glob_domain, only: POM_COMM
-      use mpi        , only: mpi_reduce
-     &                     , MPI_INTEGER, MPI_SUM
+      use mpi        , only: MPI_INTEGER, MPI_SUM
 
       implicit none
 
@@ -311,11 +321,11 @@
 
       integer ierr, tmp
 
+
 ! sum data
       call mpi_reduce(work,tmp,1,MPI_INTEGER,MPI_SUM,to,POM_COMM,ierr)
       work=tmp
 
-      return
 
       end
 
@@ -326,29 +336,23 @@
 !  Send real sum of WORK to node TO
 !______________________________________________________________________
 
-      use glob_const , only: rk
+      use glob_const , only: rk, MPI_RK
       use glob_domain, only: POM_COMM
-      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_REAL
-     &                     , mpi_reduce          , MPI_SUM
+      use mpi        , only: MPI_DOUBLE, MPI_REAL, MPI_SUM
 
       implicit none
 
       integer , intent(in)    :: to
       real(rk), intent(inout) :: work
 
-      integer  ierr, MPI_RK
+      integer  ierr
       real(rk) tmp
-      
-      if ( rk == 8 ) then
-        MPI_RK = MPI_DOUBLE_PRECISION
-      else
-        MPI_RK = MPI_REAL
-      end if
+
+
 ! sum data
       call mpi_reduce(work,tmp,1,MPI_RK,MPI_SUM,to,POM_COMM,ierr)
       work=tmp
 
-      return
 
       end
 !______________________________________________________________________
@@ -358,29 +362,23 @@
 !  Send real maximum of WORK to node TO
 !______________________________________________________________________
 
-      use glob_const , only: rk
+      use glob_const , only: rk, MPI_RK
       use glob_domain, only: POM_COMM
-      use mpi        , only: MPI_DOUBLE_PRECISION, MPI_MAX
-     &                     , MPI_REAL            , mpi_reduce
+      use mpi        , only: MPI_DOUBLE, MPI_MAX, MPI_REAL
 
       implicit none
 
       integer , intent(in)    :: to
       real(rk), intent(inout) :: work
 
-      integer  ierr, MPI_RK
+      integer  ierr
       real(rk) tmp
-      
-      if ( rk == 8 ) then
-        MPI_RK = MPI_DOUBLE_PRECISION
-      else
-        MPI_RK = MPI_REAL
-      end if
+
+
 ! get max
       call mpi_reduce(work,tmp,1,MPI_RK,MPI_MAX,to,POM_COMM,ierr)
       work=tmp
 
-      return
 
       end
 !______________________________________________________________________
@@ -391,7 +389,7 @@
 !______________________________________________________________________
 
       use glob_domain, only: POM_COMM
-      use mpi        , only: mpi_bcast, MPI_INTEGER
+      use mpi        , only: MPI_INTEGER
 
       implicit none
 
@@ -400,10 +398,10 @@
 
       integer ierr
 
+
 ! broadcast data
       call mpi_bcast(work,1,MPI_INTEGER,from,POM_COMM,ierr)
 
-      return
 
       end
 !______________________________________________________________________
@@ -413,27 +411,21 @@
 !  Send real WORK to all nodes from node FROM
 !______________________________________________________________________
 
-      use glob_const , only: rk
+      use glob_const , only: rk, MPI_RK
       use glob_domain, only: POM_COMM
-      use mpi        , only: mpi_bcast
-     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+      use mpi        , only: MPI_DOUBLE, MPI_REAL
 
       implicit none
 
       integer , intent(in)    :: from
       real(rk), intent(inout) :: work
 
-      integer ierr, MPI_RK
-      
-      if ( rk == 8 ) then
-        MPI_RK = MPI_DOUBLE_PRECISION
-      else
-        MPI_RK = MPI_REAL
-      end if
+      integer ierr
+
+
 ! broadcast data
       call mpi_bcast(work,1,MPI_RK,from,POM_COMM,ierr)
 
-      return
 
       end
 
@@ -445,11 +437,10 @@
 !  One band at a time
 !______________________________________________________________________
 
-      use glob_const , only: rk
+      use glob_const , only: rk, MPI_RK
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
-      use mpi        , only: mpi_recv            , mpi_send
-     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+      use mpi        , only: MPI_DOUBLE, MPI_REAL
      &                     , MPI_STATUS_SIZE
 
       implicit none
@@ -458,18 +449,13 @@
       real(rk), intent(inout) :: work(nx,ny)
 
       integer  i,j
-      integer  ierr, MPI_RK
+      integer  ierr
       integer  istatus(MPI_STATUS_SIZE)
       real(rk) send_east(ny) ,recv_west(ny)
       real(rk) send_west(ny) ,recv_east(ny)
       real(rk) send_north(nx),recv_south(nx)
       real(rk) send_south(nx),recv_north(nx)
-      
-      if ( rk == 8 ) then
-        MPI_RK = MPI_DOUBLE_PRECISION
-      else
-        MPI_RK = MPI_REAL
-      end if
+
 
 ! send ghost cell data to the east
       if ( n_east /= -1 ) then
@@ -539,7 +525,6 @@
         end do
       end if
 
-      return
 
       end
 
@@ -551,11 +536,10 @@
 !  One band at a time
 !______________________________________________________________________
 
-      use glob_const , only: rk
+      use glob_const , only: rk, MPI_RK
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
-      use mpi        , only: mpi_recv, mpi_send
-     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+      use mpi        , only: MPI_DOUBLE, MPI_REAL
      &                     , MPI_STATUS_SIZE
 
       implicit none
@@ -564,18 +548,13 @@
       real(rk), intent(inout) :: work(nx,ny,nz)
 
       integer  i,j,k
-      integer  ierr, MPI_RK
+      integer  ierr
       integer  istatus(MPI_STATUS_SIZE)
       real(rk) send_east(ny*nz) ,recv_west(ny*nz)
       real(rk) send_west(ny*nz) ,recv_east(ny*nz)
       real(rk) send_north(nx*nz),recv_south(nx*nz)
       real(rk) send_south(nx*nz),recv_north(nx*nz)
-      
-      if ( rk == 8 ) then
-        MPI_RK = MPI_DOUBLE_PRECISION
-      else
-        MPI_RK = MPI_REAL
-      end if
+
 
 ! send ghost cell data to the east
       if ( n_east /= -1 ) then
@@ -669,7 +648,6 @@
         end do
       end if
 
-      return
 
       end
 
@@ -681,10 +659,9 @@
 ! ayumi 2010/6/1
 !______________________________________________________________________
 
-      use glob_const , only: rk
+      use glob_const , only: rk, MPI_RK
       use glob_domain, only: is_master, n_proc, POM_COMM
-      use mpi        , only: MPI_DOUBLE_PRECISION, mpi_gather
-     &                     , MPI_REAL
+      use mpi        , only: MPI_DOUBLE, MPI_REAL
 
       implicit none
 
@@ -693,14 +670,9 @@
       real(rk), intent(out) :: sum_out
 
       integer  i, j
-      integer  ierr, MPI_RK
+      integer  ierr
       real(rk) buf( nx, n_proc )
-      
-      if ( rk == 8 ) then
-        MPI_RK = MPI_DOUBLE_PRECISION
-      else
-        MPI_RK = MPI_REAL
-      end if
+
 
       buf     = 0.
       sum_out = 0.
@@ -718,7 +690,6 @@
         end do
       end if
 
-      return
 
       end
 !______________________________________________________________________
@@ -729,11 +700,10 @@
 !  Convert a 2nd order 2D matrix to special 4th order 2D matrix
 !______________________________________________________________________
 
-      use glob_const , only: rk
+      use glob_const , only: rk, MPI_RK
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
-      use mpi        , only: mpi_recv            , mpi_send
-     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+      use mpi        , only: MPI_DOUBLE, MPI_REAL
      &                     , MPI_STATUS_SIZE
 
       implicit none
@@ -743,16 +713,11 @@
       real(rk), intent(out) :: work4(0:nx,0:ny)
 
       integer  i,j
-      integer  ierr, MPI_RK
+      integer  ierr
       integer  istatus(MPI_STATUS_SIZE)
       real(rk) send_east(ny) ,recv_west(ny)
       real(rk) send_north(nx),recv_south(nx)
-      
-      if ( rk == 8 ) then
-        MPI_RK = MPI_DOUBLE_PRECISION
-      else
-        MPI_RK = MPI_REAL
-      end if
+
 
       work4 = 0.
       work4(1:nx,1:ny) = work2
@@ -791,7 +756,6 @@
         end do
       end if
 
-      return
 
       end
 
@@ -803,11 +767,10 @@
 !  Convert a 2nd order 3D matrix to special 4th order 3D matrix
 !______________________________________________________________________
 
-      use glob_const , only: rk
+      use glob_const , only: rk, MPI_RK
       use glob_domain, only: my_task, n_east, n_north
      &                     , n_south, n_west, POM_COMM
-      use mpi        , only: mpi_recv            , mpi_send
-     &                     , MPI_DOUBLE_PRECISION, MPI_REAL
+      use mpi        , only: MPI_DOUBLE, MPI_REAL
      &                     , MPI_STATUS_SIZE
 
       implicit none
@@ -817,16 +780,11 @@
       real(rk), intent(out) :: work4(0:nx,0:ny,nz)
 
       integer  i,j,k
-      integer  ierr, MPI_RK
+      integer  ierr
       integer  istatus(MPI_STATUS_SIZE)
       real(rk) send_east(ny*nz) ,recv_west(ny*nz)
       real(rk) send_north(nx*nz),recv_south(nx*nz)
-      
-      if ( rk == 8 ) then
-        MPI_RK = MPI_DOUBLE_PRECISION
-      else
-        MPI_RK = MPI_REAL
-      end if
+
 
       work4 = 0.
       work4(1:nx,1:ny,1:nz) = work2
@@ -877,6 +835,5 @@
         end do
       end if
 
-      return
 
       end
