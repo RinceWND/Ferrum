@@ -281,7 +281,7 @@ module grid
         end do
       end if
 
-      kb = km
+      kb(:,:) = km
       do k = 1, kmm1
         where ( fsm(:,:,k+1) < 1._rk .and. fsm(:,:,k) > 0._rk ) ! FIXME: This doesn't correct the mask!
           kb = max( k+1, 3 )
@@ -343,6 +343,10 @@ module grid
 
           case ( vGEOPOTENTIAL )
 
+            if ( z(2,2,2) > z(2,2,1) ) then
+              z  = -z
+              zz = -zz
+            end if
             do k = 1, km
               do j = 1, jm
                 do i = 1, im
@@ -503,6 +507,7 @@ module grid
 
         do k = 1, kmm1
           dz  (:,:,k) = z  (:,:,k) - z  (:,:,k+1)
+!          dzb (:,:,k) = z  (:,:,k) - z  (:,:,k+1) ! FIXME: Which one? `dz` or `dzb`?
           dzz (:,:,k) = zz (:,:,k) - zz (:,:,k+1)
           dzf (:,:,k) = zf (:,:,k) - zf (:,:,k+1)
           dzzf(:,:,k) = zzf(:,:,k) - zzf(:,:,k+1)

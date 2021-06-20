@@ -429,6 +429,17 @@ module air
       if ( DISABLED ) return
 
 ! Allocate optional arrays
+      if ( interp_sss ) then
+        allocate( sss(im,jm,3) )
+      else
+        allocate( sss(im,jm,1) )
+      end if
+      if ( interp_sst ) then
+        allocate( sst(im,jm,3) )
+      else
+        allocate( sst(im,jm,1) )
+      end if
+
       if ( read_stress ) then
         N = 1
         if ( interp_stress ) N = 3
@@ -455,16 +466,6 @@ module air
           allocate( pres(im,jm,1) )
         end if
         pres = Ps
-        if ( interp_sss ) then
-          allocate( sss(im,jm,3) )
-        else
-          allocate( sss(im,jm,1) )
-        end if
-        if ( interp_sst ) then
-          allocate( sst(im,jm,3) )
-        else
-          allocate( sst(im,jm,1) )
-        end if
         if ( interp_rain ) then
           allocate( rain(im,jm,3) )
         else

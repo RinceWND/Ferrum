@@ -4004,7 +4004,8 @@
         do i = 2, imm1
           wubot(i,j) = -tps(i,j)*uf(i,j,kb(i,j)-1)
         end do
-        wubot(1,j) = -tps(2,j)*uf(1,j,kb(1,j)-1) ! For domain boundaries
+        wubot( 1,j) = -tps(   2,j)*uf( 1,j,kb( 1,j)-1) ! For domain boundaries. Will be overwritten on processors edges by mpi_exchange.
+        wubot(im,j) = -tps(imm1,j)*uf(im,j,kb(im,j)-1)
       end do
       call exchange2d_mpi(wubot,im,jm) ! FIXME: This is needed since profq reads all range from 1 to im. So, naturally it needs (domain) boundary values as well.
                                        ! TODO: Copy bottom stress to domain boundaries?
@@ -4125,7 +4126,11 @@
           wvbot(i,j) = -tps(i,j)*vf(i,j,kb(i,j)-1)
         end do
       end do
-      wvbot(:,1) = wvbot(:,2) ! For domain boundaries
+      do i = 2, imm1
+        wvbot(i, 1) = -tps(i,   2)*vf(i, 1,kb(i, 1)-1)
+        wvbot(i,jm) = -tps(i,jmm1)*vf(i,jm,kb(i,jm)-1)
+      end do
+
       call exchange2d_mpi(wvbot,im,jm)
 
 

@@ -457,20 +457,6 @@ module config
       print '(" calc_interp         : ",l2)', calc_interp   !fhx:interp_flag
       print '(" output_flag         : ",i2)', output_flag  !fhx:20110131:
       print '(" SURF_flag           : ",i2)', SURF_flag    !fhx:20110131:
-! TODO: move below output to their respected modules.
-!        print '(/'' Sensitivity:'')'
-!        print '(''   heat flux     = '',f10.4)', sf_hf
-!        print '(''   wind speed    = '',f10.4)', sf_wi
-!        print '(''   lat.velocities= '',f10.4)', sf_bf
-!        if ( calc_bulk ) then
-!          print '(/'' Air-Sea Bulk: [ ENABLED ]'')'
-!          print '(''   calc swrad    = '',l2)', calc_swr
-!          print '(''   use COARE     = '',l2)', use_coare
-!          print '(''   longwave form.= '',i2)', lwrad_formula
-!        else
-!          print '(/'' Air-Sea Bulk: [ DISABLED ]'')'
-!        end if
-!      end if
 
 
     end ! subroutine print_config

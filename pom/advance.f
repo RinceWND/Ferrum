@@ -846,11 +846,11 @@
 !            sum0i_mpi    [parallel_mpi.f]
 !______________________________________________________________________
 !
-      use config     , only: sbias, tbias
-      use glob_const , only: rk
+      use config     , only: mode, sbias, tbias
+      use glob_const , only: rk, MODE_DIAGNOSTIC
       use glob_domain
       use grid       , only: art, dz, fsm
-      use glob_ocean , only: et, dt, sb, tb
+      use glob_ocean , only: et, etb, dt, sb, tb, u, ub, v, vb
       use glob_out   , only: iprint
       use model_run
 
@@ -859,6 +859,7 @@
       real(rk), dimension(im,jm) :: d_vol
       real(rk) area_tot, vol_tot
       real(rk) elev_ave, temp_ave, salt_ave
+      real(rk) e_resid, u_resid
       integer i,j,k
 
 
@@ -885,6 +886,9 @@
         temp_ave = 0.
         salt_ave = 0.
         elev_ave = 0.
+! diagnostic residuals
+        e_resid = 0.
+        u_resid = 0.
 
         do k=1,kmm1
           d_vol    = art*dt*dz(:,:,k)*fsm(:,:,k)
@@ -903,6 +907,13 @@
         call sum0d_mpi(  vol_tot, master_task )
         call sum0d_mpi( area_tot, master_task )
 
+        if ( mode == MODE_DIAGNOSTIC ) then
+          u_resid = max( maxval(abs(u-ub)), maxval(abs(v-vb)) )
+          e_resid = maxval(abs(et-etb))
+          call max0d_mpi( u_resid, master_task )
+          call max0d_mpi( e_resid, master_task )
+        end if
+
 ! print averages
         if ( is_master ) then
 
@@ -910,10 +921,16 @@
           salt_ave = salt_ave / vol_tot
           elev_ave = elev_ave / area_tot
 
-          print '(a,e15.8,2(a,f11.8),a)'
+          if ( mode /= MODE_DIAGNOSTIC ) then
+            print '(a,e15.8,2(a,f11.8),a)'
      &        , "mean ; et = ", elev_ave, " m, tb = "
      &        , temp_ave + tbias, " deg, sb = "
      &        , salt_ave + sbias, " psu"
+          else
+            print '(a,e15.8,2(a,f11.8),a)'
+     &        , "residual: elev = ", e_resid, " m, velocity = "
+     &        , u_resid, " m/s"
+          end if
 
           call findpsi
 
@@ -1042,118 +1059,6 @@
 
 
       end ! subroutine store_surf_mean
-!
-!_______________________________________________________________________
-!      subroutine write_output( d_in )
-!
-!      use module_time
-!
-!      implicit none
-!      include 'pom.h'
-!
-!      type(date), intent(in) :: d_in
-!
-!      integer i,j,k
-!      real(kind=rk) u_tmp, v_tmp
-!
-!      if(netcdf_file.ne.'nonetcdf' .and. mod(iint,iprint).eq.0) then
-!
-!
-!         uab_mean    = uab_mean    / real ( num )
-!         vab_mean    = vab_mean    / real ( num )
-!         elb_mean    = elb_mean    / real ( num )
-!         wusurf_mean = wusurf_mean / real ( num )
-!         wvsurf_mean = wvsurf_mean / real ( num )
-!         wtsurf_mean = wtsurf_mean / real ( num )
-!         wssurf_mean = wssurf_mean / real ( num )
-!         u_mean      = u_mean      / real ( num )
-!         v_mean      = v_mean      / real ( num )
-!         w_mean      = w_mean      / real ( num )
-!         t_mean      = t_mean      / real ( num )
-!         s_mean      = s_mean      / real ( num )
-!         rho_mean    = rho_mean    / real ( num )
-!         kh_mean     = kh_mean     / real ( num )
-!         km_mean     = km_mean     / real ( num )
-!
-!
-!
-!!         if ( my_task == 41 )
-!!     $        print*, im/2,jm/2,rot(im/2,jm/2),
-!!     $        uab_mean(im/2,jm/2),vab_mean(im/2,jm/2)
-!!         do j = 1, jm
-!!            do i = 1, im
-!!               u_tmp = uab_mean(i,j)
-!!               v_tmp = vab_mean(i,j)
-!!               uab_mean(i,j)
-!!     $              = u_tmp * cos( rot(i,j) * deg2rad )
-!!     $              - v_tmp * sin( rot(i,j) * deg2rad )
-!!               vab_mean(i,j)
-!!     $              = u_tmp * sin( rot(i,j) * deg2rad )
-!!     $              + v_tmp * cos( rot(i,j) * deg2rad )
-!!            enddo
-!!         enddo
-!!         if ( my_task == 41 )
-!!     $        print*, im/2,jm/2,
-!!     $        cos(rot(im/2,jm/2)*deg2rad),
-!!     $        uab_mean(im/2,jm/2),vab_mean(im/2,jm/2)
-!
-!
-!!         do j = 1, jm
-!!            do i = 1, im
-!!               u_tmp = wusurf_mean(i,j)
-!!               v_tmp = wvsurf_mean(i,j)
-!!               wusurf_mean(i,j)
-!!     $              = u_tmp * cos( rot(i,j) * deg2rad )
-!!     $              - v_tmp * sin( rot(i,j) * deg2rad )
-!!               wvsurf_mean(i,j)
-!!     $              = u_tmp * sin( rot(i,j) * deg2rad )
-!!     $              + v_tmp * cos( rot(i,j) * deg2rad )
-!!            enddo
-!!         enddo
-!!         do k=1,kbm1
-!!            do j = 1, jm
-!!               do i = 1, im
-!!                  u_tmp = u_mean(i,j,k)
-!!                  v_tmp = v_mean(i,j,k)
-!!                  u_mean(i,j,k)
-!!     $                 = u_tmp * cos( rot(i,j) * deg2rad )
-!!     $                 - v_tmp * sin( rot(i,j) * deg2rad )
-!!                  v_mean(i,j,k)
-!!     $                 = u_tmp * sin( rot(i,j) * deg2rad )
-!!     $                 + v_tmp * cos( rot(i,j) * deg2rad )
-!!               enddo
-!!            enddo
-!!         enddo
-!
-!
-!         write( filename, '("out/",2a,".nc")' )
-!     $        trim( netcdf_file ), date2str( d_in )
-!
-!         call write_output_pnetcdf( filename )
-!
-!         uab_mean    = 0.0
-!         vab_mean    = 0.0
-!         elb_mean    = 0.0
-!         wusurf_mean = 0.0
-!         wvsurf_mean = 0.0
-!         wtsurf_mean = 0.0
-!         wssurf_mean = 0.0
-!         u_mean      = 0.0
-!         v_mean      = 0.0
-!         w_mean      = 0.0
-!         t_mean      = 0.0
-!         s_mean      = 0.0
-!         rho_mean    = 0.0
-!         kh_mean     = 0.0
-!         km_mean     = 0.0
-!
-!         num = 0
-!
-!      endif
-!
-!      return
-!      end
-!
 !______________________________________________________________________
 !
       subroutine check_nan

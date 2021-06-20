@@ -197,8 +197,8 @@
       el_name = "eclim_z"
        s_name = "s" !"salt"
        t_name = "t" !"temp"
-       u_name = "uclim_z"
-       v_name = "vclim_z"
+       u_name = "u"
+       v_name = "v"
        r_name = ""
       record = 1
 
