@@ -742,21 +742,23 @@
           end do
         end do
 
+! Surface conditions
+        if ( var == 'T' ) then
+          if ( itera == 1 ) then
+            zflux(:,:,1) = tsurf*w(:,:,1)*art
+          end if
+        else
+          zflux(:,:,1) = 0.
+        end if
+
+! Bottom conditions
         do j = 2, jmm1
           do i = 2, imm1
-            zflux(i,j,1) = 0.
-!            if(itera.eq.1) zflux(i,j,1)=w(i,j,1)*f(i,j,1)*art(i,j)
-!     for rivers 2010/5/08 ayumi
-            if ( itera == 1 ) then
-              if ( var == 'T' )
-     $              zflux(i,j,1) = tsurf(i,j)*w(i,j,1)*art(i,j)
-              if ( var == 'S' )
-     $              zflux(i,j,1) = 0.
-            end if
             zflux(i,j,kb(i,j)) = 0.
           end do
         end do
 
+! Internal fluxes
         do k = 2, kmm1
           do j = 2, jmm1
             do i = 2, imm1

@@ -641,6 +641,10 @@
           call proft(uf,wtsurf,tsurf,nbct,tps)
           call proft(vf,wssurf,ssurf,nbcs,tps)
 
+          call relax_to_clim( uf, vf )
+
+          call bc_ts ! bcond(4)
+
           if ( t_lo > -999. ) then
             where ( uf < t_lo ) uf = t_lo
           end if
@@ -654,10 +658,6 @@
           if ( s_hi <  999. ) then
             where ( vf > s_hi ) vf = s_hi
           end if
-
-          call relax_to_clim( uf, vf )
-
-          call bc_ts ! bcond(4)
 
           call exchange3d_mpi(uf(:,:,1:kmm1),im,jm,kmm1)
           call exchange3d_mpi(vf(:,:,1:kmm1),im,jm,kmm1)

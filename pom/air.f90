@@ -1283,10 +1283,12 @@ module air
 !
 !---- --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !  Calculate the salt flux [psu m/s].
-! Assume that there is no salt exchange at 10/10 concentrations.
 ! FIXME: This should be calculated using forward step salinity `vf`.
 !        However, this routine executes at the beginning of each step
 !       so it uses already filtered (now-step) salinity.
+! TODO:  Do not include salinity (and temperature) in fluxes yet
+!       and multyply right before fluxes are applied and after
+!       advection is done?
 !---- -- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 !
         wssurf(i,j) = ( precip - evap )*( s(i,j,1)+sbias )/rhoref
