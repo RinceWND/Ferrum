@@ -153,6 +153,7 @@
 !______________________________________________________________________
 !
       use config     , only: aam_init, horcon, mode, n1d, npg
+     &                     , pressure_gradient
       use bry        , only: aamfrz, USE_SPONGE
       use glob_domain, only: im, imm1, jm, jmm1, kbm1
       use grid       , only: dx, dy
@@ -176,7 +177,7 @@
 
         call advct(a,c,ee)
 
-        call pgscheme(npg)
+        call pressure_gradient
 
 !lyo:scs1d:
         if ( n1d /= 0 ) then

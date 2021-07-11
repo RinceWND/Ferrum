@@ -1240,7 +1240,7 @@
 !
       use clim       , only: rmean
       use glob_const , only: grav, rk
-      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1    ,my_task!REM:
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1
      &                     , n_south, n_west
       use grid       , only: dum, dvm, dx, dy, dzz, zz
       use glob_ocean , only: d, drhox, drhoy, dt, density => rho
@@ -1485,31 +1485,29 @@
 !______________________________________________________________________
 !
       use glob_const , only: grav, rk ,rhoref!REM:
-      use glob_domain, only: im, jm, kb, kbm1   ,my_task!REM:
-      use grid       , only: aru,arv,dum, dvm, dx, dy, dz, dzz, h, z,zz
+      use glob_domain, only: im, jm, kb, kbm1
+      use grid       , only: dum, dvm, dx, dy, dz, z
       use glob_ocean , only: drhox, drhoy, d, dt, el, et, density => rho
       use model_run  , only: ramp
-      use clim, only: rmean
 
       implicit none
 
       integer       i,j,k
-      !real(16) p(im,jm,kb),fx(im,jm,kb),fc(im,jm,kb)
       real(rk), dimension(im,jm,kb) :: p, fx, fc, rho
       real(rk) dh,cff,cff1
 
 
-      rho = density - rmean
+      rho = density*rhoref
 
       p(:,:,1) = 0.
       do k = 1,kbm1
-!        p(:,:,k+1) = p(:,:,k) + dt*dz(k)*(density(:,:,k))
-        p(:,:,k+1) = d*dz(:,:,k)*(rho(:,:,k))
+        p(:,:,k+1) = p(:,:,k) + dt*dz(:,:,k)*(rho(:,:,k))
+!        p(:,:,k+1) = d*dz(:,:,k)*(rho(:,:,k))
         fx(:,:,k) = .5*d*dz(:,:,k)*(p(:,:,k)+p(:,:,k+1))
       end do
 
       cff = .5*grav
-      cff1= grav!/rhoref
+      cff1= grav/rhoref
 !
 !  Calculate pressure gradient in the XI-direction (m4/s2).
 !
@@ -1573,40 +1571,6 @@
       drhox = ramp*drhox
       drhoy = ramp*drhoy
 
-!      if (ramp > 0) then
-!        write(40+my_task,*) iint, drhox(50,50,:),drhoy(50,50,:)
-!        write(50+my_task,*) iint, et(50,50), et(49,50), et(50,49),
-!     &                   h(50,50), h(49,50), h(50,49), dz,
-!     &                   dx(50,50), dx(49,50), dx(50,49),
-!     &                   dy(50,50), dy(49,50), dy(50,49),
-!     &               rho(50,50,:), "|", rho(49,50,:), "|", rho(50,49,:)
-!      end if
-!      if (iint >= 1) then
-!        if (my_task==0) then
-!          print *, iint, "z:     ", z(2)
-!          print *, iint, "dz:    ", dz(2)
-!          print *, iint, "hi-1:  ", h(49,50)
-!          print *, iint, "h:     ", h(50,50)
-!          print *, iint, "dy-1:  ", dy(49,50)
-!          print *, iint, "dy:    ", dy(50,50)
-!          print *, iint, "hzi-1: ", dz(2)*h(49,50)
-!          print *, iint, "hzi:   ", dz(2)*h(50,50)
-!          print *, iint, "rhoi-1:", rho(49,50,2)
-!          print *, iint, "rho:   ", rho(50,50,2)
-!          print *, iint, "pi-1:  ", p(49,50,2)
-!          print *, iint, "p:     ", p(50,50,2)
-!          print *, iint, "fxi-1: ", fx(49,50,2)
-!          print *, iint, "fx:    ", fx(50,50,2)
-!          print *, iint, "fc:    ", fc(50,50,2)
-!          print *, z(3)*(dt(50,50)-dt(49,50))+et(50,50)-et(49,50)
-!          print *, iint, "drhox: ", drhox(50,50,2)
-!        end if
-!        call finalize_mpi
-!      end if
-!      if (iint > 10) call finalize_mpi
-
-      ! rho = rho+rmean
-
 
       end ! subroutine baropg_lin
 !
@@ -1621,11 +1585,10 @@
 !______________________________________________________________________
 !
       use glob_const , only: grav, rhoref, rk
-      use glob_domain, only: im, jm, kb, kbm1   ,my_task!:REM
-      use grid       , only: dum, dvm, dx, dy, dz, z, zz  ,h!:REM
+      use glob_domain, only: im, jm, kb, kbm1
+      use grid       , only: dum, dvm, dx, dy, dz, z, zz
       use glob_ocean , only: d, drhox, drhoy, dt, density => rho  ,el!:REM
       use model_run  , only: ramp
-      use clim,only:rmean
 
       implicit none
 
@@ -1635,23 +1598,25 @@
       real(rk) rho(im,jm,kb)
 
 
-      rho = density - rmean
+      rho = density*rhoref !- rmean
 
       fac  = 10000.      /rhoref
-      fac1 =     .5 *grav!/rhoref
+      fac1 =     .5 *grav/rhoref
       fac2 = 1000.  *grav/rhoref
-      fac3 =     .25*grav!/rhoref
+      fac3 =     .25*grav/rhoref
+
+      phix = 0.
 
       do j = 1,jm
         do i = 2,im
-          cff1 = -zz(i,j,1)*(d(i,j)+d(i-1,j))
+          cff1 = -zz(i,j,1)*(dt(i,j)+dt(i-1,j))
           phix(i) = fac1*(rho(i,j,1)-rho(i-1,j,1))*cff1
 !          phix(i) = phix(i) + fac*(e_atmos(i,j)-e_atmos(i-1,j))
-          phix(i) = phix(i)+                                              &
-     &            (fac2+fac1*(rho(i,j,1)+rho(i-1,j,1)))*
-     &            (el(i,j)-el(i-1,j))
-          drhox(i,j,1) = -.25*dz(i,j,1)*(dt(i,j)+dt(i-1,j))*
-     &                          phix(i)*(dy(i,j)+dy(i-1,j))*dum(i,j,1)
+!          phix(i) = phix(i)+                                              &
+!     &            (fac2+fac1*(rho(i,j,1)+rho(i-1,j,1)))*
+!     &            (el(i,j)-el(i-1,j))
+          drhox(i,j,1) = .25*dz(i,j,1)*(dt(i,j)+dt(i-1,j))*
+     &                         phix(i)*(dy(i,j)+dy(i-1,j))*dum(i,j,1)
          end do
 !
 !  Compute interior baroclinic pressure gradient.  Differentiate and
@@ -1689,8 +1654,8 @@
 !     &           z_r(i,j,k  )-z_r(i-1,j,k  )
 !            phix(i)=phix(i)+                                            &
 !     &              fac3*(cff1*cff3-cff2*cff4)
-            drhox(i,j,k) = -.25*dz(i,j,k)*(dt(i,j)+dt(i-1,j))*
-     &                            phix(i)*(dy(i,j)+dy(i-1,j))*dum(i,j,k)
+            drhox(i,j,k) = .25*dz(i,j,k)*(dt(i,j)+dt(i-1,j))*
+     &                           phix(i)*(dy(i,j)+dy(i-1,j))*dum(i,j,k)
           end do
         end do
 !
@@ -1705,11 +1670,11 @@
             cff1 = -zz(i,j,1)*(d(i,j)+d(i,j-1))
             phie(i) = fac1*(rho(i,j,1)-rho(i,j-1,1))*cff1
 !            phie(i) = phie(i) + fac*(e_atmos(i,j)-e_atmos(i,j-1))
-            phie(i) = phie(i)+                                            &
-     &              (fac2+fac1*(rho(i,j,1)+rho(i,j-1,1)))*
-     &              (el(i,j)-el(i,j-1))
-            drhoy(i,j,1) = -.25*dz(i,j,1)*(dt(i,j)+dt(i,j-1))
-     &                *dvm(i,j,k)*phie(i)*(dy(i,j)+dy(i,j-1))
+!            phie(i) = phie(i)+                                            &
+!     &              (fac2+fac1*(rho(i,j,1)+rho(i,j-1,1)))*
+!     &              (el(i,j)-el(i,j-1))
+            drhoy(i,j,1) = .25*dz(i,j,1)*(dt(i,j)+dt(i,j-1))
+     &               *dvm(i,j,k)*phie(i)*(dy(i,j)+dy(i,j-1))
           end do
 !
 !  Compute interior baroclinic pressure gradient.  Differentiate and
@@ -1747,8 +1712,8 @@
 !     &             z_r(i,j,k  )-z_r(i,j-1,k  )
 !              phie(i)=phie(i)+                                          &
 !     &                fac3*(cff1*cff3-cff2*cff4)
-              drhoy(i,j,k) = -.25*dz(i,j,k)*(dt(i,j)+dt(i,j-1))
-     &                  *dvm(i,j,k)*phie(i)*(dx(i,j)+dx(i,j-1))
+              drhoy(i,j,k) = .25*dz(i,j,k)*(dt(i,j)+dt(i,j-1))
+     &                 *dvm(i,j,k)*phie(i)*(dx(i,j)+dx(i,j-1))
 !              if (isnan(drhoy(i,j,k))) write(*,*) my_task,"::",i,j,k
             end do
           end do
@@ -2038,7 +2003,6 @@
       use glob_domain, only: im_global, im_local, my_task
      &                     , n_east, n_west, POM_COMM
       use mpi        , only: MPI_REAL, MPI_STATUS_SIZE
-     &                     , mpi_recv, mpi_send
 
       implicit none
 
@@ -2153,7 +2117,6 @@
       use glob_domain, only: im_global, im_local, my_task
      &                     , n_east, n_west, POM_COMM
       use mpi        , only: MPI_REAL, MPI_STATUS_SIZE
-     &                     , mpi_recv, mpi_send
 
       implicit none
 
@@ -2282,7 +2245,6 @@
       use glob_domain, only: jm_global, jm_local, my_task
      &                     , n_north, n_south, POM_COMM
       use mpi        , only: MPI_REAL, MPI_STATUS_SIZE
-     &                     , mpi_recv, mpi_send
 
       implicit none
 
@@ -2395,7 +2357,6 @@
       use glob_domain, only: jm_global, jm_local, my_task
      &                     , n_north, n_south, POM_COMM
       use mpi        , only: MPI_REAL, MPI_STATUS_SIZE
-     &                     , mpi_recv, mpi_send
 
       implicit none
 
@@ -3356,8 +3317,8 @@
       use config     , only: sbias, tbias
       use glob_const , only: grav, rhoref, rk
       use glob_domain, only: im, jm, kb, kbm1
-      use grid       , only: fsm, zz
-      use glob_ocean , only: d
+      use grid       , only: fsm, zz, h
+      use glob_ocean , only: d, el
 
       implicit none
 
@@ -3379,24 +3340,25 @@
             tr4=tr3*tr
 
 ! approximate pressure in units of bars
-            p=grav*rhoref*(-zz(i,j,k)*d(i,j))*1.e-5
+            p = grav*rhoref*(-zz(i,j,k)*d(i,j)-el(i,j))*1.e-5_rk ! FIXME: Does the following algorithm works for negative pressures? Maybe need to revert to just water depth to always get zero pressure at the surface?
 
-            rhor=-0.157406+6.793952e-2*tr
-     $           -9.095290e-3*tr2+1.001685e-4*tr3
-     $           -1.120083e-6*tr4+6.536332e-9*tr4*tr
+            rhor = -0.157406   _rk     + 6.793952e-2_rk*tr
+     &             -9.095290e-3_rk*tr2 + 1.001685e-4_rk*tr3
+     &             -1.120083e-6_rk*tr4 + 6.536332e-9_rk*tr4*tr
 
-            rhor=rhor+(0.824493-4.0899e-3*tr
-     $               +7.6438e-5*tr2-8.2467e-7*tr3
-     $               +5.3875e-9*tr4)*sr
-     $               +(-5.72466e-3+1.0227e-4*tr
-     $               -1.6546e-6*tr2)*abs(sr)**1.5
-     $               +4.8314e-4*sr*sr
+            rhor = rhor
+     &           + ( 0.824493  _rk     - 4.0899e-3_rk*tr
+     &             + 7.6438 e-5_rk*tr2 - 8.2467e-7_rk*tr3
+     &             + 5.3875 e-9_rk*tr4 )*sr
+     &           + (-5.72466e-3_rk     + 1.0227e-4_rk*tr
+     &             - 1.6546 e-6_rk*tr2 )*abs(sr)**1.5
+     &           + 4.8314e-4_rk*sr*sr
 
-            cr=1449.1+.0821*p+4.55*tr-.045*tr2
-     $                 +1.34*(sr-35.)
-            rhor=rhor+1.e5*p/(cr*cr)*(1.-2.*p/(cr*cr))
+            cr = 1449.1  _rk     + 0.0821_rk*p + 4.55_rk*tr
+     &         -    0.045_rk*tr2 + 1.34  _rk*(sr-35._rk)
+            rhor = rhor + 1.e5_rk*p / (cr*cr) * (1._rk-2._rk*p/(cr*cr))
 
-            rhoo(i,j,k)=rhor/rhoref*fsm(i,j,k)
+            rhoo(i,j,k) = rhor/rhoref*fsm(i,j,k)
 
           end do
         end do
@@ -3635,6 +3597,7 @@
           vf(i,j,kb-1)=kappa*(1+z(i,j,kbm1))*dh(i,j)*q2(i,j,kbm1)
         end do
       end do
+
       do k=2,kbm1
         do j=1,jm
           do i=1,im
@@ -3981,7 +3944,7 @@
       end do
 
       do j=2,jmm1
-        do i=2,imm1
+        do i=2,im
           tps(i,j)=0.5*(cbc(i,j)+cbc(i-1,j))
      $              *sqrt(ub(i,j,kbm1)**2
      $                +(.25*(vb(i,j,kbm1)+vb(i,j+1,kbm1)
@@ -3996,18 +3959,20 @@
       do k=2,kbm1
         ki=kb-k
         do j=2,jmm1
-          do i=2,imm1
+          do i=2,im
             uf(i,j,ki)=(ee(i,j,ki)*uf(i,j,ki+1)+gg(i,j,ki))*dum(i,j,k)
           end do
         end do
       end do
 
       do j=2,jmm1
-        do i=2,imm1
+        do i=2,im
           wubot(i,j)=-tps(i,j)*uf(i,j,kbm1)
         end do
+        wubot(1,j)=wubot(2,j) ! For domain boundaries
       end do
-      call exchange2d_mpi(wubot,im,jm)
+      call exchange2d_mpi(wubot,im,jm) ! FIXME: This is needed since profq reads all range from 1 to im. So, naturally it needs (domain) boundary values as well.
+                                       ! TODO: Copy bottom stress to domain boundaries?
 
 
       end ! subroutine profu
@@ -4087,7 +4052,7 @@
         end do
       end do
 
-      do j=2,jmm1
+      do j=2,jm
         do i=2,imm1
           tps(i,j)=0.5*(cbc(i,j)+cbc(i,j-1))
      $              *sqrt((.25*(ub(i,j,kbm1)+ub(i+1,j,kbm1)
@@ -4102,18 +4067,19 @@
 
       do k=2,kbm1
         ki=kb-k
-        do j=2,jmm1
+        do j=2,jm
           do i=2,imm1
             vf(i,j,ki)=(ee(i,j,ki)*vf(i,j,ki+1)+gg(i,j,ki))*dvm(i,j,k)
           end do
         end do
       end do
 
-      do j=2,jmm1
+      do j=2,jm
         do i=2,imm1
           wvbot(i,j)=-tps(i,j)*vf(i,j,kbm1)
         end do
       end do
+      wvbot(:,1) = wvbot(:,2) ! For domain boundaries
       call exchange2d_mpi(wvbot,im,jm)
 
 

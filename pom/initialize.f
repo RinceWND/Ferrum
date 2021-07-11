@@ -150,17 +150,11 @@
 !  Reads of generates grid.
 !______________________________________________________________________
 !
-      use config     , only: n1d
-      use glob_const , only: DEG2RAD, Ohm, rk, SMALL
-      use glob_domain, only: im, imm1, jm, jmm1, kb, n_west, n_south
-      use grid
-      use glob_ocean , only: d, dt, el, et
+      use grid, only: read_grid
 
       implicit none
 
       integer, intent(in) :: TEST_CASE
-
-      integer i,j    ,ierr
 
 
       if ( TEST_CASE == 0 ) then
@@ -186,10 +180,11 @@
       use config     , only: initial_file
       use glob_const , only: rk
       use glob_domain
-      use grid       , only: dz, fsm
+      use grid       , only: dz, fsm, h, z
       use io
       use mpi        , only: MPI_OFFSET_KIND
-      use glob_ocean , only: elb, rho, s, sb, t, tb, uab, ub, vab, vb
+      use glob_ocean , only: d, dt, elb, hz, rho, s, sb, t, tb
+     &                     , uab, ub, vab, vb
       use pnetcdf    , only: NF90_NOWRITE
 
       implicit none
@@ -199,7 +194,7 @@
       integer                      file_id, i, j, k, record, status
       integer(MPI_OFFSET_KIND)
      &       , dimension(4)     :: edge, start
-      character(32) :: el_name, s_name, t_name, u_name, v_name
+      character(32) :: el_name, r_name, s_name, t_name, u_name, v_name
 
 
       el_name = "elev"
@@ -207,6 +202,7 @@
        t_name = "mean_t" !"temp"
        u_name = "u"
        v_name = "v"
+       r_name = ""
       record = 1
 
 ! Initialize main parameters with "common" values
@@ -225,13 +221,14 @@
       call msg_print("", 6, "Read initial conditions:")
       file_id = file_open( trim(initial_file), NF90_NOWRITE )
       if ( .not.is_error(file_id) ) then
+        if ( r_name /= "" ) then
+          status = var_read( file_id, r_name, rho, start, edge )
+        end if
         status = var_read( file_id,  t_name,  tb, start, edge )
         status = var_read( file_id,  s_name,  sb, start, edge )
         status = var_read( file_id,  u_name,  ub, start, edge )
         status = var_read( file_id,  v_name,  vb, start, edge )
         status = var_read( file_id, el_name, elb, start, edge )
-!        call read_initial_ts_pnetcdf( tb, sb, ub, vb, elb, 1 ) !dtime%month )
-!        call read_ts_z_pnetcdf( tb, sb, 40, dtime%month, ic_path )
       end if
 
 ! Derive barotropic velocities
@@ -244,8 +241,22 @@
         vab(:,:)  = vab(:,:) + vb(:,:,k)*dz(:,:,k)
       end do
 
+! Initialize water column for it to not be zero when calculating density.
+! FIXME:  Use `elb` for `etb` since it is not expected to be initialized yet anyway?
+! FIXME:  Though it is debatable to include elevaton since this initial
+!        elevation will be applied when calculating mean density field
+!        which makes them restart-dependent...
+      d  = h ! + elb
+      dt = h ! + elb
+
 ! Calculate initial density.
-      call dens(sb,tb,rho)
+      if ( r_name == "" ) call dens(sb,tb,rho)
+
+! Define depth in meters
+      do k = 1, kbm1
+        hz(:,:,k) = -z(:,:,k)*h(:,:)
+      end do
+      hz(:,:,kb) = h(:,:)
 
 
       end ! subroutine initial_conditions
@@ -1538,7 +1549,7 @@
         end if
       end if
 
-      call dens(s,t,rho)
+      !call dens(s,t,rho)
 
       call pgscheme(npg)
 
@@ -2099,7 +2110,6 @@
         use grid       , only: dx, dy, fsm, h
         use model_run  , only: dte
         use mpi        , only: MPI_DOUBLE, MPI_MIN, MPI_REAL
-     &                       , mpi_reduce
 
         implicit none
 
