@@ -3754,14 +3754,14 @@
       integer                      , intent(in   ) :: nbc
 
       integer  i, j, k, ki
-      real(rk) rad(im,jm,km), r(5), ad1(5), ad2(5)
+      real(rk) rad(im,jm,km), r(6), ad1(6), ad2(6)
 
 ! irradiance parameters after Paulson and Simpson (1977)
-!       ntp               1      2       3       4       5
-!   Jerlov type           i      ia      ib      ii     iii
-      data r   /         .58,    .62,    .67,    .77,    .78 /
-      data ad1 /         .35,    .60,   1.  ,   1.5 ,   1.4  /
-      data ad2 /       23.  ,  20.  ,  17.  ,  14.  ,   7.9  /
+!       ntp         1     2      3      4      5     6
+!   Jerlov type     i     ia     ib     ii    iii   DCW (ROMS)
+      data r   /   .58,   .62,   .67,   .77,   .78,  .55       /
+      data ad1 /   .35,   .60,  1.  ,  1.5 ,  1.4 ,  .00468592 /
+      data ad2 / 23.  , 20.  , 17.  , 14.  ,  7.9 , 1.51       /
 
 
 ! surface boundary condition:
