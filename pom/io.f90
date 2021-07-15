@@ -36,6 +36,7 @@ module io
     module procedure var_read_1d
     module procedure var_read_2d
     module procedure var_read_3d
+    module procedure var_read_2d_int
   end interface
 
   interface var_write
@@ -698,6 +699,62 @@ module io
 
 
     end ! function var_read_3d
+!______________________________________________________________________
+!
+    integer function var_read_2d_int( ncid, name, var, start, stride )
+!----------------------------------------------------------------------
+!  Macro for reading 2D variable.
+!______________________________________________________________________
+!
+      use mpi    , only: MPI_OFFSET_KIND
+      use pnetcdf, only: NF90_NOERR                 &
+                       , nf90mpi_get_att            &
+                       , nf90mpi_get_var_all        &
+                       , nf90mpi_inquire_attribute  &
+                       , nf90mpi_inq_varid
+
+      implicit none
+
+      integer     , intent(in   ) :: ncid
+      character(*), intent(in   ) :: name
+      integer     , dimension(:,:)                  &
+                  , intent(inout) :: var
+      integer(MPI_OFFSET_KIND)                      &
+                  , dimension(:)                    &
+                  , intent(in   ) :: start, stride
+
+      integer  status, varid, vartype
+      real(rk) missing_value
+
+
+      var_read_2d_int = nf90mpi_inq_varid( ncid, name, varid )
+
+      call check( var_read_2d_int, "inq_varid `"//trim(name)//"`" )
+      if ( var_read_2d_int /= NF90_NOERR ) return
+
+      missing_value = -2147483647
+
+      var_read_2d_int = nf90mpi_get_var_all( ncid, varid, var, start, stride )
+
+      if ( var_read_2d_int /= NF90_NOERR ) return
+
+      status = nf90mpi_inquire_attribute( ncid, varid            &
+                                        , "_FillValue", vartype )
+      if ( status == NF90_NOERR ) then
+
+        status = nf90mpi_get_att( ncid, varid, "_FillValue", missing_value )
+        call check( status, 'Failed reading `_FillValue` of '//name )
+
+        where ( var == missing_value )
+          var = 0.
+        end where
+
+        return
+
+      end if
+
+
+    end ! function var_read_2d_int
 !______________________________________________________________________
 !
     subroutine var_write_0d( ncid, name, var, start )

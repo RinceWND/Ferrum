@@ -56,7 +56,8 @@ module clim
   character(len=PATH_LEN)  & ! Full paths (with filenames) to:
     ts_clim_path           & ! climatology file for T and S
   , ts_mean_path           & ! horizontally averaged (in z-coord.) TS
-  , uv_clim_path             ! climatology file for U and V
+  , uv_clim_path           & ! climatology file for U and V
+  , wattype_path             ! water type spatial distribution file
 
 !----------------------------------------------------------------------
 ! Input variables' names
@@ -70,10 +71,11 @@ module clim
   ,  u_clim_name          & ! X-velocity
   , ua_clim_name          & ! Vertically integrated x-velocity
   ,  v_clim_name          & ! Y-velocity
-  , va_clim_name            ! Vertically integrated y-velocity
+  , va_clim_name          & ! Vertically integrated y-velocity
+  , wattype_name            ! Water type id
 
 !----------------------------------------------------------------------
-! Climatological arrays
+! Climatological and additional arrays
 !----------------------------------------------------------------------
   real(kind=rk)              &
        , allocatable         &
@@ -83,6 +85,7 @@ module clim
   , t_relx                   & ! mask for temperature surface relaxation
   , uaclim                   &
   , vaclim
+
   real(kind=rk)              &
        , allocatable         &
        , dimension(:,:,:) :: &
@@ -94,6 +97,11 @@ module clim
   , uclim                    &
   , vclim
 
+  integer                    &
+       , allocatable         &
+       , dimension(:,:)   :: &
+    wtype                      ! Water type (in ids of ntp)
+
 !----------------------------------------------------------------------
 ! Private interpolation arrays
 !----------------------------------------------------------------------
@@ -104,6 +112,7 @@ module clim
     el_int                     &
   , ua_int                     &
   , va_int
+
   real(kind=rk)                &
        , private               &
        , allocatable           &
@@ -125,6 +134,7 @@ module clim
 !  Initialize clim module.
 !______________________________________________________________________
 !
+      use config     , only: ntp
       use glob_domain, only: is_master
       use grid       , only: h
       use model_run  , only: dti
@@ -138,12 +148,13 @@ module clim
       namelist/clim/                                                  &
         CLIM_MODE      , deep_rel       , h_thres     , INTERP_CLIM   &
       , RELAX_SURF_SALT, RELAX_SURF_TEMP, RELAX_TS    , surf_rel      &
-      , ts_clim_path   , ts_mean_path   , uv_clim_path
+      , ts_clim_path   , ts_mean_path   , uv_clim_path, wattype_path
 
       namelist/clim_vars/                        &
         el_clim_name, s_clim_name,  s_mean_name  &
       ,  t_clim_name, t_mean_name,  u_clim_name  &
-      , ua_clim_name, v_clim_name, va_clim_name
+      , ua_clim_name, v_clim_name, va_clim_name  &
+      , wattype_name
 
 
 ! Initialize with default values
@@ -164,6 +175,7 @@ module clim
       ts_clim_path = "in/clim/"
       ts_mean_path = "in/clim/"
       uv_clim_path = "in/clim/"
+      wattype_path = ""
 
       el_clim_name = "eclim"
        s_clim_name = "sclim"
@@ -174,6 +186,7 @@ module clim
       ua_clim_name = "uaclim"
        v_clim_name = "vclim"
       va_clim_name = "vaclim"
+      wattype_name = "ntp"
 
 ! Override configuration
       open ( 73, file = config_file, status = 'old' )
@@ -221,6 +234,9 @@ module clim
         t_relx = ( 1._rk + tanh( .002_rk*(h-1000._rk) ) )*.5_rk
       end if
 
+! Initialise water type
+      wtype = ntp
+
 ! Convert relaxation periods to frequencies
       deep_rel = 1._rk / (deep_rel*86400._rk)
       surf_rel = 1._rk / (surf_rel*86400._rk)
@@ -259,6 +275,7 @@ module clim
       , uaclim(im,jm)    &
       , vclim(im,jm,kb)  &
       , vaclim(im,jm)    &
+      , wtype(im,jm)     &
        )
 
 ! Initialize mandatory arrays
@@ -272,6 +289,7 @@ module clim
       uaclim= 0.
       vclim = 0.
       vaclim= 0.
+      wtype = 0
 
 ! Allocate interpolation arrays
       allocate(                 &
@@ -309,6 +327,7 @@ module clim
 !  Reads forcing fields before experiment's start.
 !______________________________________________________________________
 !
+      use config     , only: ntp
       use glob_domain, only: is_master
       use io
       use module_time
@@ -425,6 +444,16 @@ module clim
       end if
 
       call dens( smean, tmean, rmean )
+
+! Read water type data if specifed
+      if ( wattype_path /= "" ) then
+        status = read_wtype( trim(wattype_path), record(1), wattype_name, wtype )
+        where ( wtype == 0 )
+          wtype = ntp
+        end where
+      else
+        wtype = ntp
+      end if
 
 ! TODO: Gather stats from all processors
       if ( is_master ) then
@@ -713,6 +742,60 @@ module clim
 
 
     end ! function read_clim
+!
+!___________________________________________________________________
+!
+    integer function read_wtype( filepath, record, name, wtype )
+
+      use config     , only: ntp
+      use glob_domain, only: i_global, j_global
+      use grid       , only: fsm
+      use io
+      use mpi        , only: MPI_OFFSET_KIND
+      use pnetcdf    , only: NF90_NOWRITE
+
+      implicit none
+
+      character(*), intent(in)          :: filepath, name
+      integer     , intent(in)          :: record
+      integer     , dimension(im,jm)  &
+                  , intent(out)         :: wtype
+
+      character(PATH_LEN)                    :: tmp_str
+      integer(MPI_OFFSET_KIND), dimension(3) :: edge, start
+      integer file_id
+
+
+      tmp_str = ""
+
+! open file
+      if ( is_master ) then
+        write(tmp_str, '("Reading file ",a," @ ",i2)') filepath, record
+        call msg_print("", 6, trim(tmp_str))
+      end if
+
+      file_id = file_open( filepath, NF90_NOWRITE )
+      if ( file_id < 0 ) then
+        read_wtype = -1
+        return
+      end if
+
+! define domain to read
+      start = [ i_global(1), j_global(1), record ]
+      edge  = [ im         , jm         ,      1 ]
+
+      if ( var_rank( file_id, name ) == 2 ) then
+        start(3) = 1
+      end if
+
+! get data
+      read_wtype = var_read( file_id, name, wtype, start, edge )
+
+! close file
+      file_id = file_close( file_id )
+
+
+    end ! function read_wtype
 !
 !___________________________________________________________________
 !
