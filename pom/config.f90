@@ -59,7 +59,7 @@ module config
     end subroutine PROC_INTERFACE
   end interface
 
-  parameter( lono=999.0,lato=999.0, xs=1.5,ys=1.5, fak=0.5)
+!  parameter( lono=999.0,lato=999.0, xs=1.5,ys=1.5, fak=0.5)
 
 
 !----------------------------------------------------------------------
@@ -267,6 +267,13 @@ module config
       s_hi =  999.
       s_lo =    0.
 
+! Mixing point modifiers
+      fak  =    .5
+      lato = 999.
+      lono = 999.
+      xs   =   1.5
+      ys   =   1.5
+
 ! Module switches
       USE_AIR   = .false.
       USE_BRY   = .false.
@@ -342,12 +349,13 @@ module config
 
       namelist/setup_nml/                     &
         aam_init, alpha , cbcmax, cbcmin      &
-      , horcon  , ispadv, mode  , nadv        &
-      , nbcs    , nbct  , nitera, npg         &
-      , ntp     , s_hi  , s_lo  , sbias       &
-      , smoth   , sw    , t_hi  , t_lo        &
-      , tbias   , tprni , umol  , vmaxl       &
-      , z0b
+      , fak     , horcon, ispadv, lato        &
+      , lono    , mode  , nadv  , nbcs        &
+      , nbct    , nitera, npg   , ntp         &
+      , s_hi    , s_lo  , sbias , smoth       &
+      , sw      , t_hi  , t_lo  , tbias       &
+      , tprni   , umol  , vmaxl , xs          &
+      , ys      , z0b
 
       namelist/output_nml/                                     &
         append_output, monthly_flag, netcdf_file, output_flag  &
