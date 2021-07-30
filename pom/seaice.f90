@@ -713,9 +713,10 @@ module seaice
 
       if ( .not. execute ) return
 
-      if ( n >= 2 ) then
+      if ( n == 3 ) then
         write(desc,'("Reading interp. sea ice record #",i4," @ ",i4)') &
             record(n), year(n)
+        icec_int(:,:,2) = icec_int(:,:,3)
       else
         write(desc,'("Reading sea ice record #",i4," @ ",i4)') &
             record(1), year(1)

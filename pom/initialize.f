@@ -194,7 +194,7 @@
       character(32) :: el_name, r_name, s_name, t_name, u_name, v_name
 
 
-      el_name = "eclim_z"
+      el_name = "el"
        s_name = "s" !"salt"
        t_name = "t" !"temp"
        u_name = "u"
@@ -225,6 +225,8 @@
         status = var_read( file_id,  s_name,  sb, start, edge )
         status = var_read( file_id,  u_name,  ub, start, edge )
         status = var_read( file_id,  v_name,  vb, start, edge )
+        start = [ i_global(1), j_global(1), record, 1 ]
+        edge  = [ im         , jm         ,      1, 1 ]
         status = var_read( file_id, el_name, elb, start, edge )
       end if
 
