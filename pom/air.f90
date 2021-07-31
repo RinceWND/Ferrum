@@ -1549,7 +1549,7 @@ module air
       charn  = max( a1*min(u10,umax)+a2, .011_rk )
 
 
-      nits = 10   ! number of iterations
+      nits = 5   ! number of iterations
 
       if ( zetu > 50. ) nits = 1
 !--------------  bulk loop --------------------------------------------------
@@ -2704,6 +2704,13 @@ module air
               srad(:,:,n) = 0.
               call msg_print("", 2, "Net shortrad. is set to zero.")
             else
+              ! Check for correct direction (fillvalue, if present, is assumed to not affect this check)
+              if ( abs(maxval(srad(:,:,n))) > abs(minval(srad(:,:,n))) ) then
+                srad(:,:,n) = -srad(:,:,n)
+              end if
+              ! Clamp to zero
+              where ( srad(:,:,n) > 0._rk ) srad(:,:,n) = 0._rk
+              ! Convert if units are specified correctly
               select case ( trim(att_read( file_id, srad_name, "units" )) )
                 case ( "W/m2", "W/m^2", "W m**-2", "W m^-2", "W m-2" )
                   srad(:,:,n) = srad(:,:,n)/rho_cpw
