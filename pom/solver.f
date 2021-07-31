@@ -3722,6 +3722,7 @@
 !______________________________________________________________________
 !
       use air        , only: swrad
+      use clim       , only: wtype
       use config     , only: ntp, umol
       use glob_const , only: rk
       use glob_domain, only: im, jm, kb, kbm1, kbm2, i_global, j_global
@@ -3782,6 +3783,7 @@
         do k=1,kbm1
           do j=1,jm
             do i=1,im
+              ntp = wtype(i,j)
               rad(i,j,k)=swrad(i,j)*
      &                (     r(ntp) *exp(z(i,j,k)*dh(i,j)/ad1(ntp))
      &                 +(1.-r(ntp))*exp(z(i,j,k)*dh(i,j)/ad2(ntp)))

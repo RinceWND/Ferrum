@@ -87,9 +87,16 @@ module air
 ! Paths configuration
 !----------------------------------------------------------------------
   character(256)      & ! Full paths (with filenames) to:
-    bulk_path         & !  atmospheric parameters file
-  , flux_path         & !  surface fluxes file
-  , wind_path           !  wind file
+     bulk_path        & !  atmospheric parameters file (default for all unspecified atmospheric files)
+  ,  flux_path        & !  surface fluxes
+  , humid_path        & !  relative humidity
+  ,   pbl_path        & !  planetary boundary layer height
+  ,  pres_path        & !  atm. pressure
+  ,  rain_path        & !  precipitation
+  ,   sst_path        & !  sea surface temperature
+  ,  tair_path        & !  atm. temperature
+  ,  tcld_path        & !  total cloud cover
+  ,  wind_path          !  wind
 
 !----------------------------------------------------------------------
 ! Input variables' names
@@ -198,7 +205,7 @@ module air
 
       character(*), intent(in) :: config_file
 
-      integer pos
+      integer pos, N_taper
 
       namelist/air_nml/                                             &
         CALC_SWR     , INTERP_CLOUD , INTERP_HEAT  , INTERP_HUMID   &
@@ -207,7 +214,9 @@ module air
       , READ_CLOUD   , READ_HEAT    , READ_STRESS  , READ_WIND      &
       , TAPER_BRY    , USE_BULK     , USE_CALENDAR , USE_COARE      &
       , USE_DQDSST   , USE_FLUXES   , USE_RAMP     , LWRAD_FORMULA  &
-      , bulk_path    , flux_path    , wind_path    , read_int
+      , bulk_path    , flux_path    , humid_path   , pbl_path       &
+      , pres_path    , rain_path    , sst_path     , tair_path      &
+      , tcld_path    , wind_path    , read_int
 
       namelist/air_vars_nml/                            &
         dlrad_name, humid_name, lheat_name,  lrad_name  &
@@ -247,6 +256,13 @@ module air
       bulk_path = "in/surf/"
       flux_path = "in/surf/"
       wind_path = "in/surf/"
+      humid_path = ""
+      pbl_path   = ""
+      pres_path  = ""
+      rain_path  = ""
+      sst_path   = ""
+      tair_path  = ""
+      tcld_path  = ""
 
       dlrad_name = "dlwr"
       lheat_name = "lht"
@@ -293,6 +309,34 @@ module air
         wind_path = trim(wind_path)//"wnd."
       end if
 
+      if ( humid_path == "" ) then
+        humid_path = bulk_path
+      end if
+
+      if ( pbl_path == "" ) then
+        pbl_path = bulk_path
+      end if
+
+      if ( pres_path == "" ) then
+        pres_path = bulk_path
+      end if
+
+      if ( rain_path == "" ) then
+        rain_path = bulk_path
+      end if
+
+      if ( sst_path == "" ) then
+        sst_path = bulk_path
+      end if
+
+      if ( tair_path == "" ) then
+        tair_path = bulk_path
+      end if
+
+      if ( tcld_path == "" ) then
+        tcld_path = bulk_path
+      end if
+
       if ( is_master ) then
         print *, "Bulk data     : ", trim(bulk_path)
         print *, "Surface fluxes: ", trim(flux_path)
@@ -316,42 +360,43 @@ module air
 ! Allocate necessary arrays
       call allocate_arrays
 
+      N_taper = 7
       if ( n_east==-1 ) then
-        where ( fsm(im,:,1) /= 0. )
-          taper_mask(im  ,:) = 0.
-          taper_mask(im-1,:) = 0.2
-          taper_mask(im-2,:) = 0.5
-          taper_mask(im-3,:) = 0.8
-        end where
+        do pos = im, im-N_taper, -1
+          where ( fsm(im,:,1) /= 0. )
+            taper_mask(pos,:) = 1. + tanh(0.3*(im-pos-N_taper))
+          end where
+        end do
       end if
 
       if ( n_west==-1 ) then
         where ( fsm(1,:,1) /= 0. )
           taper_mask(1,:) = 0.
-          taper_mask(2,:) = 0.
-          taper_mask(3,:) = 0.2
-          taper_mask(4,:) = 0.5
-          taper_mask(5,:) = 0.8
         end where
+        do pos = 1, N_taper
+          where ( fsm(1,:,1) /= 0. )
+            taper_mask(pos+1,:) = 1. + tanh(0.3*(pos-N_taper))
+          end where
+        end do
       end if
 
       if ( n_north==-1 ) then
-        where ( fsm(:,jm,1) /= 0. )
-          taper_mask(:,jm  ) = 0.
-          taper_mask(:,jm-1) = 0.2*taper_mask(:,jm-1)
-          taper_mask(:,jm-2) = 0.5*taper_mask(:,jm-2)
-          taper_mask(:,jm-3) = 0.8*taper_mask(:,jm-3)
-        end where
+        do pos = jm, jm-N_taper, -1
+          where ( fsm(:,jm,1) /= 0. )
+            taper_mask(:,pos) = ( 1. + tanh(0.3*(jm-pos-N_taper)) )*taper_mask(:,pos)
+          end where
+        end do
       end if
 
       if ( n_south==-1 ) then
         where ( fsm(:,1,1) /= 0. )
           taper_mask(:,1) = 0.
-          taper_mask(:,2) = 0.
-          taper_mask(:,3) = 0.2*taper_mask(:,3)
-          taper_mask(:,4) = 0.5*taper_mask(:,4)
-          taper_mask(:,5) = 0.8*taper_mask(:,5)
         end where
+        do pos = 1, N_taper
+          where ( fsm(:,1,1) /= 0. )
+            taper_mask(:,pos+1) = ( 1. + tanh(0.3*(pos-N_taper)) )*taper_mask(:,pos+1)
+          end where
+        end do
       end if
 
       call msg_print("AIR MODULE INITIALIZED", 1, "")
@@ -429,6 +474,17 @@ module air
       if ( DISABLED ) return
 
 ! Allocate optional arrays
+      if ( interp_sss ) then
+        allocate( sss(im,jm,3) )
+      else
+        allocate( sss(im,jm,1) )
+      end if
+      if ( interp_sst ) then
+        allocate( sst(im,jm,3) )
+      else
+        allocate( sst(im,jm,1) )
+      end if
+
       if ( read_stress ) then
         N = 1
         if ( interp_stress ) N = 3
@@ -455,16 +511,6 @@ module air
           allocate( pres(im,jm,1) )
         end if
         pres = Ps
-        if ( interp_sss ) then
-          allocate( sss(im,jm,3) )
-        else
-          allocate( sss(im,jm,1) )
-        end if
-        if ( interp_sst ) then
-          allocate( sst(im,jm,3) )
-        else
-          allocate( sst(im,jm,1) )
-        end if
         if ( interp_rain ) then
           allocate( rain(im,jm,3) )
         else
@@ -798,7 +844,7 @@ module air
         call wind_to_stress(  uwsrf,  vwsrf, gust(:,:,1)   &
                            , wusurf, wvsurf, 1           )
 
-        if ( .not.CALC_SWR ) then
+        if ( READ_HEAT .and. .not.CALC_SWR ) then ! FIXME: Remove this bullcrap?
           swrad = ( 1. - a ) * srad(:,:,2) + a * srad(:,:,3)
         end if
 
@@ -857,8 +903,8 @@ module air
       swrad  = swrad *taper_mask
       wssurf = wssurf*taper_mask
       wtsurf = wtsurf*taper_mask
-      !wusurf = ramp*wusurf*taper_mask
-      !wvsurf = ramp*wvsurf*taper_mask
+      wusurf = ramp*wusurf*taper_mask
+      wvsurf = ramp*wvsurf*taper_mask
 
 
     end ! subroutine
@@ -2471,7 +2517,7 @@ module air
 ! Read bulk file
       if ( read_bulk ) then
 
-        file_id = file_open( trim( get_filename( bulk_path, year(n) ) )  &
+        file_id = file_open( trim( get_filename( humid_path, year(n) ) )  &
                            , NF90_NOWRITE )
 
         if ((     interp_humid .and. n>=2) .or.       &
@@ -2483,6 +2529,11 @@ module air
           end if
         end if
 
+        file_id = file_close( file_id )
+
+        file_id = file_open( trim( get_filename(  rain_path, year(n) ) )  &
+                           , NF90_NOWRITE )
+
         if ((     interp_rain .and. n>=2) .or.       &
             (.not.interp_rain .and. n==1)      ) then
           if ( var_read( file_id, rain_name,  rain(:,:,n)  &
@@ -2491,6 +2542,11 @@ module air
             call msg_print("", 2, "Precip.rate is defaulted to zero.")
           end if
         end if
+
+        file_id = file_close( file_id )
+
+        file_id = file_open( trim( get_filename(  pres_path, year(n) ) )  &
+                           , NF90_NOWRITE )
 
         if ((     interp_pres .and. n>=2) .or.       &
             (.not.interp_pres .and. n==1)      ) then
@@ -2505,6 +2561,11 @@ module air
           end if
         end if
 
+        file_id = file_close( file_id )
+
+        file_id = file_open( trim( get_filename(   sst_path, year(n) ) )  &
+                           , NF90_NOWRITE )
+
         if ((     interp_sst .and. n>=2) .or.       &
             (.not.interp_sst .and. n==1)      ) then
           if ( var_read( file_id, sst_name,   sst(:,:,n)  &
@@ -2517,6 +2578,11 @@ module air
             end if
           end if
         end if
+
+        file_id = file_close( file_id )
+
+        file_id = file_open( trim( get_filename(  tair_path, year(n) ) )  &
+                           , NF90_NOWRITE )
 
         if ((     interp_tair .and. n>=2) .or.       &
             (.not.interp_tair .and. n==1)      ) then
@@ -2531,7 +2597,13 @@ module air
           end if
         end if
 
+        file_id = file_close( file_id )
+
         if ( READ_CLOUD ) then
+
+          file_id = file_open( trim( get_filename( tcld_path, year(n) ) )  &
+                             , NF90_NOWRITE )
+
           if ((     interp_cloud .and. n>=2) .or.       &
               (.not.interp_cloud .and. n==1)      ) then
             if ( var_read( file_id, tcld_name, cloud(:,:,n)  &
@@ -2540,7 +2612,13 @@ module air
               call msg_print("", 2, "Cloud cover is defaulted to zero.")
             end if
           end if
+
+          file_id = file_close( file_id )
+
         end if
+
+        file_id = file_open( trim( get_filename( pbl_path, year(n) ) )  &
+                           , NF90_NOWRITE )
 
         if ( n>=2 ) then
           if ( var_read( file_id, pbl_name, pbl(:,:,n)     &
