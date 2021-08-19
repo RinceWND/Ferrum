@@ -80,8 +80,11 @@ module air
   , USE_FLUXES     & !  momentum flux is read directly from files !TODO: if set to false, wtsurf crashes the calculations
   , USE_RAMP         !  use temporal linear damping on wind stress
 
-  integer(1)        &
+  integer(1)       &
     LWRAD_FORMULA    ! Bulk formula to estimate longwave radiation
+
+  integer          &
+    resume_from      ! Resume from record of forcing file (if USE_CALENDAR is .false.)
 
 !----------------------------------------------------------------------
 ! Paths configuration
@@ -216,7 +219,7 @@ module air
       , USE_DQDSST   , USE_FLUXES   , USE_RAMP     , LWRAD_FORMULA  &
       , bulk_path    , flux_path    , humid_path   , pbl_path       &
       , pres_path    , rain_path    , sst_path     , tair_path      &
-      , tcld_path    , wind_path    , read_int
+      , tcld_path    , wind_path    , read_int     , resume_from ! TODO: Introduce proper time variable reading
 
       namelist/air_vars_nml/                            &
         dlrad_name, humid_name, lheat_name,  lrad_name  &
@@ -239,6 +242,10 @@ module air
 
 ! Initialize variables with their defaults
       read_int = 3600 * 3 ! 8xDaily
+
+      resume_from = 1
+
+      LWRAD_FORMULA = lwBERLIAND
 
       CALC_SWR     = .true.
       READ_HEAT    = .false.
@@ -360,11 +367,11 @@ module air
 ! Allocate necessary arrays
       call allocate_arrays
 
-      N_taper = 7
+      N_taper = 14
       if ( n_east==-1 ) then
         do pos = im, im-N_taper, -1
           where ( fsm(im,:,1) /= 0. )
-            taper_mask(pos,:) = 1. + tanh(0.3*(im-pos-N_taper))
+            taper_mask(pos,:) = tanh(3./real(N_taper)*(im-pos))
           end where
         end do
       end if
@@ -375,7 +382,7 @@ module air
         end where
         do pos = 1, N_taper
           where ( fsm(1,:,1) /= 0. )
-            taper_mask(pos+1,:) = 1. + tanh(0.3*(pos-N_taper))
+            taper_mask(pos+1,:) = tanh(3./real(N_taper)*pos)
           end where
         end do
       end if
@@ -383,7 +390,7 @@ module air
       if ( n_north==-1 ) then
         do pos = jm, jm-N_taper, -1
           where ( fsm(:,jm,1) /= 0. )
-            taper_mask(:,pos) = ( 1. + tanh(0.3*(jm-pos-N_taper)) )*taper_mask(:,pos)
+            taper_mask(:,pos) = tanh(3./real(N_taper)*(jm-pos))*taper_mask(:,pos)
           end where
         end do
       end if
@@ -394,7 +401,7 @@ module air
         end where
         do pos = 1, N_taper
           where ( fsm(:,1,1) /= 0. )
-            taper_mask(:,pos+1) = ( 1. + tanh(0.3*(pos-N_taper)) )*taper_mask(:,pos+1)
+            taper_mask(:,pos+1) = tanh(3./real(N_taper)*pos)*taper_mask(:,pos+1)
           end where
         end do
       end if
@@ -605,7 +612,7 @@ module air
 
       else
 
-        record = [ 1, 1, 2 ]
+        record = [ resume_from, resume_from, resume_from+1 ]
         a = 0._rk
 
       end if
@@ -767,7 +774,7 @@ module air
 
       else
 
-        record(1) = int( iint*dti / read_int ) + 1
+        record(1) = int( iint*dti / read_int ) + resume_from
         record(2) = record(1)
         record(3) = record(2) + 1
 
