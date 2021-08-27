@@ -678,6 +678,8 @@ module glob_ocean
       vb       = 0.
       vf       = 0.
       w        = 0.
+      wubot    = 0.
+      wvbot    = 0.
 
 
       end ! subroutine initialize_arrays
