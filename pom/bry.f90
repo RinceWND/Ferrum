@@ -98,6 +98,9 @@ module bry
 !----------------------------------------------------------------------
   logical USE_SPONGE   ! Flag for sponge zones
 
+  integer            &
+    resume_from        ! Record to start reading from file
+
   real(kind=rk)      &
     hmax             & ! maximal water depth
   , tau              & ! nudging timescale
@@ -419,7 +422,8 @@ module bry
       namelist/bry_nml/                                                &
         bry_path, DERIVE_2D   , el_name   , Hmax    , interp_bry       &
       , MONTHLY , periodic_x  , periodic_y, read_int, s_name           &
-      , t_name  , USE_CALENDAR, USE_SPONGE, u_name  , v_name
+      , t_name  , USE_CALENDAR, USE_SPONGE, u_name  , v_name           &
+      , resume_from ! TODO: Introduce proper time variable reading
 
       namelist/bry_cond/                                                     &
                 el_east,         el_north,         el_south,         el_west &
@@ -489,6 +493,8 @@ module bry
 
 ! Default read interval (daily)
       read_int = 86400
+
+      resume_from = 1
 
 ! Default BC types
 !   elevation
@@ -692,9 +698,9 @@ module bry
       if ( USE_SPONGE ) then
 !lyo:pac10:beg:
 ! set lateral boundary FRZ & SPONGE layer parameters !lyo:20110224:alu:stcc:
-!      call bfrz(   nfw,   nfe,    nfs,    nfn,
-!     $          n_west,n_east,n_south,n_north,
-!     $              im,    jm,      6,    frz)       !FRZ:
+        call bfrz(     7,     7,      7,      1,  &
+                  n_west,n_east,n_south,n_north,  &
+                      im,    jm,      6,    frz)       !FRZ:
 !     For FRZ in bcond: T[n+1]={ (1-frz)*T[n] + frz*Tobs },
 !     the inverse-relax-time = frz/dti,
 !     so that since "bfrz" gives frz=1 @boundaries,
@@ -704,7 +710,7 @@ module bry
         frz = frz*rdisp !lyo:stcc:mar_:dec_:
 !     rdisp=1.;         frz(:,:)=frz(:,:)*rdisp !lyo:stcc:
 !     For aam is increased by (1.+aamfrz(i,j)) in subr lateral_viscosity
-        call bfrz(     7,     7,      7,      7   &
+        call bfrz(     7,     7,      6,      1   &
                  ,n_west,n_east,n_south,n_north   &
                  ,    im,    jm,      6, aamfrz)       !SPONGE:
 !        rdisp  = 0.
@@ -808,7 +814,7 @@ module bry
       else
 
         year = -1
-        record = [ 1, 1, 2 ]
+        record = [ resume_from, resume_from, resume_from+1 ]
         a = 0._rk
 
       end if
@@ -908,7 +914,7 @@ module bry
 
         year = -1
 
-        record(1) = int( iint*dti / read_int ) + 1
+        record(1) = int( iint*dti / read_int ) + resume_from
         record(2) = record(1)
         record(3) = record(2) + 1
 

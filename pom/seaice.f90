@@ -44,6 +44,9 @@ module seaice
     interp_ice     & ! Interpolate in time
   , use_calendar     ! Use calendar to offset read record number from the start of a year
 
+  integer          &
+    resume_from      ! Record to start reading from
+
 !----------------------------------------------------------------------
 ! Paths configuration
 !----------------------------------------------------------------------
@@ -98,7 +101,8 @@ module seaice
       integer pos
 
       namelist/ice/                       &
-        ice_path, read_int, use_calendar
+        ice_path, read_int, use_calendar  &
+      , resume_from
 
       namelist/ice_vars/      &
         icec_name, iceh_name
@@ -111,6 +115,8 @@ module seaice
 
 ! Initialize variables with their defaults
       read_int = 3600 * 24 ! 86400 (Daily)
+
+      resume_from = 1
 
       ice_path = "in/surf/"
 
@@ -250,7 +256,7 @@ module seaice
 
       else
 
-        record = [ 1, 1, 2 ]
+        record = [ resume_from, resume_from, resume_from+1 ]
         a = 0._rk
 
       end if
@@ -348,7 +354,7 @@ module seaice
 
       else
 
-        record(1) = int( iint*dti / read_int ) + 1
+        record(1) = int( iint*dti / read_int ) + resume_from
         record(2) = record(1)
         record(3) = record(2) + 1
 
