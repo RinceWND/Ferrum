@@ -194,11 +194,11 @@
       character(32) :: el_name, r_name, s_name, t_name, u_name, v_name
 
 
-      el_name = "el"
-       s_name = "s" !"salt"
-       t_name = "t" !"temp"
-       u_name = "u"
-       v_name = "v"
+      el_name = "eclim"
+       s_name = "sclim" !"salt"
+       t_name = "tclim" !"temp"
+       u_name = "uclim"
+       v_name = "vclim"
        r_name = ""
       record = 1
 

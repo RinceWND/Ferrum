@@ -10,7 +10,7 @@
 !
 module air
 
-  use glob_const , only: DEG2RAD, PI, rk
+  use glob_const , only: DEG2RAD, PI, rk, SMALL
   use glob_domain, only: im, imm1, jm, jmm1
 
   implicit none
@@ -1517,11 +1517,11 @@ module air
       ta = t+tdk
       ug = .5_rk
       dter  = .3_rk
-      dqer  = 0._rk
-      ut    = sqrt( u**2 + ug**2 )
+      dqer  = wetc*dter
+      ut    = sqrt( u*u + ug*ug )
       u10   = ut * log(10._rk/1.e-4_rk) / log(zu/1.e-4_rk)
       usr   = .035_rk * u10
-      zo10  = .011_rk*usr**2/grav + .11_rk*visa/usr
+      zo10  = .011_rk*usr*usr/grav + .11_rk*visa/usr
       Cd10  = ( von / log(10._rk/zo10) )**2
       Ch10  = .00115_rk
       Ct10  = Ch10 / sqrt(Cd10)
@@ -1530,19 +1530,16 @@ module air
       Ct    =   von / log(zt/zot10)
       CC    =   von * Ct/Cd
       Ribcu = -250._rk*zu/(zi*Beta**3) ! 1./.004 = 250. I just like multiplication better
-      Ribu  = -grav*zu/ta*( (dt-dter*jcool)+.61_rk*ta*dq )/ut**2
+      Ribu  = -grav*zu*( (dt-dter*jcool)+.61_rk*ta*dq )/( ta*ut*ut )
       if ( Ribu < 0. ) then
         zetu = CC*Ribu/( 1._rk +       Ribu/Ribcu )
       else
         zetu = CC*Ribu*( 1._rk + 3._rk*Ribu/CC    )
       end if
       L10 = zu/zetu                         ! Monin-Obukhov length
-      gf  = ut/u
-      usr = ut*von / ( log(zu/zo10) - psiu_40(zu/L10) )
-      tsr = -(dt-     dter*jcool)*von*fdg                          &
-                                 /(log(zt/zot10)-psit_26(zt/L10))
-      qsr = -(dq-wetc*dter*jcool)*von*fdg                          &
-                                 /(log(zq/zot10)-psit_26(zq/L10))
+      usr =   ut            *von    /(log(zu/zo10 )-psiu_40(zu/L10))
+      tsr = -(dt-dter*jcool)*von*fdg/(log(zt/zot10)-psit_26(zt/L10))
+      qsr = -(dq-dqer*jcool)*von*fdg/(log(zq/zot10)-psit_26(zq/L10))
       tkt = .001_rk
 
 !----------------------------------------------------------
@@ -1556,17 +1553,17 @@ module air
 
       charn  = max( a1*min(u10,umax)+a2, .011_rk )
 
-      nits = 10   ! number of iterations
+      nits = 5   ! number of iterations
 
       if ( zetu > 50. ) nits = 1
 !--------------  bulk loop --------------------------------------------------
 
       do i = 1, nits
 
-        zet = von*grav*zu/ta*(tsr+.61_rk*ta*qsr)/(usr*usr)
+        zet = von*grav*zu*(tsr+.61_rk*ta*qsr)/(ta*usr*usr+SMALL)
 !          zet = von*grav*zu*(tsr*(1.+.61*Q))
-        L  = zu/zet
-        zo = charn*usr*usr/grav + .11_rk*visa/usr      ! surface roughness
+        L  = zu/( zet + SMALL )
+        zo = charn*usr*usr/grav + .11_rk*visa/( usr + SMALL )  ! surface roughness
 !        zo = max( zo, 1.e-10_rk )
         rr = zo*usr/visa
 !        zoq= min(1.6e-4_rk, 5.8e-5_rk/rr**.72)        ! These thermal roughness lengths give Stanton and
@@ -1577,38 +1574,37 @@ module air
         else
           zoq = min( 1.15e-4_rk           , 5.5e-5_rk/rr**.6_rk )
         end if
-        cdhf = von    /(log(zu/zo) - psiu_26(zu/L))
+!        cdhf = von    /(log(zu/zo) - psiu_26(zu/L))
+        cdhf = von    /(log(zu/zo) - psiu_26(zet))
         cqhf = von*fdg/(log(zq/zoq)- psit_26(zq/L))
         cthf = von*fdg/(log(zt/zot)- psit_26(zt/L))
-        usr  = max( 1.e-10_rk, ut*cdhf )
-        qsr  =-(dq-wetc*dter*jcool)*cqhf
-        tsr  =-(dt-     dter*jcool)*cthf
+        usr  = max( SMALL, ut*cdhf )
+        qsr  =-(dq-dqer*jcool)*cqhf
+        tsr  =-(dt-dter*jcool)*cthf
         tvsr = tsr+.61_rk*ta*qsr
-        tssr = tsr+.51_rk*ta*qsr
+!        tssr = tsr+.51_rk*ta*qsr  ! DELETEME: Sonic heat flux is not used
         Bf   =-grav/ta*usr*tvsr
         ug   = .2_rk
         if ( Bf > 0. ) ug = max(.2_rk, Beta*(Bf*zi)**.333_rk )
-        ut = sqrt(u**2 + ug**2)
+        ut = sqrt(u*u + ug*ug)
         gf = ut/u
-        hsb=-rhoa*cpa*usr*tsr
-        hlb=-rhoa*Le*usr*qsr
+        hsb  = -rhoa*cpa*usr*tsr
+        hlb  = -rhoa*Le*usr*qsr
         qout = Rnl+hsb+hlb
         dels = Rns*( .065_rk + 11._rk*tkt - 6.6e-5_rk/tkt  &
                     *( 1._rk-exp(-1250._rk*tkt) ) )        ! 1./0.0008 = 1250.
         qcol = qout-dels
         alq  = Al*qcol + be*hlb*cpw/Le
+        tkt  = 6._rk*visw/( sqrt(rhoa/rhow)*usr + SMALL )
         if ( alq > 0. ) then
-          xlamx = 6._rk / ( 1._rk+(bigc*alq/usr**4)**.75_rk )**.333_rk
-          tkt   = xlamx*visw/(sqrt(rhoa/rhow)*usr)
-        else
-          xlamx= 6._rk
-          tkt = min(.01_rk, xlamx*visw/(sqrt(rhoa/rhow)*usr))
+          tkt = tkt / ( 1._rk+(bigc*alq/(usr*usr*usr*usr + SMALL))**.75_rk )**.333_rk
         end if
+        tkt  = min(.01_rk,tkt)
         dter = qcol*tkt/tcw
         dqer = wetc*dter
         Rnl  = .97_rk*( 5.67e-8_rk*(ts-dter*jcool+tdk)**4 - Rl ) ! update dter
-        u10N = usr/von/gf*log(10._rk/zo)
-        charn = max( a1*min(u10N,umax)+a2, .011_rk )
+        u10  = usr/von/gf*log(10._rk/zo)
+        charn = max( a1*min(u10,umax)+a2, .011_rk )
 
       end do
 
@@ -1616,8 +1612,8 @@ module air
       tau  =  rhoa*usr*usr/gf       ! wind stress [N/m^2]
       hsb  = -rhoa*cpa*usr*tsr      ! sensible heat flux [W/m^2]
       hlb  = -rhoa*Le*usr*qsr       ! latent heat flux [W/m^2]
-      hbb  = -rhoa*cpa*usr*tvsr     ! buoyancy flux
-      hsbb = -rhoa*cpa*usr*tssr     ! sonic heat flux
+!      hbb  = -rhoa*cpa*usr*tvsr     ! buoyancy flux
+!      hsbb = -rhoa*cpa*usr*tssr     ! sonic heat flux
 
 ! Precipitation heat flux
       dwat = 2.11e-5_rk*( (t+tdk)/tdk )**1.94_rk                      ! water vapour diffusivity
@@ -1630,8 +1626,8 @@ module air
       hsb = hsb + RF
 
 ! Evaporation rate
-      wbar = 1.61_rk*hlb + Le*hsb/(cpa*ta)*(1._rk+1.61_rk*Q)
-      hlb  = hlb + wbar*Q
+!      wbar = 1.61_rk*hlb + Le*hsb/(cpa*ta)*(1._rk+1.61_rk*Q)  ! FIXME: Webb correction should already be in Hlb
+!      hlb  = hlb + wbar*Q
       Evap = hlb/Le          ! evaporation rate [kg/m^2/s]
 
 !-----  compute transfer coeffs relative to ut @ meas. ht  --------------------

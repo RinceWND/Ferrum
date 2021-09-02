@@ -30,7 +30,7 @@
         call msg_print("BEGIN NUMERICAL EXPERIMENT", 1, "")
         print '(" = ",a)', date2str( dtime )
       end if
-      
+
 ! main loop
       do iint = 1,iend
 
