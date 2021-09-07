@@ -20,7 +20,7 @@
      &                     , n_south, n_west
       use grid       , only: aru, arv, fsm, dum, dvm, dx, dy
       use glob_ocean , only: aam2d, advua, advva, cbc, d
-     &                     , fluxua, fluxva, tps, ua, uab, va, vab
+     &                     , fluxua, fluxva, ua, uab, va, vab
      &                     , wubot, wvbot
 
       implicit none
@@ -28,12 +28,14 @@
 
       real(rk), dimension(im,jm), intent(out) :: curv2d
 
+      real(rk), dimension(im,jm) :: tps
       integer i,j
 
 ! u-advection and diffusion
 
 ! advective fluxes
       advua = 0.
+      tps   = 0.
 
       do j = 2, jm
         do i = 2, imm1
@@ -1390,7 +1392,7 @@
      &                    - (1._rk/24._rk)
      &                     *( dvm(i,j+1,k)*(rho(i,j+1,k)-rho(i,j  ,k))
      &                      -        2._rk*(rho(i,j  ,k)-rho(i,j-1,k))
-     &                      + dvm(i,j-1,k)*(rho(i,j-1,k)-rho(i,j-1,k)) )
+     &                      + dvm(i,j-1,k)*(rho(i,j-1,k)-rho(i,j-2,k)) )
               rhou(i,j,k) = rhou(i,j,k)
      &                    + (1._rk/16._rk)
      &                     *( dvm(i,j+1,k)*(rho(i,j  ,k)-rho(i,j+1,k))
