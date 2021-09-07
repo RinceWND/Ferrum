@@ -1468,8 +1468,8 @@
       use glob_domain, only: im, is_master, jm, km, kmm1  ,my_task
       use grid       , only: dz, h
       use model_run  , only: iint, dtime
-      use glob_ocean , only: aam, d, drhox, drhoy, drx2d, dry2d, dt
-     &                     , el, elb, et, etb, etf
+      use glob_ocean , only: aam, aam2d, d, drhox, drhoy, drx2d, dry2d
+     &                     , dt, el, elb, et, etb, etf
      &                     , kh, kmt, kq, l, q2, q2b, q2l, q2lb
      &                     , rho, s, sb, t, tb, u, ua, ub, uab
      &                     , v, va, vb, vab, w
@@ -1482,7 +1482,7 @@
 
       if ( use_tide ) then
         call tide_advance( dtime )
-        if ( .not.do_restart ) then
+        if ( .not.do_restart ) then ! FIXME: This won't work for a cold start
           uab = tide_ua
           vab = tide_va
           elb = tide_el
@@ -1503,12 +1503,13 @@
         l(:,:,k) = .1*dt
       end do
 
-      q2b = SMALL
-      q2lb= l*q2b
-      kh  = l*sqrt(q2b)
-      kmt = kh
-      kq  = kh
-      aam = aam_init
+      q2b   = SMALL
+      q2lb  = l*q2b
+      kh    = l*sqrt(q2b)
+      kmt   = kh
+      kq    = kh
+      aam   = aam_init
+      aam2d = aam_init
 
       do k=1,kmm1
         do i=1,im
