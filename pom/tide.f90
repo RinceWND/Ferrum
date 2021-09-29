@@ -75,7 +75,9 @@ module tide
   , lon                      & ! Longitude at z-points
   , lon_u                    & ! Longitude at u-points
   , lon_v                    & ! Longitude at v-points
-  , tide_el                  & ! Total cloud cover [fraction 0..1]
+  , rot_cos                  & ! precomputed cos(rot) for rotation
+  , rot_sin                  & ! precomputed sin(rot) for rotation
+  , tide_el                  & !
   , tide_el_b                &
   , tide_mask                &
   , tide_ua                  &
@@ -556,6 +558,8 @@ module tide
       , ua_pha(im,jm,ncons)  &
       , va_amp(im,jm,ncons)  &
       , va_pha(im,jm,ncons)  &
+      , rot_cos  (im,jm)     &
+      , rot_sin  (im,jm)     &
       , tide_el  (im,jm)     &
       , tide_el_b(im,jm)     &
       , tide_mask(im,jm)     &
@@ -845,20 +849,14 @@ module tide
 
         deallocate( tmp, var )
 
-! Rotate uv-variables to conform to the grid using `tmp` and `var` as u and v
-        allocate( tmp( im, jm, ncons )    &
-                , var( im, jm, ncons ) )
+! Precalculate cos and sin for rotation matrix
+        rot_cos = cos(rot)
+        rot_sin = sin(rot)
 
-! Rotating only the amplitudes does the job
-        do i = 1, int(ncons)
-          tmp(:,:,i) = ua_amp(:,:,i)*cos(rot) - va_amp(:,:,i)*sin(rot)
-          var(:,:,i) = ua_amp(:,:,i)*sin(rot) + va_amp(:,:,i)*cos(rot)
-        end do
-! Convert cm to meters
-        ua_amp = tmp/100.
-        va_amp = var/100.
-
-        deallocate( tmp, var )
+! Rotating amplitudes beforehand doesn't affect astronomical `uv` parametre
+! so just convert cm to meters
+        ua_amp = ua_amp/100.
+        va_amp = va_amp/100.
 
       else
 
@@ -914,10 +912,11 @@ module tide
 
       type(date), intent(in) :: d_in
 
-      integer                   i
-      real(rk)                  f, h, N, p, s, tick, uv
-      real(rk), dimension(4) :: tmp
-      type(T_constituent)       this_con
+      integer                       i
+      real(rk)                      f, h, N, p, s, tick, uv
+      real(rk), dimension(4)     :: tmp
+      real(rk), dimension(im,jm) :: vec_tmp
+      type(T_constituent)           this_con
 
 
 ! Quit if the module is not used.
@@ -945,40 +944,74 @@ module tide
         f  = f**this_con%f(5) ! TODO: Make this more dynamic to include cases of other kinds of calculations for `f`.
         uv = this_con%V(1) + this_con%V(2)*s      + this_con%V(3)*h         + this_con%V(4)*p
         uv = uv            + this_con%u(1)*sin(N) + this_con%u(2)*sin(2.*N) + this_con%u(3)*sin(3.*N)
-        tide_el(im,:) = tide_el(im,:) + f*el_amp(im,:,i)*cos( (this_con%speed*tick + uv - el_pha(im,:,i))*DEG2RAD )
-        tide_ua(im,:) = tide_ua(im,:) + f*ua_amp(im,:,i)*cos( (this_con%speed*tick + uv - ua_pha(im,:,i))*DEG2RAD )
-        tide_va(im,:) = tide_va(im,:) + f*va_amp(im,:,i)*cos( (this_con%speed*tick + uv - va_pha(im,:,i))*DEG2RAD )
+! Fill in the boundaries w/o overlapping (double addition)
+        tide_el(    im,: ) = tide_el(im,:)                        &
+                           + f*el_amp(im,:,i)                     &
+                            *cos( (this_con%speed*tick + uv       &
+                                  - el_pha(im,:,i))*DEG2RAD )
         tide_el(2:imm1,jm) = tide_el(2:imm1,jm)                   &
                            + f*el_amp(2:imm1,jm,i)                &
                             *cos( ( this_con%speed*tick + uv      &
                                   - el_pha(2:imm1,jm,i) )*DEG2RAD )
+        tide_el(     1,: ) = tide_el(1,:)                         &
+                           + f*el_amp(1,:,i)                      &
+                            *cos( (this_con%speed*tick + uv       &
+                                  - el_pha(1,:,i))*DEG2RAD )
+        tide_el(2:imm1, 1) = tide_el(2:imm1,1)                    &
+                           + f*el_amp(2:imm1,1,i)                 &
+                            *cos( ( this_con%speed*tick + uv      &
+                                  - el_pha(2:imm1,1,i) )*DEG2RAD )
+        tide_ua(    im,: ) = tide_ua(im,:)                        &
+                           + f*ua_amp(im,:,i)                     &
+                            *cos( (this_con%speed*tick + uv       &
+                                  - ua_pha(im,:,i))*DEG2RAD )
         tide_ua(1:imm1,jm) = tide_ua(1:imm1,jm)                   &
                            + f*ua_amp(1:imm1,jm,i)                &
                             *cos( ( this_con%speed*tick + uv      &
                                   - ua_pha(1:imm1,jm,i) )*DEG2RAD )
+        tide_ua( 2,2:jmm1) = tide_ua(2,2:jmm1)                    &
+                           + f*ua_amp(2,2:jmm1,i)                 &
+                            *cos( ( this_con%speed*tick + uv      &
+                                  - ua_pha(2,2:jmm1,i) )*DEG2RAD )
+        tide_ua(1:imm1, 1) = tide_ua(1:imm1,1)                    &
+                           + f*ua_amp(1:imm1,1,i)                 &
+                            *cos( ( this_con%speed*tick + uv      &
+                                  - ua_pha(1:imm1,1,i) )*DEG2RAD )
+        tide_va(    im,: ) = tide_va(im,:)                        &
+                           + f*va_amp(im,:,i)                     &
+                            *cos( (this_con%speed*tick + uv       &
+                                  - va_pha(im,:,i))*DEG2RAD )
         tide_va(2:imm1,jm) = tide_va(2:imm1,jm)                   &
                            + f*va_amp(2:imm1,jm,i)                &
                             *cos( ( this_con%speed*tick + uv      &
                                   - va_pha(2:imm1,jm,i) )*DEG2RAD )
-        tide_el( 1,:) = tide_el( 1,:) + f*el_amp( 1,:,i)*cos( (this_con%speed*tick + uv - el_pha( 1,:,i))*DEG2RAD )
-        tide_ua( 2,2:jmm1) = tide_ua( 2,2:jmm1)                   &
-                           + f*ua_amp( 2,2:jmm1,i)                &
+        tide_va(     1,: ) = tide_va(1,:)                         &
+                           + f*va_amp(1,:,i)                      &
+                            *cos( (this_con%speed*tick + uv       &
+                                  - va_pha(1,:,i))*DEG2RAD )
+        tide_va(2:imm1, 2) = tide_va(2:imm1,2)                    &
+                           + f*va_amp(2:imm1,2,i)                 &
                             *cos( ( this_con%speed*tick + uv      &
-                                  - ua_pha( 2,2:jmm1,i) )*DEG2RAD )
-        tide_va( 1,:) = tide_va( 1,:) + f*va_amp( 1,:,i)*cos( (this_con%speed*tick + uv - va_pha( 1,:,i))*DEG2RAD )
-        tide_el(2:imm1, 1) = tide_el(2:imm1, 1)                   &
-                           + f*el_amp(2:imm1, 1,i)                &
-                            *cos( ( this_con%speed*tick + uv      &
-                                  - el_pha(2:imm1, 1,i) )*DEG2RAD )
-        tide_ua(2:imm1, 1) = tide_ua(2:imm1, 1)                   &
-                           + f*ua_amp(2:imm1, 1,i)                &
-                            *cos( ( this_con%speed*tick + uv      &
-                                  - ua_pha(2:imm1, 1,i) )*DEG2RAD )
-        tide_va(2:imm1, 2) = tide_va(2:imm1, 2)                   &
-                           + f*va_amp(2:imm1, 2,i)                &
-                            *cos( ( this_con%speed*tick + uv      &
-                                  - va_pha(2:imm1, 2,i) )*DEG2RAD )
+                                  - va_pha(2:imm1,2,i) )*DEG2RAD )
       end do
+
+      ! Rotate the resulted tidal vector
+      ! FIXME: sin and cos are not really conform to u and v locataions
+      vec_tmp(  im  ,: ) = tide_ua(  im  ,: )*rot_cos(  im  ,: ) - tide_va(  im  ,: )*rot_sin(  im  ,: )
+      vec_tmp(1:imm1,jm) = tide_ua(1:imm1,jm)*rot_cos(1:imm1,jm) - tide_va(1:imm1,jm)*rot_sin(1:imm1,jm)
+      vec_tmp( 2,2:jmm1) = tide_ua( 2,2:jmm1)*rot_cos( 2,2:jmm1) - tide_va( 1,2:jmm1)*rot_sin( 1,2:jmm1)
+      vec_tmp(1:imm1, 1) = tide_ua(1:imm1, 1)*rot_cos(1:imm1, 1) - tide_va(1:imm1, 2)*rot_sin(1:imm1, 2)
+
+      tide_va(  im  ,: ) = tide_ua(  im  ,: )*rot_sin(  im  ,: ) + tide_va(  im  ,: )*rot_cos(  im  ,: )
+      tide_va(1:imm1,jm) = tide_ua(1:imm1,jm)*rot_sin(1:imm1,jm) + tide_va(1:imm1,jm)*rot_cos(1:imm1,jm)
+      tide_va( 1,2:jmm1) = tide_ua( 2,2:jmm1)*rot_sin( 2,2:jmm1) + tide_va( 1,2:jmm1)*rot_cos( 1,2:jmm1)
+      tide_va(1:imm1, 2) = tide_ua(1:imm1, 1)*rot_sin(1:imm1, 1) + tide_va(1:imm1, 2)*rot_cos(1:imm1, 2)
+
+      tide_ua(im,: ) = vec_tmp(im,: )
+      tide_ua( 2,: ) = vec_tmp( 2,: )
+      tide_ua( :,jm) = vec_tmp( :,jm)
+      tide_ua( :, 1) = vec_tmp( :, 1)
+
       !tide_el = tide_el*fsm!tide_mask
       !tide_ua = tide_ua*fsm!tide_mask
       !tide_va = tide_va*fsm!tide_mask
