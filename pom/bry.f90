@@ -3997,6 +3997,11 @@ module bry
               uf(im,:,:) = uf(imm1,:,:)
               vf(im,:,:) = vf(imm1,:,:)
 
+            case ( bcCLAMPED )
+
+              uf(im,:,:) = SMALL
+              vf(im,:,:) = SMALL
+
             case ( bcINOUTFLOW )
 
               do k = 1,km
@@ -4072,6 +4077,11 @@ module bry
 
               uf(1,:,:) = uf(2,:,:)
               vf(1,:,:) = vf(2,:,:)
+
+            case ( bcCLAMPED )
+
+              uf(1,:,:) = SMALL
+              vf(1,:,:) = SMALL
 
             case ( bcINOUTFLOW )
 
@@ -4161,6 +4171,11 @@ module bry
               uf(:,jm,:) = uf(:,jmm1,:)
               vf(:,jm,:) = vf(:,jmm1,:)
 
+            case ( bcCLAMPED )
+
+              uf(:,jm,:) = SMALL
+              vf(:,jm,:) = SMALL
+
             case ( bcINOUTFLOW )
 
               do k = 1,km
@@ -4236,6 +4251,11 @@ module bry
 
               uf(:,1,:) = uf(:,2,:)
               vf(:,1,:) = vf(:,2,:)
+
+            case ( bcCLAMPED )
+
+              uf(:,1,:) = SMALL
+              vf(:,1,:) = SMALL
 
             case ( bcINOUTFLOW )
 
