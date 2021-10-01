@@ -10,7 +10,7 @@
 !
 module air
 
-  use glob_const , only: DEG2RAD, PI, rk
+  use glob_const , only: DEG2RAD, PI, rk, SMALL
   use glob_domain, only: im, imm1, jm, jmm1
 
   implicit none
@@ -80,16 +80,26 @@ module air
   , USE_FLUXES     & !  momentum flux is read directly from files !TODO: if set to false, wtsurf crashes the calculations
   , USE_RAMP         !  use temporal linear damping on wind stress
 
-  integer(1)        &
+  integer(1)       &
     LWRAD_FORMULA    ! Bulk formula to estimate longwave radiation
+
+  integer          &
+    resume_from      ! Resume from record of forcing file (if USE_CALENDAR is .false.)
 
 !----------------------------------------------------------------------
 ! Paths configuration
 !----------------------------------------------------------------------
   character(256)      & ! Full paths (with filenames) to:
-    bulk_path         & !  atmospheric parameters file
-  , flux_path         & !  surface fluxes file
-  , wind_path           !  wind file
+     bulk_path        & !  atmospheric parameters file (default for all unspecified atmospheric files)
+  ,  flux_path        & !  surface fluxes
+  , humid_path        & !  relative humidity
+  ,   pbl_path        & !  planetary boundary layer height
+  ,  pres_path        & !  atm. pressure
+  ,  rain_path        & !  precipitation
+  ,   sst_path        & !  sea surface temperature
+  ,  tair_path        & !  atm. temperature
+  ,  tcld_path        & !  total cloud cover
+  ,  wind_path          !  wind
 
 !----------------------------------------------------------------------
 ! Input variables' names
@@ -198,7 +208,7 @@ module air
 
       character(*), intent(in) :: config_file
 
-      integer pos
+      integer pos, N_taper
 
       namelist/air_nml/                                             &
         CALC_SWR     , INTERP_CLOUD , INTERP_HEAT  , INTERP_HUMID   &
@@ -207,7 +217,9 @@ module air
       , READ_CLOUD   , READ_HEAT    , READ_STRESS  , READ_WIND      &
       , TAPER_BRY    , USE_BULK     , USE_CALENDAR , USE_COARE      &
       , USE_DQDSST   , USE_FLUXES   , USE_RAMP     , LWRAD_FORMULA  &
-      , bulk_path    , flux_path    , wind_path    , read_int
+      , bulk_path    , flux_path    , humid_path   , pbl_path       &
+      , pres_path    , rain_path    , sst_path     , tair_path      &
+      , tcld_path    , wind_path    , read_int     , resume_from ! TODO: Introduce proper time variable reading
 
       namelist/air_vars_nml/                            &
         dlrad_name, humid_name, lheat_name,  lrad_name  &
@@ -231,6 +243,10 @@ module air
 ! Initialize variables with their defaults
       read_int = 3600 * 3 ! 8xDaily
 
+      resume_from = 1
+
+      LWRAD_FORMULA = lwBERLIAND
+
       CALC_SWR     = .true.
       READ_HEAT    = .false.
       READ_STRESS  = .false.
@@ -247,6 +263,13 @@ module air
       bulk_path = "in/surf/"
       flux_path = "in/surf/"
       wind_path = "in/surf/"
+      humid_path = ""
+      pbl_path   = ""
+      pres_path  = ""
+      rain_path  = ""
+      sst_path   = ""
+      tair_path  = ""
+      tcld_path  = ""
 
       dlrad_name = "dlwr"
       lheat_name = "lht"
@@ -293,6 +316,34 @@ module air
         wind_path = trim(wind_path)//"wnd."
       end if
 
+      if ( humid_path == "" ) then
+        humid_path = bulk_path
+      end if
+
+      if ( pbl_path == "" ) then
+        pbl_path = bulk_path
+      end if
+
+      if ( pres_path == "" ) then
+        pres_path = bulk_path
+      end if
+
+      if ( rain_path == "" ) then
+        rain_path = bulk_path
+      end if
+
+      if ( sst_path == "" ) then
+        sst_path = bulk_path
+      end if
+
+      if ( tair_path == "" ) then
+        tair_path = bulk_path
+      end if
+
+      if ( tcld_path == "" ) then
+        tcld_path = bulk_path
+      end if
+
       if ( is_master ) then
         print *, "Bulk data     : ", trim(bulk_path)
         print *, "Surface fluxes: ", trim(flux_path)
@@ -316,42 +367,43 @@ module air
 ! Allocate necessary arrays
       call allocate_arrays
 
+      N_taper = 14
       if ( n_east==-1 ) then
-        where ( fsm(im,:,1) /= 0. )
-          taper_mask(im  ,:) = 0.
-          taper_mask(im-1,:) = 0.2
-          taper_mask(im-2,:) = 0.5
-          taper_mask(im-3,:) = 0.8
-        end where
+        do pos = im, im-N_taper, -1
+          where ( fsm(im,:,1) /= 0. )
+            taper_mask(pos,:) = tanh(3./real(N_taper)*(im-pos))
+          end where
+        end do
       end if
 
       if ( n_west==-1 ) then
         where ( fsm(1,:,1) /= 0. )
           taper_mask(1,:) = 0.
-          taper_mask(2,:) = 0.
-          taper_mask(3,:) = 0.2
-          taper_mask(4,:) = 0.5
-          taper_mask(5,:) = 0.8
         end where
+        do pos = 1, N_taper
+          where ( fsm(1,:,1) /= 0. )
+            taper_mask(pos+1,:) = tanh(3./real(N_taper)*pos)
+          end where
+        end do
       end if
 
       if ( n_north==-1 ) then
-        where ( fsm(:,jm,1) /= 0. )
-          taper_mask(:,jm  ) = 0.
-          taper_mask(:,jm-1) = 0.2*taper_mask(:,jm-1)
-          taper_mask(:,jm-2) = 0.5*taper_mask(:,jm-2)
-          taper_mask(:,jm-3) = 0.8*taper_mask(:,jm-3)
-        end where
+        do pos = jm, jm-N_taper, -1
+          where ( fsm(:,jm,1) /= 0. )
+            taper_mask(:,pos) = tanh(3./real(N_taper)*(jm-pos))*taper_mask(:,pos)
+          end where
+        end do
       end if
 
       if ( n_south==-1 ) then
         where ( fsm(:,1,1) /= 0. )
           taper_mask(:,1) = 0.
-          taper_mask(:,2) = 0.
-          taper_mask(:,3) = 0.2*taper_mask(:,3)
-          taper_mask(:,4) = 0.5*taper_mask(:,4)
-          taper_mask(:,5) = 0.8*taper_mask(:,5)
         end where
+        do pos = 1, N_taper
+          where ( fsm(:,1,1) /= 0. )
+            taper_mask(:,pos+1) = tanh(3./real(N_taper)*pos)*taper_mask(:,pos+1)
+          end where
+        end do
       end if
 
       call msg_print("AIR MODULE INITIALIZED", 1, "")
@@ -560,7 +612,7 @@ module air
 
       else
 
-        record = [ 1, 1, 2 ]
+        record = [ resume_from, resume_from, resume_from+1 ]
         a = 0._rk
 
       end if
@@ -722,7 +774,7 @@ module air
 
       else
 
-        record(1) = int( iint*dti / read_int ) + 1
+        record(1) = int( iint*dti / read_int ) + resume_from
         record(2) = record(1)
         record(3) = record(2) + 1
 
@@ -859,8 +911,8 @@ module air
       swrad  = swrad *taper_mask
       wssurf = wssurf*taper_mask
       wtsurf = wtsurf*taper_mask
-      !wusurf = ramp*wusurf*taper_mask
-      !wvsurf = ramp*wvsurf*taper_mask
+      wusurf = ramp*wusurf*taper_mask
+      wvsurf = ramp*wvsurf*taper_mask
 
 
     end ! subroutine
@@ -1467,11 +1519,11 @@ module air
       ta = t+tdk
       ug = .5_rk
       dter  = .3_rk
-      dqer  = 0._rk
-      ut    = sqrt( u**2 + ug**2 )
+      dqer  = wetc*dter
+      ut    = sqrt( u*u + ug*ug )
       u10   = ut * log(10._rk/1.e-4_rk) / log(zu/1.e-4_rk)
       usr   = .035_rk * u10
-      zo10  = .011_rk*usr**2/grav + .11_rk*visa/usr
+      zo10  = .011_rk*usr*usr/grav + .11_rk*visa/usr
       Cd10  = ( von / log(10._rk/zo10) )**2
       Ch10  = .00115_rk
       Ct10  = Ch10 / sqrt(Cd10)
@@ -1480,19 +1532,16 @@ module air
       Ct    =   von / log(zt/zot10)
       CC    =   von * Ct/Cd
       Ribcu = -250._rk*zu/(zi*Beta**3) ! 1./.004 = 250. I just like multiplication better
-      Ribu  = -grav*zu/ta*( (dt-dter*jcool)+.61_rk*ta*dq )/ut**2
+      Ribu  = -grav*zu*( (dt-dter*jcool)+.61_rk*ta*dq )/( ta*ut*ut )
       if ( Ribu < 0. ) then
         zetu = CC*Ribu/( 1._rk +       Ribu/Ribcu )
       else
         zetu = CC*Ribu*( 1._rk + 3._rk*Ribu/CC    )
       end if
       L10 = zu/zetu                         ! Monin-Obukhov length
-      gf  = ut/u
-      usr = ut*von / ( log(zu/zo10) - psiu_40(zu/L10) )
-      tsr = -(dt-     dter*jcool)*von*fdg                          &
-                                 /(log(zt/zot10)-psit_26(zt/L10))
-      qsr = -(dq-wetc*dter*jcool)*von*fdg                          &
-                                 /(log(zq/zot10)-psit_26(zq/L10))
+      usr =   ut            *von    /(log(zu/zo10 )-psiu_40(zu/L10))
+      tsr = -(dt-dter*jcool)*von*fdg/(log(zt/zot10)-psit_26(zt/L10))
+      qsr = -(dq-dqer*jcool)*von*fdg/(log(zq/zot10)-psit_26(zq/L10))
       tkt = .001_rk
 
 !----------------------------------------------------------
@@ -1506,17 +1555,17 @@ module air
 
       charn  = max( a1*min(u10,umax)+a2, .011_rk )
 
-      nits = 10   ! number of iterations
+      nits = 5   ! number of iterations
 
       if ( zetu > 50. ) nits = 1
 !--------------  bulk loop --------------------------------------------------
 
       do i = 1, nits
 
-        zet = von*grav*zu/ta*(tsr+.61_rk*ta*qsr)/(usr*usr)
+        zet = von*grav*zu*(tsr+.61_rk*ta*qsr)/(ta*usr*usr+SMALL)
 !          zet = von*grav*zu*(tsr*(1.+.61*Q))
-        L  = zu/zet
-        zo = charn*usr*usr/grav + .11_rk*visa/usr      ! surface roughness
+        L  = zu/( zet + SMALL )
+        zo = charn*usr*usr/grav + .11_rk*visa/( usr + SMALL )  ! surface roughness
 !        zo = max( zo, 1.e-10_rk )
         rr = zo*usr/visa
 !        zoq= min(1.6e-4_rk, 5.8e-5_rk/rr**.72)        ! These thermal roughness lengths give Stanton and
@@ -1527,38 +1576,37 @@ module air
         else
           zoq = min( 1.15e-4_rk           , 5.5e-5_rk/rr**.6_rk )
         end if
-        cdhf = von    /(log(zu/zo) - psiu_26(zu/L))
+!        cdhf = von    /(log(zu/zo) - psiu_26(zu/L))
+        cdhf = von    /(log(zu/zo) - psiu_26(zet))
         cqhf = von*fdg/(log(zq/zoq)- psit_26(zq/L))
         cthf = von*fdg/(log(zt/zot)- psit_26(zt/L))
-        usr  = max( 1.e-10_rk, ut*cdhf )
-        qsr  =-(dq-wetc*dter*jcool)*cqhf
-        tsr  =-(dt-     dter*jcool)*cthf
+        usr  = max( SMALL, ut*cdhf )
+        qsr  =-(dq-dqer*jcool)*cqhf
+        tsr  =-(dt-dter*jcool)*cthf
         tvsr = tsr+.61_rk*ta*qsr
-        tssr = tsr+.51_rk*ta*qsr
+!        tssr = tsr+.51_rk*ta*qsr  ! DELETEME: Sonic heat flux is not used
         Bf   =-grav/ta*usr*tvsr
         ug   = .2_rk
         if ( Bf > 0. ) ug = max(.2_rk, Beta*(Bf*zi)**.333_rk )
-        ut = sqrt(u**2 + ug**2)
+        ut = sqrt(u*u + ug*ug)
         gf = ut/u
-        hsb=-rhoa*cpa*usr*tsr
-        hlb=-rhoa*Le*usr*qsr
+        hsb  = -rhoa*cpa*usr*tsr
+        hlb  = -rhoa*Le*usr*qsr
         qout = Rnl+hsb+hlb
         dels = Rns*( .065_rk + 11._rk*tkt - 6.6e-5_rk/tkt  &
                     *( 1._rk-exp(-1250._rk*tkt) ) )        ! 1./0.0008 = 1250.
         qcol = qout-dels
         alq  = Al*qcol + be*hlb*cpw/Le
+        tkt  = 6._rk*visw/( sqrt(rhoa/rhow)*usr + SMALL )
         if ( alq > 0. ) then
-          xlamx = 6._rk / ( 1._rk+(bigc*alq/usr**4)**.75_rk )**.333_rk
-          tkt   = xlamx*visw/(sqrt(rhoa/rhow)*usr)
-        else
-          xlamx= 6._rk
-          tkt = min(.01_rk, xlamx*visw/(sqrt(rhoa/rhow)*usr))
+          tkt = tkt / ( 1._rk+(bigc*alq/(usr*usr*usr*usr + SMALL))**.75_rk )**.333_rk
         end if
+        tkt  = min(.01_rk,tkt)
         dter = qcol*tkt/tcw
         dqer = wetc*dter
         Rnl  = .97_rk*( 5.67e-8_rk*(ts-dter*jcool+tdk)**4 - Rl ) ! update dter
-        u10N = usr/von/gf*log(10._rk/zo)
-        charn = max( a1*min(u10N,umax)+a2, .011_rk )
+        u10  = usr/von/gf*log(10._rk/zo)
+        charn = max( a1*min(u10,umax)+a2, .011_rk )
 
       end do
 
@@ -1566,8 +1614,8 @@ module air
       tau  =  rhoa*usr*usr/gf       ! wind stress [N/m^2]
       hsb  = -rhoa*cpa*usr*tsr      ! sensible heat flux [W/m^2]
       hlb  = -rhoa*Le*usr*qsr       ! latent heat flux [W/m^2]
-      hbb  = -rhoa*cpa*usr*tvsr     ! buoyancy flux
-      hsbb = -rhoa*cpa*usr*tssr     ! sonic heat flux
+!      hbb  = -rhoa*cpa*usr*tvsr     ! buoyancy flux
+!      hsbb = -rhoa*cpa*usr*tssr     ! sonic heat flux
 
 ! Precipitation heat flux
       dwat = 2.11e-5_rk*( (t+tdk)/tdk )**1.94_rk                      ! water vapour diffusivity
@@ -1580,8 +1628,8 @@ module air
       hsb = hsb + RF
 
 ! Evaporation rate
-      wbar = 1.61_rk*hlb + Le*hsb/(cpa*ta)*(1._rk+1.61_rk*Q)
-      hlb  = hlb + wbar*Q
+!      wbar = 1.61_rk*hlb + Le*hsb/(cpa*ta)*(1._rk+1.61_rk*Q)  ! FIXME: Webb correction should already be in Hlb
+!      hlb  = hlb + wbar*Q
       Evap = hlb/Le          ! evaporation rate [kg/m^2/s]
 
 !-----  compute transfer coeffs relative to ut @ meas. ht  --------------------
@@ -2474,7 +2522,7 @@ module air
 ! Read bulk file
       if ( read_bulk ) then
 
-        file_id = file_open( trim( get_filename( bulk_path, year(n) ) )  &
+        file_id = file_open( trim( get_filename( humid_path, year(n) ) )  &
                            , NF90_NOWRITE )
 
         if ((     interp_humid .and. n>=2) .or.       &
@@ -2486,6 +2534,11 @@ module air
           end if
         end if
 
+        file_id = file_close( file_id )
+
+        file_id = file_open( trim( get_filename(  rain_path, year(n) ) )  &
+                           , NF90_NOWRITE )
+
         if ((     interp_rain .and. n>=2) .or.       &
             (.not.interp_rain .and. n==1)      ) then
           if ( var_read( file_id, rain_name,  rain(:,:,n)  &
@@ -2494,6 +2547,11 @@ module air
             call msg_print("", 2, "Precip.rate is defaulted to zero.")
           end if
         end if
+
+        file_id = file_close( file_id )
+
+        file_id = file_open( trim( get_filename(  pres_path, year(n) ) )  &
+                           , NF90_NOWRITE )
 
         if ((     interp_pres .and. n>=2) .or.       &
             (.not.interp_pres .and. n==1)      ) then
@@ -2508,6 +2566,11 @@ module air
           end if
         end if
 
+        file_id = file_close( file_id )
+
+        file_id = file_open( trim( get_filename(   sst_path, year(n) ) )  &
+                           , NF90_NOWRITE )
+
         if ((     interp_sst .and. n>=2) .or.       &
             (.not.interp_sst .and. n==1)      ) then
           if ( var_read( file_id, sst_name,   sst(:,:,n)  &
@@ -2520,6 +2583,11 @@ module air
             end if
           end if
         end if
+
+        file_id = file_close( file_id )
+
+        file_id = file_open( trim( get_filename(  tair_path, year(n) ) )  &
+                           , NF90_NOWRITE )
 
         if ((     interp_tair .and. n>=2) .or.       &
             (.not.interp_tair .and. n==1)      ) then
@@ -2534,7 +2602,13 @@ module air
           end if
         end if
 
+        file_id = file_close( file_id )
+
         if ( READ_CLOUD ) then
+
+          file_id = file_open( trim( get_filename( tcld_path, year(n) ) )  &
+                             , NF90_NOWRITE )
+
           if ((     interp_cloud .and. n>=2) .or.       &
               (.not.interp_cloud .and. n==1)      ) then
             if ( var_read( file_id, tcld_name, cloud(:,:,n)  &
@@ -2543,7 +2617,13 @@ module air
               call msg_print("", 2, "Cloud cover is defaulted to zero.")
             end if
           end if
+
+          file_id = file_close( file_id )
+
         end if
+
+        file_id = file_open( trim( get_filename( pbl_path, year(n) ) )  &
+                           , NF90_NOWRITE )
 
         if ( n>=2 ) then
           if ( var_read( file_id, pbl_name, pbl(:,:,n)     &

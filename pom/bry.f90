@@ -1347,7 +1347,8 @@ module bry
 !  Vertically integrates baroclinic boundary values
 !______________________________________________________________________
 !
-      use grid, only: dz
+      use grid      , only: dz, h
+      use glob_ocean, only: et
 
       implicit none
 
@@ -1364,6 +1365,8 @@ module bry
                        +  V_bry % EST(1:NFE,:,k)  &
                         * dz(im:im-NFE+1:-1,:,k)
         end do
+        UA_bry % EST = UA_bry % EST / ( h + et )
+        VA_bry % EST = VA_bry % EST / ( h + et )
 
       end if
 
@@ -1379,6 +1382,8 @@ module bry
                        +  V_bry % NTH(:,1:NFN,k)  &
                         * dz(:,jm:jm-NFN+1:-1,k)
         end do
+        UA_bry % NTH = UA_bry % NTH / ( h + et )
+        VA_bry % NTH = VA_bry % NTH / ( h + et )
 
       end if
 
@@ -1394,6 +1399,8 @@ module bry
                        +  V_bry % STH(:,1:NFS,k)  &
                         * dz(:,1:NFS,k)
         end do
+        UA_bry % STH = UA_bry % STH / ( h + et )
+        VA_bry % STH = VA_bry % STH / ( h + et )
 
       end if
 
@@ -1409,6 +1416,8 @@ module bry
                        +  V_bry % WST(1:NFW,:,k)  &
                         * dz(1:NFW,:,k)
         end do
+        UA_bry % WST = UA_bry % WST / ( h + et )
+        VA_bry % WST = VA_bry % WST / ( h + et )
 
       end if
 
@@ -3988,6 +3997,11 @@ module bry
               uf(im,:,:) = uf(imm1,:,:)
               vf(im,:,:) = vf(imm1,:,:)
 
+            case ( bcCLAMPED )
+
+              uf(im,:,:) = SMALL
+              vf(im,:,:) = SMALL
+
             case ( bcINOUTFLOW )
 
               do k = 1,km
@@ -4063,6 +4077,11 @@ module bry
 
               uf(1,:,:) = uf(2,:,:)
               vf(1,:,:) = vf(2,:,:)
+
+            case ( bcCLAMPED )
+
+              uf(1,:,:) = SMALL
+              vf(1,:,:) = SMALL
 
             case ( bcINOUTFLOW )
 
@@ -4152,6 +4171,11 @@ module bry
               uf(:,jm,:) = uf(:,jmm1,:)
               vf(:,jm,:) = vf(:,jmm1,:)
 
+            case ( bcCLAMPED )
+
+              uf(:,jm,:) = SMALL
+              vf(:,jm,:) = SMALL
+
             case ( bcINOUTFLOW )
 
               do k = 1,km
@@ -4227,6 +4251,11 @@ module bry
 
               uf(:,1,:) = uf(:,2,:)
               vf(:,1,:) = vf(:,2,:)
+
+            case ( bcCLAMPED )
+
+              uf(:,1,:) = SMALL
+              vf(:,1,:) = SMALL
 
             case ( bcINOUTFLOW )
 

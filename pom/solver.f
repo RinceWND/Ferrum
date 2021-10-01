@@ -20,7 +20,7 @@
      &                     , n_south, n_west
       use grid       , only: aru, arv, fsm, dum, dvm, dx, dy
       use glob_ocean , only: aam2d, advua, advva, cbc, d
-     &                     , fluxua, fluxva, tps, ua, uab, va, vab
+     &                     , fluxua, fluxva, ua, uab, va, vab
      &                     , wubot, wvbot
 
       implicit none
@@ -28,12 +28,14 @@
 
       real(rk), dimension(im,jm), intent(out) :: curv2d
 
+      real(rk), dimension(im,jm) :: tps
       integer i,j
 
 ! u-advection and diffusion
 
 ! advective fluxes
       advua = 0.
+      tps   = 0.
 
       do j = 2, jm
         do i = 2, imm1
@@ -1392,7 +1394,7 @@
      &                    - (1._rk/24._rk)
      &                     *( dvm(i,j+1,k)*(rho(i,j+1,k)-rho(i,j  ,k))
      &                      -        2._rk*(rho(i,j  ,k)-rho(i,j-1,k))
-     &                      + dvm(i,j-1,k)*(rho(i,j-1,k)-rho(i,j-1,k)) )
+     &                      + dvm(i,j-1,k)*(rho(i,j-1,k)-rho(i,j-2,k)) )
               rhou(i,j,k) = rhou(i,j,k)
      &                    + (1._rk/16._rk)
      &                     *( dvm(i,j+1,k)*(rho(i,j  ,k)-rho(i,j+1,k))
@@ -3741,6 +3743,7 @@
 !______________________________________________________________________
 !
       use air        , only: swrad
+      use clim       , only: wtype
       use config     , only: ntp, umol
       use glob_const , only: rk
       use glob_domain, only: im, jm, km, kmm1, kmm2, i_global, j_global
@@ -3756,14 +3759,14 @@
       integer                      , intent(in   ) :: nbc
 
       integer  i, j, k, ki
-      real(rk) rad(im,jm,km), r(5), ad1(5), ad2(5)
+      real(rk) rad(im,jm,km), r(6), ad1(6), ad2(6)
 
 ! irradiance parameters after Paulson and Simpson (1977)
-!       ntp               1      2       3       4       5
-!   Jerlov type           i      ia      ib      ii     iii
-      data r   /         .58,    .62,    .67,    .77,    .78 /
-      data ad1 /         .35,    .60,   1.  ,   1.5 ,   1.4  /
-      data ad2 /       23.  ,  20.  ,  17.  ,  14.  ,   7.9  /
+!       ntp         1     2      3      4      5     6
+!   Jerlov type     i     ia     ib     ii    iii   DCW (ROMS)
+      data r   /   .58,   .62,   .67,   .77,   .78,  .55       /
+      data ad1 /   .35,   .60,  1.  ,  1.5 ,  1.4 ,  .00468592 /
+      data ad2 / 23.  , 20.  , 17.  , 14.  ,  7.9 , 1.51       /
 
 
 ! surface boundary condition:
@@ -3800,6 +3803,7 @@
         do k = 1, kmm1
           do j = 1, jm
             do i = 1, im
+              ntp = wtype(i,j)
               rad(i,j,k) = swrad(i,j)
      &                    *(     r(ntp) *exp(zf(i,j,k)/ad1(ntp))
      &                     + (1.-r(ntp))*exp(zf(i,j,k)/ad2(ntp)) )
