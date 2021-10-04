@@ -72,7 +72,8 @@
 ! finalize mpi
       call finalize_mpi
 
-      if (is_master) print '(a,f7.2,a)',"Done in ",(tick1-tick0)," sec."
+      if (is_master) print '(a,f7.2,a)',"Done in ",(tick1-tick0)/60.
+     &                                 ," min."
 
 
       end program
