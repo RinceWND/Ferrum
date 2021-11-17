@@ -19,7 +19,8 @@ MISCFLAGS = -std=f2018 -O3 -ffast-math -funroll-loops -march=native
 NETCDFINC = -I/usr/lib/x86_64-linux-gnu/fortran/gfortran-mod-15/ -I./
 NETCDFLIB = -L/usr/lib/x86_64-linux-gnu
 
-FFLAGS = $(NETCDFINC) $(MISCFLAGS)
+# Since gfortran10 mpi calls stopped working, because the devs are idiots. Hence `allow-arg-mismatch`
+FFLAGS = $(NETCDFINC) $(MISCFLAGS) -fallow-argument-mismatch
 
 LIBS = $(NETCDFLIB) -lpnetcdf
 #-----------------------------------------------------------------------
