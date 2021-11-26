@@ -1775,14 +1775,14 @@
       real(rk), dimension(im,jm)   :: fc, aux, idRx, idZx
 
 
-      rho = density - rmean
+      rho = density*rhoref! - rmean
 
 !
 !-----------------------------------------------------------------------
 !  Preliminary step (same for XI- and ETA-components:
 !-----------------------------------------------------------------------
 !
-      GRho  = grav!/rhoref
+      GRho  = grav/rhoref
       GRho0 = 1000.*GRho/rhoref
       HalfGRho = .5*GRho
       fac = 100./rhoref
@@ -1814,9 +1814,11 @@
         end do
         do i=1,im
           cff1 = 1./(d(i,j)*(zz(i,j,1)-zz(i,j,2)))
-          cff2 = .5*(rho(i,j,1)-rho(i,j,2))*d(i,j)*(-zz(i,j,1))*cff1
-          p(i,j,1) = Grho0*  el(i,j)
-     &             + Grho *(rho(i,j,1)+cff2)*d(i,j)*(-zz(i,j,1))
+          cff2 = .5*(rho(i,j,1)-rho(i,j,2))
+     &             *d(i,j)*(z(i,j,1)-zz(i,j,1))*cff1
+          p(i,j,1) = Grho0*( el(i,j) + d(i,j)*z(i,j,1) )
+     &             + Grho *( rho(i,j,1) + cff2 )
+     &                    *d(i,j)*(z(i,j,1)-zz(i,j,1))
         end do
         do k = 2,kb
           do i = 1,im
@@ -1843,10 +1845,13 @@
       do k = 1,kb
         do j = 1,jm
           do i = 2,im
-            aux(i,j) = zz(i,j,k)*(d(i,j)-d(i-1,j))+el(i,j)-el(i-1,j)
+            aux(i,j) = zz(i,j,k)*d(i,j)-zz(i-1,j,k)*d(i-1,j)
+     &               + el(i,j) - el(i-1,j)
             fc(i,j) = rho(i,j,k)-rho(i-1,j,k)
           end do
         end do
+        call exchange2d_mpi( aux, im, jm )
+        call exchange2d_mpi(  fc, im, jm )
         do j = 1,jm
           do i = 1,imm1
             cff = 2.*aux(i,j)*aux(i+1,j)
@@ -1866,15 +1871,9 @@
           end do
         end do
 
-        do j = 1,jm
-          do i = 2,im
-            if (k==1) then
-              drhox(i,j,k) = 0.
-            else
-              drhox(i,j,k) = drhox(i,j,k-1)
-            end if
-            drhox(i,j,k) = drhox(i,j,k)+
-     &                    .25*(dy(i,j)+dy(i-1,j))*
+        do j = 2,jmm1
+          do i = 2,imm1
+            drhox(i,j,k) = .25*(dy(i,j)+dy(i-1,j))*
      &                    (dz(i,j,k)*(dt(i,j)+dt(i-1,j)))*
      &                    (p(i-1,j,k)-p(i,j,k)-
      &                     HalfGRho*
@@ -1904,14 +1903,14 @@
 !!          end do
 !!        end do
 !!      end do
-      print *, "BAROPG_SHCH" !REM:
-      if ( my_task==1 ) then
+!!      print *, "BAROPG_SHCH" !REM:
+!      if ( my_task==1 ) then
 !!        print *, "Di  :", d(25,25), h(25,25), el(25,25)
 !!        print *, "Di-1:", d(24,25), h(24,25), el(24,25)
 !!        print *, "dy:", dy(25,25), dy(24,25)
-        print '(*(2(f18.7,";"),f18.7/))', (drhox(60,70,k)
-     &                    ,drhox(60,70,k)/dt(60,70),dt(60,70), k=1,kb-1)
-      end if
+!        print '(*(2(f18.7,";"),f18.7/))', (drhox(60,70,k)
+!     &                    ,drhox(60,70,k)/dt(60,70),dt(60,70), k=1,kb-1)
+!      end if
 !!      call finalize_mpi
 !!      stop
 !
@@ -1922,10 +1921,13 @@
       do k = 1,kb
         do j = 2,jm
           do i = 1,im
-            aux(i,j) = zz(i,j,k)*(d(i,j)-d(i,j-1))
+            aux(i,j) = zz(i,j,k)*d(i,j)-zz(i,j-1,k)*d(i,j-1)
+     &               + el(i,j) - el(i,j-1)
             fc(i,j) = rho(i,j,k)-rho(i,j-1,k)
           end do
         end do
+        call exchange2d_mpi( aux, im, jm )
+        call exchange2d_mpi(  fc, im, jm )
         do j = 1,jmm1
           do i = 1,im
             cff = 2.*aux(i,j)*aux(i,j+1)
@@ -1945,15 +1947,9 @@
           end do
         end do
 
-        do j = 2,jm
-          do i = 1,im
-            if (k==1) then
-              drhoy(i,j,k) = 0.
-            else
-              drhoy(i,j,k) = drhoy(i,j,k-1)
-            end if
-            drhoy(i,j,k) = drhoy(i,j,k)+
-     &                    .25*(dx(i,j)+dx(i,j-1))*
+        do j = 2,jmm1
+          do i = 1,imm1
+            drhoy(i,j,k) = .25*(dx(i,j)+dx(i,j-1))*
      &                    (dz(i,j,k)*(dt(i,j)+dt(i,j-1)))*
      &                    (p(i,j-1,k)-p(i,j,k)-
      &                     HalfGRho*
@@ -1977,8 +1973,8 @@
 !
 
 
-      drhox = ramp*drhox
-      drhoy = ramp*drhoy
+      drhox = -ramp*drhox
+      drhoy = -ramp*drhoy
 
 
       end ! subroutine baropg_shch
