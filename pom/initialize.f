@@ -511,8 +511,8 @@
      &                    , 'v - free surface mask'
      &                    , 'dimensionless'
      &                    , -1, 0., 'east_v north_v zz' )
-        call define_tide_init( file_id, [ x_dimid, y_dimid ]
-     &                       , NF90_FLOAT )
+!        call define_tide_init( file_id, [ x_dimid, y_dimid ]
+!     &                       , NF90_FLOAT )
 
         varid = var_define( file_id, 'uab', NF90_FLOAT
      &                    , [ x_dimid, y_dimid, time_dimid ]
@@ -562,8 +562,8 @@
      &                      , 0, 0., 'east_e north_e' )
         end if
 
-        call define_tide( file_id, [ x_dimid, y_dimid, time_dimid ]
-     &                  , NF90_FLOAT )
+!        call define_tide( file_id, [ x_dimid, y_dimid, time_dimid ]
+!     &                  , NF90_FLOAT )
 
         if ( mode /= MODE_BAROTROPIC ) then
           varid = var_define( file_id, 'u', NF90_FLOAT
@@ -623,7 +623,7 @@
         call var_write( file_id, "fsm"    , fsm    , start, edge )
         call var_write( file_id, "dum"    , dum    , start, edge )
         call var_write( file_id, "dvm"    , dvm    , start, edge )
-        call write_tide_init( file_id, start, edge )
+!        call write_tide_init( file_id, start, edge )
 
         file_id = file_close( file_id )
 
@@ -701,7 +701,7 @@
         if ( use_ice ) then
           call var_write( file_id, "icec", icec  , start, edge )
         end if
-        call write_tide( file_id, start, edge )
+!        call write_tide( file_id, start, edge )
 
         if ( mode /= MODE_BAROTROPIC ) then
           start(3:4) = [  1, record ]

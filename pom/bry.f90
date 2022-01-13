@@ -96,7 +96,9 @@ module bry
 !----------------------------------------------------------------------
 ! Configuration
 !----------------------------------------------------------------------
-  logical USE_SPONGE   ! Flag for sponge zones
+  logical            &
+    NUDGE_INTERIOR   & ! Use relaxation with tau directly at boundaries
+  , USE_SPONGE         ! Flag for sponge zones
 
   integer            &
     resume_from        ! Record to start reading from file
@@ -443,6 +445,7 @@ module bry
       hmax = 4500. !8000.
 
 ! Set nudging timescale
+      NUDGE_INTERIOR = .true.
       tau = 2./86400. ! Half a day
 
 ! Set default relaxation thickness
@@ -2918,6 +2921,13 @@ module bry
 
           end select
 
+          if ( NUDGE_INTERIOR ) then
+            uf(imm1,:,1:kbm1) = uf(imm1,:,1:kbm1)  &
+                              - tau*( uf(imm1,:,1:kbm1) - U_bry%EST(1,:,1:kbm1) )
+            vf(imm1,:,1:kbm1) = vf(imm1,:,1:kbm1)  &
+                              - tau*( vf(imm1,:,1:kbm1) - V_bry%EST(1,:,1:kbm1) )
+          end if
+
         end if
 
 ! WEST
@@ -3046,6 +3056,13 @@ module bry
               vf(1,:,:) = 0.
 
           end select
+
+          if ( NUDGE_INTERIOR ) then
+            uf(3,:,1:kbm1) = uf(3,:,1:kbm1)  &
+                           - tau*( uf(3,:,1:kbm1) - U_bry%WST(1,:,1:kbm1) )
+            vf(2,:,1:kbm1) = vf(2,:,1:kbm1)  &
+                           - tau*( vf(2,:,1:kbm1) - V_bry%WST(1,:,1:kbm1) )
+          end if
 
         end if
 
@@ -3202,6 +3219,13 @@ module bry
 
           end select
 
+          if ( NUDGE_INTERIOR ) then
+            uf(:,jmm1,1:kbm1) = uf(:,jmm1,1:kbm1)  &
+                              - tau*( uf(:,jmm1,1:kbm1) - U_bry%NTH(:,1,1:kbm1) )
+            vf(:,jmm1,1:kbm1) = vf(:,jmm1,1:kbm1)  &
+                              - tau*( vf(:,jmm1,1:kbm1) - V_bry%NTH(:,1,1:kbm1) )
+          end if
+
         end if
 
 ! SOUTH
@@ -3331,6 +3355,13 @@ module bry
 
           end select
 
+          if ( NUDGE_INTERIOR ) then
+            uf(:,2,1:kbm1) = uf(:,2,1:kbm1)  &
+                           - tau*( uf(:,2,1:kbm1) - U_bry%STH(:,1,1:kbm1) )
+            vf(:,3,1:kbm1) = vf(:,3,1:kbm1)  &
+                           - tau*( vf(:,3,1:kbm1) - V_bry%STH(:,1,1:kbm1) )
+          end if
+
         end if
 
       end if ! periodic_y end
@@ -3444,15 +3475,15 @@ module bry
                                - u1*(t(im,j,k)-t(imm1,j,k))
                     vf(im,j,k) = s(im,j,k)                        &
                                - u1*(s(im,j,k)-s(imm1,j,k))
-                    if ( k/=1 .and. k/=kbm1 ) then
-                      wm = .5 * (w(imm1,j,k)+w(imm1,j,k+1))*dti   &
-                              / ( (zz(imm1,j,k-1)-zz(imm1,j,k+1))*dt(imm1,j) )
-                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
-                      uf(im,j,k) = uf(im,j,k)                     &
-                           - wm*(t(imm1,j,k-1)-t(imm1,j,k+1))
-                      vf(im,j,k) = vf(im,j,k)                     &
-                           - wm*(s(imm1,j,k-1)-s(imm1,j,k+1))
-                    end if
+!                    if ( k/=1 .and. k/=kbm1 ) then
+!                      wm = .5 * (w(imm1,j,k)+w(imm1,j,k+1))*dti   &
+!                              / ( (zz(imm1,j,k-1)-zz(imm1,j,k+1))*dt(imm1,j) )
+!                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
+!                      uf(im,j,k) = uf(im,j,k)                     &
+!                           - wm*(t(imm1,j,k-1)-t(imm1,j,k+1))
+!                      vf(im,j,k) = vf(im,j,k)                     &
+!                           - wm*(s(imm1,j,k-1)-s(imm1,j,k+1))
+!                    end if
                   end if
                 end do
               end do
@@ -3522,6 +3553,13 @@ module bry
 
           end select
 
+          if ( NUDGE_INTERIOR ) then
+            uf(imm1,:,1:kbm1) = uf(imm1,:,1:kbm1)  &
+                              - tau*( uf(imm1,:,1:kbm1) - T_bry%EST(1,:,1:kbm1) )
+            vf(imm1,:,1:kbm1) = vf(imm1,:,1:kbm1)  &
+                              - tau*( vf(imm1,:,1:kbm1) - S_bry%EST(1,:,1:kbm1) )
+          end if
+
         end if
 
 ! WEST
@@ -3567,15 +3605,15 @@ module bry
                               - u1*(t(2,j,k)-t(1,j,k))
                     vf(1,j,k) = s(1,j,k)                        &
                               - u1*(s(2,j,k)-s(1,j,k))
-                    if ( k/=1 .and. k/=kbm1 ) then
-                      wm = .5 * ( w(2,j,k)+w(2,j,k+1) )*dti     &
-                              / ( (zz(2,j,k-1)-zz(2,j,k+1))*dt(2,j) )
-                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
-                      uf(1,j,k) = uf(1,j,k)                     &
-                           - wm*(t(2,j,k-1)-t(2,j,k+1))
-                      vf(1,j,k) = vf(1,j,k)                     &
-                           - wm*(s(2,j,k-1)-s(2,j,k+1))
-                    end if
+!                    if ( k/=1 .and. k/=kbm1 ) then
+!                      wm = .5 * ( w(2,j,k)+w(2,j,k+1) )*dti     &
+!                              / ( (zz(2,j,k-1)-zz(2,j,k+1))*dt(2,j) )
+!                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
+!                      uf(1,j,k) = uf(1,j,k)                     &
+!                           - wm*(t(2,j,k-1)-t(2,j,k+1))
+!                      vf(1,j,k) = vf(1,j,k)                     &
+!                           - wm*(s(2,j,k-1)-s(2,j,k+1))
+!                    end if
                   end if
                 end do
               end do
@@ -3644,6 +3682,13 @@ module bry
 
           end select
 
+          if ( NUDGE_INTERIOR ) then
+            uf(2,:,1:kbm1) = uf(2,:,1:kbm1)  &
+                           - tau*( uf(2,:,1:kbm1) - T_bry%WST(1,:,1:kbm1) )
+            vf(2,:,1:kbm1) = vf(2,:,1:kbm1)  &
+                           - tau*( vf(2,:,1:kbm1) - S_bry%WST(1,:,1:kbm1) )
+          end if
+
         end if
 
       end if ! periodic_x end
@@ -3698,15 +3743,15 @@ module bry
                                - u1*(t(i,jm,k)-t(i,jmm1,k))
                     vf(i,jm,k) = s(i,jm,k)                        &
                                - u1*(s(i,jm,k)-s(i,jmm1,k))
-                    if ( k/=1 .and. k/=kbm1 ) then
-                      wm = .5 * (w(i,jmm1,k)+w(i,jmm1,k+1))*dti   &
-                              / ( (zz(i,jmm1,k-1)-zz(i,jmm1,k+1))*dt(i,jmm1) )
-                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
-                      uf(i,jm,k) = uf(i,jm,k)                     &
-                                 - wm*(t(i,jmm1,k-1)-t(i,jmm1,k+1))
-                      vf(i,jm,k) = vf(i,jm,k)                     &
-                                 - wm*(s(i,jmm1,k-1)-s(i,jmm1,k+1))
-                    end if
+!                    if ( k/=1 .and. k/=kbm1 ) then
+!                      wm = .5 * (w(i,jmm1,k)+w(i,jmm1,k+1))*dti   &
+!                              / ( (zz(i,jmm1,k-1)-zz(i,jmm1,k+1))*dt(i,jmm1) )
+!                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
+!                      uf(i,jm,k) = uf(i,jm,k)                     &
+!                                 - wm*(t(i,jmm1,k-1)-t(i,jmm1,k+1))
+!                      vf(i,jm,k) = vf(i,jm,k)                     &
+!                                 - wm*(s(i,jmm1,k-1)-s(i,jmm1,k+1))
+!                    end if
                   end if
                 end do
               end do
@@ -3776,6 +3821,13 @@ module bry
 
           end select
 
+          if ( NUDGE_INTERIOR ) then
+            uf(:,jmm1,1:kbm1) = uf(:,jmm1,1:kbm1)  &
+                              - tau*( uf(:,jmm1,1:kbm1) - T_bry%NTH(:,1,1:kbm1) )
+            vf(:,jmm1,1:kbm1) = vf(:,jmm1,1:kbm1)  &
+                              - tau*( vf(:,jmm1,1:kbm1) - S_bry%NTH(:,1,1:kbm1) )
+          end if
+
         end if
 
 ! SOUTH
@@ -3821,15 +3873,15 @@ module bry
                               - u1*(t(i,2,k)-t(i,1,k))
                     vf(i,1,k) = s(i,1,k)                        &
                               - u1*(s(i,2,k)-s(i,1,k))
-                    if ( k/=1 .and. k/=kbm1 ) then
-                      wm = .5 * ( w(i,2,k)+w(i,2,k+1) )*dti     &
-                              / ( (zz(i,2,k-1)-zz(i,2,k+1))*dt(i,2) )
-                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
-                      uf(i,1,k) = uf(i,1,k)                     &
-                                - wm*(t(i,2,k-1)-t(i,2,k+1))
-                      vf(i,1,k) = vf(i,1,k)                     &
-                                - wm*(s(i,2,k-1)-s(i,2,k+1))
-                    end if
+!                    if ( k/=1 .and. k/=kbm1 ) then
+!                      wm = .5 * ( w(i,2,k)+w(i,2,k+1) )*dti     &
+!                              / ( (zz(i,2,k-1)-zz(i,2,k+1))*dt(i,2) )
+!                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
+!                      uf(i,1,k) = uf(i,1,k)                     &
+!                                - wm*(t(i,2,k-1)-t(i,2,k+1))
+!                      vf(i,1,k) = vf(i,1,k)                     &
+!                                - wm*(s(i,2,k-1)-s(i,2,k+1))
+!                    end if
                   end if
                 end do
               end do
@@ -3897,6 +3949,13 @@ module bry
               end do
 
           end select
+
+          if ( NUDGE_INTERIOR ) then
+            uf(:,2,1:kbm1) = uf(:,2,1:kbm1)  &
+                           - tau*( uf(:,2,1:kbm1) - T_bry%STH(:,1,1:kbm1) )
+            vf(:,2,1:kbm1) = vf(:,2,1:kbm1)  &
+                           - tau*( vf(:,2,1:kbm1) - S_bry%STH(:,1,1:kbm1) )
+          end if
 
         end if
 
