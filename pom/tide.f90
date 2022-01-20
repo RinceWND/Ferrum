@@ -265,7 +265,7 @@ module tide
       con(12) = specify_constituent( "m8" , 115.93642  _rk, 8, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water lunar eighth-diurnal
       con(13) = specify_constituent( "s8" , 120.       _rk, 8, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water solar eighth-diurnal
       con(14) = specify_constituent( "k3" ,  43.31412  _rk, 3, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water lunisolar declinational third-diurnal
-      con(15) = specify_constituent( "m3" ,  43.4761563_rk, 3, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water lunar third-diurnal
+      con(15) = specify_constituent( "m3" ,  43.4761563_rk, 3, [0.,-3.,3.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! Shallow water lunar third-diurnal
 !  - low-frequency:
       con(16) = specify_constituent( "msf", 1.0158958_rk, 2, [   0.    ,  2.    , -2.    ,  0. ]      &
                                                            , [   2.14  ,  0.    ,  0.    ]            &
@@ -308,7 +308,7 @@ module tide
                                                               , [ - 4.28  ,  0.    ,  0.    ]            &
                                                               , [   1.0004, -0.0373,  0.0002,  0. , 2. ] ) ! Shallow water quarter diurnal
       con(31) = specify_constituent( "pi1" ,  14.9178647_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
-      con(32) = specify_constituent( "2sm2",  31.0158958_rk, 2, [   0.    ,  2.    ,  2.    ,  0. ]      &
+      con(32) = specify_constituent( "2sm2",  31.0158958_rk, 2, [   0.    ,  2.    , -2.    ,  0. ]      &
                                                               , [   2.14  ,  0.    ,  0.    ]            &
                                                               , [   1.0004, -0.0373,  0.0002,  0. , 1. ] ) ! Shallow water semidiurnal
       con(33) = specify_constituent( "phi1",  15.1232059_rk, 1, [0.,0.,0.,0.], [0.,0.,0.], [1.,0.,0.,0.,1.] ) ! ?
