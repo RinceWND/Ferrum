@@ -263,8 +263,8 @@ module seaice
 
 ! Read ice fields
       if ( interp_ice ) then
+        call read_all( .true., 3, year, record ) ! Reading forward-step record (n=3) overwrites previous-step record (n=2)
         call read_all( .true., 2, year, record )
-        call read_all( .true., 3, year, record )
       else
         call read_all( .true., 1, year, record )
       end if
