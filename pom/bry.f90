@@ -1998,6 +1998,9 @@ module bry
 
           select case ( BC % zeta % east )
 
+            case ( bc0GRADIENT )
+              elf(im,2:jmm1) = elf(imm1,2:jmm1)
+
             case ( bcCLAMPED )
               elf(imm1,2:jmm1) = EL_bry%EST(1,2:jmm1)
               elf(im  ,2:jmm1) = elf(imm1,2:jmm1)
@@ -2051,6 +2054,9 @@ module bry
         if ( hasWEST ) then
 
           select case ( BC % zeta % west )
+
+            case ( bc0GRADIENT )
+              elf(1,2:jmm1) = elf(2,2:jmm1)
 
             case ( bcCLAMPED )
               elf(2,2:jmm1) = EL_bry%WST(1,2:jmm1)
@@ -2115,6 +2121,9 @@ module bry
         if ( hasNORTH ) then
 
           select case ( BC % zeta % north )
+
+            case ( bc0GRADIENT )
+              elf(2:imm1,jm) = elf(2:imm1,jmm1)
 
             case ( bcCLAMPED )
               elf(2:imm1,jmm1) = EL_bry%NTH(2:imm1,1)
@@ -2192,6 +2201,9 @@ module bry
         if ( hasSOUTH ) then
 
           select case ( BC % zeta % south )
+
+            case ( bc0GRADIENT )
+              elf(2:imm1,1) = elf(2:imm1,2)
 
             case ( bcCLAMPED )
               elf(2:imm1,2) = EL_bry%STH(2:imm1,1)
@@ -2280,18 +2292,19 @@ module bry
 !______________________________________________________________________
 !
       use air        , only: wusurf, wvsurf
-      use config     , only: use_tide
-      use glob_const , only: GRAV
+      use config     , only: use_tide,   hc
+      use glob_const , only: GRAV,  pi
       use glob_domain, only: im, jm
-      use grid       , only: dum, dvm, h, dx, dy
-      use glob_ocean , only: d, dt, el, elf, uaf, ua, vaf, va, wubot, wvbot
+      use grid       , only: dum, dvm, fsm, h, dx, dy
+      use glob_ocean , only: d, dt, el, elf, uaf, ua, vaf, va, wdm, wubot, wvbot
       use tide       , only: tide_el, tide_ua, tide_va
-      use model_run  , only: dte, ramp
+      use model_run  , only: dte, ramp, time
 
       implicit none
 
       real(rk), dimension(im) :: ce
       real(rk), dimension(jm) :: cx
+      real(rk) tidamp, etide
 
 
 ! Apply periodic BC in x-dimension
@@ -2438,6 +2451,7 @@ module bry
                                 * ( .5*(el(1,2:jmm1)+el(2,2:jmm1))  &
                                    - EL_bry%WST(1,2:jmm1) )
               end if
+              uaf(2,2:jmm1) = uaf(2,2:jmm1)*wdm(2,2:jmm1)
 
             case ( bcFLATHER_SSH )
               cx(2:jmm1) = -GRAV*2._rk*( el(2,2:jmm1)-EL_bry%WST(1,2:jmm1) )  &
@@ -2638,6 +2652,9 @@ module bry
 
             case ( bcFLATHER )
               ce(2:imm1) = sqrt( 2.*GRAV / (d(2:imm1,1)+d(2:imm1,2)) )
+!              where ( ce(2:imm1) == ce(2:imm1)+1. )
+!                ce(2:imm1) = 0._rk
+!              end where
               if ( use_tide ) then
                 vaf(2:imm1,2) = VA_bry%STH(2:imm1,1) + tide_va(2:imm1,2)  &
                               - ce(2:imm1)                                &
@@ -2649,6 +2666,7 @@ module bry
                                 * ( .5*(el(2:imm1,1)+el(2:imm1,2))  &
                                    - EL_bry%STH(2:imm1,1) )
               end if
+              vaf(2:imm1,2) = wdm(2:imm1,2)*vaf(2:imm1,2)
 
             case ( bcFLATHER_SSH )
               ce(2:imm1) = -GRAV*2._rk*( el(2:imm1,2)-EL_bry%STH(2:imm1,1) )  &
@@ -2671,12 +2689,24 @@ module bry
                                *(el(2:imm1,2)-EL_bry%STH(2:imm1,1))) &
                               /(h(2:imm1,2)+el(2:imm1,2))
 
+            case ( 10 )
+              tidamp = 9.
+              etide=-tidamp*sin(2.e0*pi*time/1.e0)
+              where ( d(2:imm1,2) > hc )
+                vaf(2:imm1,2) = VA_bry%STH(2:imm1,1)    &
+                              - sqrt(GRAV/d(2:imm1,2))  &
+                             *(el(2:imm1,2)-EL_bry%STH(2:imm1,1)-etide)
+              elsewhere
+                vaf(2:imm1,2) = 0._rk
+              end where
+              !vaf(2:imm1,2) = wdm(2:imm1,2)*vaf(2:imm1,2)
+
             case default
               vaf(2:imm1,2) = 0.
 
           end select
 
-          vaf(2:imm1,2) = ramp*vaf(2:imm1,2)
+          vaf(2:imm1,2) = ramp*vaf(2:imm1,2)*dvm(2:imm1,2,1)
           vaf(2:imm1,1) = vaf(2:imm1,2)
 
           select case ( BC % VEL2D % TANG % SOUTH )
@@ -2723,7 +2753,7 @@ module bry
         if ( hasSOUTH .and. hasWEST ) then
           uaf(2,1) = .5*(uaf(3,1)+uaf(2,2))
           uaf(1,1) = uaf(2,1)
-          vaf(1,2) = .5*(vaf(2,2)+vaf(1,3))
+          !vaf(1,2) = .5*(vaf(2,2)+vaf(1,3))
           vaf(1,1) = vaf(1,2)
         end if
 
@@ -3259,7 +3289,7 @@ module bry
               do k = 1,kbm1
                 do i = 2,imm1
                   cff = vf(i,3,k) + vb(i,3,k) - 2.*v(i,4,k)
-                  if ( abs(cff) < 0. ) cff = sign(.01_rk,cff)
+                  if ( abs(cff) < 0.01 ) cff = sign(.01_rk,cff)
                   cff = ( vb(i,3,k)-vf(i,3,k) )/cff
                   if ( cff > 1. ) cff = 1.
                   if ( cff < 0. ) cff = 0.

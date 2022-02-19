@@ -527,7 +527,103 @@
 
 
       end
+!______________________________________________________________________
+!
+      subroutine exchange2d_byte_mpi(work,nx,ny)
+!----------------------------------------------------------------------
+!  Exchange ghost cells around 2D local grids
+!  One band at a time
+!______________________________________________________________________
+!
+      use glob_domain, only: my_task, n_east, n_north
+     &                     , n_south, n_west, POM_COMM
+      use mpi        , only: mpi_bcast, mpi_recv
+     &                     , MPI_BYTE, MPI_STATUS_SIZE
 
+      implicit none
+
+      integer   , intent(in   ) :: nx,ny
+      integer(1), intent(inout) :: work(nx,ny)
+
+      integer  i,j
+      integer  ierr
+      integer  istatus(MPI_STATUS_SIZE)
+      integer(1) send_east(ny) ,recv_west(ny)
+      integer(1) send_west(ny) ,recv_east(ny)
+      integer(1) send_north(nx),recv_south(nx)
+      integer(1) send_south(nx),recv_north(nx)
+
+
+! send ghost cell data to the east
+      if ( n_east /= -1 ) then
+        do j=1,ny
+          send_east(j) = work(nx-1,j)
+        end do
+        call mpi_send(send_east,ny,MPI_BYTE,n_east,my_task,
+     &                POM_COMM,ierr)
+      end if
+! recieve ghost cell data from the west
+      if ( n_west /= -1 ) then
+        call mpi_recv(recv_west,ny,MPI_BYTE,n_west,n_west,
+     &                POM_COMM,istatus,ierr)
+        do j=1,ny
+          work(1,j) = recv_west(j)
+        end do
+      end if
+
+! send ghost cell data to the west
+      if ( n_west /= -1 ) then
+        do j=1,ny
+          send_west(j) = work(2,j)
+        end do
+        call mpi_send(send_west,ny,MPI_BYTE,n_west,my_task,
+     &                POM_COMM,ierr)
+      end if
+! recieve ghost cell data from the east
+      if ( n_east /= -1 ) then
+        call mpi_recv(recv_east,ny,MPI_BYTE,n_east,n_east,
+     &                POM_COMM,istatus,ierr)
+        do j=1,ny
+          work(nx,j) = recv_east(j)
+        end do
+      end if
+
+! send ghost cell data to the north
+      if ( n_north /= -1 ) then
+        do i=1,nx
+          send_north(i) = work(i,ny-1)
+        end do
+        call mpi_send(send_north,nx,MPI_BYTE,n_north,my_task,
+     &                POM_COMM,ierr)
+      end if
+! recieve ghost cell data from the south
+      if ( n_south /= -1 ) then
+        call mpi_recv(recv_south,nx,MPI_BYTE,n_south,n_south,
+     &                POM_COMM,istatus,ierr)
+        do i=1,nx
+          work(i,1) = recv_south(i)
+        end do
+      end if
+
+! send ghost cell data to the south
+      if ( n_south /= -1 ) then
+        do i=1,nx
+          send_south(i) = work(i,2)
+        end do
+        call mpi_send(send_south,nx,MPI_BYTE,n_south,my_task,
+     &                POM_COMM,ierr)
+      end if
+! recieve ghost cell data from the north
+      if ( n_north /= -1 ) then
+        call mpi_recv(recv_north,nx,MPI_BYTE,n_north,n_north,
+     &                POM_COMM,istatus,ierr)
+        do i=1,nx
+          work(i,ny) = recv_north(i)
+        end do
+      end if
+
+
+      end
 !______________________________________________________________________
 !
       subroutine exchange3d_mpi(work,nx,ny,nz)

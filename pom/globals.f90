@@ -218,12 +218,14 @@ module glob_out
 ! Scalars
 !----------------------------------------------------------------------
   integer          &
-    nums           &
+    num            & ! series length for averaging (`pom::output_results`)
+  , nums           & ! series length for surface averaging (`pom::write_output_surf`) TODO: remove?
   , iprint         & ! interval [iint] at which variables are printed
   , iprints        & ! interval [iint] for writing SURF?
   , iswtch         & ! interval [iint] to switch prtd1 to prtd2 for main output
   , irestart       & ! restart file writing time step [in iint]
-  , iouts
+  , iouts          & ! ???
+  , out_record       ! incremental record for netcdf output
 
   real(rk)         &
     prtd1          & ! output interval (days)
@@ -270,9 +272,6 @@ module glob_out
   , v_mean           &
   , w_mean
 
-  integer &
-    num, out_record
-
   contains
 
     subroutine allocate_arrays
@@ -282,11 +281,22 @@ module glob_out
       implicit none
 
 
-      num        = 0
-      out_record = 1
+!   Initialise with dummy values
+      prtd1      =  0.
+      prtd2      =  0.
+      swtch      = -1.
+      write_rst  =  1.
 
-      swtch      = huge(swtch)
+      num        =  0
+      nums       =  0
+      iprint     = -1
+      iprints    = -1
+      iswtch     = -1
+      irestart   = -1
+      iouts      = -1
+      out_record =  1
 
+!   Initialise arrays for mean values
       allocate(             &
         elb_mean   (im,jm)  &
       , swrad_mean (im,jm)  &
@@ -383,6 +393,11 @@ module model_run
   , time             & ! model time (days)
   , time0              ! initial time (days)
 
+  real(rk)           &
+    dtrat            & ! Dry cell TS relaxation factor
+  , wet_relx1        & ! relaxation coefficent 1
+  , wet_relx2          ! relaxation coefficent 2
+
   character(26)      &
     time_start       & ! date and time of start of initial run of model
   , datetime           ! current model datetime string
@@ -420,10 +435,16 @@ module model_run
       iprint  = max( nint(      prtd1*86400._rk/dti), 1 )
       irestart= max( nint(  write_rst*86400._rk/dti), 1 )
       iprints = max( nint(      prtd2*86400._rk/dti), 1 )
+      if ( swtch < 0._rk ) swtch = days
       iswtch  =      nint(      swtch*86400._rk/dti)
 
       ispi = 1._rk/       real(isplit)
       isp2i= 1._rk/(2._rk*real(isplit))
+
+! WaD stuff
+      dtrat     = 2._rk*dti/86400._rk ! Half a day dry-cell relaxation
+      wet_relx1 = (1._rk-dtrat)/(1._rk+dtrat)
+      wet_relx2 =   2._rk*dtrat/(1._rk+dtrat)
 
 
     end subroutine
@@ -435,7 +456,9 @@ module model_run
       implicit none
 
       time = dti*real(iint)/86400._rk + time0
-      if ( iint >= iswtch ) iprint = nint( prtd2*86400._rk/dti )
+      if ( iint >= iswtch ) then
+        iprint = max( nint( prtd2*86400._rk/dti ), 1 )
+      end if
 
       if( is_leap( dtime%year ) ) then
         days_in_month(2) = 29
@@ -490,6 +513,10 @@ module glob_ocean
 !----------------------------------------------------------------------
 ! Ocean state 2D arrays
 !----------------------------------------------------------------------
+  integer(1)                 &
+       , allocatable         &
+       , dimension(:,:)   :: &
+    wdm                ! WaD mask
   real(rk)                   &
        , allocatable         &
        , dimension(:,:)   :: &
@@ -501,6 +528,7 @@ module glob_ocean
   , ady2d            & ! vertical integral of advy
   , cbc              & ! bottom friction coefficient
   , d                & ! h+el
+  , df               & ! h+elf
   , drx2d            & ! vertical integral of drhox
   , dry2d            & ! vertical integral of drhoy
   , dt               & ! h+et
@@ -552,6 +580,7 @@ module glob_ocean
   , km               & ! vertical kinematic viscosity
   , kq               & 
   , l                & ! turbulence length scale
+  , pres             & ! hydrostatic pressure
   , q2b              & ! twice the turbulent kinetic energy at time n-1
   , q2               & ! twice the turbulent kinetic energy at time n
   , q2lb             & ! q2 x l at time n-1
@@ -593,6 +622,7 @@ module glob_ocean
       , ady2d (im,jm)  &
       , cbc   (im,jm)  &
       , d     (im,jm)  &
+      , df    (im,jm)  &
       , drx2d (im,jm)  &
       , dry2d (im,jm)  &
       , dt    (im,jm)  &
@@ -620,6 +650,7 @@ module glob_ocean
       , vaf   (im,jm)  &
       , vtb   (im,jm)  &
       , vtf   (im,jm)  &
+      , wdm   (im,jm)  &
       , wubot (im,jm)  &
       , wvbot (im,jm)  &
       ! , alon_coarse(im_coarse,jm_coarse) &
@@ -643,6 +674,7 @@ module glob_ocean
       , km   (im,jm,kb)  &
       , kq   (im,jm,kb)  &
       , l    (im,jm,kb)  &
+      , pres (im,jm,kb)  &
       , q2b  (im,jm,kb)  &
       , q2   (im,jm,kb)  &
       , q2lb (im,jm,kb)  &
@@ -667,6 +699,10 @@ module glob_ocean
       aamfac   = 1.
       drhox    = 0.
       drhoy    = 0.
+      drx2d    = 0.
+      dry2d    = 0.
+      fluxua   = 0.
+      fluxva   = 0.
       u        = 0.
       uab      = 0.
       uaf      = 0.
@@ -678,6 +714,7 @@ module glob_ocean
       vb       = 0.
       vf       = 0.
       w        = 0.
+      wdm      = 0
       wubot    = 0.
       wvbot    = 0.
 

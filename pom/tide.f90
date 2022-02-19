@@ -36,26 +36,26 @@ module tide
 ! Paths configuration
 !----------------------------------------------------------------------
   character(PATH_LEN)  & ! Full paths (with filenames) to:
-    tide_el_path       & !  atmospheric parameters file
-  , tide_uv_path         !  surface fluxes file
+    tide_el_path       & !  tidal elevation file
+  , tide_uv_path         !  tidal currents file
 
 !----------------------------------------------------------------------
 ! Input variables' names
 !----------------------------------------------------------------------
   character(VAR_LEN)  &
-      cons_name       & ! Downward longwave radiation
-  , el_amp_name       & ! Downward longwave radiation
-  , el_pha_name       & ! Latent heat flux
+      cons_name       & ! Constituent string id
+  , el_amp_name       & ! Elevation amplitude
+  , el_pha_name       & ! Elevation phase
   ,    lat_name       & ! Latitude at z-points
   ,  lat_u_name       & ! Latitude at u-points
   ,  lat_v_name       & ! Latitude at v-points
   ,    lon_name       & ! Longitude at z-points
   ,  lon_u_name       & ! Longitude at u-points
   ,  lon_v_name       & ! Longitude at v-points
-  , ua_amp_name       & ! Longwave net radiation
-  , ua_pha_name       & ! Relative humidity
-  , va_amp_name       & ! Atm. pressure
-  , va_pha_name         ! Precipitation rate
+  , ua_amp_name       & ! U-current amplitude
+  , ua_pha_name       & ! U-current phase
+  , va_amp_name       & ! V-current amplitude
+  , va_pha_name         ! V-current phase
 
 
 !----------------------------------------------------------------------
@@ -75,7 +75,7 @@ module tide
   , lon                      & ! Longitude at z-points
   , lon_u                    & ! Longitude at u-points
   , lon_v                    & ! Longitude at v-points
-  , tide_el                  & ! Total cloud cover [fraction 0..1]
+  , tide_el                  & !
   , tide_el_b                &
   , tide_mask                &
   , tide_ua                  &
@@ -151,7 +151,7 @@ module tide
       integer pos
 
       namelist/tide/                                        &
-        active_cons, tide_el_path, tide_uv_path
+        active_cons, tide_el_path, tide_uv_path, TPXO_FILE
 
       namelist/tide_vars/                                   &
         el_amp_name, el_pha_name,    lat_name,  lat_u_name  &
@@ -543,6 +543,7 @@ module tide
         allocate( cons_dimlens(3) )
         cons_dimlens = var_shape( file_id, el_amp_name )
         ncons = cons_dimlens(3)
+        allocate( constituent(ncons) )
 
         file_id = file_close( file_id )
 
@@ -585,7 +586,8 @@ module tide
 !  TODO: Fill up
 !______________________________________________________________________
 !
-      use glob_domain, only: im, i_global, jm, j_global, my_task, POM_COMM
+      use glob_domain, only: im, i_global, jm, j_global, my_task, POM_COMM &
+                           , im_global, jm_global
       use grid       , only: fsm, east_e, east_u, east_v, rot  &
                            , north_e, north_u, north_v
       use io
@@ -598,8 +600,10 @@ module tide
       type(date), intent(in) :: d_in
 
       integer                                    file_id, varid, dimlen, i,j,k
+      integer                                    len_dimid, con_dimid, y_dimid, x_dimid
       integer(MPI_OFFSET_KIND)                :: start(3), edge(3)
       real(rk), allocatable, dimension(:,:,:) :: tmp, var
+      character(PATH_LEN)                     :: out_file
 
 
 ! Quit if the module is not used.
@@ -845,25 +849,108 @@ module tide
 
         deallocate( tmp, var )
 
+! Convert cm to meters
+        ua_amp = ua_amp/100.
+        va_amp = va_amp/100.
+
 ! Rotate uv-variables to conform to the grid using `tmp` and `var` as u and v
-        allocate( tmp( im, jm, ncons )    &
-                , var( im, jm, ncons ) )
+!        allocate( tmp( im, jm, ncons )    &
+!                , var( im, jm, ncons ) )
 
 ! Rotating only the amplitudes does the job
-        do i = 1, int(ncons)
-          tmp(:,:,i) = ua_amp(:,:,i)*cos(rot) - va_amp(:,:,i)*sin(rot)
-          var(:,:,i) = ua_amp(:,:,i)*sin(rot) + va_amp(:,:,i)*cos(rot)
-        end do
-! Convert cm to meters
-        ua_amp = tmp/100.
-        va_amp = var/100.
+!        do i = 1, int(ncons)
+!          tmp(:,:,i) = ua_amp(:,:,i)*cos(rot) - va_amp(:,:,i)*sin(rot)
+!          var(:,:,i) = ua_amp(:,:,i)*sin(rot) + va_amp(:,:,i)*cos(rot)
+!        end do
 
-        deallocate( tmp, var )
+!        deallocate( tmp, var )
+
+! Write to file
+        out_file = "tide_interpolated.nc"
+        file_id = file_create( out_file )
+
+! define global attributes
+        call att_write( file_id, -1, 'title'      , 'Tidal harmonics' )
+        call att_write( file_id, -1, 'description', 'Tidal constituents' )
+
+! define dimensions
+        len_dimid = dim_define( file_id, 'len',          4 )
+        con_dimid = dim_define( file_id, 'con', int(ncons) )
+        y_dimid   = dim_define( file_id, 'y'  ,  jm_global )
+        x_dimid   = dim_define( file_id, 'x'  ,  im_global )
+
+! define variables and their attributes
+        varid = var_define( file_id, 'con'                               &
+                          , NF90_CHAR, [ len_dimid, con_dimid ]          &
+                          , 'Constituent name', ''                       &
+                          , -1, 0., '' )
+        varid = var_define( file_id, 'y'                                 &
+     &                    , NF90_FLOAT, [ y_dimid ]                      &
+     &                    , 'y-coordinate', ''                           &
+     &                    , -1, 0., '' )
+        varid = var_define( file_id, 'x'                                 &
+     &                    , NF90_FLOAT, [ x_dimid ]                      &
+     &                    , 'x-coordinate', ''                           &
+     &                    , -1, 0., '' )
+        varid = var_define( file_id, 'el_amp'                            &
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, con_dimid ]  &
+     &                    , 'Elevation amplitude'                        &
+     &                    , 'metre'                                      &
+     &                    , -1, 0., 'x y con' )
+        varid = var_define( file_id, 'el_pha'                            &
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, con_dimid ]  &
+     &                    , 'Elevation phase'                            &
+     &                    , 'degree GMT'                                 &
+     &                    , -1, 0., 'x y con' )
+        varid = var_define( file_id, 'ua_amp'                            &
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, con_dimid ]  &
+     &                    , 'U-current amplitude'                        &
+     &                    , 'metre'                                      &
+     &                    , -1, 0., 'x y con' )
+        varid = var_define( file_id, 'ua_pha'                            &
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, con_dimid ]  &
+     &                    , 'U-current phase'                            &
+     &                    , 'degree GMT'                                 &
+     &                    , -1, 0., 'x y con' )
+        varid = var_define( file_id, 'va_amp'                            &
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, con_dimid ]  &
+     &                    , 'V-current amplitude'                        &
+     &                    , 'metre'                                      &
+     &                    , -1, 0., 'x y con' )
+        varid = var_define( file_id, 'va_pha'                            &
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, con_dimid ]  &
+     &                    , 'V-current phase'                            &
+     &                    , 'degree GMT'                                 &
+     &                    , -1, 0., 'x y con' )
+
+        call file_end_definition( file_id )
+
+        start = [ 1, 1, 1 ]
+        edge  = [ 4, int(ncons), 1 ]
+        call var_write( file_id, "con", constituent, start, edge )
+
+        start = [ i_global(1), j_global(1),          1 ]
+        edge  = [ im         , jm         , int(ncons) ]
+        call var_write( file_id, "el_amp", el_amp, start, edge )
+        call var_write( file_id, "el_pha", el_pha, start, edge )
+        call var_write( file_id, "ua_amp", ua_amp, start, edge )
+        call var_write( file_id, "ua_pha", ua_pha, start, edge )
+        call var_write( file_id, "va_amp", va_amp, start, edge )
+        call var_write( file_id, "va_pha", va_pha, start, edge )
+
+        file_id = file_close( file_id )
 
       else
 
         file_id = file_open( tide_el_path, NF90_NOWRITE )
 
+        start = [ 1,          1, 1 ]
+        edge  = [ 4, int(ncons), 1 ]
+        print *, shape(constituent)
+        call check( var_read( file_id, cons_name, constituent    &
+                            , start, edge )                      &
+                  , "[tide]var_read:init "//trim(cons_name) )
+        print *, my_task, ":", constituent, shape(constituent)
         start = [ i_global(1), j_global(1),          1 ]
         edge  = [ im         , jm         , int(ncons) ]
         call check( var_read( file_id, el_amp_name, el_amp       &

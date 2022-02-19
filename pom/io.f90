@@ -37,6 +37,7 @@ module io
     module procedure var_read_2d
     module procedure var_read_3d
     module procedure var_read_2d_int
+    module procedure var_read_strings
   end interface
 
   interface var_write
@@ -44,6 +45,8 @@ module io
     module procedure var_write_1d
     module procedure var_write_2d
     module procedure var_write_3d
+    module procedure var_write_strings ! 1D array of chars (effectively 2D array)
+    module procedure var_write_2d_byte
   end interface
 
 
@@ -757,6 +760,40 @@ module io
     end ! function var_read_2d_int
 !______________________________________________________________________
 !
+    integer function var_read_strings( ncid, name, var, start, stride )
+!----------------------------------------------------------------------
+!  Macro for reading 2D variable.
+!______________________________________________________________________
+!
+      use mpi    , only: MPI_OFFSET_KIND
+      use pnetcdf, only: NF90_NOERR                 &
+                       , nf90mpi_get_var_all        &
+                       , nf90mpi_inq_varid
+
+      implicit none
+
+      integer     , intent(in   ) :: ncid
+      character(*), intent(in   ) :: name
+      character(*), dimension(:)                    &
+                  , intent(inout) :: var
+      integer(MPI_OFFSET_KIND)                      &
+                  , dimension(:)                    &
+                  , intent(in   ) :: start, stride
+
+      integer varid
+
+
+      var_read_strings = nf90mpi_inq_varid( ncid, name, varid )
+      call check( var_read_strings, "inq_varid `"//trim(name)//"`" )
+      if ( var_read_strings /= NF90_NOERR ) return
+
+      var_read_strings = nf90mpi_get_var_all( ncid, varid, var, start, stride )
+      call check( var_read_strings, "get_var `"//trim(name)//"`" )
+
+
+    end ! function var_read_strings
+!______________________________________________________________________
+!
     subroutine var_write_0d( ncid, name, var, start )
 !----------------------------------------------------------------------
 !  Macro for writing scalar variable.
@@ -885,6 +922,74 @@ module io
 
 
     end ! function var_write_3d
+!
+!______________________________________________________________________
+!
+    subroutine var_write_strings( ncid, name, var, start, stride )
+!----------------------------------------------------------------------
+!  Macro for writing 1D array of strings.
+!______________________________________________________________________
+!
+      use mpi    , only: MPI_OFFSET_KIND
+      use pnetcdf, only: NF90_NOERR                 &
+                       , nf90mpi_inq_varid          &
+                       , nf90mpi_put_var_all
+
+      implicit none
+
+      integer     , intent(in   ) :: ncid
+      character(*), intent(in   ) :: name
+      character(*), dimension(:)                    &
+                  , intent(inout) :: var
+      integer(MPI_OFFSET_KIND)                      &
+                  , dimension(:)                    &
+                  , intent(in   ) :: start, stride
+
+      integer varid
+
+
+      call check( nf90mpi_inq_varid( ncid, name, varid )  &
+                , 'nf_inq_varid: '//trim(name) )
+
+      call check( nf90mpi_put_var_all( ncid, varid, var, start, stride )  &
+                , "nf_put_var: "//trim(name) )
+
+
+    end ! function var_write_strings
+!
+!______________________________________________________________________
+!
+    subroutine var_write_2d_byte( ncid, name, var, start, stride )
+!----------------------------------------------------------------------
+!  Macro for writing 2D variable of bytes.
+!______________________________________________________________________
+!
+      use mpi    , only: MPI_OFFSET_KIND
+      use pnetcdf, only: NF90_NOERR                 &
+                       , nf90mpi_inq_varid          &
+                       , nf90mpi_put_var_all
+
+      implicit none
+
+      integer     , intent(in   ) :: ncid
+      character(*), intent(in   ) :: name
+      integer(1)  , dimension(:,:)                  &
+                  , intent(inout) :: var
+      integer(MPI_OFFSET_KIND)                      &
+                  , dimension(:)                    &
+                  , intent(in   ) :: start, stride
+
+      integer varid
+
+
+      call check( nf90mpi_inq_varid( ncid, name, varid )  &
+                , 'nf_inq_varid: '//trim(name) )
+
+      call check( nf90mpi_put_var_all( ncid, varid, var, start, stride )  &
+                , "nf_put_var: "//trim(name) )
+
+
+    end ! function var_write_2d_byte
 !
 !______________________________________________________________________
 !

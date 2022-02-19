@@ -22,6 +22,8 @@ module config
   , nbcs             & ! surface salinity boundary condition
   , nitera           & ! maximum number of iterations for Smolarkiewicz scheme
   , npg              & ! pressure gradient scheme
+  , nsmolar          & ! smolarkiewic enabled/disabled
+  , nwad             & ! wetting/drying enabled/disabled
   , iperx            & !periodic boundary condition in x direction !alu:stcc
   , ipery            & !periodic boundary condition in y direction !lyo:scs1d:
   , n1d                !n1d .ne. 0 for 1d-simulation !lyo:scs1d:
@@ -37,10 +39,14 @@ module config
   , aam_init         & ! initial value of aam
   , cbcmax           & ! maximum bottom friction coefficient
   , cbcmin           & ! minimum bottom friction coefficient
+  , hc               & ! thinnest fluid layer thickness ( d < hc -> dry cell )
+  , hhi              & ! maximum water level (isobath of infinitely high wall)
   , horcon           & ! smagorinsky diffusivity coefficient
   , smoth            & ! constant to prevent solution splitting
   , sw               & ! smoothing parameter for Smolarkiewicz scheme
-  , z0b              & ! bottom roughness
+  , wadsmoth         & ! isolated dry cells smoothing parameter (0.1, 0..1)
+  , z0b              & ! bottom roughness [m]
+  , zsh              & ! Bottom log-layer shift [m]
   , lono,lato        & ! lon,lat where aam*(1+fak) larger influence (xs,ys)
   , xs,ys,fak          ! set lono or lato=999.     to skip !lyo:pac10:
 ! , period           & ! inertial period
@@ -267,6 +273,15 @@ module config
       s_hi =  999.
       s_lo =    0.
 
+! Disable hhi if no WaD
+      nwad    = 1
+      nsmolar = 0
+      hc  =   .05_rk
+      hhi = 20.  _rk
+      hhi = hhi*real(nwad)
+      wadsmoth = 0.05_rk
+      zsh = .01_rk ! 0.1 is default for non-WaD
+
 ! Mixing point modifiers
       fak  =    .5
       lato = 999.
@@ -331,7 +346,8 @@ module config
 !______________________________________________________________________
 !
       use glob_const , only: rk
-      use glob_out   , only: prtd1, prtd2, swtch , write_rst
+      use glob_out   , only: prtd1, prtd2, swtch , write_rst             &
+                           , out_init => allocate_arrays
       use model_run  , only: days , dte  , isplit, initialize_model_run  &
                            , time_start
 
@@ -368,6 +384,9 @@ module config
       namelist/sensitivity_nml/ sf_bf, sf_hf, sf_wi
 
 
+!  Allocate output variables; FIXME: This has to be here since apart from mean arrays it initializes `swtch`
+      call out_init
+
 !  Initialize parameters first.
       call parameters_init
 
@@ -384,6 +403,9 @@ module config
 
 !  Initialise timestep-related variables
       call initialize_model_run
+
+!  Update some dependent variables
+      alpha = alpha*real(1-nwad)
 
 ! Set pressure gradient and advection schemes procedures
       call get_pgproc (npg ,pressure_gradient)
@@ -424,6 +446,11 @@ module config
       print '(" Internal timestep   : ",f10.1)', dti
       print '(" INT/EXT ratio       : ",i10)'  , isplit
       print '(" Total model steps   : ",i10)'  , iend
+      print '(/" Wetting/Drying      : ",l2)'   , nwad
+      print '(" Smolarkiewic scheme : ",l2)'   , (nsmolar.eq.1)
+      print '(" Highest water level : ",f7.3)' , hhi
+      print '(" Thinnes fluid layer : ",f7.3)' , hc
+      print '(" Cell smoothing      : ",f10.3)', wadsmoth
       print '(/" Advection scheme    : ",i10)' , nadv
       print '(" Max iterations      : ",i10)'  , nitera
       print '(" Smolar. smoothing   : ",f10.4)', sw

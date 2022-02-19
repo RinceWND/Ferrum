@@ -233,7 +233,7 @@
 !______________________________________________________________________
 !
       use config     , only: mode
-      use glob_domain, only: im, jm, kbm1
+      use glob_domain, only: im, jm, kbm1, my_task
       use grid       , only: dz
       use glob_ocean
       use model_run  , only: isp2i, ispi
@@ -301,8 +301,8 @@
       use module_time
       use air        , only: e_atmos, vfluxf, wusurf, wvsurf
       use bry        , only: apply_tide, bc_vel_ext, bc_zeta ! TODO: Move apply_tide to tide
-      use config     , only: alpha, cbcmax, cbcmin, ispadv, smoth
-     &                     , use_tide, z0b
+      use config     , only: alpha, cbcmax, cbcmin, hc, ispadv, smoth
+     &                     , use_tide, wadsmoth, z0b, zsh,  mode
       use glob_const , only: grav, Kappa
       use glob_domain, only: im, imm1, jm, jmm1, kbm1   , my_task
       use grid       , only: art, aru, arv, cor, dx, dy, fsm, h, zz
@@ -316,29 +316,50 @@
       integer i,j
 
 
-      do j=2,jm
-        do i=2,im
-          fluxua(i,j)=.25*( d(i,j)+ d(i-1,j))
-     $                   *(dy(i,j)+dy(i-1,j))*ua(i,j)
-          fluxva(i,j)=.25*( d(i,j)+ d(i,j-1))
-     $                   *(dx(i,j)+dx(i,j-1))*va(i,j)
+      do j = 2, jm
+        do i = 2, im
+          fluxua(i,j) = .25_rk*(  d(i,j) +  d(i-1,j) )
+     $                        *( dy(i,j) + dy(i-1,j) )*ua(i,j)
+          fluxva(i,j) = .25_rk*(  d(i,j) +  d(i,j-1) )
+     $                        *( dx(i,j) + dx(i,j-1) )*va(i,j)
         end do
       end do
 
 ! NOTE addition of surface freshwater flux, w(i,j,1)=vflux, compared
 ! with pom98.f. See also modifications to subroutine vertvl
-      do j=2,jmm1
-        do i=2,imm1
-          elf(i,j)=elb(i,j)
-     $              +dte2*(-(fluxua(i+1,j)-fluxua(i,j)
-     $                      +fluxva(i,j+1)-fluxva(i,j))/art(i,j)
-     $                      -vfluxf(i,j))
+      do j = 2, jmm1
+        do i = 2, imm1
+          elf(i,j) = elb(i,j)
+     $             + dte2*( -( fluxua(i+1,j) - fluxua(i,j)
+     $                       + fluxva(i,j+1) - fluxva(i,j) )/art(i,j)
+     $                      -vfluxf(i,j) )
+          elf(i,j) = max( elf(i,j), hc*0.9_rk-h(i,j) )
         end do
       end do
 
       call bc_zeta ! bcond(1)
 
       call exchange2d_mpi(elf,im,jm)
+
+! Update WaD mask !TODO: Manage subsequent layers for GCS
+      df = h + elf*fsm(:,:,1)
+      wdm = int(fsm(:,:,1),1)
+      where ( df <= hc )
+        wdm = 0
+      end where
+
+      if ( wadsmoth > 0._rk ) then
+        do j = 2,jmm1
+        do i = 2,imm1
+          if ( wdm(i,j) > ( wdm(i-1,j) + wdm(i+1,j)                     &
+     &                    + wdm(i,j-1) + wdm(i,j+1) )                   &
+     &         .and. ( df(i,j) <= hc*(1._rk+wadsmoth) ) ) then
+            wdm(i,j) = 0
+          end if
+        end do
+        end do
+        call exchange2d_byte_mpi(wdm,im,jm)
+      end if
 
       if ( mod(iext,ispadv) == 0 ) call advave(tps)
 
@@ -425,18 +446,35 @@
 
       end if
 
+! Restrict fluxes on dry-to-wet directions
+      do j = 1, jm
+      do i = 2, im
+        if ( .5_rk*( df(i,j) + df(i-1,j) ) <= hc ) then
+          uaf(i,j) = 0._rk
+        else
+          if ( wdm(i-1,j)==0._rk .and. uaf(i,j)>0._rk ) uaf(i,j) = 0._rk
+          if ( wdm(i  ,j)==0._rk .and. uaf(i,j)<0._rk ) uaf(i,j) = 0._rk
+        end if
+      end do
+      end do
+      call exchange2d_mpi(uaf,im,jm)
+
+      do j = 2, jm
+      do i = 1, im
+        if ( .5_rk*( df(i,j) + df(i,j-1) ) <= hc ) then
+          vaf(i,j) = 0._rk
+        else
+          if ( wdm(i,j-1)==0._rk .and. vaf(i,j)>0._rk ) vaf(i,j) = 0._rk
+          if ( wdm(i,j  )==0._rk .and. vaf(i,j)<0._rk ) vaf(i,j) = 0._rk
+        end if
+      end do
+      end do
+      call exchange2d_mpi(vaf,im,jm)
+
 ! apply filter to remove time split
       ua = ua + .5*smoth*( uab + uaf - 2.*ua )
       va = va + .5*smoth*( vab + vaf - 2.*va )
       el = el + .5*smoth*( elb + elf - 2.*el )
-      ! if (iint>2) then
-      ! print *, iint,"=",my_task, ": UA : ", maxval(abs(va))
-      ! print *, iint,"=",my_task, ": UAB: ", maxval(abs(vab))
-      ! print *, iint,"=",my_task, ": UAF: ", maxval(abs(vaf))
-      ! call finalize_mpi
-      ! stop
-      ! end if
-
       elb = el
       el  = elf
       d   = h + el
@@ -445,14 +483,23 @@
       vab = va
       va  = vaf
 
-! update bottom friction
-      do j=1,jm
-        do i=1,im
-          cbc(i,j)=(Kappa/log((.1+(1.+zz(i,j,kbm1))*d(i,j))/z0b))**2
-          cbc(i,j)=max(cbcmin,cbc(i,j))
-          cbc(i,j)=min(cbcmax,cbc(i,j))
-        end do
+! DELETE: Debug
+      do j = 1, jm
+      do i = 1, im
+        if ( d(i,j) < 0. ) then
+          print *, "NEGATIVE WCD @ ", i, j
+          print *, wdm(i,j)
+          d(i,j) = 0.01_rk
+          wdm(i,j) = 0
+          print *, uaf(i,j), uaf(i+1,j)
+          print *, vaf(i,j), vaf(i+1,j)
+          !stop -1
+        end if
       end do
+      end do
+
+! update bottom friction
+      call bottom_friction
 
       if ( iext /= isplit ) then
 
@@ -501,8 +548,8 @@
       use bry        , only: bc_ts, bc_turb, bc_vel_int, bc_vel_vert
       use clim       , only: tclim, sclim, relax_to_clim
       use glob_const , only: rk, small
-      use config     , only: mode , nadv, nbcs, nbct, do_restart
-     &                     , smoth, s_hi, s_lo, t_hi, t_lo
+      use config     , only: hc, hhi, mode , nadv, nbcs, nbct
+     &                     , do_restart, smoth, s_hi, s_lo, t_hi, t_lo
       use glob_domain
       use grid       , only: dz, h  ,fsm
       use glob_ocean
@@ -518,50 +565,38 @@
      &               .or.      do_restart ) then
 
 ! adjust u(z) and v(z) such that depth average of (u,v) = (ua,va)
-        tps = 0.
+        tps = 0._rk
 
-        do k=1,kbm1
-          do j=1,jm
-            do i=1,im
-              tps(i,j)=tps(i,j)+u(i,j,k)*dz(i,j,k)
+        do k = 1, kbm1
+          tps(:,:) = tps(:,:) + u(:,:,k)*dz(:,:,k)
+        end do
+
+        do k = 1, kbm1
+          do j = 1, jm
+            u(1,j,k) = .5_rk*( u(1,j,k) - tps(1,j) )
+     &               +       ( utb(1,j) + utf(1,j) )/dt(1,j)
+            do i = 2, im
+              u(i,j,k) = ( u(i,j,k) - tps(i,j) )
+     $                 + ( utb(i,j) + utf(i,j) )/( dt(i,j) + dt(i-1,j) )
             end do
           end do
         end do
 
-        do k=1,kbm1
-          do j=1,jm
-            u(1,j,k) = .5*( u(1,j,k) - tps(1,j) )
-     &               +    ( utb(1,j) + utf(1,j) )/dt(1,j)
-            do i=2,im
-              u(i,j,k)=(u(i,j,k)-tps(i,j))+
-     $                 (utb(i,j)+utf(i,j))/(dt(i,j)+dt(i-1,j))
-            end do
-          end do
+        tps = 0._rk
+
+        do k = 1, kbm1
+          tps(:,:) = tps(:,:) + v(:,:,k)*dz(:,:,k)
         end do
 
-        do j=1,jm
-          do i=1,im
-            tps(i,j)=0.
+        do k = 1, kbm1
+          do i = 1, im
+            v(i,1,k) = .5_rk*( v(i,1,k) - tps(i,1) )
+     &               +       ( vtb(i,1) + vtf(i,1) )/dt(i,1)
           end do
-        end do
-
-        do k=1,kbm1
-          do j=1,jm
-            do i=1,im
-              tps(i,j)=tps(i,j)+v(i,j,k)*dz(i,j,k)
-            end do
-          end do
-        end do
-
-        do k=1,kbm1
-          do i=1,im
-            v(i,1,k) = .5*( v(i,1,k) - tps(i,1) )
-     &               +    ( vtb(i,1) + vtf(i,1) )/dt(i,1)
-          end do
-          do j=2,jm
-            do i=1,im
-              v(i,j,k)=(v(i,j,k)-tps(i,j))+
-     $                 (vtb(i,j)+vtf(i,j))/(dt(i,j)+dt(i,j-1))
+          do j = 2, jm
+            do i = 1, im
+              v(i,j,k) = ( v(i,j,k) - tps(i,j) )
+     $                 + ( vtb(i,j) + vtf(i,j) )/( dt(i,j) + dt(i,j-1) )
             end do
           end do
         end do
@@ -582,12 +617,11 @@
         call vertvl(a,c)
 
         call bc_vel_vert ! bcond(5)
-
         call exchange3d_mpi(w,im,jm,kb)
 
 ! set uf and vf to zero
-        uf = 0.
-        vf = 0.
+        uf = 0._rk
+        vf = 0._rk
 
 ! calculate q2f and q2lf using uf, vf, a and c as temporary variables
         call advq(q2b,q2,uf,a,c)
@@ -595,16 +629,15 @@
         call profq(a,c,tps,dtef)
 
 ! an attempt to prevent underflow (DEBUG)
-        where(q2l.lt..5*small) q2l = .5*small
-        where(q2lb.lt..5*small) q2lb = .5*small
+!        where(q2l.lt..5*small) q2l = .5*small
+!        where(q2lb.lt..5*small) q2lb = .5*small
 
         call bc_turb ! bcond(6)
-
         call exchange3d_mpi(uf(:,:,2:kbm1),im,jm,kbm2)
         call exchange3d_mpi(vf(:,:,2:kbm1),im,jm,kbm2)
 
-        q2  = q2  + .5*smoth*( q2b  -2.*q2  + uf )
-        q2l = q2l + .5*smoth*( q2lb -2.*q2l + vf )
+        q2  = q2  + .5_rk*smoth*( q2b  + uf - 2._rk*q2  )
+        q2l = q2l + .5_rk*smoth*( q2lb + vf - 2._rk*q2l )
         q2b = q2
         q2  = uf
         q2lb= q2l
@@ -632,7 +665,6 @@
 
           end if
 
-
           call proft(uf,wtsurf,tsurf,nbct,tps)
           call proft(vf,wssurf,ssurf,nbcs,tps)
 
@@ -655,11 +687,21 @@
 
           call bc_ts ! bcond(4)
 
+! Relax T/S for dry cells
+          do k = 1, kbm1
+            where ( wdm == 0 )
+              uf(:,:,k) = wet_relx1*tb(:,:,k) + wet_relx2*tsurf(:,:)
+     &                                         *fsm(:,:,1)
+              vf(:,:,k) = wet_relx1*sb(:,:,k) + wet_relx2*ssurf(:,:)
+     &                                         *fsm(:,:,1)
+            end where
+          end do
+
           call exchange3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
           call exchange3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
 
-          t = t + .5*smoth*( tb + uf -2.*t )
-          s = s + .5*smoth*( sb + vf -2.*s )
+          t = t + .5_rk*smoth*( tb + uf - 2._rk*t )
+          s = s + .5_rk*smoth*( sb + vf - 2._rk*s )
           tb = t
           t  = uf
           sb = s
@@ -677,49 +719,41 @@
 
         call bc_vel_int ! bcond(3)
 
+! Mask currents
+        do k = 1, kbm1
+          where ( wdm(2:im,:)*wdm(1:imm1,:) == 0 )
+     &          uf(2:im,:,k) = 0._rk
+          where ( wdm(:,2:jm)*wdm(:,1:jmm1) == 0 )
+     &          vf(:,2:jm,k) = 0._rk
+        end do
+
         call exchange3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
         call exchange3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
 
-        tps = 0.
+        tps = 0._rk
 
-        do k=1,kbm1
-          do j=1,jm
-            do i=1,im
-              tps(i,j)=tps(i,j)
-     $              +(uf(i,j,k)+ub(i,j,k)-2.*u(i,j,k))*dz(i,j,k)
-            end do
-          end do
+        do k = 1, kbm1
+          tps(:,:) = tps(:,:)
+     $             + ( uf(:,:,k)+ub(:,:,k)-2._rk*u(:,:,k) )*dz(:,:,k)
         end do
 
-        do k=1,kbm1
-          do j=1,jm
-            do i=1,im
-              u(i,j,k)=u(i,j,k)
-     $                  +.5*smoth*(uf(i,j,k)+ub(i,j,k)
-     $                               -2.*u(i,j,k)-tps(i,j))
-            end do
-          end do
+        do k = 1, kbm1
+          u(:,:,k) = u(:,:,k)
+     $             + .5_rk*smoth*(      uf(:,:,k) + ub(:,:,k)
+     $                           - 2._rk*u(:,:,k) - tps(:,:)  )
         end do
 
-        tps = 0.
+        tps = 0._rk
 
-        do k=1,kbm1
-          do j=1,jm
-            do i=1,im
-              tps(i,j)=tps(i,j)
-     $              +(vf(i,j,k)+vb(i,j,k)-2.*v(i,j,k))*dz(i,j,k)
-            end do
-          end do
+        do k = 1, kbm1
+          tps(:,:) = tps(:,:)
+     $             + ( vf(:,:,k)+vb(:,:,k)-2._rk*v(:,:,k) )*dz(:,:,k)
         end do
 
-        do k=1,kbm1
-          do j=1,jm
-            do i=1,im
-              v(i,j,k)=v(i,j,k)
-     $                  +.5*smoth*(vf(i,j,k)+vb(i,j,k)
-     $                               -2.*v(i,j,k)-tps(i,j))
-            end do
-          end do
+        do k = 1, kbm1
+          v(:,:,k) = v(:,:,k)
+     $             + .5_rk*smoth*(      vf(:,:,k) + vb(:,:,k)
+     $                           - 2._rk*v(:,:,k) - tps(:,:)  )
         end do
 
         ub = u
@@ -829,14 +863,14 @@
       use glob_const , only: rk
       use glob_domain
       use grid       , only: art, dz, fsm
-      use glob_ocean , only: et, dt, sb, tb
+      use glob_ocean , only: et, dt, sb, tb, u, v, w, wdm
       use glob_out   , only: iprint
       use model_run
 
       implicit none
 
       real(rk), dimension(im,jm) :: d_vol
-      real(rk) area_tot, vol_tot
+      real(rk) area_tot, vol_tot, kin_ave
       real(rk) elev_ave, temp_ave, salt_ave
       integer i,j,k
 
@@ -859,20 +893,23 @@
         end if
 
 ! local averages
-        vol_tot  = 0.
-        area_tot = 0.
-        temp_ave = 0.
-        salt_ave = 0.
-        elev_ave = 0.
+        vol_tot  = 0._rk
+        area_tot = 0._rk
+        kin_ave  = 0._rk
+        temp_ave = 0._rk
+        salt_ave = 0._rk
+        elev_ave = 0._rk
 
-        do k=1,kbm1
-          d_vol    = art*dt*dz(:,:,k)*fsm(:,:,k)
+        do k = 1, kbm1
+          d_vol    = art*dt*dz(:,:,k)*wdm
           vol_tot  = vol_tot + sum(d_vol)
+          kin_ave  = kin_ave + sum( (u(:,:,k)*u(:,:,k)
+     &                              +v(:,:,k)*v(:,:,k))*d_vol )
           temp_ave = temp_ave + sum(tb(:,:,k)*d_vol)
           salt_ave = salt_ave + sum(sb(:,:,k)*d_vol)
         end do
 
-        area_tot = sum( art )
+        area_tot = sum( art*wdm )
         elev_ave = sum( et*art )
 
 
@@ -881,6 +918,7 @@
         call sum0d_mpi( elev_ave, master_task )
         call sum0d_mpi(  vol_tot, master_task )
         call sum0d_mpi( area_tot, master_task )
+        call sum0d_mpi(  kin_ave, master_task )
 
 ! print averages
         if ( is_master ) then
@@ -888,11 +926,15 @@
           temp_ave = temp_ave / vol_tot
           salt_ave = salt_ave / vol_tot
           elev_ave = elev_ave / area_tot
+          kin_ave  = .5_rk*kin_ave / vol_tot
 
-          print '(a,e15.8,2(a,f11.8),a)'
-     &        , "mean ; et = ", elev_ave, " m, tb = "
-     &        , temp_ave + tbias, " deg, sb = "
-     &        , salt_ave + sbias, " psu"
+          print '(3(2(a,e15.8),a,/))'
+     &        , "AVG: et = ", elev_ave        , " m  , KE = "
+     %        , kin_ave         , " m^2/s^2;"
+     &        , "   : tb = ", temp_ave + tbias, " deg, sb = "
+     &        , salt_ave + sbias, " psu    ;"
+     &        , "TOT: vol = ", vol_tot, " m^3, area = "
+     &        , area_tot, " m^2. "
 
         end if
 

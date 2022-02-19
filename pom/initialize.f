@@ -18,7 +18,6 @@
       use glob_ocean , only: aamfac, d, dt, el, et
      &                     , initialize_ocean => allocate_arrays
       use glob_out   , only: out_record, iprint
-     &                     , initialize_mean_arrays => allocate_arrays
       use model_run  , only: dtime, time, time0
 
       implicit none
@@ -36,17 +35,17 @@
 ! Read domain distribution (TODO: get rid of hardcoded parameters)
       call read_domain_dist( 'domain.nml' )
 
+! distribute the model domain across processors
+      call distribute_mpi
+
+! distribute the coarse wind/assim data domain across processors
+!      call distribute_mpi_coarse   !fhx:20101206
+
 ! Read configuration files
       call read_config( 'config.nml' )
 !______________________________________________________________________
 !  `read_config` initializes all parameters to their default values
 ! prior to reading them.
-
-! distribute the model domain across processors
-      call distribute_mpi
-
-! distribute the coarse wind/assim data domain across processors
-      call distribute_mpi_coarse   !fhx:20101206
 
 ! decide on interpolation feasibility (sets calc_interp flag)
       call check_interpolation
@@ -119,9 +118,6 @@
         call incmix(aamfac,im,jm,1,lono,lato,east_e,north_e,xs,ys,fak)
       end if
 
-! Output routines
-      call initialize_mean_arrays
-
 ! write grid (NO initial conditions)
       if ( output_flag == 1 ) then
         call create_output("out/"//trim(netcdf_file)//".nc")
@@ -177,14 +173,14 @@
 !______________________________________________________________________
 !
       use bry        , only: initial_conditions_boundary
-      use config     , only: initial_file
+      use config     , only: hc, hhi, initial_file
       use glob_const , only: rk
       use glob_domain
       use grid       , only: dz, fsm, h, z
       use io
       use mpi        , only: MPI_OFFSET_KIND
       use glob_ocean , only: d, dt, elb, hz, rho, s, sb, t, tb
-     &                     , uab, ub, vab, vb
+     &                     , uab, ub, vab, vb, wdm
       use pnetcdf    , only: NF90_NOWRITE
 
       implicit none
@@ -232,6 +228,7 @@
         edge  = [ im         , jm         ,      1, 1 ]
         status = var_read( file_id, el_name, elb, start, edge )
       end if
+      elb = elb - hhi
 
 ! Derive barotropic velocities
       uab = 0.
@@ -259,6 +256,14 @@
         hz(:,:,k) = -z(:,:,k)*h(:,:)
       end do
       hz(:,:,kb) = h(:,:)
+
+! Update free surface mask
+      wdm = int(fsm(:,:,1))
+      where ( d > hc )
+        wdm = 1
+      elsewhere
+        wdm = 0
+      end where
 
 
       end ! subroutine initial_conditions
@@ -379,14 +384,14 @@
 !______________________________________________________________________
 !
         use air
-        use config     , only: use_ice, mode, title
+        use config     , only: hhi, use_ice, mode, title
         use glob_const , only: MODE_BAROTROPIC, rk
         use glob_domain
         use grid
         use io
         use glob_ocean
         use glob_out
-        use pnetcdf    , only: NF90_FLOAT
+        use pnetcdf    , only: NF90_FLOAT, NF90_BYTE
         use seaice     , only: icec, iceu, icev
         use tide       , only: define_tide, define_tide_init
      &                       , write_tide_init
@@ -514,6 +519,16 @@
 !        call define_tide_init( file_id, [ x_dimid, y_dimid ]
 !     &                       , NF90_FLOAT )
 
+        varid = var_define( file_id, 'wetmask', NF90_BYTE
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'Mask for wetting and drying (WaD)'
+     &                    , 'n/a'
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'water_column', NF90_FLOAT
+     &                    , [ x_dimid, y_dimid, time_dimid ]
+     &                    , 'Height of water column'
+     &                    , 'm'
+     &                    , -1, 0., 'east_e north_e' )
         varid = var_define( file_id, 'uab', NF90_FLOAT
      &                    , [ x_dimid, y_dimid, time_dimid ]
      &                    , 'depth-averaged u'
@@ -528,7 +543,7 @@
      &                    , [ x_dimid, y_dimid, time_dimid ]
      &                    , 'surface elevation'
      &                    , 'metre'
-     &                    , 0, -999., 'east_e north_e' )
+     &                    , 1, -999., 'east_e north_e' )
         varid = var_define( file_id, 'wusurf', NF90_FLOAT
      &                    , [ x_dimid, y_dimid, time_dimid ]
      &                    , 'x-momentum flux'
@@ -619,7 +634,9 @@
         call var_write( file_id, "north_v", north_v, start, edge )
         call var_write( file_id, "north_e", north_e, start, edge )
         call var_write( file_id, "rot"    , rot    , start, edge )
+        h = h - hhi*fsm(:,:,1)
         call var_write( file_id, "h"      , h      , start, edge )
+        h = h + hhi*fsm(:,:,1)
         call var_write( file_id, "fsm"    , fsm    , start, edge )
         call var_write( file_id, "dum"    , dum    , start, edge )
         call var_write( file_id, "dvm"    , dvm    , start, edge )
@@ -639,7 +656,7 @@
 !______________________________________________________________________
 !
         use air
-        use config     , only: use_ice, mode, title ! TODO: `use_ice` move output sections to be perfomed by their own modules
+        use config     , only: hhi, use_ice, mode, title ! TODO: `use_ice` move output sections to be perfomed by their own modules
         use glob_const , only: MODE_BAROTROPIC, rk
         use glob_domain
         use grid
@@ -661,6 +678,7 @@
         integer                                   file_id , status
         integer(MPI_OFFSET_KIND), dimension(4) :: start   , edge
         character(PATH_LEN)                       tmp_str
+        real(rk), dimension(im,jm)             :: out
 
 
         tmp_str = ""
@@ -679,6 +697,8 @@
 
         start = [ i_global(1), j_global(1), record, 1 ]
         edge  = [  im        , jm         ,      1, 1 ]
+        call var_write( file_id, "wetmask", wdm, start, edge )
+        call var_write( file_id, "water_column", d, start, edge )
         if ( write_means ) then
           call var_write( file_id, "uab"   , uab_mean   , start, edge )
           call var_write( file_id, "vab"   , vab_mean   , start, edge )
@@ -691,7 +711,9 @@
         else
           call var_write( file_id, "uab"   , uab   , start, edge )
           call var_write( file_id, "vab"   , vab   , start, edge )
-          call var_write( file_id, "elb"   , elb   , start, edge )
+          out = (elb+hhi)*wdm
+          !where ( wdm(:,:,1) == 0._rk ) out = -999._rk
+          call var_write( file_id, "elb"   , out   , start, edge )
           call var_write( file_id, "wusurf", wusurf, start, edge )
           call var_write( file_id, "wvsurf", wvsurf, start, edge )
           call var_write( file_id, "wtsurf", wtsurf, start, edge )
@@ -1484,13 +1506,14 @@
 !______________________________________________________________________
 !
       use air        , only: vfluxf
-      use config     , only: aam_init, npg  ,do_restart,use_tide
+      use config     , only: aam_init, hc, hhi, mode, npg,do_restart
+     &                     ,use_tide
       use glob_const , only: rk, SMALL
       use glob_domain, only: im, is_master, jm, kb, kbm1  ,my_task
-      use grid       , only: dz, h
+      use grid       , only: dz, fsm, h
       use model_run,only:iint, dtime
-      use glob_ocean , only: aam, d, drhox, drhoy, drx2d, dry2d, dt
-     &                     , el, elb, et, etb, etf
+      use glob_ocean , only: aam, aam2d, d, drhox, drhoy, drx2d, dry2d
+     &                     , dt, el, elb, et, etb, etf
      &                     , kh, km, kq, l, q2, q2b, q2l, q2lb
      &                     , rho, s, sb, t, tb, u, ua, ub, uab
      &                     , v, va, vb, vab, w
@@ -1503,15 +1526,16 @@
 
       if ( use_tide ) then
         call tide_advance( dtime )
-        if ( .not.do_restart ) then
-          uab = tide_ua
-          vab = tide_va
-          elb = tide_el
-          etb = elb
-        end if
+!        if ( .not.do_restart ) then
+!          uab = tide_ua
+!          vab = tide_va
+!          elb = tide_el
+!          etb = elb
+!        end if
       end if
       ua = uab
       va = vab
+      elb = elb*fsm(:,:,1)
       el = elb
       et = etb
       etf= et
@@ -1529,7 +1553,8 @@
       kh  = l*sqrt(q2b)
       km  = kh
       kq  = kh
-      aam = aam_init
+      aam   = aam_init
+      aam2d = aam_init
 
       do k=1,kbm1
         do i=1,im
@@ -1553,16 +1578,20 @@
 
       !call dens(s,t,rho)
 
-      call pgscheme(npg)
+      if ( mode /= 2 ) then ! Do not use pressure gradient in barotropic runs
 
-      do k=1,kbm1
-        do j=1,jm
-          do i=1,im
-            drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(i,j,k)
-            dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)*dz(i,j,k)
+        call pgscheme(npg)
+
+        do k=1,kbm1
+          do j=1,jm
+            do i=1,im
+              drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(i,j,k)
+              dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)*dz(i,j,k)
+            end do
           end do
         end do
-      end do
+
+      end if
 
 
       end
@@ -1600,22 +1629,29 @@
 !  Calculates the bottom friction coefficient.
 !______________________________________________________________________
 !
-      use config     , only: cbcmax, cbcmin, z0b
+      use config     , only: cbcmax, cbcmin, mode, z0b, zsh
       use glob_const , only: Kappa, rk
-      use glob_domain, only: im, jm, kbm1
-      use grid       , only: h, zz
-      use glob_ocean , only: cbc
+      use glob_domain, only: im, jm, kbm1    ,j_global,my_task
+      use grid       , only: zz
+      use glob_ocean , only: cbc, d
 
       implicit none
 
       integer i,j
 
 
+!  Apply minimum friction for 2D run
+! IWONDER: why, though? Why not calculate it as per usual?
+      if ( mode == 2 ) then
+        cbc(:,:) = cbcmin
+        return
+      end if
+
 ! calculate bottom friction
       do j=1,jm
         do i=1,im
 !lyo:correct:cbc(i,j)=(Kappa/log((1.+zz(kbm1))*h(i,j)/z0b))**2 !lyo:bug:
-          cbc(i,j)=(Kappa/log(1._rk+(1._rk+zz(i,j,kbm1))*h(i,j)/z0b))**2
+          cbc(i,j)=(Kappa/log((zsh+(1._rk+zz(i,j,kbm1))*d(i,j))/z0b))**2
           cbc(i,j)=max(cbcmin,cbc(i,j))
 ! if the following is invoked, then it is probable that the wrong
 ! choice of z0b or vertical spacing has been made:

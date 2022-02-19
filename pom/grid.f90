@@ -206,7 +206,7 @@ module grid
 !______________________________________________________________________
 !
 !      use mpi        , only: MPI_OFFSET_KIND
-      use config     , only: n1d
+      use config     , only: hc, hhi, n1d ! TODO: hhi should be embed into grid file
       use glob_const , only: DEG2RAD, Ohm, rk, SMALL
       use io         , only: check   , file_close, file_open  &
                            , is_error, var_rank  , var_read
@@ -342,7 +342,7 @@ module grid
       dzz(:,:,kb) = dzz(:,:,kb-1)
 
 ! set up Coriolis parameter
-      cor = 2.*Ohm*sin(north_e*DEG2RAD)
+      cor = 2._rk*Ohm*sin(north_e*DEG2RAD)
 
 ! inertial period for temporal filter
 !      period=(2.e0*pi)/abs(cor(im/2,jm/2))/86400.e0
@@ -369,6 +369,16 @@ module grid
         aru(:,1) = aru(:,2)
         arv(:,1) = arv(:,2)
       end if
+
+! Add offset `hhi` so that MSL moves from 0 to `hhi`
+      h = h + hhi
+!  Make depth at absolute land boundary so water depth equals `hc`
+! when elevations is masked out with free surface mask
+!  Or just set to `hc` but make sure initialisation masks elevation
+! (at `update_initial` right now)
+      where ( fsm(:,:,1) == 0._rk )
+        h = hc! + hhi
+      end where
 
       call print_config
 
