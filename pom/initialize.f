@@ -173,7 +173,8 @@
 !______________________________________________________________________
 !
       use bry        , only: initial_conditions_boundary
-      use config     , only: hc, hhi, initial_file
+      use config     , only: hc, hhi, initial_file, el_name
+     &                     , r_name, s_name, t_name, u_name, v_name
       use glob_const , only: rk
       use glob_domain
       use grid       , only: dz, fsm, h, z
@@ -190,15 +191,8 @@
       integer                      file_id, i, j, k, record, status
       integer(MPI_OFFSET_KIND)
      &       , dimension(4)     :: edge, start
-      character(32) :: el_name, r_name, s_name, t_name, u_name, v_name
 
 
-      el_name = "eclim"
-       s_name = "sclim" !"salt"
-       t_name = "tclim" !"temp"
-       u_name = "uclim"
-       v_name = "vclim"
-       r_name = ""
       record = 1
 
 ! Initialize main parameters with "common" values
