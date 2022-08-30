@@ -697,6 +697,10 @@ module glob_ocean
 
 ! Initialize arrays
       aamfac   = 1.
+      advua    = 0.
+      advva    = 0.
+      ady2d    = 0.
+      adx2d    = 0.
       drhox    = 0.
       drhoy    = 0.
       drx2d    = 0.
