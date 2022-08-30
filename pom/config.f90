@@ -54,6 +54,15 @@ module config
   character(VAR_LEN)  &
     title
 
+! Initialize varnames
+  character(VAR_LEN)  &
+    el_name           &
+  ,  r_name           &
+  ,  s_name           &
+  ,  t_name           &
+  ,  u_name           &
+  ,  v_name
+
   character(PATH_LEN) &
     netcdf_file       & ! output netcdf filename
   , initial_file        ! restart filename to read from
@@ -303,6 +312,14 @@ module config
       output_flag  = 1
       output_means = .false.
 
+! Init varnames
+      el_name = "el"
+      r_name = ""
+      s_name = "salt"
+      t_name = "temp"
+      u_name = "u"
+      v_name = "v"
+
     end ! subroutine
 !
 !______________________________________________________________________
@@ -377,6 +394,9 @@ module config
         append_output, monthly_flag, netcdf_file, output_flag  &
       , output_means , prtd1       , prtd2      , swtch        &
       , write_rst    , SURF_flag
+
+      namelist/init_nml/                                 &
+        el_name, r_name, s_name, t_name, u_name, v_name
 
       namelist/modules_nml/                             &
         USE_AIR, USE_BRY, USE_ICE, USE_RIVER, USE_TIDE
