@@ -257,6 +257,13 @@ module grid
         do k = 1, kb
           z (:,:,k) = z (1,1,k)
           zz(:,:,k) = zz(1,1,k)
+        end do
+      end if
+
+      z_rnk = var_rank( file_id, fsm_name )
+
+      if ( z_rnk == 2 ) then
+        do k = 1, kb
           fsm(:,:,k) = fsm(:,:,1)
         end do
       end if
