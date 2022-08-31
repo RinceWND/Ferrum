@@ -419,6 +419,8 @@ module config
       read ( 73, nml =   setup_nml )
       rewind( 73 )
       read ( 73, nml = modules_nml )
+      rewind( 73 )
+      read ( 73, nml =    init_nml )
       close( 73 )
 
 !  Initialise timestep-related variables
@@ -428,7 +430,7 @@ module config
       alpha = alpha*real(1-nwad)
 
 ! Set pressure gradient and advection schemes procedures
-      call get_pgproc (npg ,pressure_gradient)
+      call get_pgproc(npg, pressure_gradient)
 
 ! End of input of constants
       call print_config
