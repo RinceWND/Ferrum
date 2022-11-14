@@ -1,0 +1,170 @@
+&run_nml
+ title  = "Run title"
+ days   = 10.
+ dte    =  6.
+ isplit = 20
+ time_start   = "2020-10-03 00:00:00"
+ do_restart   = .false.
+ initial_file = "in/2020-06-10_00_00_00.test.rst"
+ spinup       = .false.
+/
+
+&output_nml
+ netcdf_file = "test"
+ output_flag =  1
+ prtd1       =  0.25
+ prtd2       =  1.
+ write_rst   =  1.
+ output_means = .false.
+/
+
+&setup_nml
+ mode = 3
+ nitera =  7
+ npg    =  2
+ nadv   =  2
+ nbct   =  2
+ tprni  =   .2
+ horcon =   .5
+ t_lo   = -2.
+ aam_init = 1000.
+/
+
+&modules_nml
+ use_air   = .false.
+ use_bry   = .false.
+ use_ice   = .false.
+ use_tide  = .false.
+ use_river = .false.
+/
+
+&bry_nml
+ USE_SPONGE = .false.
+ DERIVE_2D  = .true.
+ bry_path = "lbry.oper.nc"
+ el_name  = "el"
+ s_name   = "s"
+ t_name   = "t"
+ MONTHLY      = .false.
+ interp_bry   = .false.
+ read_int     = 3600
+ USE_CALENDAR = .false.
+/
+
+&bry_cond
+!---------------------------------------------------
+! 0 - Zero gradient condition
+! 1 - 3-cell interior smoothing
+! 2 - Clamped (should be provided by boundary files)
+! 3 - Flather
+! 4 - In-outflow (TS-condition)
+! 5 - Simple radiation condition
+! 6 - Orlanski condition
+! 7 - Enhanced radiation condition
+! 8 - Generalized Flather (TODO: NOT IMPLEMENTED)
+! 9 - Chapman
+!---------------------------------------------------
+ el_east  = 5
+ el_north = 5
+ el_south = 5
+ el_west  = 5
+ ts_east  = 4
+ ts_north = 4
+ ts_south = 4
+ ts_west  = 4
+ vel2d_norm_east  = 3
+ vel2d_norm_north = 3
+ vel2d_norm_south = 3
+ vel2d_norm_west  = 3
+ vel2d_tang_east  = 9
+ vel2d_tang_north = 9
+ vel2d_tang_south = 9
+ vel2d_tang_west  = 9
+ vel3d_norm_east  = 2
+ vel3d_norm_north = 2
+ vel3d_norm_south = 2
+ vel3d_norm_west  = 2
+ vel3d_tang_east  = 2
+ vel3d_tang_north = 2
+ vel3d_tang_south = 2
+ vel3d_tang_west  = 2
+/
+
+&grid
+ grid_path = "path/to/grid.nc"
+/
+
+&clim
+ ts_clim_path = "/path/to/clim_sigma.nc"
+ ts_mean_path = "/path/to/clim_sigma.nc"
+ RELAX_SURF_TEMP = 2
+ RELAX_SURF_SALT = 1
+ surf_rel =   .25
+ deep_rel = 10.
+/
+
+&clim_vars
+ t_clim_name = "tclim"
+ s_clim_name = "sclim"
+ t_mean_name = "tmean"
+ s_mean_name = "smean"
+/
+
+&air_nml
+ read_wind     = .true.
+ interp_wind   = .true.
+ read_bulk     = .true.
+ interp_pres   = .true.
+ use_bulk      = .true.
+ read_cloud    = .false.
+ calc_swr      = .false.
+ use_fluxes    = .true.
+ read_heat     = .true.
+ read_stress   = .false.
+ interp_stress = .false.
+ interp_heat   = .true.
+ use_coare     = .true.
+ taper_bry     = .true.
+ use_calendar  = .false.
+ wind_path = "frc.nc"
+ bulk_path = "frc.nc"
+ flux_path = "frc.nc"
+/
+
+&air_vars_nml
+ sst_name   = "skin"
+ rain_name  = "rain"
+ humid_name = "rhum"
+ tair_name  = "temp"
+ pres_name  = "mslp"
+ tcld_name  = ""
+ ustr_name  = ""
+ vstr_name  = ""
+ dlrad_name = "dlwr"
+ lheat_name = "lhf"
+ sheat_name = "shf"
+ srad_name  = "swr"
+ lrad_name  = "lwr"
+/
+
+&ice
+ ice_path = "frc.nc"
+ read_int = 86400
+ use_calendar = .false.
+/
+
+&ice_vars
+ icec_name = "sice"
+/
+
+&tide
+ tide_el_path = "/path/to/tides/h_tpxo9.v1.nc"
+ tide_uv_path = "/path/to/tides/u_tpxo9.v1.nc"
+/
+
+&tide_vars
+/
+
+&river
+ river_path = "/path/to/disch.nc"
+/

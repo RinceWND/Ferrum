@@ -30,7 +30,7 @@
         call msg_print("BEGIN NUMERICAL EXPERIMENT", 1, "")
         print '(" = ",a)', date2str( dtime )
       end if
-      
+
 ! main loop
       do iint = 1,iend
 
@@ -72,7 +72,8 @@
 ! finalize mpi
       call finalize_mpi
 
-      if (is_master) print '(a,f7.2,a)',"Done in ",(tick1-tick0)," sec."
+      if (is_master) print '(a,f7.2,a)',"Done in ",(tick1-tick0)/60.
+     &                                 ," min."
 
 
       end program
@@ -89,7 +90,7 @@
 
       use config     , only: calc_assim , netcdf_file
      &                     , output_flag, output_means
-      use glob_domain, only: im, jm, kb
+      use glob_domain, only: im, jm, km
       use glob_ocean , only: ssurf, tsurf
       use glob_out
       use model_run  , only: iint
@@ -136,8 +137,8 @@
 !     store tsurf & ssurf in rho(k=kb) & s(k=kb) respectively
 !     note that these will be satellite &/or monthly climatology
 
-          s_mean(:,:,kb)   = ssurf(:,:) !lyo:exp301!lyo:exp302:store ssurf!lyonew:
-          rho_mean(:,:,kb) = tsurf(:,:) !lyo:exp301!lyo:exp302:store tsurf!lyonew:
+          s_mean(:,:,km)   = ssurf(:,:) !lyo:exp301!lyo:exp302:store ssurf!lyonew:
+          rho_mean(:,:,km) = tsurf(:,:) !lyo:exp301!lyo:exp302:store tsurf!lyonew:
 
 !     fill up ghost cells before output
           call exchange2d_mpi( uab_mean, im, jm )
@@ -148,15 +149,15 @@
           call exchange2d_mpi( wtsurf_mean, im, jm )
           call exchange2d_mpi( wssurf_mean, im, jm )
           call exchange2d_mpi( swrad_mean, im, jm )
-          call exchange3d_mpi( u_mean, im, jm, kb )
-          call exchange3d_mpi( v_mean, im, jm, kb )
-          call exchange3d_mpi( w_mean, im, jm, kb )
-          call exchange3d_mpi( t_mean, im, jm, kb )
-          call exchange3d_mpi( s_mean, im, jm, kb )
-          call exchange3d_mpi( rho_mean, im, jm, kb )
-          call exchange3d_mpi( kh_mean, im, jm, kb )
-          call exchange3d_mpi( km_mean, im, jm, kb )
-          call exchange3d_mpi( aam_mean, im, jm, kb )
+          call exchange3d_mpi( u_mean, im, jm, km )
+          call exchange3d_mpi( v_mean, im, jm, km )
+          call exchange3d_mpi( w_mean, im, jm, km )
+          call exchange3d_mpi( t_mean, im, jm, km )
+          call exchange3d_mpi( s_mean, im, jm, km )
+          call exchange3d_mpi( rho_mean, im, jm, km )
+          call exchange3d_mpi( kh_mean, im, jm, km )
+          call exchange3d_mpi( km_mean, im, jm, km )
+          call exchange3d_mpi( aam_mean, im, jm, km )
 
 
           if ( output_flag == 1 ) then
@@ -260,9 +261,9 @@
       use air        , only: wusurf, wvsurf
       use config     , only: netcdf_file
       use glob_const , only: rk
-      use glob_domain, only: im, jm, kb
+      use glob_domain, only: im, jm, km
       use glob_ocean , only: aam, aam2d, advua, advva, adx2d, ady2d
-     &                     , egb, el, elb, et, etb, kh, km, kq, l
+     &                     , egb, el, elb, et, etb, kh, kmt, kq, l
      &                     , q2, q2b, q2l, q2lb, rho, s, sb, t, tb
      &                     , u, ua, uab, ub, utb, v, va, vab, vb, vtb
      &                     , w, wubot, wvbot
@@ -276,7 +277,7 @@
 
 !lyo:exp302:The following changes will create a restart 1day after the
 !     initial date_start0 to be used for next-day's ncast&fcast
-      real(kind=rk), parameter :: write_rst1d = 1.0
+      real(rk), parameter :: write_rst1d = 1.0
       integer irestart1d, ncount ! each run for next-day
       data ncount/0/             ! fcast
 
@@ -294,8 +295,8 @@
         call exchange2d_mpi(advva,im,jm)
         call exchange2d_mpi(adx2d,im,jm)
         call exchange2d_mpi(ady2d,im,jm)
-        call exchange2d_mpi(utb,im,jm)
-        call exchange2d_mpi(vtb,im,jm)
+        call exchange2d_mpi(utb  ,im,jm)
+        call exchange2d_mpi(vtb  ,im,jm)
 !        call exchange2d_mpi(q2(:,:,1),im,jm)
 !        call exchange2d_mpi(q2(:,:,kb),im,jm)
 !        call exchange2d_mpi(q2b(:,:,1),im,jm)
@@ -315,38 +316,38 @@
 
         call exchange2d_mpi(wusurf,im,jm)
         call exchange2d_mpi(wvsurf,im,jm)
-        call exchange2d_mpi(wubot,im,jm)
-        call exchange2d_mpi(wvbot,im,jm)
-        call exchange2d_mpi(aam2d,im,jm)
-        call exchange2d_mpi(ua,im,jm)
-        call exchange2d_mpi(uab,im,jm)
-        call exchange2d_mpi(va,im,jm)
-        call exchange2d_mpi(vab,im,jm)
-        call exchange2d_mpi(el,im,jm)
-        call exchange2d_mpi(elb,im,jm)
-        call exchange2d_mpi(et,im,jm)
-        call exchange2d_mpi(etb,im,jm)
-        call exchange2d_mpi(egb,im,jm)
+        call exchange2d_mpi(wubot ,im,jm)
+        call exchange2d_mpi(wvbot ,im,jm)
+        call exchange2d_mpi(aam2d ,im,jm)
+        call exchange2d_mpi(ua    ,im,jm)
+        call exchange2d_mpi(uab   ,im,jm)
+        call exchange2d_mpi(va    ,im,jm)
+        call exchange2d_mpi(vab   ,im,jm)
+        call exchange2d_mpi(el    ,im,jm)
+        call exchange2d_mpi(elb   ,im,jm)
+        call exchange2d_mpi(et    ,im,jm)
+        call exchange2d_mpi(etb   ,im,jm)
+        call exchange2d_mpi(egb   ,im,jm)
 
-        call exchange3d_mpi(u,im,jm,kb)
-        call exchange3d_mpi(v,im,jm,kb)
-        call exchange3d_mpi(ub,im,jm,kb)
-        call exchange3d_mpi(vb,im,jm,kb)
-        call exchange3d_mpi(w,im,jm,kb)
-        call exchange3d_mpi(t,im,jm,kb)
-        call exchange3d_mpi(tb,im,jm,kb)
-        call exchange3d_mpi(s,im,jm,kb)
-        call exchange3d_mpi(sb,im,jm,kb)
-        call exchange3d_mpi(rho,im,jm,kb)
-        call exchange3d_mpi(km,im,jm,kb)
-        call exchange3d_mpi(kh,im,jm,kb)
-        call exchange3d_mpi(kq,im,jm,kb)
-        call exchange3d_mpi(l,im,jm,kb)
-        call exchange3d_mpi(q2,im,jm,kb)
-        call exchange3d_mpi(q2b,im,jm,kb)
-        call exchange3d_mpi(aam,im,jm,kb)
-        call exchange3d_mpi(q2l,im,jm,kb)
-        call exchange3d_mpi(q2lb,im,jm,kb)
+        call exchange3d_mpi(u   ,im,jm,km)
+        call exchange3d_mpi(v   ,im,jm,km)
+        call exchange3d_mpi(ub  ,im,jm,km)
+        call exchange3d_mpi(vb  ,im,jm,km)
+        call exchange3d_mpi(w   ,im,jm,km)
+        call exchange3d_mpi(t   ,im,jm,km)
+        call exchange3d_mpi(tb  ,im,jm,km)
+        call exchange3d_mpi(s   ,im,jm,km)
+        call exchange3d_mpi(sb  ,im,jm,km)
+        call exchange3d_mpi(rho ,im,jm,km)
+        call exchange3d_mpi(kmt ,im,jm,km)
+        call exchange3d_mpi(kh  ,im,jm,km)
+        call exchange3d_mpi(kq  ,im,jm,km)
+        call exchange3d_mpi(l   ,im,jm,km)
+        call exchange3d_mpi(q2  ,im,jm,km)
+        call exchange3d_mpi(q2b ,im,jm,km)
+        call exchange3d_mpi(aam ,im,jm,km)
+        call exchange3d_mpi(q2l ,im,jm,km)
+        call exchange3d_mpi(q2lb,im,jm,km)
 
 
         call create_restart(
@@ -370,8 +371,8 @@
 
         implicit none
 
-        character(len=*), intent(in) :: msg, desc
-        integer         , intent(in) :: status
+        character(*), intent(in) :: msg, desc
+        integer     , intent(in) :: status
 
         integer                 , parameter :: line_len = 56
         integer(2), dimension(6), parameter :: chr =
@@ -426,3 +427,200 @@
 
 
       end subroutine
+!______________________________________________________________________
+      subroutine out_debug( out_file )
+
+        use config
+        use glob_domain
+        use glob_ocean
+        use glob_out
+        use model_run
+        use module_time
+        use io
+        use mpi        , only: MPI_OFFSET_KIND
+        use pnetcdf    , only: NF90_FLOAT, NF90_BYTE
+
+        implicit none
+
+        character(*), intent(in) :: out_file
+
+
+        character(len=120) str_tmp!, netcdf_out_file
+        integer time_dimid, x_dimid, y_dimid, z_dimid
+        integer file_id, varid, status
+
+        integer(MPI_OFFSET_KIND), dimension(4) :: start, edge
+
+
+!     create file
+        if ( is_master )
+     &    call msg_print("", 6, "Creating `"//trim(out_file)//"`")
+
+        file_id = file_create( out_file )
+
+! define global attributes
+        call att_write( file_id, -1, 'title'      , trim(title)   )
+        call att_write( file_id, -1, 'description', 'Output file' )
+
+! define dimensions
+        time_dimid = dim_define( file_id, 'time',         0 )
+        z_dimid    = dim_define( file_id, 'z'   ,        km )
+        y_dimid    = dim_define( file_id, 'y'   , jm_global )
+        x_dimid    = dim_define( file_id, 'x'   , im_global )
+
+! define variables and their attributes
+        str_tmp  = 'days since '//time_start
+        varid = var_define( file_id, 'time'
+     &                    , NF90_FLOAT, [ time_dimid ]
+     &                    , 'time'
+     &                    , "days since "//time_start
+     &                    , -1, 0., '' )
+
+        varid = var_define( file_id, 'z'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'sigma of cell face'
+     &                    , 'sigma_level'
+     &                    , -1, 0., '' )
+        call att_write( file_id, varid
+     &                    , 'standard_name'
+     &                    , 'ocean_sigma_coordinate' )
+        call att_write( file_id, varid
+     &                    , 'formula_terms'
+     &                    , 'sigma: z eta: elb depth: h' )
+
+        varid = var_define( file_id, 'zz'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'sigma of cell centre'
+     &                    , 'sigma_level'
+     &                    , -1, 0., '' )
+        call att_write( file_id, varid
+     &                    , 'standard_name'
+     &                    , 'ocean_sigma_coordinate' )
+        call att_write( file_id, varid
+     &                    , 'formula_terms'
+     &                    , 'sigma: zz eta: elb depth: h' )
+
+        varid = var_define( file_id, 'fluxua'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'fluxua'
+     &                    , ''
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'fluxva'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'fluxva'
+     &                    , ''
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'elb'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'elb'
+     &                    , ''
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'elf'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'elf'
+     &                    , ''
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'vfluxf'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'vfluxf'
+     &                    , ''
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'advua'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'advua'
+     &                    , ''
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'advva'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'advva'
+     &                    , ''
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'adx2d'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'adx2d'
+     &                    , ''
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'ady2d'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'ady2d'
+     &                    , ''
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'uaf'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , ''
+     &                    , ''
+     &                    , -1, 0., 'east_e north_e' )
+        varid = var_define( file_id, 'vaf'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , ''
+     &                    , ''
+     &                    , -1, 0., 'east_u north_u' )
+        varid = var_define( file_id, 'drx2d'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'drx2d'
+     &                    , ''
+     &                    , -1, 0., 'east_v north_v' )
+        varid = var_define( file_id, 'dry2d'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid ]
+     &                    , 'dry2d'
+     &                    , ''
+     &                    , -1, 0., 'east_v north_v' )
+
+        varid = var_define( file_id, 'aam'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'aam'
+     &                    , ''
+     &                    , -1, 0., 'east_v north_v zz' )
+        varid = var_define( file_id, 'drhox'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'drhox'
+     &                    , ''
+     &                    , -1, 0., 'east_v north_v zz' )
+        varid = var_define( file_id, 'drhoy'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'drhoy'
+     &                    , ''
+     &                    , -1, 0., 'east_v north_v zz' )
+        varid = var_define( file_id, 'u'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'u'
+     &                    , ''
+     &                    , -1, 0., 'east_v north_v zz' )
+        varid = var_define( file_id, 'v'
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
+     &                    , 'v'
+     &                    , ''
+     &                    , -1, 0., 'east_v north_v zz' )
+
+! end definitions
+        call file_end_definition( file_id )
+
+! write static data
+        start = [ i_global(1), j_global(1), 1, 1 ]
+        edge  = [  im        , jm         , 1, 1 ]
+        call var_write( file_id, "fluxua" , fluxua , start, edge )
+        call var_write( file_id, "fluxva" , fluxva , start, edge )
+        call var_write( file_id, "elb"    , elb    , start, edge )
+        call var_write( file_id, "elf"    , elf    , start, edge )
+!        call var_write( file_id, "vfluxf" , vfluxf , start, edge )
+        call var_write( file_id, "advua"  , advua  , start, edge )
+        call var_write( file_id, "advva"  , advva  , start, edge )
+        call var_write( file_id, "adx2d"  , adx2d  , start, edge )
+        call var_write( file_id, "ady2d"  , ady2d  , start, edge )
+        call var_write( file_id, "uaf"    , uaf    , start, edge )
+        call var_write( file_id, "vaf"    , uaf    , start, edge )
+        call var_write( file_id, "drx2d"  , drx2d  , start, edge )
+        call var_write( file_id, "dry2d"  , dry2d  , start, edge )
+
+        edge(3) = km
+
+        call var_write( file_id, "aam"  , aam  , start, edge )
+        call var_write( file_id, "drhox", drhox, start, edge )
+        call var_write( file_id, "drhoy", drhoy, start, edge )
+        call var_write( file_id, "u"    , u    , start, edge )
+        call var_write( file_id, "v"    , v    , start, edge )
+
+        file_id = file_close( file_id )
+
+      end !subroutine output_results
+!

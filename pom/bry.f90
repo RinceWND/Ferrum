@@ -13,7 +13,7 @@
 module bry
 
   use config     , only: PATH_LEN, rk, VAR_LEN ! SO... If a module uses some other module's variable, another module can access the variable through this "medium" module?
-  use glob_domain, only: im, imm1, imm2, jm, jmm1, jmm2, kb, kbm1
+  use glob_domain, only: im, imm1, imm2, jm, jmm1, jmm2, km, kmm1
 
   implicit none
 
@@ -241,10 +241,10 @@ module bry
           el_bry%est(NFE,jm)    &
         , ua_bry%est(NFE,jm)    &
         , va_bry%est(NFE,jm)    &
-        , S_bry%est(NFE,jm,kb)  &
-        , T_bry%est(NFE,jm,kb)  &
-        , U_bry%est(NFE,jm,kb)  &
-        , V_bry%est(NFE,jm,kb)  &
+        , S_bry%est(NFE,jm,km)  &
+        , T_bry%est(NFE,jm,km)  &
+        , U_bry%est(NFE,jm,km)  &
+        , V_bry%est(NFE,jm,km)  &
          )
         el_bry % est = 0.
         ua_bry % est = 0.
@@ -258,10 +258,10 @@ module bry
             el_int%est(NFE,jm,2:N+1)    &
           , ua_int%est(NFE,jm,2:N+1)    &
           , va_int%est(NFE,jm,2:N+1)    &
-          , S_int%est(NFE,jm,kb,2:N+1)  &
-          , T_int%est(NFE,jm,kb,2:N+1)  &
-          , U_int%est(NFE,jm,kb,2:N+1)  &
-          , V_int%est(NFE,jm,kb,2:N+1)  &
+          , S_int%est(NFE,jm,km,2:N+1)  &
+          , T_int%est(NFE,jm,km,2:N+1)  &
+          , U_int%est(NFE,jm,km,2:N+1)  &
+          , V_int%est(NFE,jm,km,2:N+1)  &
            )
           el_int % est = 0.
           ua_int % est = 0.
@@ -278,10 +278,10 @@ module bry
           el_bry%nth(im,NFN)    &
         , ua_bry%nth(im,NFN)    &
         , va_bry%nth(im,NFN)    &
-        , S_bry%nth(im,NFN,kb)  &
-        , T_bry%nth(im,NFN,kb)  &
-        , U_bry%nth(im,NFN,kb)  &
-        , V_bry%nth(im,NFN,kb)  &
+        , S_bry%nth(im,NFN,km)  &
+        , T_bry%nth(im,NFN,km)  &
+        , U_bry%nth(im,NFN,km)  &
+        , V_bry%nth(im,NFN,km)  &
          )
         el_bry % nth = 0.
         ua_bry % nth = 0.
@@ -295,10 +295,10 @@ module bry
             el_int%nth(im,NFN,2:N+1)    &
           , ua_int%nth(im,NFN,2:N+1)    &
           , va_int%nth(im,NFN,2:N+1)    &
-          , S_int%nth(im,NFN,kb,2:N+1)  &
-          , T_int%nth(im,NFN,kb,2:N+1)  &
-          , U_int%nth(im,NFN,kb,2:N+1)  &
-          , V_int%nth(im,NFN,kb,2:N+1)  &
+          , S_int%nth(im,NFN,km,2:N+1)  &
+          , T_int%nth(im,NFN,km,2:N+1)  &
+          , U_int%nth(im,NFN,km,2:N+1)  &
+          , V_int%nth(im,NFN,km,2:N+1)  &
            )
           el_int % nth = 0.
           ua_int % nth = 0.
@@ -315,10 +315,10 @@ module bry
           el_bry%sth(im,NFS)    &
         , ua_bry%sth(im,NFS)    &
         , va_bry%sth(im,NFS)    &
-        , S_bry%sth(im,NFS,kb)  &
-        , T_bry%sth(im,NFS,kb)  &
-        , U_bry%sth(im,NFS,kb)  &
-        , V_bry%sth(im,NFS,kb)  &
+        , S_bry%sth(im,NFS,km)  &
+        , T_bry%sth(im,NFS,km)  &
+        , U_bry%sth(im,NFS,km)  &
+        , V_bry%sth(im,NFS,km)  &
          )
         el_bry % sth = 0.
         ua_bry % sth = 0.
@@ -332,10 +332,10 @@ module bry
             el_int%sth(im,NFS,2:N+1)    &
           , ua_int%sth(im,NFS,2:N+1)    &
           , va_int%sth(im,NFS,2:N+1)    &
-          , S_int%sth(im,NFS,kb,2:N+1)  &
-          , T_int%sth(im,NFS,kb,2:N+1)  &
-          , U_int%sth(im,NFS,kb,2:N+1)  &
-          , V_int%sth(im,NFS,kb,2:N+1)  &
+          , S_int%sth(im,NFS,km,2:N+1)  &
+          , T_int%sth(im,NFS,km,2:N+1)  &
+          , U_int%sth(im,NFS,km,2:N+1)  &
+          , V_int%sth(im,NFS,km,2:N+1)  &
            )
           el_int % sth = 0.
           ua_int % sth = 0.
@@ -352,10 +352,10 @@ module bry
           el_bry%wst(NFW,jm)    &
         , ua_bry%wst(NFW,jm)    &
         , va_bry%wst(NFW,jm)    &
-        , S_bry%wst(NFW,jm,kb)  &
-        , T_bry%wst(NFW,jm,kb)  &
-        , U_bry%wst(NFW,jm,kb)  &
-        , V_bry%wst(NFW,jm,kb)  &
+        , S_bry%wst(NFW,jm,km)  &
+        , T_bry%wst(NFW,jm,km)  &
+        , U_bry%wst(NFW,jm,km)  &
+        , V_bry%wst(NFW,jm,km)  &
          )
         el_bry % wst = 0.
         ua_bry % wst = 0.
@@ -369,10 +369,10 @@ module bry
             el_int%wst(NFW,jm,2:N+1)    &
           , ua_int%wst(NFW,jm,2:N+1)    &
           , va_int%wst(NFW,jm,2:N+1)    &
-          , S_int%wst(NFW,jm,kb,2:N+1)  &
-          , T_int%wst(NFW,jm,kb,2:N+1)  &
-          , U_int%wst(NFW,jm,kb,2:N+1)  &
-          , V_int%wst(NFW,jm,kb,2:N+1)  &
+          , S_int%wst(NFW,jm,km,2:N+1)  &
+          , T_int%wst(NFW,jm,km,2:N+1)  &
+          , U_int%wst(NFW,jm,km,2:N+1)  &
+          , V_int%wst(NFW,jm,km,2:N+1)  &
            )
           el_int % wst = 0.
           ua_int % wst = 0.
@@ -1356,7 +1356,8 @@ module bry
 !  Vertically integrates baroclinic boundary values
 !______________________________________________________________________
 !
-      use grid, only: dz
+      use grid      , only: dz, h
+      use glob_ocean, only: et
 
       implicit none
 
@@ -1365,7 +1366,7 @@ module bry
 
         UA_bry % EST = 0.
         VA_bry % EST = 0.
-        do k = 1, kbm1
+        do k = 1, kmm1
           UA_bry % EST = UA_bry % EST             &
                        +  U_bry % EST(1:NFE,:,k)  &
                         * dz(im:im-NFE+1:-1,:,k)
@@ -1373,6 +1374,8 @@ module bry
                        +  V_bry % EST(1:NFE,:,k)  &
                         * dz(im:im-NFE+1:-1,:,k)
         end do
+        UA_bry % EST = UA_bry % EST / ( h + et )
+        VA_bry % EST = VA_bry % EST / ( h + et )
 
       end if
 
@@ -1380,7 +1383,7 @@ module bry
 
         UA_bry % NTH = 0.
         VA_bry % NTH = 0.
-        do k = 1, kbm1
+        do k = 1, kmm1
           UA_bry % NTH = UA_bry % NTH             &
                        +  U_bry % NTH(:,1:NFN,k)  &
                         * dz(:,jm:jm-NFN+1:-1,k)
@@ -1388,6 +1391,8 @@ module bry
                        +  V_bry % NTH(:,1:NFN,k)  &
                         * dz(:,jm:jm-NFN+1:-1,k)
         end do
+        UA_bry % NTH = UA_bry % NTH / ( h + et )
+        VA_bry % NTH = VA_bry % NTH / ( h + et )
 
       end if
 
@@ -1395,7 +1400,7 @@ module bry
 
         UA_bry % STH = 0.
         VA_bry % STH = 0.
-        do k = 1, kbm1
+        do k = 1, kmm1
           UA_bry % STH = UA_bry % STH             &
                        +  U_bry % STH(:,1:NFS,k)  &
                         * dz(:,1:NFS,k)
@@ -1403,6 +1408,8 @@ module bry
                        +  V_bry % STH(:,1:NFS,k)  &
                         * dz(:,1:NFS,k)
         end do
+        UA_bry % STH = UA_bry % STH / ( h + et )
+        VA_bry % STH = VA_bry % STH / ( h + et )
 
       end if
 
@@ -1410,7 +1417,7 @@ module bry
 
         UA_bry % WST = 0.
         VA_bry % WST = 0.
-        do k = 1, kbm1
+        do k = 1, kmm1
           UA_bry % WST = UA_bry % WST             &
                        +  U_bry % WST(1:NFW,:,k)  &
                         * dz(1:NFW,:,k)
@@ -1418,6 +1425,8 @@ module bry
                        +  V_bry % WST(1:NFW,:,k)  &
                         * dz(1:NFW,:,k)
         end do
+        UA_bry % WST = UA_bry % WST / ( h + et )
+        VA_bry % WST = VA_bry % WST / ( h + et )
 
       end if
 
@@ -1472,7 +1481,7 @@ module bry
           start(4) = record(n)
           edge(1) = NFE
           edge(2) = jm
-          edge(3) = kb
+          edge(3) = km
           edge(4) = 1
         else
           start(1) = j_global(1)
@@ -1480,7 +1489,7 @@ module bry
           start(3) = record(n)
           start(4) = 1
           edge(1)   = jm
-          edge(2)   = kb
+          edge(2)   = km
           edge(3:4) = 1
         end if
 ! Temperature
@@ -1598,7 +1607,7 @@ module bry
           start(4) = record(n)
           edge(1) = im
           edge(2) = NFN
-          edge(3) = kb
+          edge(3) = km
           edge(4) = 1
         else
           start(1) = i_global(1)
@@ -1606,7 +1615,7 @@ module bry
           start(3) = record(n)
           start(4) = 1
           edge(1)   = im
-          edge(2)   = kb
+          edge(2)   = km
           edge(3:4) = 1
         end if
 ! Temperature
@@ -1723,7 +1732,7 @@ module bry
           start(4) = record(n)
           edge(1) = im
           edge(2) = NFS
-          edge(3) = kb
+          edge(3) = km
           edge(4) = 1
         else
           start(1) = i_global(1)
@@ -1731,7 +1740,7 @@ module bry
           start(3) = record(n)
           start(4) = 1
           edge(1)   = im
-          edge(2)   = kb
+          edge(2)   = km
           edge(3:4) = 1
         end if
 ! Temperature
@@ -1848,7 +1857,7 @@ module bry
           start(4) = record(n)
           edge(1) = NFW
           edge(2) = jm
-          edge(3) = kb
+          edge(3) = km
           edge(4) = 1
         else
           start(1) = j_global(1)
@@ -1856,7 +1865,7 @@ module bry
           start(3) = record(n)
           start(4) = 1
           edge(1)   = jm
-          edge(2)   = kb
+          edge(2)   = km
           edge(3:4) = 1
         end if
 ! Temperature
@@ -2805,13 +2814,13 @@ module bry
 
         call xperi2d_mpi(wubot,im,jm)
         call xperi2d_mpi(wvbot,im,jm)
-        call xperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-        call xperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+        call xperi3d_mpi(uf(:,:,1:kmm1),im,jm,kmm1)
+        call xperi3d_mpi(vf(:,:,1:kmm1),im,jm,kmm1)
 
         if ( hasNORTH ) then
           if ( BC % VEL3D % TANG % NORTH == bc0GRADIENT ) then
             wubot(:,jm) = wubot(:,jmm1)
-            do k=1,kbm1
+            do k=1,kmm1
               uf(:,jm,k) = uf(:,jmm1,k)
             end do
           end if
@@ -2819,7 +2828,7 @@ module bry
         if ( hasSOUTH ) then
           if ( BC % VEL3D % TANG % SOUTH == bc0GRADIENT ) then
             wubot(:,1) = wubot(:,2)
-            do k=1,kbm1
+            do k=1,kmm1
               uf(:,1,k) = uf(:,2,k)
             end do
           end if
@@ -2832,18 +2841,18 @@ module bry
           select case ( BC % VEL3D % NORM % EAST )
 
             case ( bc0GRADIENT )
-              uf(im,2:jmm1,1:kbm1) = u(imm1,2:jmm1,1:kbm1)
+              uf(im,2:jmm1,1:kmm1) = u(imm1,2:jmm1,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              uf(im,2:jmm1,1:kbm1) = ( u(imm1,1:jmm2,1:kbm1)       &
-                                     + u(imm1,2:jmm1,1:kbm1)       &
-                                     + u(imm1,3:jm  ,1:kbm1) )/3.
+              uf(im,2:jmm1,1:kmm1) = ( u(imm1,1:jmm2,1:kmm1)       &
+                                     + u(imm1,2:jmm1,1:kmm1)       &
+                                     + u(imm1,3:jm  ,1:kmm1) )/3.
 
             case ( bcCLAMPED )
-              uf(im,2:jmm1,1:kbm1) = U_bry%EST(1,2:jmm1,1:kbm1)
+              uf(im,2:jmm1,1:kmm1) = U_bry%EST(1,2:jmm1,1:kmm1)
 
             case ( bcRADIATION )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jmm1
                   cff = sqrt( d(im,j) / hmax )
                   uf(im,j,k) = .25 * (     cff  * ( u(imm1,j-1,k)     &
@@ -2854,7 +2863,7 @@ module bry
               end do
 
             case ( bcORLANSKI )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jmm1
                   cff = uf(im-1,j,k) + ub(im-1,j,k) - 2.*u(im-2,j,k)
                   if ( abs(cff) < .01 ) cff = sign(.01_rk,cff)
@@ -2868,7 +2877,7 @@ module bry
               end do
 
               case ( bcRADIATION_ENH )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jm
                   grdy(1,j) = u(imm1,j,k)-u(imm1,j-1,k)
                   grdy(2,j) = u(im  ,j,k)-u(im  ,j-1,k)
@@ -2900,18 +2909,18 @@ module bry
           select case ( BC % VEL3D % TANG % EAST )
 
             case ( bc0GRADIENT )
-              vf(im,2:jmm1,1:kbm1) = v(imm1,2:jmm1,1:kbm1)
+              vf(im,2:jmm1,1:kmm1) = v(imm1,2:jmm1,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              vf(im,2:jmm1,1:kbm1) = ( v(imm1,1:jmm2,1:kbm1)       &
-                                     + v(imm1,2:jmm1,1:kbm1)       &
-                                     + v(imm1,3:jm  ,1:kbm1) )/3.
+              vf(im,2:jmm1,1:kmm1) = ( v(imm1,1:jmm2,1:kmm1)       &
+                                     + v(imm1,2:jmm1,1:kmm1)       &
+                                     + v(imm1,3:jm  ,1:kmm1) )/3.
 
             case ( bcCLAMPED )
-              vf(im,2:jmm1,1:kbm1) = V_bry%EST(1,2:jmm1,1:kbm1)
+              vf(im,2:jmm1,1:kmm1) = V_bry%EST(1,2:jmm1,1:kmm1)
 
             case ( bcRADIATION ) ! NOT CORRECT!
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jmm1
                   cff = sqrt( h(im,j) / hmax )
                   vf(im,j,k) = .25 * (     cff  * ( v(imm1,j-1,k)     &
@@ -2922,7 +2931,7 @@ module bry
               end do
 
             case ( bcRADIATION_ENH )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 1,jmm1
                   grdy(1,j) = v(imm1,j+1,k)-v(imm1,j,k)
                   grdy(2,j) = v(im  ,j+1,k)-v(im  ,j,k)
@@ -2952,10 +2961,10 @@ module bry
           end select
 
           if ( NUDGE_INTERIOR ) then
-            uf(imm1,:,1:kbm1) = uf(imm1,:,1:kbm1)  &
-                              - tau*( uf(imm1,:,1:kbm1) - U_bry%EST(1,:,1:kbm1) )
-            vf(imm1,:,1:kbm1) = vf(imm1,:,1:kbm1)  &
-                              - tau*( vf(imm1,:,1:kbm1) - V_bry%EST(1,:,1:kbm1) )
+            uf(imm1,:,1:kmm1) = uf(imm1,:,1:kmm1)  &
+                              - tau*( uf(imm1,:,1:kmm1) - U_bry%EST(1,:,1:kmm1) )
+            vf(imm1,:,1:kmm1) = vf(imm1,:,1:kmm1)  &
+                              - tau*( vf(imm1,:,1:kmm1) - V_bry%EST(1,:,1:kmm1) )
           end if
 
         end if
@@ -2966,18 +2975,18 @@ module bry
           select case ( BC % VEL3D % NORM % WEST )
 
             case ( bc0GRADIENT )
-              uf(2,2:jmm1,1:kbm1) = u(3,2:jmm1,1:kbm1)
+              uf(2,2:jmm1,1:kmm1) = u(3,2:jmm1,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              uf(2,2:jmm1,1:kbm1) = ( u(2,1:jmm2,1:kbm1)       &
-                                    + u(2,2:jmm1,1:kbm1)       &
-                                    + u(2,3:jm  ,1:kbm1) )/3.
+              uf(2,2:jmm1,1:kmm1) = ( u(2,1:jmm2,1:kmm1)       &
+                                    + u(2,2:jmm1,1:kmm1)       &
+                                    + u(2,3:jm  ,1:kmm1) )/3.
 
             case ( bcCLAMPED )
-              uf(2,2:jmm1,1:kbm1) = U_bry%WST(1,2:jmm1,1:kbm1)
+              uf(2,2:jmm1,1:kmm1) = U_bry%WST(1,2:jmm1,1:kmm1)
 
             case ( bcRADIATION )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jmm1
                   cff = sqrt( d(1,j) / hmax )
                   uf(2,j,k) = .25 * (     cff  * ( u(3,j-1,k)     &
@@ -2988,7 +2997,7 @@ module bry
               end do
 
             case ( bcORLANSKI )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jmm1
                   cff = uf(3,j,k) + ub(3,j,k) - 2.*u(4,j,k)
                   if ( abs(cff) < .01 ) cff = sign(.01_rk,cff)
@@ -3002,7 +3011,7 @@ module bry
               end do
 
             case ( bcRADIATION_ENH )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jm
                   grdy(1,j) = u(2,j,k)-u(2,j-1,k)
                   grdy(2,j) = u(3,j,k)-u(3,j-1,k)
@@ -3036,18 +3045,18 @@ module bry
           select case ( BC % VEL3D % TANG % WEST )
 
             case ( bc0GRADIENT )
-              vf(1,2:jmm1,1:kbm1) = v(2,2:jmm1,1:kbm1)
+              vf(1,2:jmm1,1:kmm1) = v(2,2:jmm1,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              vf(1,2:jmm1,1:kbm1) = ( v(2,1:jmm2,1:kbm1)       &
-                                    + v(2,2:jmm1,1:kbm1)       &
-                                    + v(2,3:jm  ,1:kbm1) )/3.
+              vf(1,2:jmm1,1:kmm1) = ( v(2,1:jmm2,1:kmm1)       &
+                                    + v(2,2:jmm1,1:kmm1)       &
+                                    + v(2,3:jm  ,1:kmm1) )/3.
 
             case ( bcCLAMPED )
-              vf(1,2:jmm1,1:kbm1) = V_bry%WST(1,2:jmm1,1:kbm1)
+              vf(1,2:jmm1,1:kmm1) = V_bry%WST(1,2:jmm1,1:kmm1)
 
             case ( bcRADIATION )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jmm1
                   cff = sqrt( h(1,j) / hmax )
                   vf(1,j,k) = .25 * (     cff  * ( v(2,j-1,k)     &
@@ -3058,7 +3067,7 @@ module bry
               end do
 
             case ( bcRADIATION_ENH )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 1,jmm1
                   grdy(1,j) = v(1,j+1,k)-v(1,j,k)
                   grdy(2,j) = v(2,j+1,k)-v(2,j,k)
@@ -3088,10 +3097,10 @@ module bry
           end select
 
           if ( NUDGE_INTERIOR ) then
-            uf(3,:,1:kbm1) = uf(3,:,1:kbm1)  &
-                           - tau*( uf(3,:,1:kbm1) - U_bry%WST(1,:,1:kbm1) )
-            vf(2,:,1:kbm1) = vf(2,:,1:kbm1)  &
-                           - tau*( vf(2,:,1:kbm1) - V_bry%WST(1,:,1:kbm1) )
+            uf(3,:,1:kmm1) = uf(3,:,1:kmm1)  &
+                           - tau*( uf(3,:,1:kmm1) - U_bry%WST(1,:,1:kmm1) )
+            vf(2,:,1:kmm1) = vf(2,:,1:kmm1)  &
+                           - tau*( vf(2,:,1:kmm1) - V_bry%WST(1,:,1:kmm1) )
           end if
 
         end if
@@ -3103,13 +3112,13 @@ module bry
 
         call yperi2d_mpi(wubot,im,jm)
         call yperi2d_mpi(wvbot,im,jm)
-        call yperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-        call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+        call yperi3d_mpi(uf(:,:,1:kmm1),im,jm,kmm1)
+        call yperi3d_mpi(vf(:,:,1:kmm1),im,jm,kmm1)
 
         if ( hasEAST ) then
           if ( BC % VEL3D % TANG % EAST == bc0GRADIENT ) then
             wvbot(im,:) = wvbot(imm1,:)
-            do k=1,kbm1
+            do k=1,kmm1
               vf(im,:,k) = vf(imm1,:,k)
             end do
           end if
@@ -3117,7 +3126,7 @@ module bry
         if ( hasWEST ) then
           if ( BC % VEL3D % TANG % WEST == bc0GRADIENT ) then
             wvbot(1,:) = wvbot(2,:)
-            do k=1,kbm1
+            do k=1,kmm1
               vf(1,:,k) = vf(2,:,k)
             end do
           end if
@@ -3130,18 +3139,18 @@ module bry
           select case ( BC % VEL3D % NORM % NORTH )
 
             case ( bc0GRADIENT )
-              vf(2:imm1,jm,1:kbm1) = v(2:imm1,jmm1,1:kbm1)
+              vf(2:imm1,jm,1:kmm1) = v(2:imm1,jmm1,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              vf(2:imm1,jm,1:kbm1) = ( v(1:imm2,jmm1,1:kbm1)       &
-                                     + v(2:imm1,jmm1,1:kbm1)       &
-                                     + v(3:im  ,jmm1,1:kbm1) )/3.
+              vf(2:imm1,jm,1:kmm1) = ( v(1:imm2,jmm1,1:kmm1)       &
+                                     + v(2:imm1,jmm1,1:kmm1)       &
+                                     + v(3:im  ,jmm1,1:kmm1) )/3.
 
             case ( bcCLAMPED )
-              vf(2:imm1,jm,1:kbm1) = V_bry%NTH(2:imm1,1,1:kbm1)
+              vf(2:imm1,jm,1:kmm1) = V_bry%NTH(2:imm1,1,1:kmm1)
 
             case ( bcRADIATION )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,imm1
                   cff = sqrt( d(i,jm) / hmax )
                   vf(i,jm,k) = .25 * (     cff  * ( v(i-1,jmm1,k)     &
@@ -3152,7 +3161,7 @@ module bry
               end do
 
             case ( bcORLANSKI )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,imm1
                   cff = vf(i,jm-1,k) + vb(i,jm-1,k) - 2.*v(i,jm-2,k)
                   if ( abs(cff) < .01 ) cff = sign(.01_rk,cff)
@@ -3166,7 +3175,7 @@ module bry
               end do
 
             case ( bcRADIATION_ENH )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,im
                   grdx(i,1) = v(i,jmm1,k)-v(i-1,jmm1,k)
                   grdx(i,2) = v(i,jm  ,k)-v(i-1,jm  ,k)
@@ -3198,18 +3207,18 @@ module bry
           select case ( BC % VEL3D % TANG % NORTH )
 
             case ( bc0GRADIENT )
-              uf(2:imm1,jm,1:kbm1) = u(2:imm1,jmm1,1:kbm1)
+              uf(2:imm1,jm,1:kmm1) = u(2:imm1,jmm1,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              uf(2:imm1,jm,1:kbm1) = ( u(1:imm2,jmm1,1:kbm1)       &
-                                     + u(2:imm1,jmm1,1:kbm1)       &
-                                     + u(3:im  ,jmm1,1:kbm1) )/3.
+              uf(2:imm1,jm,1:kmm1) = ( u(1:imm2,jmm1,1:kmm1)       &
+                                     + u(2:imm1,jmm1,1:kmm1)       &
+                                     + u(3:im  ,jmm1,1:kmm1) )/3.
 
             case ( bcCLAMPED )
-              uf(2:imm1,jm,1:kbm1) = U_bry%NTH(2:imm1,1,1:kbm1)
+              uf(2:imm1,jm,1:kmm1) = U_bry%NTH(2:imm1,1,1:kmm1)
 
             case ( bcRADIATION )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,imm1
                   cff = sqrt( h(i,jm) / hmax )
                   uf(i,jm,k) = .25 * (     cff  * ( u(i-1,jmm1,k)     &
@@ -3220,7 +3229,7 @@ module bry
               end do
 
             case ( bcRADIATION_ENH )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 1,imm1
                   grdx(i,1) = u(i+1,jmm1,k)-u(i,jmm1,k)
                   grdx(i,2) = u(i+1,jm  ,k)-u(i,jm  ,k)
@@ -3250,10 +3259,10 @@ module bry
           end select
 
           if ( NUDGE_INTERIOR ) then
-            uf(:,jmm1,1:kbm1) = uf(:,jmm1,1:kbm1)  &
-                              - tau*( uf(:,jmm1,1:kbm1) - U_bry%NTH(:,1,1:kbm1) )
-            vf(:,jmm1,1:kbm1) = vf(:,jmm1,1:kbm1)  &
-                              - tau*( vf(:,jmm1,1:kbm1) - V_bry%NTH(:,1,1:kbm1) )
+            uf(:,jmm1,1:kmm1) = uf(:,jmm1,1:kmm1)  &
+                              - tau*( uf(:,jmm1,1:kmm1) - U_bry%NTH(:,1,1:kmm1) )
+            vf(:,jmm1,1:kmm1) = vf(:,jmm1,1:kmm1)  &
+                              - tau*( vf(:,jmm1,1:kmm1) - V_bry%NTH(:,1,1:kmm1) )
           end if
 
         end if
@@ -3264,18 +3273,18 @@ module bry
           select case ( BC % VEL3D % NORM % SOUTH )
 
             case ( bc0GRADIENT )
-              vf(2:imm1,2,1:kbm1) = v(2:imm1,3,1:kbm1)
+              vf(2:imm1,2,1:kmm1) = v(2:imm1,3,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              vf(2:imm1,2,1:kbm1) = ( v(1:imm2,3,1:kbm1)       &
-                                    + v(2:imm1,3,1:kbm1)       &
-                                    + v(3:im  ,3,1:kbm1) )/3.
+              vf(2:imm1,2,1:kmm1) = ( v(1:imm2,3,1:kmm1)       &
+                                    + v(2:imm1,3,1:kmm1)       &
+                                    + v(3:im  ,3,1:kmm1) )/3.
 
             case ( bcCLAMPED )
-              vf(2:imm1,2,1:kbm1) = V_bry%STH(2:imm1,1,1:kbm1)
+              vf(2:imm1,2,1:kmm1) = V_bry%STH(2:imm1,1,1:kmm1)
 
             case ( bcRADIATION )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,imm1
                   cff = sqrt( d(i,1) / hmax )
                   vf(i,2,k) = .25 * (     cff  * ( v(i-1,3,k)     &
@@ -3286,7 +3295,7 @@ module bry
               end do
 
             case ( bcORLANSKI )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,imm1
                   cff = vf(i,3,k) + vb(i,3,k) - 2.*v(i,4,k)
                   if ( abs(cff) < 0.01 ) cff = sign(.01_rk,cff)
@@ -3300,7 +3309,7 @@ module bry
               end do
 
             case ( bcRADIATION_ENH )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,im
                   grdx(i,1) = v(i,2,k)-v(i-1,2,k)
                   grdx(i,2) = v(i,3,k)-v(i-1,3,k)
@@ -3334,18 +3343,18 @@ module bry
           select case ( BC % VEL3D % TANG % SOUTH )
 
             case ( bc0GRADIENT )
-              uf(2:imm1,1,1:kbm1) = u(2:imm1,2,1:kbm1)
+              uf(2:imm1,1,1:kmm1) = u(2:imm1,2,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              uf(2:imm1,1,1:kbm1) = ( u(1:imm2,2,1:kbm1)       &
-                                    + u(2:imm1,2,1:kbm1)       &
-                                    + u(3:im  ,2,1:kbm1) )/3.
+              uf(2:imm1,1,1:kmm1) = ( u(1:imm2,2,1:kmm1)       &
+                                    + u(2:imm1,2,1:kmm1)       &
+                                    + u(3:im  ,2,1:kmm1) )/3.
 
             case ( bcCLAMPED )
-              uf(2:imm1,1,1:kbm1) = U_bry%STH(2:imm1,1,1:kbm1)
+              uf(2:imm1,1,1:kmm1) = U_bry%STH(2:imm1,1,1:kmm1)
 
             case ( bcRADIATION )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,imm1
                   cff = sqrt( h(i,1) / hmax )
                   uf(i,1,k) = .25 * (     cff  * ( u(i-1,2,k)     &
@@ -3356,7 +3365,7 @@ module bry
               end do
 
             case ( bcRADIATION_ENH )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 1,imm1
                   grdx(i,1) = u(i+1,1,k)-u(i,1,k)
                   grdx(i,2) = u(i+1,2,k)-u(i,2,k)
@@ -3386,10 +3395,10 @@ module bry
           end select
 
           if ( NUDGE_INTERIOR ) then
-            uf(:,2,1:kbm1) = uf(:,2,1:kbm1)  &
-                           - tau*( uf(:,2,1:kbm1) - U_bry%STH(:,1,1:kbm1) )
-            vf(:,3,1:kbm1) = vf(:,3,1:kbm1)  &
-                           - tau*( vf(:,3,1:kbm1) - V_bry%STH(:,1,1:kbm1) )
+            uf(:,2,1:kmm1) = uf(:,2,1:kmm1)  &
+                           - tau*( uf(:,2,1:kmm1) - U_bry%STH(:,1,1:kmm1) )
+            vf(:,3,1:kmm1) = vf(:,3,1:kmm1)  &
+                           - tau*( vf(:,3,1:kmm1) - V_bry%STH(:,1,1:kmm1) )
           end if
 
         end if
@@ -3458,8 +3467,8 @@ module bry
 ! Apply periodic BC in x-dimension
       if ( periodic_bc % x ) then
 
-        call xperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-        call xperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+        call xperi3d_mpi(uf(:,:,1:kmm1),im,jm,kmm1)
+        call xperi3d_mpi(vf(:,:,1:kmm1),im,jm,kmm1)
 
       else
 ! EAST
@@ -3468,31 +3477,31 @@ module bry
           select case ( BC % TS % EAST )
 
             case ( bc0GRADIENT )
-              uf(im,:,1:kbm1) = uf(imm1,:,1:kbm1)
-              vf(im,:,1:kbm1) = vf(imm1,:,1:kbm1)
+              uf(im,:,1:kmm1) = uf(imm1,:,1:kmm1)
+              vf(im,:,1:kmm1) = vf(imm1,:,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              uf(im,2:jmm1,1:kbm1) = ( uf(imm1,1:jmm2,1:kbm1)       &
-                                     + uf(imm1,2:jmm1,1:kbm1)       &
-                                     + uf(imm1,3:jm  ,1:kbm1) )/3.
-              uf(im,1     ,1:kbm1) = ( uf(imm1,1     ,1:kbm1)       &
-                                     + uf(imm1,2     ,1:kbm1) )*.5
-              uf(im,  jm  ,1:kbm1) = ( uf(imm1,  jmm1,1:kbm1)       &
-                                     + uf(imm1,  jm  ,1:kbm1) )*.5
-              vf(im,2:jmm1,1:kbm1) = ( vf(imm1,1:jmm2,1:kbm1)       &
-                                     + vf(imm1,2:jmm1,1:kbm1)       &
-                                     + vf(imm1,3:jm  ,1:kbm1) )/3.
-              vf(im,1     ,1:kbm1) = ( vf(imm1,1     ,1:kbm1)       &
-                                     + vf(imm1,2     ,1:kbm1) )*.5
-              vf(im,  jm  ,1:kbm1) = ( vf(imm1,  jmm1,1:kbm1)       &
-                                     + vf(imm1,  jm  ,1:kbm1) )*.5
+              uf(im,2:jmm1,1:kmm1) = ( uf(imm1,1:jmm2,1:kmm1)       &
+                                     + uf(imm1,2:jmm1,1:kmm1)       &
+                                     + uf(imm1,3:jm  ,1:kmm1) )/3.
+              uf(im,1     ,1:kmm1) = ( uf(imm1,1     ,1:kmm1)       &
+                                     + uf(imm1,2     ,1:kmm1) )*.5
+              uf(im,  jm  ,1:kmm1) = ( uf(imm1,  jmm1,1:kmm1)       &
+                                     + uf(imm1,  jm  ,1:kmm1) )*.5
+              vf(im,2:jmm1,1:kmm1) = ( vf(imm1,1:jmm2,1:kmm1)       &
+                                     + vf(imm1,2:jmm1,1:kmm1)       &
+                                     + vf(imm1,3:jm  ,1:kmm1) )/3.
+              vf(im,1     ,1:kmm1) = ( vf(imm1,1     ,1:kmm1)       &
+                                     + vf(imm1,2     ,1:kmm1) )*.5
+              vf(im,  jm  ,1:kmm1) = ( vf(imm1,  jmm1,1:kmm1)       &
+                                     + vf(imm1,  jm  ,1:kmm1) )*.5
 
             case ( bcCLAMPED )
-              uf(im,:,1:kbm1) = T_bry%EST(1,:,1:kbm1)
-              vf(im,:,1:kbm1) = S_bry%EST(1,:,1:kbm1)
+              uf(im,:,1:kmm1) = T_bry%EST(1,:,1:kmm1)
+              vf(im,:,1:kmm1) = S_bry%EST(1,:,1:kmm1)
 
             case ( bcINOUTFLOW )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 1,jm
                   u1 = 2.*u(im,j,k)*dti / (dx(im,j)+dx(imm1,j))
                   if ( u1 <= 0. ) then
@@ -3505,21 +3514,21 @@ module bry
                                - u1*(t(im,j,k)-t(imm1,j,k))
                     vf(im,j,k) = s(im,j,k)                        &
                                - u1*(s(im,j,k)-s(imm1,j,k))
-!                    if ( k/=1 .and. k/=kbm1 ) then
-!                      wm = .5 * (w(imm1,j,k)+w(imm1,j,k+1))*dti   &
-!                              / ( (zz(imm1,j,k-1)-zz(imm1,j,k+1))*dt(imm1,j) )
-!                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
-!                      uf(im,j,k) = uf(im,j,k)                     &
-!                           - wm*(t(imm1,j,k-1)-t(imm1,j,k+1))
-!                      vf(im,j,k) = vf(im,j,k)                     &
-!                           - wm*(s(imm1,j,k-1)-s(imm1,j,k+1))
-!                    end if
+                    if ( k/=1 .and. k/=kmm1 ) then
+                      wm = .5 * (w(imm1,j,k)+w(imm1,j,k+1))*dti   &
+                              / ( (zz(imm1,j,k-1)-zz(imm1,j,k+1))*dt(imm1,j) )
+                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
+                      uf(im,j,k) = uf(im,j,k)                     &
+                           - wm*(t(imm1,j,k-1)-t(imm1,j,k+1))
+                      vf(im,j,k) = vf(im,j,k)                     &
+                           - wm*(s(imm1,j,k-1)-s(imm1,j,k+1))
+                    end if
                   end if
                 end do
               end do
 
               if ( NFE > 3 ) then
-                do k = 1,kbm1
+                do k = 1,kmm1
                   do j = 1,jm
                     do i = 1,NFE
                       ii = im-i+1
@@ -3533,7 +3542,7 @@ module bry
               end if
 
             case ( bcRADIATION )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jm
                   grdy(1,j) = ( t(imm1,j,k)-t(imm1,j-1,k) )*dvm(imm1,j,k)
                   grdy(2,j) = ( t(im  ,j,k)-t(im  ,j-1,k) )*dvm(im  ,j,k)
@@ -3557,7 +3566,7 @@ module bry
                 end do
               end do
 
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jm
                   grdy(1,j) = ( s(imm1,j,k)-s(imm1,j-1,k) )*dvm(imm1,j,k)
                   grdy(2,j) = ( s(im  ,j,k)-s(im  ,j-1,k) )*dvm(im  ,j,k)
@@ -3584,10 +3593,10 @@ module bry
           end select
 
           if ( NUDGE_INTERIOR ) then
-            uf(imm1,:,1:kbm1) = uf(imm1,:,1:kbm1)  &
-                              - tau*( uf(imm1,:,1:kbm1) - T_bry%EST(1,:,1:kbm1) )
-            vf(imm1,:,1:kbm1) = vf(imm1,:,1:kbm1)  &
-                              - tau*( vf(imm1,:,1:kbm1) - S_bry%EST(1,:,1:kbm1) )
+            uf(imm1,:,1:kmm1) = uf(imm1,:,1:kmm1)  &
+                              - tau*( uf(imm1,:,1:kmm1) - T_bry%EST(1,:,1:kmm1) )
+            vf(imm1,:,1:kmm1) = vf(imm1,:,1:kmm1)  &
+                              - tau*( vf(imm1,:,1:kmm1) - S_bry%EST(1,:,1:kmm1) )
           end if
 
         end if
@@ -3598,31 +3607,31 @@ module bry
           select case ( BC % TS % WEST )
 
             case ( bc0GRADIENT )
-              uf(1,:,1:kbm1) = uf(2,:,1:kbm1)
-              vf(1,:,1:kbm1) = vf(2,:,1:kbm1)
+              uf(1,:,1:kmm1) = uf(2,:,1:kmm1)
+              vf(1,:,1:kmm1) = vf(2,:,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              uf(1,2:jmm1,1:kbm1) = ( uf(2,1:jmm2,1:kbm1)       &
-                                    + uf(2,2:jmm1,1:kbm1)       &
-                                    + uf(2,3:jm  ,1:kbm1) )/3.
-              uf(1,1     ,1:kbm1) = ( uf(2,1     ,1:kbm1)       &
-                                    + uf(2,2     ,1:kbm1) )*.5
-              uf(1,  jm  ,1:kbm1) = ( uf(2,  jmm1,1:kbm1)       &
-                                    + uf(2,  jm  ,1:kbm1) )*.5
-              vf(1,2:jmm1,1:kbm1) = ( vf(2,1:jmm2,1:kbm1)       &
-                                    + vf(2,2:jmm1,1:kbm1)       &
-                                    + vf(2,3:jm  ,1:kbm1) )/3.
-              vf(1,1     ,1:kbm1) = ( vf(2,1     ,1:kbm1)       &
-                                    + vf(2,2     ,1:kbm1) )*.5
-              vf(1,  jm  ,1:kbm1) = ( vf(2,  jmm1,1:kbm1)       &
-                                    + vf(2,  jm  ,1:kbm1) )*.5
+              uf(1,2:jmm1,1:kmm1) = ( uf(2,1:jmm2,1:kmm1)       &
+                                    + uf(2,2:jmm1,1:kmm1)       &
+                                    + uf(2,3:jm  ,1:kmm1) )/3.
+              uf(1,1     ,1:kmm1) = ( uf(2,1     ,1:kmm1)       &
+                                    + uf(2,2     ,1:kmm1) )*.5
+              uf(1,  jm  ,1:kmm1) = ( uf(2,  jmm1,1:kmm1)       &
+                                    + uf(2,  jm  ,1:kmm1) )*.5
+              vf(1,2:jmm1,1:kmm1) = ( vf(2,1:jmm2,1:kmm1)       &
+                                    + vf(2,2:jmm1,1:kmm1)       &
+                                    + vf(2,3:jm  ,1:kmm1) )/3.
+              vf(1,1     ,1:kmm1) = ( vf(2,1     ,1:kmm1)       &
+                                    + vf(2,2     ,1:kmm1) )*.5
+              vf(1,  jm  ,1:kmm1) = ( vf(2,  jmm1,1:kmm1)       &
+                                    + vf(2,  jm  ,1:kmm1) )*.5
 
             case ( bcCLAMPED )
-              uf(1,:,1:kbm1) = T_bry%WST(1,:,1:kbm1)
-              vf(1,:,1:kbm1) = S_bry%WST(1,:,1:kbm1)
+              uf(1,:,1:kmm1) = T_bry%WST(1,:,1:kmm1)
+              vf(1,:,1:kmm1) = S_bry%WST(1,:,1:kmm1)
 
             case ( bcINOUTFLOW )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 1,jm
                   u1 = 2.*u(2,j,k)*dti / (dx(1,j)+dx(2,j))
                   if ( u1 >= 0. ) then
@@ -3635,21 +3644,21 @@ module bry
                               - u1*(t(2,j,k)-t(1,j,k))
                     vf(1,j,k) = s(1,j,k)                        &
                               - u1*(s(2,j,k)-s(1,j,k))
-!                    if ( k/=1 .and. k/=kbm1 ) then
-!                      wm = .5 * ( w(2,j,k)+w(2,j,k+1) )*dti     &
-!                              / ( (zz(2,j,k-1)-zz(2,j,k+1))*dt(2,j) )
-!                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
-!                      uf(1,j,k) = uf(1,j,k)                     &
-!                           - wm*(t(2,j,k-1)-t(2,j,k+1))
-!                      vf(1,j,k) = vf(1,j,k)                     &
-!                           - wm*(s(2,j,k-1)-s(2,j,k+1))
-!                    end if
+                    if ( k/=1 .and. k/=kmm1 ) then
+                      wm = .5 * ( w(2,j,k)+w(2,j,k+1) )*dti     &
+                              / ( (zz(2,j,k-1)-zz(2,j,k+1))*dt(2,j) )
+                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
+                      uf(1,j,k) = uf(1,j,k)                     &
+                           - wm*(t(2,j,k-1)-t(2,j,k+1))
+                      vf(1,j,k) = vf(1,j,k)                     &
+                           - wm*(s(2,j,k-1)-s(2,j,k+1))
+                    end if
                   end if
                 end do
               end do
 
               if ( NFW > 3 ) then
-                do k = 1,kbm1
+                do k = 1,kmm1
                   do j = 1,jm
                     do i = 1,NFW
                       uf(i,j,k) =     uf(i,j,k)*(1.-frz(i,j))  &
@@ -3662,7 +3671,7 @@ module bry
               end if
 
             case ( bcRADIATION )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jm
                   grdy(1,j) = ( t(1,j,k)-t(1,j-1,k) )*dvm(1,j,k)
                   grdy(2,j) = ( t(2,j,k)-t(2,j-1,k) )*dvm(2,j,k)
@@ -3686,7 +3695,7 @@ module bry
                 end do
               end do
 
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do j = 2,jm
                   grdy(1,j) = ( s(1,j,k)-s(1,j-1,k) )*dvm(1,j,k)
                   grdy(2,j) = ( s(2,j,k)-s(2,j-1,k) )*dvm(2,j,k)
@@ -3713,10 +3722,10 @@ module bry
           end select
 
           if ( NUDGE_INTERIOR ) then
-            uf(2,:,1:kbm1) = uf(2,:,1:kbm1)  &
-                           - tau*( uf(2,:,1:kbm1) - T_bry%WST(1,:,1:kbm1) )
-            vf(2,:,1:kbm1) = vf(2,:,1:kbm1)  &
-                           - tau*( vf(2,:,1:kbm1) - S_bry%WST(1,:,1:kbm1) )
+            uf(2,:,1:kmm1) = uf(2,:,1:kmm1)  &
+                           - tau*( uf(2,:,1:kmm1) - T_bry%WST(1,:,1:kmm1) )
+            vf(2,:,1:kmm1) = vf(2,:,1:kmm1)  &
+                           - tau*( vf(2,:,1:kmm1) - S_bry%WST(1,:,1:kmm1) )
           end if
 
         end if
@@ -3726,8 +3735,8 @@ module bry
 ! Apply periodic BC in y-dimension
       if ( periodic_bc % y ) then
 
-        call yperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-        call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
+        call yperi3d_mpi(uf(:,:,1:kmm1),im,jm,kmm1)
+        call yperi3d_mpi(vf(:,:,1:kmm1),im,jm,kmm1)
 
       else
 ! NORTH
@@ -3736,31 +3745,31 @@ module bry
           select case ( BC % TS % NORTH )
 
             case ( bc0GRADIENT )
-              uf(:,jm,1:kbm1) = uf(:,jmm1,1:kbm1)
-              vf(:,jm,1:kbm1) = vf(:,jmm1,1:kbm1)
+              uf(:,jm,1:kmm1) = uf(:,jmm1,1:kmm1)
+              vf(:,jm,1:kmm1) = vf(:,jmm1,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              uf(2:imm1,jm,1:kbm1) = ( uf(1:imm2,jmm1,1:kbm1)       &
-                                     + uf(2:imm1,jmm1,1:kbm1)       &
-                                     + uf(3:im  ,jmm1,1:kbm1) )/3.
-              uf(1     ,jm,1:kbm1) = ( uf(1     ,jmm1,1:kbm1)       &
-                                     + uf(2     ,jmm1,1:kbm1) )*.5
-              uf(  im  ,jm,1:kbm1) = ( uf(imm1  ,jmm1,1:kbm1)       &
-                                     + uf(im    ,jmm1,1:kbm1) )*.5
-              vf(2:imm1,jm,1:kbm1) = ( vf(1:imm2,jmm1,1:kbm1)       &
-                                     + vf(2:imm1,jmm1,1:kbm1)       &
-                                     + vf(3:im  ,jmm1,1:kbm1) )/3.
-              vf(1     ,jm,1:kbm1) = ( vf(1     ,jmm1,1:kbm1)       &
-                                     + vf(2     ,jmm1,1:kbm1) )*.5
-              vf(  im  ,jm,1:kbm1) = ( vf(imm1  ,jmm1,1:kbm1)       &
-                                     + vf(im    ,jmm1,1:kbm1) )*.5
+              uf(2:imm1,jm,1:kmm1) = ( uf(1:imm2,jmm1,1:kmm1)       &
+                                     + uf(2:imm1,jmm1,1:kmm1)       &
+                                     + uf(3:im  ,jmm1,1:kmm1) )/3.
+              uf(1     ,jm,1:kmm1) = ( uf(1     ,jmm1,1:kmm1)       &
+                                     + uf(2     ,jmm1,1:kmm1) )*.5
+              uf(  im  ,jm,1:kmm1) = ( uf(imm1  ,jmm1,1:kmm1)       &
+                                     + uf(im    ,jmm1,1:kmm1) )*.5
+              vf(2:imm1,jm,1:kmm1) = ( vf(1:imm2,jmm1,1:kmm1)       &
+                                     + vf(2:imm1,jmm1,1:kmm1)       &
+                                     + vf(3:im  ,jmm1,1:kmm1) )/3.
+              vf(1     ,jm,1:kmm1) = ( vf(1     ,jmm1,1:kmm1)       &
+                                     + vf(2     ,jmm1,1:kmm1) )*.5
+              vf(  im  ,jm,1:kmm1) = ( vf(imm1  ,jmm1,1:kmm1)       &
+                                     + vf(im    ,jmm1,1:kmm1) )*.5
 
             case ( bcCLAMPED )
-              uf(:,jm,1:kbm1) = T_bry%NTH(:,1,1:kbm1)
-              vf(:,jm,1:kbm1) = S_bry%NTH(:,1,1:kbm1)
+              uf(:,jm,1:kmm1) = T_bry%NTH(:,1,1:kmm1)
+              vf(:,jm,1:kmm1) = S_bry%NTH(:,1,1:kmm1)
 
             case ( bcINOUTFLOW )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 1,im
                   u1 = 2.*v(i,jm,k)*dti / (dy(i,jm)+dy(i,jmm1))
                   if ( u1 <= 0. ) then
@@ -3773,21 +3782,21 @@ module bry
                                - u1*(t(i,jm,k)-t(i,jmm1,k))
                     vf(i,jm,k) = s(i,jm,k)                        &
                                - u1*(s(i,jm,k)-s(i,jmm1,k))
-!                    if ( k/=1 .and. k/=kbm1 ) then
-!                      wm = .5 * (w(i,jmm1,k)+w(i,jmm1,k+1))*dti   &
-!                              / ( (zz(i,jmm1,k-1)-zz(i,jmm1,k+1))*dt(i,jmm1) )
-!                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
-!                      uf(i,jm,k) = uf(i,jm,k)                     &
-!                                 - wm*(t(i,jmm1,k-1)-t(i,jmm1,k+1))
-!                      vf(i,jm,k) = vf(i,jm,k)                     &
-!                                 - wm*(s(i,jmm1,k-1)-s(i,jmm1,k+1))
-!                    end if
+                    if ( k/=1 .and. k/=kmm1 ) then
+                      wm = .5 * (w(i,jmm1,k)+w(i,jmm1,k+1))*dti   &
+                              / ( (zz(i,jmm1,k-1)-zz(i,jmm1,k+1))*dt(i,jmm1) )
+                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
+                      uf(i,jm,k) = uf(i,jm,k)                     &
+                                 - wm*(t(i,jmm1,k-1)-t(i,jmm1,k+1))
+                      vf(i,jm,k) = vf(i,jm,k)                     &
+                                 - wm*(s(i,jmm1,k-1)-s(i,jmm1,k+1))
+                    end if
                   end if
                 end do
               end do
 
               if ( NFN > 3 ) then
-                do k = 1,kbm1
+                do k = 1,kmm1
                   do i = 1,im
                     do j = 1,NFN
                       jj = jm-j+1
@@ -3801,7 +3810,7 @@ module bry
               end if
 
             case ( bcRADIATION )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,im
                   grdx(i,1) = ( t(i,jmm1,k)-t(i-1,jmm1,k) )*dum(i,jmm1,k)
                   grdx(i,2) = ( t(i,jm  ,k)-t(i-1,jm  ,k) )*dum(i,jm  ,k)
@@ -3825,7 +3834,7 @@ module bry
                 end do
               end do
 
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,im
                   grdx(i,1) = ( s(i,jmm1,k)-s(i-1,jmm1,k) )*dum(i,jmm1,k)
                   grdx(i,2) = ( s(i,jm  ,k)-s(i-1,jm  ,k) )*dum(i,jm  ,k)
@@ -3852,10 +3861,10 @@ module bry
           end select
 
           if ( NUDGE_INTERIOR ) then
-            uf(:,jmm1,1:kbm1) = uf(:,jmm1,1:kbm1)  &
-                              - tau*( uf(:,jmm1,1:kbm1) - T_bry%NTH(:,1,1:kbm1) )
-            vf(:,jmm1,1:kbm1) = vf(:,jmm1,1:kbm1)  &
-                              - tau*( vf(:,jmm1,1:kbm1) - S_bry%NTH(:,1,1:kbm1) )
+            uf(:,jmm1,1:kmm1) = uf(:,jmm1,1:kmm1)  &
+                              - tau*( uf(:,jmm1,1:kmm1) - T_bry%NTH(:,1,1:kmm1) )
+            vf(:,jmm1,1:kmm1) = vf(:,jmm1,1:kmm1)  &
+                              - tau*( vf(:,jmm1,1:kmm1) - S_bry%NTH(:,1,1:kmm1) )
           end if
 
         end if
@@ -3866,31 +3875,31 @@ module bry
           select case ( BC % TS % SOUTH )
 
             case ( bc0GRADIENT )
-              uf(:,1,1:kbm1) = uf(:,2,1:kbm1)
-              vf(:,1,1:kbm1) = vf(:,2,1:kbm1)
+              uf(:,1,1:kmm1) = uf(:,2,1:kmm1)
+              vf(:,1,1:kmm1) = vf(:,2,1:kmm1)
 
             case ( bc3POINTSMOOTH )
-              uf(2:imm1,1,1:kbm1) = ( uf(1:imm2,2,1:kbm1)       &
-                                    + uf(2:imm1,2,1:kbm1)       &
-                                    + uf(3:im  ,2,1:kbm1) )/3.
-              uf(1     ,1,1:kbm1) = ( uf(1     ,2,1:kbm1)       &
-                                    + uf(2     ,2,1:kbm1) )*.5
-              uf(  im  ,1,1:kbm1) = ( uf(imm1  ,2,1:kbm1)       &
-                                    + uf(im    ,2,1:kbm1) )*.5
-              vf(2:imm1,1,1:kbm1) = ( vf(1:imm2,2,1:kbm1)       &
-                                    + vf(2:imm1,2,1:kbm1)       &
-                                    + vf(3:im  ,2,1:kbm1) )/3.
-              vf(1     ,1,1:kbm1) = ( vf(1     ,2,1:kbm1)       &
-                                    + vf(2     ,2,1:kbm1) )*.5
-              vf(  im  ,1,1:kbm1) = ( vf(imm1  ,2,1:kbm1)       &
-                                    + vf(im    ,2,1:kbm1) )*.5
+              uf(2:imm1,1,1:kmm1) = ( uf(1:imm2,2,1:kmm1)       &
+                                    + uf(2:imm1,2,1:kmm1)       &
+                                    + uf(3:im  ,2,1:kmm1) )/3.
+              uf(1     ,1,1:kmm1) = ( uf(1     ,2,1:kmm1)       &
+                                    + uf(2     ,2,1:kmm1) )*.5
+              uf(  im  ,1,1:kmm1) = ( uf(imm1  ,2,1:kmm1)       &
+                                    + uf(im    ,2,1:kmm1) )*.5
+              vf(2:imm1,1,1:kmm1) = ( vf(1:imm2,2,1:kmm1)       &
+                                    + vf(2:imm1,2,1:kmm1)       &
+                                    + vf(3:im  ,2,1:kmm1) )/3.
+              vf(1     ,1,1:kmm1) = ( vf(1     ,2,1:kmm1)       &
+                                    + vf(2     ,2,1:kmm1) )*.5
+              vf(  im  ,1,1:kmm1) = ( vf(imm1  ,2,1:kmm1)       &
+                                    + vf(im    ,2,1:kmm1) )*.5
 
             case ( bcCLAMPED )
-              uf(:,1,1:kbm1) = T_bry%STH(:,1,1:kbm1)
-              vf(:,1,1:kbm1) = S_bry%STH(:,1,1:kbm1)
+              uf(:,1,1:kmm1) = T_bry%STH(:,1,1:kmm1)
+              vf(:,1,1:kmm1) = S_bry%STH(:,1,1:kmm1)
 
             case ( bcINOUTFLOW )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 1,im
                   u1 = 2.*v(i,2,k)*dti / (dy(i,1)+dy(i,2))
                   if ( u1 >= 0. ) then
@@ -3903,21 +3912,21 @@ module bry
                               - u1*(t(i,2,k)-t(i,1,k))
                     vf(i,1,k) = s(i,1,k)                        &
                               - u1*(s(i,2,k)-s(i,1,k))
-!                    if ( k/=1 .and. k/=kbm1 ) then
-!                      wm = .5 * ( w(i,2,k)+w(i,2,k+1) )*dti     &
-!                              / ( (zz(i,2,k-1)-zz(i,2,k+1))*dt(i,2) )
-!                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
-!                      uf(i,1,k) = uf(i,1,k)                     &
-!                                - wm*(t(i,2,k-1)-t(i,2,k+1))
-!                      vf(i,1,k) = vf(i,1,k)                     &
-!                                - wm*(s(i,2,k-1)-s(i,2,k+1))
-!                    end if
+                    if ( k/=1 .and. k/=kmm1 ) then
+                      wm = .5 * ( w(i,2,k)+w(i,2,k+1) )*dti     &
+                              / ( (zz(i,2,k-1)-zz(i,2,k+1))*dt(i,2) )
+                      wm = sign(min(abs(wm),1._rk),wm) ! TODO: find another approach
+                      uf(i,1,k) = uf(i,1,k)                     &
+                                - wm*(t(i,2,k-1)-t(i,2,k+1))
+                      vf(i,1,k) = vf(i,1,k)                     &
+                                - wm*(s(i,2,k-1)-s(i,2,k+1))
+                    end if
                   end if
                 end do
               end do
 
               if ( NFS > 3 ) then
-                do k = 1,kbm1
+                do k = 1,kmm1
                   do i = 1,im
                     do j = 1,NFS
                       uf(i,j,k) =    uf(i,j,k)*(1.-frz(i,j))  &
@@ -3930,7 +3939,7 @@ module bry
               end if
 
             case ( bcRADIATION )
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,im
                   grdx(i,1) = ( t(i,1,k)-t(i-1,1,k) )*dum(i,1,k)
                   grdx(i,2) = ( t(i,2,k)-t(i-1,2,k) )*dum(i,2,k)
@@ -3954,7 +3963,7 @@ module bry
                 end do
               end do
 
-              do k = 1,kbm1
+              do k = 1,kmm1
                 do i = 2,im
                   grdx(i,1) = ( s(i,1,k)-s(i-1,1,k) )*dum(i,1,k)
                   grdx(i,2) = ( s(i,2,k)-s(i-1,2,k) )*dum(i,2,k)
@@ -3981,10 +3990,10 @@ module bry
           end select
 
           if ( NUDGE_INTERIOR ) then
-            uf(:,2,1:kbm1) = uf(:,2,1:kbm1)  &
-                           - tau*( uf(:,2,1:kbm1) - T_bry%STH(:,1,1:kbm1) )
-            vf(:,2,1:kbm1) = vf(:,2,1:kbm1)  &
-                           - tau*( vf(:,2,1:kbm1) - S_bry%STH(:,1,1:kbm1) )
+            uf(:,2,1:kmm1) = uf(:,2,1:kmm1)  &
+                           - tau*( uf(:,2,1:kmm1) - T_bry%STH(:,1,1:kmm1) )
+            vf(:,2,1:kmm1) = vf(:,2,1:kmm1)  &
+                           - tau*( vf(:,2,1:kmm1) - S_bry%STH(:,1,1:kmm1) )
           end if
 
         end if
@@ -4051,7 +4060,7 @@ module bry
 !
       use glob_const , only: SMALL
       use grid       , only: dum, dvm, dx, dy, fsm
-      use glob_ocean , only: kh, km, kq, l, q2, q2l, u, uf, v, vf
+      use glob_ocean , only: kh, kmt, kq, l, q2, q2l, u, uf, v, vf
       use model_run  , only: dti
 
       implicit none
@@ -4065,12 +4074,12 @@ module bry
 ! Apply periodic BC in x-dimension
       if ( periodic_bc % x ) then
 
-        call xperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-        call xperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
-        call xperi3d_mpi(kh(:,:,1:kbm1),im,jm,kbm1)
-        call xperi3d_mpi(km(:,:,1:kbm1),im,jm,kbm1)
-        call xperi3d_mpi(kq(:,:,1:kbm1),im,jm,kbm1)
-        call xperi3d_mpi( l(:,:,1:kbm1),im,jm,kbm1)
+        call xperi3d_mpi(uf (:,:,1:kmm1),im,jm,kmm1)
+        call xperi3d_mpi(vf (:,:,1:kmm1),im,jm,kmm1)
+        call xperi3d_mpi(kh (:,:,1:kmm1),im,jm,kmm1)
+        call xperi3d_mpi(kmt(:,:,1:kmm1),im,jm,kmm1)
+        call xperi3d_mpi(kq (:,:,1:kmm1),im,jm,kmm1)
+        call xperi3d_mpi(l  (:,:,1:kmm1),im,jm,kmm1)
 
       else
 ! EAST
@@ -4083,9 +4092,14 @@ module bry
               uf(im,:,:) = uf(imm1,:,:)
               vf(im,:,:) = vf(imm1,:,:)
 
+            case ( bcCLAMPED )
+
+              uf(im,:,:) = SMALL
+              vf(im,:,:) = SMALL
+
             case ( bcINOUTFLOW )
 
-              do k = 1,kb
+              do k = 1,km
                 do j = 1,jm
                   u1 = 2.*u(im,j,k)*dti / (dx(im,j)+dx(imm1,j))
                   if ( u1 <= 0. ) then
@@ -4102,7 +4116,7 @@ module bry
 
             case ( bcRADIATION )
 
-              do k = 1, kb
+              do k = 1, km
                 do j = 2, jm
                   grdy(2,j) = dvm(imm1,j,k)*(q2(imm1,j,k)-q2(imm1,j-1,k))
                   grdy(1,j) = dvm(im  ,j,k)*(q2(im  ,j,k)-q2(im  ,j-1,k))
@@ -4159,9 +4173,14 @@ module bry
               uf(1,:,:) = uf(2,:,:)
               vf(1,:,:) = vf(2,:,:)
 
+            case ( bcCLAMPED )
+
+              uf(1,:,:) = SMALL
+              vf(1,:,:) = SMALL
+
             case ( bcINOUTFLOW )
 
-              do k = 1,kb
+              do k = 1,km
                 do j = 1,jm
                   u1 = 2.*u(2,j,k)*dti / (dx(1,j)+dx(2,j))
                   if ( u1 >= 0. ) then
@@ -4176,7 +4195,7 @@ module bry
 
             case ( bcRADIATION )
 
-              do k = 1, kb
+              do k = 1, km
                 do j = 2, jm
                   grdy(1,j) = dvm(1,j,k)*(q2(1,j,k)-q2(1,j-1,k))
                   grdy(2,j) = dvm(2,j,k)*(q2(2,j,k)-q2(2,j-1,k))
@@ -4229,12 +4248,12 @@ module bry
 ! Apply periodic BC in y-dimension
       if ( periodic_bc % y ) then
 
-        call yperi3d_mpi(uf(:,:,1:kbm1),im,jm,kbm1)
-        call yperi3d_mpi(vf(:,:,1:kbm1),im,jm,kbm1)
-        call yperi3d_mpi(kh(:,:,1:kbm1),im,jm,kbm1)
-        call yperi3d_mpi(km(:,:,1:kbm1),im,jm,kbm1)
-        call yperi3d_mpi(kq(:,:,1:kbm1),im,jm,kbm1)
-        call yperi3d_mpi( l(:,:,1:kbm1),im,jm,kbm1)
+        call yperi3d_mpi(uf (:,:,1:kmm1),im,jm,kmm1)
+        call yperi3d_mpi(vf (:,:,1:kmm1),im,jm,kmm1)
+        call yperi3d_mpi(kh (:,:,1:kmm1),im,jm,kmm1)
+        call yperi3d_mpi(kmt(:,:,1:kmm1),im,jm,kmm1)
+        call yperi3d_mpi(kq (:,:,1:kmm1),im,jm,kmm1)
+        call yperi3d_mpi(l  (:,:,1:kmm1),im,jm,kmm1)
 
       else
 ! NORTH
@@ -4247,9 +4266,14 @@ module bry
               uf(:,jm,:) = uf(:,jmm1,:)
               vf(:,jm,:) = vf(:,jmm1,:)
 
+            case ( bcCLAMPED )
+
+              uf(:,jm,:) = SMALL
+              vf(:,jm,:) = SMALL
+
             case ( bcINOUTFLOW )
 
-              do k = 1,kb
+              do k = 1,km
                 do i = 1,im
                   u1 = 2.*v(i,jm,k)*dti / (dy(i,jm)+dy(i,jmm1))
                   if ( u1 <= 0. ) then
@@ -4266,7 +4290,7 @@ module bry
 
             case ( bcRADIATION )
 
-              do k = 1, kb
+              do k = 1, km
                 do i = 2, im
                   grdx(i,2) = dum(i,jmm1,k)*(q2(i,jmm1,k)-q2(i-1,jmm1,k))
                   grdx(i,1) = dum(i,jm  ,k)*(q2(i,jm  ,k)-q2(i-1,jm  ,k))
@@ -4323,9 +4347,14 @@ module bry
               uf(:,1,:) = uf(:,2,:)
               vf(:,1,:) = vf(:,2,:)
 
+            case ( bcCLAMPED )
+
+              uf(:,1,:) = SMALL
+              vf(:,1,:) = SMALL
+
             case ( bcINOUTFLOW )
 
-              do k=1,kb
+              do k=1,km
                 do i=1,im
                   u1 = 2.*v(i,2,k)*dti / (dy(i,1)+dy(i,2))
                   if ( u1 >= 0. ) then
@@ -4340,7 +4369,7 @@ module bry
 
             case ( bcRADIATION )
 
-              do k = 1, kb
+              do k = 1, km
                 do i = 2, im
                   grdx(i,1) = dum(i,1,k)*(q2(i,1,k)-q2(i-1,1,k))
                   grdx(i,2) = dum(i,2,k)*(q2(i,2,k)-q2(i-1,2,k))

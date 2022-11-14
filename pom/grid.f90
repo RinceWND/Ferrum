@@ -11,7 +11,7 @@
 module grid
 
   use glob_const , only: PATH_LEN, rk, VAR_LEN
-  use glob_domain, only: im, jm, kb
+  use glob_domain, only: im, jm, km, kmm1
 
   implicit none
 
@@ -57,6 +57,11 @@ module grid
 !----------------------------------------------------------------------
 ! Model discretisation
 !----------------------------------------------------------------------
+  integer                    &
+       , allocatable         &
+       , dimension(:,:)   :: &
+    kb                 ! water column bottom level indicies
+
   real(rk)                   &
        , allocatable         &
        , dimension(:,:)   :: &
@@ -84,11 +89,18 @@ module grid
     dum              & ! mask for u-velocity
   , dvm              & ! mask for v-velocity
   , dwm              & ! mask for w-velocity
-  , dz               & ! sigma-"layer" thickness (z(k)-z(k+1))
-  , dzz              & ! thickness of two halves of neigbour sigma-"layers" (zz(k)-zz(k+1))
+  , dz               & ! layer real thickness (z(k)-z(k+1)), m
+  , dzb              & ! layer real thickness at n-1, m
+  , dzf              & ! layer real thickness at n+1, m
+  , dzz              & ! thickness of two halves of adjacent layers (zz(k)-zz(k+1)), m
+  , dzzf             & ! thickness of two halves of adjacent layers at time n+1, m
   , fsm              & ! mask for scalar variables
-  , z                & ! sigma coordinate from z=0 (surface) to z=-1 (bottom)
-  , zz                 ! sigma coordinate, intermediate between z
+  , sig              & ! sigma coordinate from z=0 (surface) to z=-1 (bottom)
+  , sigz             & ! sigma coordinate, intermediate between z
+  , z                & ! geopotential coordinate from z=-eta (surface) to z=-H (bottom)
+  , zf               & ! geopotential coordinate at time n+1
+  , zz               & ! geopotential coordinate, intermediate between z
+  , zzf                ! geopotential coordinate at time n+1, intermediate between z
 
   contains
 !______________________________________________________________________
@@ -176,6 +188,7 @@ module grid
       , east_u (im,jm)  &
       , east_v (im,jm)  &
       , h      (im,jm)  &
+      , kb     (im,jm)  &
       , norm_h (im,jm)  &
       , north_c(im,jm)  &
       , north_e(im,jm)  &
@@ -184,15 +197,22 @@ module grid
       , rot    (im,jm)  &
       )
 
-      allocate(         &
-        dz (im,jm,kb)   &
-      , dzz(im,jm,kb)   &
-      , dum(im,jm,kb)   &
-      , dvm(im,jm,kb)   &
-      , dwm(im,jm,kb)   &
-      , fsm(im,jm,kb)   &
-      , z  (im,jm,kb)   &
-      , zz (im,jm,kb)   &
+      allocate(          &
+        dz  (im,jm,km)   &
+      , dzb (im,jm,km)   &
+      , dzf (im,jm,km)   &
+      , dzz (im,jm,km)   &
+      , dzzf(im,jm,km)   &
+      , dum (im,jm,km)   &
+      , dvm (im,jm,km)   &
+      , dwm (im,jm,km)   &
+      , fsm (im,jm,km)   &
+      , sig (im,jm,km)   &
+      , sigz(im,jm,km)   &
+      , z   (im,jm,km)   &
+      , zf  (im,jm,km)   &
+      , zz  (im,jm,km)   &
+      , zzf (im,jm,km)   &
       )
 
 
@@ -211,8 +231,8 @@ module grid
       use io         , only: check   , file_close, file_open  &
                            , is_error, var_rank  , var_read
       use glob_domain, only: i_global, imm1  , is_master  &
-                           , j_global, jmm1  , kb, kbm1   &
-                           , n_south , n_west
+                           , j_global, jmm1  , km, kmm1   &
+                           , n_south , n_west, n_north, n_east
       use pnetcdf    , only: NF90_NOWRITE
 
       implicit none
@@ -223,7 +243,7 @@ module grid
 
 
       start  = [ i_global(1), j_global(1),  1, 1 ]
-      stride = [ im         , jm         , kb, 1 ]
+      stride = [ im         , jm         , km, 1 ]
 
       if ( is_master ) then
         call msg_print("", 6, "Reading grid `"//trim( grid_path )//"`")
@@ -245,35 +265,28 @@ module grid
                             , start(1:3), stride(1:3) )              &
                   , '[grid]:read_grid:var_read `'//trim(fsm_name) )
       else
-        call check( var_read( file_id,  z_name,  z(1,1,:)           &
+        call check( var_read( file_id,  z_name,  sig(1,1,:)         &
                             , start(3:3), stride(3:3) )             &
                   , '[grid]:read_grid:var_read `'//trim(z_name) )
-        call check( var_read( file_id, zz_name, zz(1,1,:)           &
+        call check( var_read( file_id, zz_name, sigz(1,1,:)         &
                             , start(3:3), stride(3:3) )             &
                   , '[grid]:read_grid:var_read `'//trim(zz_name) )
         call check( var_read( file_id, fsm_name, fsm(:,:,1)         &
-                            , start(1:3), stride(1:3) )             &
+                            , start(1:2), stride(1:2) )             &
                   , '[grid]:read_grid:var_read `'//trim(fsm_name) )
-        do k = 1, kb
-          z (:,:,k) = z (1,1,k)
-          zz(:,:,k) = zz(1,1,k)
+        do k = 1, km
+          sig (:,:,k) = sig (1,1,k)
+          sigz(:,:,k) = sigz(1,1,k)
+          fsm (:,:,k) = fsm (:,:,1)
         end do
       end if
 
-      z_rnk = var_rank( file_id, fsm_name )
-
-      if ( z_rnk == 2 ) then
-        do k = 1, kb
-          fsm(:,:,k) = fsm(:,:,1)
-        end do
-      end if
-
-      norm_h = 1.
-      do k = kbm1, 1, -1
-        where( fsm(:,:,k) == 0. ) norm_h = -z(:,:,k)
+      kb(:,:) = km
+      do k = 1, kmm1
+        where ( fsm(:,:,k+1) < 1._rk .and. fsm(:,:,k) > 0._rk ) ! FIXME: This doesn't correct the mask!
+          kb = max( k+1, 3 )
+        end where
       end do
-      where( norm_h == 0. ) norm_h = 1.
-      norm_h = 1./norm_h
 
       call check( var_read( file_id,  dx_name, dx                 &
                           , start(1:3), stride(1:3) )             &
@@ -309,13 +322,94 @@ module grid
 ! close file:
       file_id = file_close( file_id )
 
+      if ( z(2,2,2) > z(2,2,1) ) then
+        z  = -z
+        zz = -zz
+      end if
+
+! manage vertical coordinates
+      if ( z_rnk == 3 ) then
+
+        select case ( v_type )
+
+          case ( vSIGMA )
+
+            sig  = z
+            sigz = zz
+            do k = 1, km
+              z (:,:,k) = sig (:,:,k)*h
+              zz(:,:,k) = sigz(:,:,k)*h
+            end do
+
+          case ( vGEOPOTENTIAL )
+
+            if ( z(2,2,2) > z(2,2,1) ) then
+              z  = -z
+              zz = -zz
+            end if
+            do k = 1, km
+              do j = 1, jm
+                do i = 1, im
+                  sig (i,j,k) = -z (i,j,k)/z(i,j,kb(i,j))
+                  sigz(i,j,k) = -zz(i,j,k)/z(i,j,kb(i,j))
+                end do
+              end do
+            end do
+
+            do j = 1, jm
+              do i = 1, im
+                h(i,j) = -z(i,j,kb(i,j))
+              end do
+            end do
+
+        end select
+
+      else
+
+        select case ( v_type )
+
+          case ( vSIGMA )
+
+            do k = 1, km
+              z (:,:,k) = sig (:,:,k)*h
+              zz(:,:,k) = sigz(:,:,k)*h
+            end do
+
+          case ( vGEOPOTENTIAL )
+
+            do k = 1, km
+              do j = 1, jm
+                do i = 1, im
+                  z (i,j,k) = -sig (i,j,k)*h(i,j)/sig(i,j,kb(i,j))
+                  zz(i,j,k) = -sigz(i,j,k)*h(i,j)/sig(i,j,kb(i,j))
+                end do
+              end do
+            end do
+
+        end select
+
+      end if
+
+! DELETEME: ---
+!     if (n_north == -1) fsm(:,jm,:) = 0.
+!     if (n_south==-1) fsm(:,1 ,:) = 0.
+!     if (n_east==-1) fsm(im,:,:) = 0.
+!     if (n_west==-1) fsm(1 ,:,:) = 0.
+
+!  Domain boundary mask must conform to interior boundary mask
+! in the way that there are no free water at domain boundary if
+! there is land at the interior boundary.
+      if (n_north==-1) where (fsm(:,jmm1,:)<1) fsm(:,jm,:) = 0.
+      if (n_south==-1) where (fsm(:,   2,:)<1) fsm(:, 1,:) = 0.
+      if (n_east==-1) where (fsm(imm1,:,:)<1) fsm(im,:,:) = 0.
+      if (n_west==-1) where (fsm(   2,:,:)<1) fsm( 1,:,:) = 0.
 
 ! derive u- and v-mask from rho-mask
       dum(2:im,:,:) = fsm(2:im,:,:)*fsm(1:imm1,:,:)
       dvm(:,2:jm,:) = fsm(:,2:jm,:)*fsm(:,1:jmm1,:)
-      call exchange3d_mpi(dum,im,jm,kb)
-      call exchange3d_mpi(dvm,im,jm,kb)
-      dwm(:,:,2:kb) = fsm(:,:,2:kb)*fsm(:,:,1:kbm1)
+      call exchange3d_mpi(dum,im,jm,km)
+      call exchange3d_mpi(dvm,im,jm,km)
+      dwm(:,:,2:km) = fsm(:,:,2:km)*fsm(:,:,1:kmm1)
       
       if ( n_west  == -1 ) dum(1,:,:) = dum(2,:,:)
       if ( n_south == -1 ) dvm(:,1,:) = dvm(:,2,:)
@@ -343,10 +437,11 @@ module grid
 !      zz(kb) = 2.*zz(kb-1)-zz(kb-2) ! :
 !!      if (my_task==1) fsm(:,jm-8:jm) = 0.
 !      h = 1500.
-      dz (:,:,1:kb-1) = z (:,:,1:kb-1) - z (:,:,2:kb)
-      dzz(:,:,1:kb-1) = zz(:,:,1:kb-1) - zz(:,:,2:kb)
-      dz (:,:,kb) = dz (:,:,kb-1)
-      dzz(:,:,kb) = dzz(:,:,kb-1)
+      dz (:,:,1:km-1) = z (:,:,1:km-1) - z (:,:,2:km)
+      dzz(:,:,1:km-1) = zz(:,:,1:km-1) - zz(:,:,2:km)
+      dz (:,:,km) = dz (:,:,km-1)
+      dzz(:,:,km) = dzz(:,:,km-1)
+      dzb = dz
 
 ! set up Coriolis parameter
       cor = 2._rk*Ohm*sin(north_e*DEG2RAD)
@@ -394,6 +489,58 @@ module grid
 !
 !______________________________________________________________________
 !
+    subroutine update_vcoord
+!----------------------------------------------------------------------
+!  Updates vertical discretisation.
+!______________________________________________________________________
+!
+      use glob_ocean, only: et, etf
+
+      implicit none
+
+      integer i,j,k
+
+
+      select case ( v_type )
+
+        case ( vSIGMA )
+
+          do k = 1, km
+            z  (:,:,k) = sig (:,:,k)*( h + et  )
+            zf (:,:,k) = sig (:,:,k)*( h + etf )
+            zz (:,:,k) = sigz(:,:,k)*( h + et  )
+            zzf(:,:,k) = sigz(:,:,k)*( h + etf )
+          end do
+
+        case ( vGEOPOTENTIAL )
+
+          do k = 1, km
+            do j = 1, jm
+              do i = 1, im
+                z  (i,j,k) = -sig (i,j,k)*( h(i,j)+et (i,j) )/sig(i,j,kb(i,j))
+                zf (i,j,k) = -sig (i,j,k)*( h(i,j)+etf(i,j) )/sig(i,j,kb(i,j))
+                zz (i,j,k) = -sigz(i,j,k)*( h(i,j)+et (i,j) )/sig(i,j,kb(i,j))
+                zzf(i,j,k) = -sigz(i,j,k)*( h(i,j)+etf(i,j) )/sig(i,j,kb(i,j))
+              end do
+            end do
+          end do
+
+        end select
+
+
+        do k = 1, kmm1
+          dz  (:,:,k) = z  (:,:,k) - z  (:,:,k+1)
+!          dzb (:,:,k) = z  (:,:,k) - z  (:,:,k+1) ! FIXME: Which one? `dz` or `dzb`?
+          dzz (:,:,k) = zz (:,:,k) - zz (:,:,k+1)
+          dzf (:,:,k) = zf (:,:,k) - zf (:,:,k+1)
+          dzzf(:,:,k) = zzf(:,:,k) - zzf(:,:,k+1)
+        end do
+
+
+    end subroutine update_vcoord
+!
+!______________________________________________________________________
+!
     subroutine print_config
 !----------------------------------------------------------------------
 !  Prints module configuration.
@@ -411,7 +558,7 @@ module grid
 ! Print initial (core) summary
       print '(/a)', "---- VERTICAL DISCRETISATION --------------------"
       print '(/3x,a,9x,a,8x,a,8x,a,8x,a)', 'k','z','zz','dz','dzz'
-      do k = 1, kb
+      do k = 1, km
         print '(1x,i5,4f10.3)', k, z(2,2,k), zz(2,2,k)  &
                                  ,dz(2,2,k),dzz(2,2,k)
       end do

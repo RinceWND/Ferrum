@@ -84,9 +84,6 @@
 ! read laterel boundary conditions
        !call lateral_boundary_conditions !ayumi:20100407
 
-! read M2 tidal amplitude & phase
-        if ( use_tide ) call read_tide  ! TODO: move to initialize_modules?
-
       else
 
 ! read restart data from a previous run TODO: Shoul be in init module as a variation of read_initial
@@ -177,10 +174,10 @@
      &                     , r_name, s_name, t_name, u_name, v_name
       use glob_const , only: rk
       use glob_domain
-      use grid       , only: dz, fsm, h, z
+      use grid       , only: dum, dvm, dz, fsm, h, zz
       use io
       use mpi        , only: MPI_OFFSET_KIND
-      use glob_ocean , only: d, dt, elb, hz, rho, s, sb, t, tb
+      use glob_ocean , only: d, dt, elb, etb, hz, rho, s, sb, t, tb
      &                     , uab, ub, vab, vb, wdm
       use pnetcdf    , only: NF90_NOWRITE
 
@@ -193,19 +190,26 @@
      &       , dimension(4)     :: edge, start
 
 
+      el_name = "eclim"
+       s_name = "sclim" !"salt"
+       t_name = "tclim" !"temp"
+       u_name = "uclim"
+       v_name = "vclim"
+       r_name = ""
       record = 1
 
 ! Initialize main parameters with "common" values
       tb  = 15.
       sb  = 33.
       elb =  0.
+      etb =  0.
       ub  =  0.
       vb  =  0.
 
 !      record = dtime % month
 ! Set computational-thread-specific domain to read in parallel
       start = [ i_global(1), j_global(1),  1, record ]
-      edge  = [ im         , jm         , kb,      1 ]
+      edge  = [ im         , jm         , km,      1 ]
 
 ! Read initial file
       call msg_print("", 6, "Read initial conditions:")
@@ -227,12 +231,19 @@
 ! Derive barotropic velocities
       uab = 0.
       vab = 0.
+!      ! DELME: Test TS-profiles
+!      do k = 1, km
+!        sb(:,:,k) = exp(zz(:,:,k)*0.005_rk)*(31.5_rk-34.7_rk)+34.7_rk
+!        tb(:,:,k) = exp(zz(:,:,k)*0.007_rk)*(16.0_rk- 1.2_rk)+ 1.2_rk
+!      end do
       sb = sb * fsm
       tb = tb * fsm
-      do k = 1, kbm1
-        uab(:,:)  = uab(:,:) + ub(:,:,k)*dz(:,:,k)
-        vab(:,:)  = vab(:,:) + vb(:,:,k)*dz(:,:,k)
+      do k = 1, kmm1
+        uab(:,:)  = uab(:,:) + ub(:,:,k)*dz(:,:,k)*dum(:,:,k)
+        vab(:,:)  = vab(:,:) + vb(:,:,k)*dz(:,:,k)*dvm(:,:,k)
       end do
+      uab = uab/(h+elb)
+      vab = vab/(h+elb)
 
 ! Initialize water column for it to not be zero when calculating density.
 ! FIXME:  Use `elb` for `etb` since it is not expected to be initialized yet anyway?
@@ -246,13 +257,13 @@
       if ( r_name == "" ) call dens(sb,tb,rho)
 
 ! Define depth in meters
-      do k = 1, kbm1
-        hz(:,:,k) = -z(:,:,k)*h(:,:)
-      end do
-      hz(:,:,kb) = h(:,:)
+!      do k = 1, kbm1
+!        hz(:,:,k) = -z(:,:,k)*h(:,:)
+!      end do
+!      hz(:,:,kb) = h(:,:)
 
 ! Update free surface mask
-      wdm = int(fsm(:,:,1))
+      wdm = int(fsm(:,:,1), 1)
       where ( d > hc )
         wdm = 1
       elsewhere
@@ -277,7 +288,7 @@
       use mpi        , only: MPI_OFFSET_KIND
       use model_run  , only: time
       use glob_ocean
-      use pnetcdf    , only: NF90_NOWRITE
+      use pnetcdf    , only: nf90mpi_strerror, NF90_NOWRITE
 
       implicit none
 
@@ -288,7 +299,7 @@
 
 
       start = [ i_global(1), j_global(1),  1 ]
-      edge  = [ im         , jm         , kb ]
+      edge  = [ im         , jm         , km ]
 
 ! Read initial file
       call msg_print("", 6, "Read restart file: `"
@@ -327,7 +338,7 @@
         status = var_read(file_id,'s'     ,s     , start     ,edge     )
         status = var_read(file_id,'sb'    ,sb    , start     ,edge     )
         status = var_read(file_id,'rho'   ,rho   , start     ,edge     )
-        status = var_read(file_id,'km'    ,km    , start     ,edge     )
+        status = var_read(file_id,'km'    ,kmt   , start     ,edge     )
         status = var_read(file_id,'kh'    ,kh    , start     ,edge     )
         status = var_read(file_id,'kq'    ,kq    , start     ,edge     )
         status = var_read(file_id,'l'     ,l     , start     ,edge     )
@@ -419,7 +430,7 @@
 
 ! define dimensions
         time_dimid = dim_define( file_id, 'time',         0 )
-        z_dimid    = dim_define( file_id, 'z'   ,        kb )
+        z_dimid    = dim_define( file_id, 'z'   ,        km )
         y_dimid    = dim_define( file_id, 'y'   , jm_global )
         x_dimid    = dim_define( file_id, 'x'   , im_global )
 
@@ -618,7 +629,7 @@
 
 ! write static data
         start = [ i_global(1), j_global(1),  1, 1 ]
-        edge  = [  im        , jm         , kb, 1 ]
+        edge  = [  im        , jm         , km, 1 ]
         call var_write( file_id, "z"      , z      , start, edge )
         call var_write( file_id, "zz"     , zz     , start, edge )
         call var_write( file_id, "east_u" , east_u , start, edge )
@@ -721,7 +732,7 @@
 
         if ( mode /= MODE_BAROTROPIC ) then
           start(3:4) = [  1, record ]
-          edge (3:4) = [ kb,      1 ]
+          edge (3:4) = [ km,      1 ]
           if ( write_means ) then
             call var_write( file_id, "u"   , u_mean  , start, edge )
             call var_write( file_id, "v"   , v_mean  , start, edge )
@@ -792,7 +803,7 @@
 
 ! define dimensions
         time_dimid = dim_define( file_id, 'time',         1 )
-        z_dimid    = dim_define( file_id, 'z'   ,        kb )
+        z_dimid    = dim_define( file_id, 'z'   ,        km )
         y_dimid    = dim_define( file_id, 'y'   , jm_global )
         x_dimid    = dim_define( file_id, 'x'   , im_global )
 
@@ -805,7 +816,7 @@
      &                    , -1, 0., '' )
 
         varid = var_define( file_id, 'z'
-     &                    , NF90_FLOAT, [ z_dimid ]
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
      &                    , 'sigma of cell face'
      &                    , 'sigma_level'
      &                    , -1, 0., '' )
@@ -817,7 +828,7 @@
      &                    , 'sigma: z eta: elb depth: h' )
 
         varid = var_define( file_id, 'zz'
-     &                    , NF90_FLOAT, [ z_dimid ]
+     &                    , NF90_FLOAT, [ x_dimid, y_dimid, z_dimid ]
      &                    , 'sigma of cell centre'
      &                    , 'sigma_level'
      &                    , -1, 0., '' )
@@ -945,13 +956,9 @@
         call file_end_definition( file_id )
 
 ! write static data
-        start = [  1, 1,1,1 ]
-        edge  = [ kb, 1,1,1 ]
-        call var_write( file_id, "z" , z , start, edge )
-        call var_write( file_id, "zz", zz, start, edge )
 
-        start(1:2) = [ i_global(1), j_global(1) ]
-        edge (1:2) = [  im        , jm          ]
+        start = [ i_global(1), j_global(1), 1, 1 ]
+        edge  = [  im        , jm         , 1, 1 ]
         call var_write( file_id, "east_u" , east_u , start, edge )
         call var_write( file_id, "east_v" , east_v , start, edge )
         call var_write( file_id, "east_e" , east_e , start, edge )
@@ -966,18 +973,21 @@
         call var_write( file_id, "vwnd"   , vwsrf  , start, edge )
         call var_write( file_id, "swrad"  , swrad  , start, edge )
 
-        edge(3) = kb
+        edge(3) = km
+
+        call var_write( file_id, "z" , z , start, edge )
+        call var_write( file_id, "zz", zz, start, edge )
 
         if ( mode /= MODE_BAROTROPIC ) then
-          call var_write( file_id, "u"      , ub     , start, edge )
-          call var_write( file_id, "v"      , vb     , start, edge )
-          call var_write( file_id, "t"      , tb     , start, edge )
-          call var_write( file_id, "s"      , sb     , start, edge )
-          call var_write( file_id, "w"      , w      , start, edge )
+          call var_write( file_id, "u", ub, start, edge )
+          call var_write( file_id, "v", vb, start, edge )
+          call var_write( file_id, "t", tb, start, edge )
+          call var_write( file_id, "s", sb, start, edge )
+          call var_write( file_id, "w", w , start, edge )
         end if
 
-        call var_write( file_id, "rho"    , rho    , start, edge )
-        call var_write( file_id, "rmean"  , rmean  , start, edge )
+        call var_write( file_id, "rho"  , rho  , start, edge )
+        call var_write( file_id, "rmean", rmean, start, edge )
 
         file_id = file_close( file_id )
 
@@ -1025,7 +1035,7 @@
 
 ! define dimensions
         time_dimid = dim_define( file_id, 'time',         1 )
-        z_dimid    = dim_define( file_id, 'z'   ,        kb )
+        z_dimid    = dim_define( file_id, 'z'   ,        km )
         y_dimid    = dim_define( file_id, 'y'   , jm_global )
         x_dimid    = dim_define( file_id, 'x'   , im_global )
 
@@ -1238,7 +1248,7 @@
 
 ! write data
         start = [ i_global(1), j_global(1),  1, 1 ]
-        edge  = [ im         , jm         , kb, 1 ]
+        edge  = [ im         , jm         , km, 1 ]
 
         if ( spinup ) then
           call var_write( file_id, "time", time0, start(4:4) )
@@ -1277,7 +1287,7 @@
         call var_write( file_id, "s"      , s      , start, edge )
         call var_write( file_id, "sb"     , sb     , start, edge )
         call var_write( file_id, "rho"    , rho    , start, edge )
-        call var_write( file_id, "km"     , km     , start, edge )
+        call var_write( file_id, "km"     , kmt    , start, edge )
         call var_write( file_id, "kh"     , kh     , start, edge )
         call var_write( file_id, "kq"     , kq     , start, edge )
         call var_write( file_id, "l"      , l      , start, edge )
@@ -1473,26 +1483,6 @@
 !
 !______________________________________________________________________
 !
-      subroutine read_tide
-!----------------------------------------------------------------------
-!fhx:tide:read tidal amplitude & phase at the eastern boundary for PROFS
-!______________________________________________________________________
-!
-        use glob_const , only: rk
-
-
-!      call read_tide_east_pnetcdf(ampe,phae)
-!        call read_tide_east_pnetcdf(ampe,phae,amue,phue)
-
-!      if(my_task.eq.0)print*,ampe(10,1),phae(10,1),amue(10,1),phue(10,1)
-!      if(my_task.eq.0)print*,ampe(10,2),phae(10,2),amue(10,2),phue(10,2)
-
-
-      end
-!fhx:tide:read_tide end
-!
-!______________________________________________________________________
-!
       subroutine update_initial
 !----------------------------------------------------------------------
 !  Updates the initial conditions and sets the remaining
@@ -1503,12 +1493,12 @@
       use config     , only: aam_init, hc, hhi, mode, npg,do_restart
      &                     ,use_tide
       use glob_const , only: rk, SMALL
-      use glob_domain, only: im, is_master, jm, kb, kbm1  ,my_task
+      use glob_domain, only: im, is_master, jm, km, kmm1  ,my_task
       use grid       , only: dz, fsm, h
-      use model_run,only:iint, dtime
+      use model_run  , only: iint, dtime
       use glob_ocean , only: aam, aam2d, d, drhox, drhoy, drx2d, dry2d
      &                     , dt, el, elb, et, etb, etf
-     &                     , kh, km, kq, l, q2, q2b, q2l, q2lb
+     &                     , kh, kmt, kq, l, q2, q2b, q2l, q2lb
      &                     , rho, s, sb, t, tb, u, ua, ub, uab
      &                     , v, va, vb, vab, w
       use tide, only: tide_advance=>step, tide_el, tide_ua, tide_va
@@ -1520,12 +1510,12 @@
 
       if ( use_tide ) then
         call tide_advance( dtime )
-!        if ( .not.do_restart ) then
-!          uab = tide_ua
-!          vab = tide_va
-!          elb = tide_el
-!          etb = elb
-!        end if
+        if ( .not.do_restart ) then ! FIXME: This won't work for a cold start
+          uab = tide_ua
+          vab = tide_va
+          elb = tide_el
+          etb = elb
+        end if
       end if
       ua = uab
       va = vab
@@ -1538,19 +1528,19 @@
       d  = h + el
       dt = h + et
 
-      do k=1,kb
+      do k=1,km
         l(:,:,k) = .1*dt
       end do
 
-      q2b = SMALL
-      q2lb= l*q2b
-      kh  = l*sqrt(q2b)
-      km  = kh
-      kq  = kh
+      q2b   = SMALL
+      q2lb  = l*q2b
+      kh    = l*sqrt(q2b)
+      kmt   = kh
+      kq    = kh
       aam   = aam_init
       aam2d = aam_init
 
-      do k=1,kbm1
+      do k=1,kmm1
         do i=1,im
           do j=1,jm
             q2(i,j,k)=q2b(i,j,k)
@@ -1573,16 +1563,13 @@
       !call dens(s,t,rho)
 
       if ( mode /= 2 ) then ! Do not use pressure gradient in barotropic runs
+                            ! FIXME: Why though?
 
-        call pgscheme(npg)
+        call pgscheme(npg) ! FIXME: Do not call it in GCS?
 
-        do k=1,kbm1
-          do j=1,jm
-            do i=1,im
-              drx2d(i,j)=drx2d(i,j)+drhox(i,j,k)*dz(i,j,k)
-              dry2d(i,j)=dry2d(i,j)+drhoy(i,j,k)*dz(i,j,k)
-            end do
-          end do
+        do k=1,kmm1
+          drx2d(:,:) = drx2d(:,:) + drhox(:,:,k)
+          dry2d(:,:) = dry2d(:,:) + drhoy(:,:,k)
         end do
 
       end if
@@ -1625,9 +1612,9 @@
 !
       use config     , only: cbcmax, cbcmin, mode, z0b, zsh
       use glob_const , only: Kappa, rk
-      use glob_domain, only: im, jm, kbm1    ,j_global,my_task
-      use grid       , only: zz
-      use glob_ocean , only: cbc, d
+      use glob_domain, only: im, jm, kmm1
+      use grid       , only: h, kb, dzb
+      use glob_ocean , only: cbc
 
       implicit none
 
@@ -1642,14 +1629,15 @@
       end if
 
 ! calculate bottom friction
-      do j=1,jm
-        do i=1,im
-!lyo:correct:cbc(i,j)=(Kappa/log((1.+zz(kbm1))*h(i,j)/z0b))**2 !lyo:bug:
-          cbc(i,j)=(Kappa/log((zsh+(1._rk+zz(i,j,kbm1))*d(i,j))/z0b))**2
-          cbc(i,j)=max(cbcmin,cbc(i,j))
+      do j = 1, jm
+        do i = 1, im
+          cbc(i,j) = ( Kappa/log( 1._rk
+     &                          + ( dzb(i,j,kb(i,j)-1) )/z0b )
+     &               )**2
+          cbc(i,j) = max(cbcmin,cbc(i,j))
 ! if the following is invoked, then it is probable that the wrong
 ! choice of z0b or vertical spacing has been made:
-          cbc(i,j)=min(cbcmax,cbc(i,j))
+          cbc(i,j) = min(cbcmax,cbc(i,j))
         end do
       end do
 
@@ -1907,7 +1895,7 @@
 !
       use glob_const , only: DEG2RAD, rk
       use glob_domain, only: i_global, im_global, is_master
-     &                     , j_global, jm_global, kb
+     &                     , j_global, jm_global, km
      &                     , n_east, n_north, n_south, n_west
       use grid
       use glob_ocean , only: d, dt, el, et
@@ -1923,20 +1911,20 @@
       end if 
 
 ! generate grid
-      do k = 1,kb
-        z(:,:,k)  = -real(k-1)/real(kb-1)
+      do k = 1,km
+        z(:,:,k)  = -real(k-1)/real(km-1)
       end do
-      do k = 1,kb-1
+      do k = 1,km-1
         zz(:,:,k) = .5*(z(:,:,k+1)+z(:,:,k))
       end do
-      zz(:,:,kb) = 2.*zz(:,:,kb-1)-zz(:,:,kb-2)
+      zz(:,:,km) = 2.*zz(:,:,km-1)-zz(:,:,km-2)
 
-      do k=1,kb-1
+      do k=1,km-1
         dz(:,:,k) = z(:,:,k)- z(:,:,k+1)
         dzz(:,:,k)=zz(:,:,k)-zz(:,:,k+1)
       end do
-      dz(:,:,kb) = dz(:,:,kb-1)
-      dzz(:,:,kb)=dzz(:,:,kb-1)
+      dz(:,:,km) = dz(:,:,km-1)
+      dzz(:,:,km)=dzz(:,:,km-1)
 
 
       do j = 1,jm
@@ -2029,22 +2017,22 @@
 
       dvm = fsm
       dum = fsm
-      do k = 1, kb
+      do k = 1, km
         do j = 1, jm-1
           do i = 1, im
             if (fsm(i,j,k)==0..and.fsm(i,j+1,k)/=0.) dvm(i,j+1,k) = 0.
           end do
         end do
       end do
-      do k = 1, kb
+      do k = 1, km
         do j=1,jm
           do i=1,im-1
             if (fsm(i,j,k)==0..and.fsm(i+1,j,k)/=0.) dum(i+1,j,k) = 0.
           end do
         end do
       end do
-      call exchange3d_mpi(dum,im,jm,kb)
-      call exchange3d_mpi(dvm,im,jm,kb)
+      call exchange3d_mpi(dum,im,jm,km)
+      call exchange3d_mpi(dvm,im,jm,km)
 !     The followings are read in read_grid_pnetcdf:
 !     z,zz,dx,dy
 !     east_u,east_v,east_e,east_c
