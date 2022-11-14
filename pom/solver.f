@@ -1797,7 +1797,7 @@
 !______________________________________________________________________
 !
       use glob_const , only: grav, rhoref, rk
-      use glob_domain, only: im, imm1, jm, jmm1, km  ,my_task!REM:
+      use glob_domain, only: im, imm1, jm, jmm1, km, kmm1  ,my_task!REM:
       use grid       , only: dum, dvm, dx, dy, dz, kb, z, zz
       use glob_ocean , only: d, drhox, drhoy, dt, density => rho, el
       use model_run  , only: ramp
@@ -1816,20 +1816,19 @@
       real(rk), dimension(im,jm)   :: fc, aux, idRx, idZx
 
 
-      rho = density*rhoref! - rmean
+      rho = density !*rhoref! - rmean
 
 !
 !-----------------------------------------------------------------------
 !  Preliminary step (same for XI- and ETA-components:
 !-----------------------------------------------------------------------
 !
-      GRho  = grav/rhoref
-      GRho0 = 1000._rk*GRho/rhoref
+      GRho  = grav!/rhoref
+      GRho0 = 1000._rk*GRho/(rhoref*rhoref)
       HalfGRho = .5_rk*GRho
 
-
       do j = 1,jm
-        do k = 2,km
+        do k = 2,kmm1
           do i = 1,im
             idR(i,k) = rho(i,j,k-1) - rho(i,j,k)
             idZ(i,k) = zz(i,j,k-1) - zz(i,j,k)
@@ -1838,10 +1837,10 @@
         do i = 1,im
           idR(i,1) = idR(i,2)
           idZ(i,1) = idZ(i,2)
-          idR(i,kb(i,j)+1) = idR(i,kb(i,j))
-          idZ(i,kb(i,j)+1) = idZ(i,kb(i,j))
+          idR(i,kb(i,j)) = idR(i,kb(i,j)-1) ! FIXME: Here we make zero gradient at bottom, but the loops are designed around 1 to km, not bottom. So it'll only work in sigma/s-coordinates, not GCS.
+          idZ(i,kb(i,j)) = idZ(i,kb(i,j)-1)
         end do
-        do k = 1, km
+        do k = 1, kmm1
           do i = 1, im
             cff = 2._rk*idR(i,k)*idR(i,k+1)
             if (cff > eps) then
@@ -1860,7 +1859,7 @@
      &             + Grho *( rho(i,j,1) + cff2 )
      &                    *( z(i,j,1) - zz(i,j,1) )
         end do
-        do k = 2, km
+        do k = 2, kmm1
           do i = 1, im
             p(i,j,k) = p(i,j,k-1)
      &               + HalfGRho*( (rho(i,j,k-1)+rho(i,j,k))
@@ -1884,7 +1883,7 @@
 !  Compute XI-component pressure gradient term.
 !-----------------------------------------------------------------------
 !
-      do k = 1, km
+      do k = 1, kmm1
         do j = 1, jm
           do i = 2, im
             aux(i,j) = zz(i,j,k) - zz(i-1,j,k)
@@ -1962,7 +1961,7 @@
 !  ETA-component pressure gradient term.
 !-----------------------------------------------------------------------
 !
-      do k = 1, km
+      do k = 1, kmm1
         do j = 2, jm
           do i = 1, im
             aux(i,j) = zz(i,j,k) - zz(i,j-1,k)
