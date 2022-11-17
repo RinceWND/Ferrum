@@ -1756,7 +1756,7 @@
 !______________________________________________________________________
 !
       use glob_const , only: grav, rhoref, rk
-      use glob_domain, only: im, imm1, jm, jmm1, kb  ,my_task!REM:
+      use glob_domain, only: im, imm1, jm, jmm1, kb, kbm1  ,my_task!REM:
       use grid       , only: dum, dvm, dx, dy, dz, z, zz
       use glob_ocean , only: d, drhox, drhoy, dt, density => rho, el
       use model_run  , only: ramp
@@ -1789,7 +1789,7 @@
 
 
       do j = 1,jm
-        do k = 2,kb
+        do k = 2,kbm1
           do i = 1,im
             idR(i,k) = rho(i,j,k-1) - rho(i,j,k)
             idZ(i,k) = (zz(i,j,k-1)-zz(i,j,k))*d(i,j)
@@ -1798,10 +1798,10 @@
         do i = 1,im
           idR(i,1) = idR(i,2)
           idZ(i,1) = idZ(i,2)
-          idR(i,kb+1) = idR(i,kb)
-          idZ(i,kb+1) = idZ(i,kb)
+          idR(i,kb) = idR(i,kbm1)
+          idZ(i,kb) = idZ(i,kbm1)
         end do
-        do k=1,kb
+        do k=1,kbm1
           do i=1,im
             cff = 2.*idR(i,k)*idR(i,k+1)
             if (cff > eps) then
@@ -1820,7 +1820,7 @@
      &             + Grho *( rho(i,j,1) + cff2 )
      &                    *d(i,j)*(z(i,j,1)-zz(i,j,1))
         end do
-        do k = 2,kb
+        do k = 2,kbm1
           do i = 1,im
             p(i,j,k) = p(i,j,k-1) +
      &                HalfGRho*((rho(i,j,k-1)+rho(i,j,k))*
@@ -1842,7 +1842,7 @@
 !  Compute XI-component pressure gradient term.
 !-----------------------------------------------------------------------
 !
-      do k = 1,kb
+      do k = 1,kbm1
         do j = 1,jm
           do i = 2,im
             aux(i,j) = zz(i,j,k)*d(i,j)-zz(i-1,j,k)*d(i-1,j)
@@ -1918,7 +1918,7 @@
 !  ETA-component pressure gradient term.
 !-----------------------------------------------------------------------
 !
-      do k = 1,kb
+      do k = 1,kbm1
         do j = 2,jm
           do i = 1,im
             aux(i,j) = zz(i,j,k)*d(i,j)-zz(i,j-1,k)*d(i,j-1)
