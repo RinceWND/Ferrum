@@ -227,11 +227,11 @@ module clim
 
 ! Always allow surface relaxation only over deep ocean > 1000m (TODO: Is it really necessary?)
       if ( RELAX_SURF_SALT > 0 ) then
-        s_relx = ( 1._rk + tanh( .002_rk*(h-1000._rk) ) )*.5_rk
+        s_relx = ( 1._rk + tanh( .002_rk*(h-h_thres) ) )*.5_rk
       end if
 
       if ( RELAX_SURF_TEMP > 0 ) then
-        t_relx = ( 1._rk + tanh( .002_rk*(h-1000._rk) ) )*.5_rk
+        t_relx = ( 1._rk + tanh( .002_rk*(h-h_thres) ) )*.5_rk
       end if
 
 ! Initialise water type
